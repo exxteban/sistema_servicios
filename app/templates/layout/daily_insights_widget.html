@@ -1,0 +1,9 @@
+<script>
+    window.__dailyInsightsConfig = {
+        url: {{ url_for('insights_diarios.api_hoy') | tojson }},
+        seenUrl: {{ url_for('insights_diarios.api_marcar_visto') | tojson }},
+        chatUrl: {{ url_for('asistente_ia.chat') | tojson }},
+        preview: {{ 'true' if current_user.es_admin() else 'false' }}
+    };
+</script>
+<script src="{{ static_url('js/daily_insights_widget.js') }}" defer></script>

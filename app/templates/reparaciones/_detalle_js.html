@@ -1,0 +1,526 @@
+<script>
+    (function () {
+        const reparacionId = {{ reparacion.id_reparacion| tojson
+    }};
+    const csrfToken = "{{ csrf_token() }}";
+    const urlBuscarProductos = "{{ url_for('productos.buscar_api') }}";
+    const urlAgregarItem = "{{ url_for('reparaciones.agregar_item', id=reparacion.id_reparacion) }}";
+    const urlEliminarBase = "{{ url_for('reparaciones.eliminar_item', id=reparacion.id_reparacion, id_detalle=0) }}".replace(/0$/, '');
+    const urlToggleCostoBase = "{{ url_for('reparaciones.toggle_item_costo', id=reparacion.id_reparacion, id_detalle=0) }}".replace(/0$/, '');
+    const urlActualizarCostos = "{{ url_for('reparaciones.actualizar_costos', id=reparacion.id_reparacion) }}";
+    const urlGenerarVenta = "{{ url_for('reparaciones.generar_venta', id=reparacion.id_reparacion) }}";
+    const urlEnviarCaja = "{{ url_for('reparaciones.enviar_a_caja', id=reparacion.id_reparacion) }}";
+
+    const inputBuscar = document.getElementById('buscar_producto');
+    const resultados = document.getElementById('resultados_busqueda');
+    const inputCantidad = document.getElementById('cantidad_producto');
+    const btnAgregar = document.getElementById('btn_agregar_item');
+    const labelSeleccion = document.getElementById('producto_seleccionado_label');
+    const tbody = document.getElementById('tabla_detalles');
+    const totalEl = document.getElementById('total_reparacion');
+    const btnCobrar = document.getElementById('btn_cobrar_pos');
+    const btnEnviarCaja = document.getElementById('btn_enviar_caja');
+    const formCostos = document.getElementById('form_costos');
+    const btnGuardarCostos = document.getElementById('btn_guardar_costos');
+    const ticketPrintFrame = document.getElementById('ticket_print_frame');
+    const ticketPrintLinks = Array.from(document.querySelectorAll('[data-ticket-print-link]'));
+
+    let productoSeleccionado = null;
+    let timeoutId = null;
+    let abortBuscarProductos = null;
+    let secuenciaBusquedaProductos = 0;
+    const cacheBusquedaProductos = new Map();
+    let ticketPrintEnCurso = false;
+
+    function formatGs(value) {
+        const n = Number(value || 0);
+        try {
+            return new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(Math.round(n));
+        } catch (e) {
+            return String(Math.round(n));
+        }
+    }
+
+    function setTotal(valor) {
+        if (!totalEl) return;
+        totalEl.textContent = `₲ ${formatGs(valor)}`;
+    }
+
+    function construirUrlImpresion(url) {
+        const ticketUrl = new URL(url, window.location.origin);
+        ticketUrl.searchParams.set('embedded', '1');
+        ticketUrl.searchParams.set('_', Date.now().toString());
+        return ticketUrl.toString();
+    }
+
+    function abrirTicketFallback(url) {
+        const printWindow = window.open(url, '_blank');
+        return !!printWindow;
+    }
+
+    async function imprimirTicketDesdeUrl(url) {
+        if (!url) return false;
+        if (ticketPrintEnCurso) return true;
+        ticketPrintEnCurso = true;
+
+        try {
+            if (!ticketPrintFrame) {
+                ticketPrintEnCurso = false;
+                return abrirTicketFallback(url);
+            }
+
+            const embeddedUrl = construirUrlImpresion(url);
+
+            return await new Promise((resolve) => {
+                let finalizado = false;
+                let timeoutVerificacion = null;
+
+                const terminar = (ok) => {
+                    if (finalizado) return;
+                    finalizado = true;
+                    try { ticketPrintFrame.onload = null; } catch (e) { }
+                    if (timeoutVerificacion) {
+                        clearTimeout(timeoutVerificacion);
+                    }
+                    ticketPrintEnCurso = false;
+                    resolve(ok);
+                };
+
+                const fallback = () => terminar(abrirTicketFallback(url));
+
+                const esperarTicketListo = (callback) => {
+                    const startedAt = Date.now();
+                    const maxWaitMs = 4000;
+
+                    const revisar = () => {
+                        if (finalizado) return;
+
+                        try {
+                            const childWindow = ticketPrintFrame.contentWindow;
+                            if (!childWindow) {
+                                callback();
+                                return;
+                            }
+
+                            if (typeof childWindow.__ticketPrepareForPrint === 'function') {
+                                Promise.resolve(childWindow.__ticketPrepareForPrint())
+                                    .then(() => callback())
+                                    .catch(() => callback());
+                                return;
+                            }
+
+                            if (childWindow.__ticketPrintReady === true) {
+                                callback();
+                                return;
+                            }
+                        } catch (e) {
+                            callback();
+                            return;
+                        }
+
+                        if ((Date.now() - startedAt) >= maxWaitMs) {
+                            callback();
+                            return;
+                        }
+
+                        timeoutVerificacion = window.setTimeout(revisar, 120);
+                    };
+
+                    revisar();
+                };
+
+                ticketPrintFrame.onload = () => {
+                    esperarTicketListo(() => {
+                        try {
+                            ticketPrintFrame.contentWindow.focus();
+                            ticketPrintFrame.contentWindow.print();
+                            terminar(true);
+                        } catch (e) {
+                            fallback();
+                        }
+                    });
+                };
+
+                try {
+                    ticketPrintFrame.src = embeddedUrl;
+                } catch (e) {
+                    fallback();
+                    return;
+                }
+
+                setTimeout(() => {
+                    if (!finalizado) fallback();
+                }, 5000);
+            });
+        } catch (e) {
+            ticketPrintEnCurso = false;
+            return abrirTicketFallback(url);
+        }
+    }
+
+    function hideResultados() {
+        resultados.classList.add('hidden');
+        resultados.innerHTML = '';
+    }
+
+    function showResultados(items) {
+        resultados.innerHTML = '';
+        if (!Array.isArray(items) || items.length === 0) {
+            hideResultados();
+            return;
+        }
+        for (const p of items) {
+            const div = document.createElement('div');
+            div.className = 'px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors';
+            const tipo = p.es_servicio ? 'Servicio' : `Stock: ${p.stock}`;
+            div.innerHTML = `
+                    <div class="flex justify-between items-center gap-3">
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">${p.codigo} - ${p.nombre}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">${tipo}</div>
+                        </div>
+                        <div class="text-sm font-bold text-green-600 dark:text-green-400 whitespace-nowrap">₲ ${formatGs(p.precio)}</div>
+                    </div>
+                `;
+            div.addEventListener('click', () => {
+                productoSeleccionado = p;
+                labelSeleccion.textContent = `${p.codigo} - ${p.nombre}`;
+                btnAgregar.disabled = false;
+                hideResultados();
+                inputBuscar.value = '';
+                inputCantidad.focus();
+                inputCantidad.select();
+            });
+            resultados.appendChild(div);
+        }
+        resultados.classList.remove('hidden');
+    }
+
+    async function buscarProductos(q) {
+        const query = (q || '').trim();
+        if (query.length < 2) {
+            secuenciaBusquedaProductos += 1;
+            if (abortBuscarProductos) abortBuscarProductos.abort();
+            hideResultados();
+            return;
+        }
+
+        const requestId = ++secuenciaBusquedaProductos;
+        if (abortBuscarProductos) abortBuscarProductos.abort();
+
+        const cacheKey = query.toLowerCase();
+        if (cacheBusquedaProductos.has(cacheKey)) {
+            showResultados(cacheBusquedaProductos.get(cacheKey));
+            return;
+        }
+
+        abortBuscarProductos = typeof AbortController !== 'undefined' ? new AbortController() : null;
+
+        try {
+            const res = await fetch(`${urlBuscarProductos}?q=${encodeURIComponent(query)}`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                signal: abortBuscarProductos ? abortBuscarProductos.signal : undefined
+            });
+            if (requestId !== secuenciaBusquedaProductos) return;
+            if (!res.ok) {
+                hideResultados();
+                return;
+            }
+            const data = await res.json();
+            cacheBusquedaProductos.set(cacheKey, data);
+            showResultados(data);
+        } catch (e) {
+            if (!e || e.name !== 'AbortError') hideResultados();
+        }
+    }
+
+    ticketPrintLinks.forEach((link) => {
+        link.addEventListener('click', async (event) => {
+            event.preventDefault();
+            const ok = await imprimirTicketDesdeUrl(link.href);
+            if (!ok && typeof mostrarNotificacion === 'function') {
+                mostrarNotificacion('No se pudo abrir la impresión del ticket', 'warning');
+            }
+        });
+    });
+
+    const autoPrint = new URLSearchParams(window.location.search).get('auto_print');
+    if (autoPrint === '1' && ticketPrintLinks.length > 0) {
+        if (window.history && typeof window.history.replaceState === 'function') {
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('auto_print');
+            window.history.replaceState({}, document.title, cleanUrl.toString());
+        }
+        window.setTimeout(() => {
+            imprimirTicketDesdeUrl(ticketPrintLinks[0].href);
+        }, 250);
+    }
+
+    async function agregarItem() {
+        if (!productoSeleccionado) return;
+        const cantidad = Math.max(1, parseInt(inputCantidad.value || '1', 10));
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        fd.append('id_producto', String(productoSeleccionado.id));
+        fd.append('cantidad', String(cantidad));
+
+        const res = await fetch(urlAgregarItem, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success) {
+            mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo agregar el item', 'error');
+            return;
+        }
+
+        const filaSin = document.getElementById('fila_sin_items');
+        if (filaSin) filaSin.remove();
+
+        const det = data.detalle;
+        const trExistente = tbody.querySelector(`tr[data-id-detalle="${det.id}"]`);
+        if (trExistente) {
+            const tdCant = trExistente.querySelector('td:nth-child(2)');
+            const tdSub = trExistente.querySelector('td:nth-child(4)');
+            if (tdCant) tdCant.textContent = String(det.cantidad);
+            if (tdSub) tdSub.textContent = `₲ ${formatGs(det.subtotal)}`;
+        } else {
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-id-detalle', String(det.id));
+            const tipo = det.es_servicio ? 'Servicio' : 'Repuesto';
+            const incluye = !!det.incluye_costo_final;
+            const btnClase = incluye
+                ? 'btn_toggle_costo px-2 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow'
+                : 'btn_toggle_costo px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 text-xs font-bold';
+            const btnTexto = incluye ? 'Incluido' : 'Sumar';
+            tr.innerHTML = `
+                    <td class="px-3 py-2 text-gray-800 dark:text-gray-100">
+                        <div class="font-medium">${det.nombre}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${tipo}</div>
+                    </td>
+                    <td class="px-3 py-2 text-center text-gray-700 dark:text-gray-200">${det.cantidad}</td>
+                    <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-200">₲ ${formatGs(det.precio)}</td>
+                    <td class="px-3 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">₲ ${formatGs(det.subtotal)}</td>
+                    <td class="px-3 py-2 text-center">
+                        <button type="button" class="${btnClase}" data-id-detalle="${det.id}" data-incluye="${incluye ? 1 : 0}">
+                            ${btnTexto}
+                        </button>
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                        <button type="button" class="btn_eliminar_item text-red-600 hover:text-red-800" data-id-detalle="${det.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+            tbody.appendChild(tr);
+        }
+
+        setTotal(data.costo_final);
+        mostrarNotificacion('Item agregado', 'success');
+        productoSeleccionado = null;
+        labelSeleccion.textContent = '';
+        btnAgregar.disabled = true;
+        inputCantidad.value = '1';
+    }
+
+    async function eliminarItem(idDetalle) {
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        const res = await fetch(`${urlEliminarBase}${idDetalle}`, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success) {
+            mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo eliminar el item', 'error');
+            return;
+        }
+        const tr = tbody.querySelector(`tr[data-id-detalle="${idDetalle}"]`);
+        if (tr) tr.remove();
+        setTotal(data.costo_final);
+        mostrarNotificacion('Item eliminado', 'success');
+
+        if (tbody.querySelectorAll('tr[data-id-detalle]').length === 0) {
+            const trEmpty = document.createElement('tr');
+            trEmpty.id = 'fila_sin_items';
+            trEmpty.innerHTML = `<td colspan="6" class="px-3 py-6 text-center text-gray-400 dark:text-gray-500">No hay repuestos/servicios cargados todavía.</td>`;
+            tbody.appendChild(trEmpty);
+        }
+    }
+
+    async function toggleCosto(idDetalle, incluyeActual) {
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        const res = await fetch(`${urlToggleCostoBase}${idDetalle}`, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success) {
+            mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo actualizar el costo final', 'error');
+            return;
+        }
+        setTotal(data.costo_final);
+
+        const tr = tbody.querySelector(`tr[data-id-detalle="${idDetalle}"]`);
+        if (!tr) return;
+        const btn = tr.querySelector('.btn_toggle_costo');
+        if (!btn) return;
+
+        const incluyeNuevo = !!data.incluye_costo_final;
+        btn.setAttribute('data-incluye', incluyeNuevo ? '1' : '0');
+        if (incluyeNuevo) {
+            btn.textContent = 'Incluido';
+            btn.className = 'btn_toggle_costo px-2 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow';
+        } else {
+            btn.textContent = 'Sumar';
+            btn.className = 'btn_toggle_costo px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 text-xs font-bold';
+        }
+    }
+
+    async function cobrarEnPos() {
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        const res = await fetch(urlGenerarVenta, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success || !data.redirect_url) {
+            mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo iniciar el cobro', 'error');
+            return;
+        }
+        if (typeof window.appOpenTab === 'function') {
+            window.appOpenTab(data.redirect_url, `POS - Reparación #${reparacionId}`, 'fas fa-cash-register');
+            return;
+        }
+        window.location.href = data.redirect_url;
+    }
+
+    async function enviarACaja() {
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        const res = await fetch(urlEnviarCaja, {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !data.success) {
+            mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo enviar a caja', 'error');
+            return;
+        }
+        mostrarNotificacion(data.mensaje || 'Reparación enviada a caja', 'success');
+        window.location.reload();
+    }
+
+    async function guardarCostos(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }
+        if (!formCostos) return;
+        if (btnGuardarCostos) btnGuardarCostos.disabled = true;
+        try {
+            const fd = new FormData(formCostos);
+            const res = await fetch(urlActualizarCostos, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || !data.success) {
+                mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo guardar los costos', 'error');
+                return;
+            }
+            setTotal(data.costo_final_calculado);
+            mostrarNotificacion('Costos actualizados', 'success');
+        } finally {
+            if (btnGuardarCostos) btnGuardarCostos.disabled = false;
+        }
+    }
+
+    if (inputBuscar) {
+        inputBuscar.addEventListener('input', () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => buscarProductos(inputBuscar.value), 250);
+        });
+        document.addEventListener('click', (e) => {
+            if (!resultados.contains(e.target) && e.target !== inputBuscar) hideResultados();
+        });
+    }
+
+    if (btnAgregar) {
+        btnAgregar.addEventListener('click', agregarItem);
+    }
+
+    if (tbody) {
+        tbody.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn_eliminar_item');
+            if (btn) {
+                const idDetalle = btn.getAttribute('data-id-detalle');
+                if (!idDetalle) return;
+                eliminarItem(idDetalle);
+                return;
+            }
+            const btnCosto = e.target.closest('.btn_toggle_costo');
+            if (btnCosto) {
+                const idDetalle = btnCosto.getAttribute('data-id-detalle');
+                if (!idDetalle) return;
+                const incluyeActual = btnCosto.getAttribute('data-incluye') === '1';
+                toggleCosto(idDetalle, incluyeActual);
+            }
+        });
+    }
+
+    if (btnCobrar) {
+        btnCobrar.addEventListener('click', cobrarEnPos);
+    }
+
+    if (btnEnviarCaja) {
+        btnEnviarCaja.addEventListener('click', enviarACaja);
+    }
+
+    if (formCostos) {
+        formCostos.addEventListener('submit', guardarCostos);
+    }
+
+    // Botón de WhatsApp
+    const btnWhatsapp = document.getElementById('btn_whatsapp');
+    if (btnWhatsapp) {
+        btnWhatsapp.addEventListener('click', () => {
+            const telefono = '{{ reparacion.cliente.telefono }}';
+            if (!telefono || telefono.trim() === '') {
+                alert('El cliente no tiene un número de teléfono registrado.');
+                return;
+            }
+
+            // Limpiar número (solo dígitos)
+            const tel = telefono.replace(/\D/g, '');
+
+            // Intentar obtener el URL de seguimiento del localStorage
+            const seguimientoUrl = localStorage.getItem('seguimiento_url_{{ reparacion.id_reparacion }}');
+            const plantillaMensaje = {{ mensaje_whatsapp_seguimiento|tojson }};
+            const nombreEmpresa = {{ (app_brand_name or 'la empresa')|tojson }};
+
+            // Mensaje predeterminado con o sin link
+            let mensaje;
+            if (seguimientoUrl) {
+                mensaje = plantillaMensaje
+                    .replaceAll('{empresa}', nombreEmpresa)
+                    .replaceAll('{link}', seguimientoUrl);
+            } else {
+                mensaje = `Hola! Para ver el estado de reparación de su equipo, escanee el código QR del ticket que le entregamos o contáctenos en ${nombreEmpresa}.`;
+            }
+
+            // Abrir WhatsApp
+            const url = `https://wa.me/595${tel}?text=${encodeURIComponent(mensaje)}`;
+            window.open(url, '_blank');
+        });
+    }
+    }) ();
+</script>

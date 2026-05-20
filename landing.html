@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión Comercial Integral — Todo en uno para tu negocio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { bg: '#0f172a', surface: '#1e293b', border: '#334155', text: '#e2e8f0', muted: '#94a3b8' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hero-gradient { background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #1e1b4b 70%, #0f172a 100%); }
+        .card-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+        .card-hover:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.3); }
+        .nav-blur { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-200 font-sans antialiased">
+
+    <!-- NAV -->
+    <nav id="nav" class="fixed top-0 left-0 right-0 z-50 nav-blur bg-slate-950/80 border-b border-slate-800/60">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="#hero" class="flex items-center gap-2.5 group">
+                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                        <i class="fas fa-store text-white text-lg"></i>
+                    </div>
+                    <span class="font-bold text-lg text-white tracking-tight">Gestión Comercial</span>
+                </a>
+                <div class="hidden lg:flex items-center gap-1">
+                    <a href="#modulos" class="px-3 py-2 text-sm text-slate-300 hover:text-white transition rounded-lg hover:bg-white/5">Módulos</a>
+                    <a href="#ventas" class="px-3 py-2 text-sm text-slate-300 hover:text-white transition rounded-lg hover:bg-white/5">Ventas</a>
+                    <a href="#inventario" class="px-3 py-2 text-sm text-slate-300 hover:text-white transition rounded-lg hover:bg-white/5">Inventario</a>
+                    <a href="#clientes" class="px-3 py-2 text-sm text-slate-300 hover:text-white transition rounded-lg hover:bg-white/5">Clientes</a>
+                    <a href="#whatsapp" class="px-3 py-2 text-sm text-slate-300 hover:text-white transition rounded-lg hover:bg-white/5">WhatsApp</a>
+                    <a href="#ia" class="px-3 py-2 text-sm text-slate-300 hover:text-white transition rounded-lg hover:bg-white/5">IA</a>
+                    <a href="#contacto" class="px-3 py-2 text-sm text-slate-300 hover:text-white transition rounded-lg hover:bg-white/5">Contacto</a>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="https://wa.me/595961862624?text=Hola%20Esteban%2C%20me%20interesa%20el%20sistema." target="_blank" rel="noopener noreferrer"
+                        class="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-500 rounded-full transition shadow-lg shadow-green-600/25">
+                        <i class="fab fa-whatsapp"></i> Solicitar Demo
+                    </a>
+                    <a href="/auth/login"
+                        class="px-4 py-2 text-sm font-semibold text-white bg-white/10 hover:bg-white/20 border border-white/15 rounded-full transition">
+                        Ingresar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section id="hero" class="hero-gradient pt-28 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+            <div class="absolute -top-40 -right-40 w-[500px] h-[500px] bg-blue-600 rounded-full mix-blend-screen filter blur-[120px] opacity-20"></div>
+            <div class="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-purple-600 rounded-full mix-blend-screen filter blur-[120px] opacity-20"></div>
+        </div>
+        <div class="max-w-5xl mx-auto text-center relative z-10">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm mb-6">
+                <i class="fas fa-rocket text-blue-400"></i> Sistema integral todo en uno
+            </div>
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-6 leading-tight">
+                Gestioná tu negocio
+                <span class="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 text-transparent bg-clip-text">desde un solo lugar</span>
+            </h1>
+            <p class="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed">
+                Pos, inventario, clientes, reparaciones, cobranzas, WhatsApp, tienda online, IA y más.
+                Todo integrado en tiempo real para impulsar tu comercio.
+            </p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="#modulos" class="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-500 hover:to-purple-500 transition shadow-xl shadow-purple-600/25 text-center">
+                    <i class="fas fa-cubes mr-2"></i> Ver todos los módulos
+                </a>
+                <a href="https://wa.me/595961862624?text=Hola%20Esteban%2C%20me%20interesa%20el%20sistema." target="_blank" rel="noopener noreferrer"
+                    class="w-full sm:w-auto px-8 py-3.5 bg-white/5 border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition text-center">
+                    <i class="fab fa-whatsapp mr-2 text-green-400"></i> Hablar por WhatsApp
+                </a>
+            </div>
+            <div class="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-2xl mx-auto text-center">
+                <div><div class="text-2xl font-bold text-white">+25</div><div class="text-xs text-slate-500 mt-1">Módulos</div></div>
+                <div><div class="text-2xl font-bold text-white">100%</div><div class="text-xs text-slate-500 mt-1">Integrado</div></div>
+                <div><div class="text-2xl font-bold text-white">24/7</div><div class="text-xs text-slate-500 mt-1">Disponible</div></div>
+                <div><div class="text-2xl font-bold text-white">IA</div><div class="text-xs text-slate-500 mt-1">Asistente GPT</div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECCIONES DE MÓDULOS -->
+    <div id="modulos" class="bg-slate-900 py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-4">Todo lo que tu negocio necesita</h2>
+                <p class="text-slate-400 text-lg max-w-2xl mx-auto">Un sistema integral con más de <strong class="text-white">25 módulos</strong> que cubren cada aspecto de la gestión comercial.</p>
+            </div>
+            <div class="space-y-20">
+
+<!-- 1. VENTAS -->
+<div id="ventas" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(34,197,94,0.15);color:#4ade80"><i class="fas fa-cash-register text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">Ventas y Operaciones</h3><p class="text-slate-400 text-sm">El corazón de tu comercio: pos, caja y pedidos integrados.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(34,197,94,0.15);color:#4ade80"><i class="fas fa-cash-register"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Punto de Venta POS</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Ventas rápidas con ticket térmico, códigos de barra, promociones, descuentos y envío entre vendedores.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(16,185,129,0.15);color:#34d399"><i class="fas fa-wallet"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Caja</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Sesiones de caja, cierres diarios con conciliación, contabilidad de movimientos, cola de cobro y gestión multi-caja.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(20,184,166,0.15);color:#2dd4bf"><i class="fas fa-clipboard-list"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Pedidos</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Seguimiento completo de pedidos de clientes con flujo de estados, pagos parciales y entrega.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 2. INVENTARIO -->
+<div id="inventario" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(59,130,246,0.15);color:#60a5fa"><i class="fas fa-boxes-stacked text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">Inventario y Logística</h3><p class="text-slate-400 text-sm">Control total sobre productos, compras, proveedores y presupuestos.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(59,130,246,0.15);color:#60a5fa"><i class="fas fa-boxes-stacked"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Productos</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Catálogo con categorías, stock mínimo/máximo, precios variables, costos, fotos y kits armables.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(14,165,233,0.15);color:#38bdf8"><i class="fas fa-cart-shopping"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Compras</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Registro de compras con control de deuda a proveedores, pagos y cuentas corrientes.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(99,102,241,0.15);color:#818cf8"><i class="fas fa-truck"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Proveedores</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Directorio completo con datos de contacto, productos asociados e historial de compras.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(245,158,11,0.15);color:#fbbf24"><i class="fas fa-rotate-left"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Compra de Usados</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Recepción y valorización de bienes usados con registro de estado y precio de compra.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(6,182,212,0.15);color:#22d3ee"><i class="fas fa-file-invoice-dollar"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Presupuestos</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Cotizaciones empresariales configurables con seguimiento de aprobación.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 3. CLIENTES -->
+<div id="clientes" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(168,85,247,0.15);color:#c084fc"><i class="fas fa-address-book text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">Clientes y Fidelización</h3><p class="text-slate-400 text-sm">Conocé a tus clientes, calificalos y fidelizalos.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(168,85,247,0.15);color:#c084fc"><i class="fas fa-address-book"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Clientes</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Directorio con historial completo: compras, reparaciones, créditos y observaciones.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(234,179,8,0.15);color:#facc15"><i class="fas fa-star"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Calificación</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Scoring automático basado en frecuencia de compra, monto y comportamiento de pago.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(245,158,11,0.15);color:#fbbf24"><i class="fas fa-crown"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Fidelización</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Programa de lealtad configurable con beneficios, puntos y recompensas.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 4. SERVICIO TÉCNICO -->
+<div id="servicio" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(249,115,22,0.15);color:#fb923c"><i class="fas fa-tools text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">Servicio Técnico</h3><p class="text-slate-400 text-sm">Gestión profesional de reparaciones con seguimiento público.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(249,115,22,0.15);color:#fb923c"><i class="fas fa-tools"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Reparaciones</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Tickets con flujo de trabajo técnico, presupuestos, repuestos, estados por etapa y entrega.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(245,158,11,0.15);color:#fbbf24"><i class="fas fa-eye"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Seguimiento Público</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Portal anónimo para que tus clientes consulten el estado de sus reparaciones en tiempo real.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 5. COBRANZAS -->
+<div id="cobranzas" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(239,68,68,0.15);color:#f87171"><i class="fas fa-hand-holding-usd text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">Cobranzas y Finanzas</h3><p class="text-slate-400 text-sm">Controlá tus cuentas por cobrar y gestioná los pagos de forma eficiente.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(239,68,68,0.15);color:#f87171"><i class="fas fa-file-invoice"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Cuentas por Cobrar</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Gestión de ventas a crédito con saldos, vencimientos y recordatorios automáticos.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(244,63,94,0.15);color:#fb7185"><i class="fas fa-calendar-alt"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Planes de Pago</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Planes personalizados por cliente con cuotas, fechas e intereses configurables.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(245,158,11,0.15);color:#fbbf24"><i class="fas fa-coins"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Cobros</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Registro de pagos, recibos, imputación a cuentas y conciliación automática con caja.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 6. REPORTES -->
+<div id="reportes" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(99,102,241,0.15);color:#818cf8"><i class="fas fa-chart-pie text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">Reportes e Inteligencia</h3><p class="text-slate-400 text-sm">Tomá decisiones informadas con datos en tiempo real e IA.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(99,102,241,0.15);color:#818cf8"><i class="fas fa-chart-bar"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Reportes</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Reportes de ventas, productos más vendidos, rentabilidad y rendimiento de técnicos.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(139,92,246,0.15);color:#a78bfa"><i class="fas fa-brain"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Inteligencia BI</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Panel de inteligencia de negocios con KPIs, tendencias y análisis comercial y operativo.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(234,179,8,0.15);color:#facc15"><i class="fas fa-lightbulb"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Insights Diarios</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Alertas inteligentes generadas por IA con anomalías, oportunidades y recordatorios.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 7. WHATSAPP -->
+<div id="whatsapp" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(34,197,94,0.15);color:#4ade80"><i class="fab fa-whatsapp text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">WhatsApp y CRM</h3><p class="text-slate-400 text-sm">Conectate con tus clientes donde están: WhatsApp integrado al 100%.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(34,197,94,0.15);color:#4ade80"><i class="fab fa-whatsapp"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">WhatsApp Cloud API</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Conversaciones integradas, notificaciones automáticas por estados y webhook en tiempo real.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(20,184,166,0.15);color:#2dd4bf"><i class="fas fa-address-book"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">CRM WhatsApp</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Contactos con plantillas de mensajes, etiquetas, bandeja compartida y vista de supervisor.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 8. TIENDA ONLINE -->
+<div id="tienda" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(6,182,212,0.15);color:#22d3ee"><i class="fas fa-store text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">Tienda Online</h3><p class="text-slate-400 text-sm">Llevá tu catálogo al mundo digital con una tienda web moderna.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(6,182,212,0.15);color:#22d3ee"><i class="fas fa-store"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Catálogo Web</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Tienda pública multi-tenant con buscador, categorías, carrito y chatbot IA 24/7.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(236,72,153,0.15);color:#f472b6"><i class="fas fa-tag"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Promociones Web</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Ofertas y promociones visibles en tu tienda online, gestionadas desde el backoffice.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 9. IA -->
+<div id="ia" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(139,92,246,0.15);color:#a78bfa"><i class="fas fa-robot text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">IA y Automatización</h3><p class="text-slate-400 text-sm">Potenciá tu operación con inteligencia artificial integrada.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(139,92,246,0.15);color:#a78bfa"><i class="fas fa-robot"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Asistente IA</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Chatbot GPT/DeepSeek integrado que conoce tu negocio: productos, clientes y datos en tiempo real.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(217,70,239,0.15);color:#e879f9"><i class="fas fa-comment-dots"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">WebBot</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Chatbot inteligente en tu tienda online que responde consultas sobre productos y precios.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 10. RRHH Y ADMIN -->
+<div id="admin" class="scroll-mt-24">
+    <div class="flex items-center gap-4 mb-8">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style="background:rgba(100,116,139,0.15);color:#94a3b8"><i class="fas fa-users-cog text-xl"></i></div>
+        <div><h3 class="text-2xl font-bold text-white">RRHH y Administración</h3><p class="text-slate-400 text-sm">Herramientas para gestionar tu equipo y tu operación diaria.</p></div>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(14,165,233,0.15);color:#38bdf8"><i class="fas fa-users-cog"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Control de Empleados</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Asistencias, horarios, salarios, sanciones por llegada tarde y recibos de sueldo.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(99,102,241,0.15);color:#818cf8"><i class="fas fa-calendar-check"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Agenda</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Calendario compartido con tareas, recordatorios, alertas y notificaciones al equipo.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(244,63,94,0.15);color:#fb7185"><i class="fas fa-file-invoice-dollar"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Gastos Corrientes</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Seguimiento de servicios, alquiler, impuestos y gastos fijos con alertas de vencimiento.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(59,130,246,0.15);color:#60a5fa"><i class="fas fa-users"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Usuarios y Roles</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Control de acceso granular con roles personalizables y permisos por módulo.</p>
+        </div>
+        <div class="card-hover group p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform" style="background:rgba(100,116,139,0.15);color:#94a3b8"><i class="fas fa-shield-alt"></i></div>
+            <h4 class="font-semibold text-white mb-1.5">Auditoría</h4>
+            <p class="text-sm text-slate-400 leading-relaxed">Registro completo de todas las operaciones: quién hizo qué y cuándo.</p>
+        </div>
+    </div>
+</div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- TECNOLOGÍA -->
+    <div class="bg-slate-950 py-16 px-4 sm:px-6 lg:px-8 border-t border-slate-800/40">
+        <div class="max-w-4xl mx-auto text-center">
+            <h3 class="text-xl font-bold text-white mb-8">Tecnología que respalda tu operación</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div class="flex flex-col items-center gap-2 p-4 rounded-xl bg-slate-900/50 border border-slate-800/50">
+                    <i class="fas fa-cloud text-2xl text-slate-500"></i>
+                    <span class="text-sm text-slate-400">100% Web</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 p-4 rounded-xl bg-slate-900/50 border border-slate-800/50">
+                    <i class="fas fa-mobile-alt text-2xl text-slate-500"></i>
+                    <span class="text-sm text-slate-400">Responsive</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 p-4 rounded-xl bg-slate-900/50 border border-slate-800/50">
+                    <i class="fas fa-shield-alt text-2xl text-slate-500"></i>
+                    <span class="text-sm text-slate-400">Permisos granulares</span>
+                </div>
+                <div class="flex flex-col items-center gap-2 p-4 rounded-xl bg-slate-900/50 border border-slate-800/50">
+                    <i class="fas fa-database text-2xl text-slate-500"></i>
+                    <span class="text-sm text-slate-400">Datos en tiempo real</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA FINAL -->
+    <section id="contacto" class="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-slate-900 to-slate-950">
+        <div class="max-w-3xl mx-auto text-center">
+            <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/25">
+                <i class="fab fa-whatsapp text-white text-3xl"></i>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-4">¿Listo para transformar tu negocio?</h2>
+            <p class="text-slate-400 text-lg mb-8 max-w-xl mx-auto">
+                Solicita una demostración sin compromiso por WhatsApp y descubrí cómo este sistema puede adaptarse a tu comercio.
+            </p>
+            <a href="https://wa.me/595961862624?text=Hola%20Esteban%2C%20me%20interesa%20una%20demo%20del%20sistema." target="_blank" rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition text-lg shadow-xl shadow-green-600/25">
+                <i class="fab fa-whatsapp text-xl"></i> Solicitar Demo por WhatsApp
+            </a>
+            <p class="text-slate-500 text-sm mt-6">
+                <i class="fas fa-phone mr-1"></i> 0961862624 &mdash; Esteban Lezcano
+            </p>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-slate-800/60 py-8 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-store text-slate-600"></i>
+                <span>&copy; <script>document.write(new Date().getFullYear())</script> Sistema de Gestión Comercial Integral</span>
+            </div>
+            <div class="flex items-center gap-6">
+                <a href="#hero" class="hover:text-slate-300 transition">Inicio</a>
+                <a href="#modulos" class="hover:text-slate-300 transition">Módulos</a>
+                <a href="/auth/login" class="hover:text-slate-300 transition">Ingresar</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const nav = document.getElementById('nav');
+        let lastScroll = 0;
+        window.addEventListener('scroll', () => {
+            const current = window.pageYOffset;
+            if (current <= 0) { nav.classList.remove('shadow-lg'); }
+            else { nav.classList.add('shadow-lg', 'shadow-black/20'); }
+            lastScroll = current;
+        });
+    </script>
+</body>
+</html>

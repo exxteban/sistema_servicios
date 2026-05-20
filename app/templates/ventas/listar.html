@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Ventas{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data='ventasListado({{ detalles_por_venta|tojson|forceescape }})'>
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-receipt text-green-600 dark:text-green-400 mr-2"></i>Historial de Ventas
+        </h1>
+        <a href="{{ url_for('ventas.pos') }}"
+            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+            <i class="fas fa-cash-register mr-2"></i>Nueva Venta
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+        <form method="GET" action="{{ url_for('ventas.listar') }}" class="flex flex-wrap gap-3 items-end">
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Desde</label>
+                <input type="date" name="desde" value="{{ desde }}"
+                    class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Hasta</label>
+                <input type="date" name="hasta" value="{{ hasta }}"
+                    class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <button type="submit"
+                class="bg-gray-800 dark:bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition">
+                Filtrar
+            </button>
+            {% if desde or hasta %}
+            <a href="{{ url_for('ventas.listar') }}"
+                class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                Limpiar
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300"># Venta</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Cliente</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Vendedor</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Detalle</th>
+                    <th class="px-3 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Total</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Estado</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for venta in ventas.items %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors cursor-pointer"
+                    @click="verDetalle({{ venta.id_venta }})">
+                    <td class="px-4 py-3 font-mono text-gray-800 dark:text-gray-100">{{ venta.id_venta }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">{{ venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ venta.cliente.nombre }}</td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                        {{ venta.vendedor.nombre_completo if venta.vendedor else (venta.sesion_caja.usuario.nombre_completo if venta.sesion_caja and venta.sesion_caja.usuario else 'Desconocido') }}
+                    </td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                        {% set detalle_txt = detalles_por_venta.get(venta.id_venta, '') %}
+                        <button type="button"
+                            class="block text-left hover:underline whitespace-normal break-words"
+                            title="{{ detalle_txt }}"
+                            @click.stop="verDetalle({{ venta.id_venta }})">
+                            {{ detalle_txt or '—' }}
+                        </button>
+                        {% if venta.beneficio_fidelizacion_descripcion %}
+                        <div class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                            <i class="fas fa-gift"></i>
+                            <span>{{ venta.beneficio_fidelizacion_descripcion }}</span>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">
+                        ₲&nbsp;{{ "{:,.0f}".format(venta.total).replace(",", ".") }}
+                        {% if venta.descuento_fidelizacion_monto and venta.descuento_fidelizacion_monto > 0 %}
+                        <div class="mt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            Fid.: -₲ {{ "{:,.0f}".format(venta.descuento_fidelizacion_monto).replace(",", ".") }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span
+                            class="px-2 py-1 rounded-full text-xs {% if venta.estado == 'completada' %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300{% elif venta.estado == 'anulada' %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300{% else %}bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300{% endif %}">
+                            {{ venta.estado }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <a href="{{ url_for('ventas.detalle', id=venta.id_venta) }}"
+                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                            @click.stop>
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if ventas.pages > 1 %}
+    <div class="flex justify-center space-x-2">
+        {% if ventas.has_prev %}
+        <a href="{{ url_for('ventas.listar', page=ventas.prev_num, desde=desde or none, hasta=hasta or none) }}"
+            class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        {% endif %}
+
+        <span class="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg">
+            {{ ventas.page }} / {{ ventas.pages }}
+        </span>
+
+        {% if ventas.has_next %}
+        <a href="{{ url_for('ventas.listar', page=ventas.next_num, desde=desde or none, hasta=hasta or none) }}"
+            class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Modal Detalle Venta -->
+    <div x-show="modalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="modalOpen = false">
+                <div class="absolute inset-0 bg-gray-900/70"></div>
+            </div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div
+                class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                                Detalle de Venta #<span x-text="venta?.id"></span>
+                            </h3>
+                            <div class="mt-2" x-show="loading">
+                                <p class="text-gray-500 dark:text-gray-400 text-center py-4">Cargando detalles...</p>
+                            </div>
+                            <div class="mt-4" x-show="!loading && venta">
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-2"><strong>Cliente:</strong> <span
+                                        x-text="venta?.cliente"></span></p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4"><strong>Fecha:</strong> <span
+                                        x-text="venta?.fecha"></span></p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Tipo de venta</p>
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="venta?.tipo_venta || 'Contado'"></p>
+                                    </div>
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Estado de cobro</p>
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="venta?.estado_cobro || 'Pendiente'"></p>
+                                    </div>
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Cobrado al momento</p>
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                            ₲ <span x-text="new Intl.NumberFormat('es-PY').format(venta?.cobrado_al_momento || 0)"></span>
+                                        </p>
+                                    </div>
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Saldo pendiente</p>
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                            ₲ <span x-text="new Intl.NumberFormat('es-PY').format(venta?.saldo_pendiente || 0)"></span>
+                                        </p>
+                                    </div>
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2" x-show="(venta?.descuento_manual_monto || 0) > 0">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Descuento manual</p>
+                                        <p class="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                                            -₲ <span x-text="new Intl.NumberFormat('es-PY').format(venta?.descuento_manual_monto || 0)"></span>
+                                        </p>
+                                    </div>
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2" x-show="(venta?.descuento_fidelizacion_monto || 0) > 0">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Fidelización aplicada</p>
+                                        <p class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                            -₲ <span x-text="new Intl.NumberFormat('es-PY').format(venta?.descuento_fidelizacion_monto || 0)"></span>
+                                        </p>
+                                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1" x-text="venta?.beneficio_fidelizacion_descripcion || ''"></p>
+                                    </div>
+                                </div>
+
+                                <div class="border-t border-gray-200 dark:border-gray-700 py-2">
+                                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                        <thead>
+                                            <tr>
+                                                <th
+                                                    class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Prod</th>
+                                                <th
+                                                    class="text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Cant</th>
+                                                <th
+                                                    class="text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <template x-for="item in venta?.items" :key="item.producto">
+                                                <tr>
+                                                    <td class="py-2 text-sm text-gray-900 dark:text-gray-100"
+                                                        x-text="item.producto"></td>
+                                                    <td class="py-2 text-sm text-gray-500 dark:text-gray-400 text-right"
+                                                        x-text="item.cantidad"></td>
+                                                    <td
+                                                        class="py-2 text-sm text-gray-900 dark:text-gray-100 text-right">
+                                                        ₲ <span
+                                                            x-text="new Intl.NumberFormat('es-PY').format(item.subtotal)"></span>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr x-show="(venta?.descuento_manual_monto || 0) > 0">
+                                                <td colspan="2" class="pt-2 text-right text-amber-600 dark:text-amber-400">Descuento manual:</td>
+                                                <td class="pt-2 text-right text-amber-600 dark:text-amber-400">-₲ <span
+                                                        x-text="venta ? new Intl.NumberFormat('es-PY').format(venta.descuento_manual_monto || 0) : 0"></span>
+                                                </td>
+                                            </tr>
+                                            <tr x-show="(venta?.descuento_fidelizacion_monto || 0) > 0">
+                                                <td colspan="2" class="pt-1 text-right text-emerald-600 dark:text-emerald-400">Fidelización:</td>
+                                                <td class="pt-1 text-right text-emerald-600 dark:text-emerald-400">-₲ <span
+                                                        x-text="venta ? new Intl.NumberFormat('es-PY').format(venta.descuento_fidelizacion_monto || 0) : 0"></span>
+                                                </td>
+                                            </tr>
+                                            <tr class="font-bold border-t border-gray-200 dark:border-gray-700">
+                                                <td colspan="2"
+                                                    class="pt-2 text-right text-gray-800 dark:text-gray-100">Total:</td>
+                                                <td class="pt-2 text-right text-gray-800 dark:text-gray-100">₲ <span
+                                                        x-text="venta ? new Intl.NumberFormat('es-PY').format(venta.total) : 0"></span>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <h4 class="text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">Pagos Realizados
+                                    </h4>
+                                    <template x-for="pago in venta?.pagos" :key="pago.metodo">
+                                        <div class="flex justify-between text-sm text-gray-600 dark:text-gray-300 mb-1">
+                                            <span x-text="pago.metodo"></span>
+                                            <span>₲ <span
+                                                    x-text="new Intl.NumberFormat('es-PY').format(pago.monto)"></span></span>
+                                        </div>
+                                    </template>
+                                    <div x-show="!venta?.pagos || venta?.pagos.length === 0"
+                                        class="text-sm text-gray-500 dark:text-gray-400 italic">
+                                        No hay pagos registrados
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800/90 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                        @click="window.open('/ventas/' + venta.id + '/ticket', '_blank')">
+                        <i class="fas fa-print mr-2"></i> Reimprimir Ticket
+                    </button>
+                    <button type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        x-show="venta && venta.id"
+                        @click="window.location.href = '/ventas/' + venta.id">
+                        Abrir venta
+                    </button>
+                    <button type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        @click="modalOpen = false">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        window.ventasListado = function (detallesPorVenta) {
+            return {
+                modalOpen: false,
+                venta: null,
+                loading: false,
+                async verDetalle(id) {
+                    this.loading = true;
+                    this.modalOpen = true;
+                    try {
+                        const response = await fetch(`/reportes/ventas/${id}/detalle`);
+                        this.venta = await response.json();
+                    } catch (error) {
+                        console.error('Error:', error);
+                        mostrarNotificacion('Error al cargar detalles', 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                openDetalle(id) {
+                    return this.verDetalle(id);
+                }
+            };
+        };
+    })();
+</script>
+{% endblock %}

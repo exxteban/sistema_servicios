@@ -1,0 +1,131 @@
+<div x-show="resumenTab === 'movimientos'" x-cloak>
+<div class="px-5 py-4 border-b border-gray-200">
+    <h2 class="text-lg font-semibold text-gray-900">Agregar movimiento del mes</h2>
+    <p class="text-sm text-gray-500">Úsalo para bonos, horas extra, descuentos o adelantos. Las llegadas tardías se registran arriba para no mezclarlas con vacaciones.</p>
+</div>
+<form method="post" action="{{ url_for('control_empleados.agregar_movimiento', id_empleado=empleado.id_empleado) }}" class="p-5 space-y-4" id="form_movimiento_salario">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="periodo" value="{{ periodo }}">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-3">
+            <div class="flex items-end gap-2">
+                <div class="flex-1">
+                    <label for="tipo" class="block text-sm font-semibold text-gray-700 mb-2">Tipo</label>
+                    <select id="tipo" name="tipo" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                        {% for tipo in tipos_movimiento %}
+                        <option value="{{ tipo.valor }}" data-modo-calculo="{{ tipo.modo_calculo }}" data-unidad="{{ tipo.unidad }}" data-valor-unitario="{{ tipo.valor_unitario }}">{{ tipo.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if puede_gestionar %}
+                <button type="button" id="toggle_tipo_movimiento_nuevo" class="inline-flex items-center justify-center rounded-xl border border-blue-200 px-3 py-2.5 text-blue-700 hover:bg-blue-50 transition-colors" title="Agregar tipo de movimiento">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button type="button" id="toggle_tipo_movimiento_eliminar" class="inline-flex items-center justify-center rounded-xl border border-red-200 px-3 py-2.5 text-red-700 hover:bg-red-50 transition-colors" title="Eliminar tipos personalizados">
+                    <i class="fas fa-trash"></i>
+                </button>
+                {% endif %}
+            </div>
+            {% if puede_gestionar %}
+            <div id="panel_tipo_movimiento_nuevo" class="hidden rounded-2xl border border-blue-100 bg-blue-50 p-4 space-y-3">
+                <div>
+                    <p class="text-sm font-semibold text-blue-900">Nuevo tipo personalizado</p>
+                    <p class="text-xs text-blue-700">Puede ser monto manual o calcularse por cantidad, como kilos, piezas u horas.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input type="text" name="nombre_tipo_movimiento" maxlength="80" form="crear_tipo_movimiento_form" placeholder="Ejemplo: Pago por kilo" class="rounded-xl border border-blue-200 bg-white px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    <select name="impacto_tipo_movimiento" form="crear_tipo_movimiento_form" class="rounded-xl border border-blue-200 bg-white px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                        <option value="positivo">Suma</option>
+                        <option value="negativo">Descuenta</option>
+                    </select>
+                    <select id="modo_calculo_tipo_movimiento" name="modo_calculo_tipo_movimiento" form="crear_tipo_movimiento_form" class="rounded-xl border border-blue-200 bg-white px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                        <option value="manual">Monto manual</option>
+                        <option value="cantidad">Por cantidad</option>
+                    </select>
+                    <input id="unidad_tipo_movimiento" type="text" name="unidad_tipo_movimiento" maxlength="30" form="crear_tipo_movimiento_form" placeholder="Unidad: kg, pieza, hora" class="rounded-xl border border-blue-200 bg-white px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    <input id="valor_unitario_tipo_movimiento" type="number" min="0" step="1" name="valor_unitario_tipo_movimiento" form="crear_tipo_movimiento_form" placeholder="Valor por unidad" class="rounded-xl border border-blue-200 bg-white px-4 py-2 focus:border-blue-500 focus:ring-blue-500 sm:col-span-2">
+                </div>
+                <button type="submit" form="crear_tipo_movimiento_form" class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-plus"></i>
+                    Agregar tipo
+                </button>
+            </div>
+            <div id="panel_tipo_movimiento_eliminar" class="hidden rounded-2xl border border-red-100 bg-red-50 p-4 space-y-3">
+                <div>
+                    <p class="text-sm font-semibold text-red-900">Tipos personalizados</p>
+                    <p class="text-xs text-red-700">Los tipos base no se eliminan. Si un tipo ya tiene movimientos, el sistema lo bloqueará.</p>
+                </div>
+                {% if tipos_movimiento_personalizados %}
+                <div class="space-y-2">
+                    {% for tipo_personalizado in tipos_movimiento_personalizados %}
+                    <div class="flex items-center justify-between gap-3 rounded-xl border border-red-100 bg-white px-3 py-2">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">{{ tipo_personalizado.label }}</div>
+                            <div class="text-xs text-gray-500">
+                                {{ 'Descuenta' if tipo_personalizado.impacto == 'negativo' else 'Suma' }}{% if tipo_personalizado.modo_calculo == 'cantidad' %} · Gs. {{ '{:,.0f}'.format(tipo_personalizado.valor_unitario|float).replace(',', '.') }} por {{ tipo_personalizado.unidad }}{% endif %}
+                            </div>
+                        </div>
+                        <button type="submit" form="eliminar_tipo_movimiento_{{ tipo_personalizado.valor }}" onclick="return confirm('Se eliminará este tipo personalizado. ¿Continuar?')" class="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-red-700 hover:bg-red-50 transition-colors" title="Eliminar tipo">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-red-800">Todavía no hay tipos personalizados.</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        <div>
+            <label for="fecha_movimiento" class="block text-sm font-semibold text-gray-700 mb-2">Fecha <span class="text-red-500 font-normal">(Obligatorio)</span></label>
+            <input id="fecha_movimiento" name="fecha_movimiento" type="date" value="{{ fecha_periodo }}" required class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+        </div>
+        <div class="md:col-span-2">
+            <label for="concepto" class="block text-sm font-semibold text-gray-700 mb-2">Concepto</label>
+            <input id="concepto" name="concepto" type="text" placeholder="Ejemplo: bono por ventas" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+        </div>
+        <div id="grupo_cantidad_movimiento" class="hidden">
+            <label for="cantidad_movimiento" class="block text-sm font-semibold text-gray-700 mb-2">Cantidad <span id="unidad_cantidad_movimiento" class="text-gray-500 font-normal"></span></label>
+            <input id="cantidad_movimiento" name="cantidad_movimiento" type="number" min="0" step="0.001" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+            <p id="detalle_calculo_movimiento" class="mt-2 text-xs text-gray-500"></p>
+        </div>
+        <div>
+            <label for="monto" class="block text-sm font-semibold text-gray-700 mb-2">Monto <span class="text-red-500 font-normal">(Obligatorio)</span></label>
+            <input id="monto" name="monto" type="number" min="0" step="1" required class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="observaciones" class="block text-sm font-semibold text-gray-700 mb-2">Observaciones</label>
+            <input id="observaciones" name="observaciones" type="text" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+        </div>
+    </div>
+
+    <label class="flex items-start gap-3 rounded-2xl border border-amber-100 p-4 bg-amber-50">
+        <input id="incide_aguinaldo" type="checkbox" name="incide_aguinaldo" value="1" class="mt-1 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+        <div>
+            <div class="text-sm font-semibold text-amber-900">Incluir este movimiento en aguinaldo</div>
+            <div class="text-sm text-amber-700">Por defecto queda desmarcado. Actívalo solo si este concepto debe computarse legalmente para el aguinaldo.</div>
+        </div>
+    </label>
+
+    <div class="flex justify-end">
+        <button type="submit" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
+            <i class="fas fa-save"></i>
+            Guardar movimiento
+        </button>
+    </div>
+</form>
+{% if puede_gestionar %}
+<form id="crear_tipo_movimiento_form" method="post" action="{{ url_for('control_empleados.crear_tipo_movimiento_personalizado', id_empleado=empleado.id_empleado) }}" class="hidden">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="periodo" value="{{ periodo }}">
+</form>
+{% for tipo_personalizado in tipos_movimiento_personalizados %}
+<form id="eliminar_tipo_movimiento_{{ tipo_personalizado.valor }}" method="post" action="{{ url_for('control_empleados.eliminar_tipo_movimiento_personalizado', id_empleado=empleado.id_empleado, tipo_movimiento=tipo_personalizado.valor) }}" class="hidden">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="periodo" value="{{ periodo }}">
+</form>
+{% endfor %}
+{% endif %}
+</div>

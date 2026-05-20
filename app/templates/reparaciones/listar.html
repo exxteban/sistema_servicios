@@ -1,0 +1,781 @@
+{% extends "base.html" %}
+
+{% block title %}Servicio Técnico{% endblock %}
+
+{% block content %}
+<div x-data="{
+        estadoAbierto: '{{ estado_inicial|e }}',
+        filtro: {{ (q or '')|tojson|forceescape }},
+        filtroAplicado: {{ (q or '')|tojson|forceescape }},
+        autoBusquedaHabilitada: true,
+        _qTimer: null,
+        stopwords: ['en', 'de', 'del', 'la', 'el', 'los', 'las', 'y', 'o', 'a', 'al', 'un', 'una', 'unos', 'unas'],
+        init() {
+            try {
+                this.autoBusquedaHabilitada = window.localStorage.getItem('reparaciones_auto_busqueda') !== 'false';
+            } catch (error) { }
+        },
+        normalizeText(value) {
+            try {
+                return (value || '')
+                    .toString()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase()
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            } catch (e) {
+                return (value || '').toString().toLowerCase().replace(/\s+/g, ' ').trim();
+            }
+        },
+        get filtroNorm() {
+            return this.normalizeText(this.filtroAplicado);
+        },
+        get filtroEntradaNorm() {
+            return this.normalizeText(this.filtro);
+        },
+        toggle(estado) {
+            this.estadoAbierto = (this.estadoAbierto === estado) ? '' : estado;
+        },
+        tokensForFilter(value) {
+            const raw = this.normalizeText(value);
+            if (!raw) return [];
+            const tokens = raw.split(/\s+/).filter((t) => t && t.length >= 2);
+            const filtrados = tokens.filter((t) => !this.stopwords.includes(t));
+            return filtrados.length ? filtrados : tokens;
+        },
+        match(elOrText) {
+            const tokens = this.tokensForFilter(this.filtroNorm);
+            if (!tokens.length) return true;
+            const baseRaw = (elOrText && typeof elOrText === 'object')
+                ? ((elOrText.dataset && elOrText.dataset.search) ? elOrText.dataset.search : elOrText.textContent)
+                : elOrText;
+            const base = this.normalizeText(baseRaw);
+            return tokens.every((t) => base.includes(t));
+        },
+        anyMatch(refName) {
+            const tokens = this.tokensForFilter(this.filtroNorm);
+            if (!tokens.length) return true;
+            const root = this.$refs[refName];
+            if (!root) return true;
+            return Array.from(root.querySelectorAll('[data-search]')).some((el) => {
+                const base = this.normalizeText((el.dataset && el.dataset.search) ? el.dataset.search : el.textContent);
+                return tokens.every((t) => base.includes(t));
+            });
+        },
+        navigateWithFilter(targetUrl) {
+            try {
+                const desired = this.filtroNorm;
+                const url = new URL(targetUrl, window.location.origin);
+                if (desired) url.searchParams.set('q', desired);
+                else url.searchParams.delete('q');
+                if (window.appNavigateActiveTab) {
+                    window.appNavigateActiveTab(url.toString());
+                    return;
+                }
+                window.location.assign(url.toString());
+            } catch (e) {
+                try {
+                    if (window.appNavigateActiveTab) window.appNavigateActiveTab(targetUrl);
+                    else window.location.assign(targetUrl);
+                } catch { }
+            }
+        },
+        guardarPreferenciaAutoBusqueda() {
+            try {
+                window.localStorage.setItem('reparaciones_auto_busqueda', this.autoBusquedaHabilitada ? 'true' : 'false');
+            } catch (error) { }
+
+            if (this.autoBusquedaHabilitada && this.filtroEntradaNorm) {
+                this.queueServerSearch();
+            }
+        },
+        limpiarFiltro() {
+            const habiaBusquedaServidor = (() => {
+                try {
+                    return !!this.normalizeText(new URL(window.location.href).searchParams.get('q') || '');
+                } catch (error) {
+                    return false;
+                }
+            })();
+
+            this.filtro = '';
+            this.filtroAplicado = '';
+            if (this._qTimer) clearTimeout(this._qTimer);
+
+            this.$nextTick(() => {
+                if (habiaBusquedaServidor) {
+                    this.triggerServerSearch();
+                    return;
+                }
+
+                if (this.$refs.filtroInput) this.$refs.filtroInput.focus();
+            });
+        },
+        queueServerSearch() {
+            const desired = this.filtroEntradaNorm;
+            if (this._qTimer) clearTimeout(this._qTimer);
+            if (!this.autoBusquedaHabilitada) return;
+            this.filtroAplicado = this.filtro;
+            // Trigger server search shortly after typing stops.
+            this._qTimer = setTimeout(() => {
+                if (desired && desired.length < 2) return;
+                if (window.appReloadActiveTab) {
+                    window.appReloadActiveTab({ q: desired || null });
+                    return;
+                }
+                const url = new URL(window.location.href);
+                const currentQ = this.normalizeText(url.searchParams.get('q') || '');
+                if ((desired || '') === (currentQ || '')) return;
+                if (desired) url.searchParams.set('q', desired);
+                else url.searchParams.delete('q');
+                Array.from(url.searchParams.keys()).forEach((k) => {
+                    if (k.endsWith('_page')) url.searchParams.delete(k);
+                });
+                window.location.assign(url.toString());
+            }, 450);
+        },
+        triggerServerSearch() {
+            // Immediately trigger server search (for Enter key)
+            if (this._qTimer) clearTimeout(this._qTimer);
+            const desired = this.filtroEntradaNorm;
+            this.filtroAplicado = this.filtro;
+            if (desired && desired.length < 2) return;
+            if (window.appReloadActiveTab) {
+                window.appReloadActiveTab({ q: desired || null });
+                return;
+            }
+            const url = new URL(window.location.href);
+            if (desired) url.searchParams.set('q', desired);
+            else url.searchParams.delete('q');
+            Array.from(url.searchParams.keys()).forEach((k) => {
+                if (k.endsWith('_page')) url.searchParams.delete(k);
+            });
+            window.location.assign(url.toString());
+        }
+    }" class="max-w-[1800px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-6 space-y-4">
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Servicio Técnico / Reparaciones</h1>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Gestiona el flujo de trabajo de reparaciones</p>
+        </div>
+        <div class="mt-4 md:mt-0">
+            <a href="{{ url_for('reparaciones.nuevo') }}" data-permiso="crear_reparacion"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow flex items-center">
+                <i class="fas fa-plus mr-2"></i>Nueva Recepción
+            </a>
+        </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="relative w-full sm:max-w-md">
+            <i
+                class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm"></i>
+            <input type="text" x-ref="filtroInput" x-model="filtro" @input="queueServerSearch()"
+                @keydown.enter="triggerServerSearch()" @keydown.escape="limpiarFiltro()"
+                placeholder="Buscar cliente, equipo, marca, modelo, IMEI o N°..."
+                class="w-full pl-8 pr-9 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors">
+            <button type="button" x-show="filtroEntradaNorm || filtroNorm"
+                @click="limpiarFiltro()"
+                class="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md inline-flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                title="Limpiar filtro">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <label class="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+                <input type="checkbox" x-model="autoBusquedaHabilitada" @change="guardarPreferenciaAutoBusqueda()"
+                    class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                <span>Búsqueda automática</span>
+            </label>
+            <div class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                <span x-show="autoBusquedaHabilitada">Escribí para buscar en todas las páginas</span>
+                <span x-show="!autoBusquedaHabilitada && filtroEntradaNorm">Presioná Enter para buscar en todas las páginas</span>
+                <span x-show="!autoBusquedaHabilitada && !filtroEntradaNorm">Escribí para filtrar (Enter para buscar todo)</span>
+            </div>
+        </div>
+    </div>
+
+    {% macro render_estado_chip(item) -%}
+    <button type="button" @click="toggle('{{ item.estado }}')"
+        class="w-full inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border transition text-[11px] {{ item.button_classes }}"
+        :class="estadoAbierto === '{{ item.estado }}' ? '{{ item.ring_classes }}' : ''">
+        <span class="inline-flex items-center gap-1 min-w-0 flex-1 text-left">
+            <span class="w-2 h-2 rounded-full shrink-0 {{ item.dot_classes }}"
+                style="{{ item.dot_style if item.dot_style is defined else '' }}"></span>
+            <span class="font-medium text-[12px] min-w-0 truncate {{ item.label_classes }}" title="{{ item.title }}">{{ item.label }}</span>
+        </span>
+        <span class="inline-flex items-center justify-center min-w-[18px] px-1 py-0.5 rounded-full font-bold text-[10px] shrink-0 {{ item.badge_classes }}">{{ item.total }}</span>
+        <i class="fas fa-chevron-down text-[10px] transition-transform shrink-0 {{ item.chevron_classes }}"
+            :class="estadoAbierto === '{{ item.estado }}' ? 'rotate-180' : ''"></i>
+    </button>
+    {%- endmacro %}
+
+    {% set estado_chips = [
+    {'estado':'pendiente','label':'Pendientes','title':'Pendientes','total':pendientes_total,'button_classes':'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 hover:bg-gray-100 dark:hover:bg-gray-900/60','ring_classes':'ring-2 ring-gray-300 dark:ring-gray-600','dot_classes':'bg-gray-500','label_classes':'text-gray-800 dark:text-gray-100','badge_classes':'bg-gray-200 text-gray-800 dark:text-gray-900','chevron_classes':'text-gray-400 dark:text-gray-500'},
+    {'estado':'diagnostico','label':'Diagnóstico','title':'Diagnóstico','total':diagnostico_total,'button_classes':'border-blue-200 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-950/30','ring_classes':'ring-2 ring-blue-300/70 dark:ring-blue-700/50','dot_classes':'bg-blue-500','label_classes':'text-blue-800 dark:text-blue-200','badge_classes':'bg-blue-200 text-blue-800 dark:text-blue-900','chevron_classes':'text-blue-400/80 dark:text-blue-300/70'},
+    {'estado':'espera_presupuesto','label':'Conf. presupuesto','title':'A confirmar presupuesto','total':espera_presupuesto_total,'button_classes':'border-orange-200 dark:border-orange-800/35 bg-orange-50 dark:bg-orange-950/15 hover:bg-orange-100 dark:hover:bg-orange-950/25','ring_classes':'ring-2 ring-orange-300/70 dark:ring-orange-700/45','dot_classes':'bg-orange-500','label_classes':'text-orange-800 dark:text-orange-200','badge_classes':'bg-orange-200 text-orange-800 dark:text-orange-900','chevron_classes':'text-orange-500/70 dark:text-orange-300/70'},
+    {'estado':'espera','label':'En espera','title':'En espera','total':espera_total,'button_classes':'border-yellow-200 dark:border-yellow-800/35 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30','ring_classes':'ring-2 ring-yellow-300/70 dark:ring-yellow-700/45','dot_classes':'bg-yellow-500','label_classes':'text-yellow-800 dark:text-yellow-400','badge_classes':'bg-yellow-300 text-yellow-900 dark:text-yellow-900','chevron_classes':'text-yellow-500/70 dark:text-yellow-300/70'},
+    {'estado':'en_proceso','label':'En proceso','title':'En proceso','total':en_proceso_total,'button_classes':'border-indigo-200 dark:border-indigo-800/35 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30','ring_classes':'ring-2 ring-indigo-300/70 dark:ring-indigo-700/45','dot_classes':'bg-indigo-500','label_classes':'text-indigo-800 dark:text-indigo-200','badge_classes':'bg-indigo-200 text-indigo-800 dark:text-indigo-900','chevron_classes':'text-indigo-500/70 dark:text-indigo-300/70'},
+    {'estado':'listo','label':'Listos p/ entrega','title':'Listos para entrega','total':listos_total,'button_classes':'border-green-200 dark:border-green-800/35 bg-green-50 dark:bg-green-950/15 hover:bg-green-100 dark:hover:bg-green-950/25','ring_classes':'ring-2 ring-green-300/70 dark:ring-green-700/45','dot_classes':'bg-green-500','label_classes':'text-green-800 dark:text-green-200','badge_classes':'bg-green-200 text-green-800 dark:text-green-900','chevron_classes':'text-green-500/70 dark:text-green-300/70'},
+    {'estado':'entregado','label':'Entregados','title':'Entregados','total':entregados_total,'button_classes':'border-purple-200 dark:border-purple-800/35 bg-purple-50 dark:bg-purple-950/15 hover:bg-purple-100 dark:hover:bg-purple-950/25','ring_classes':'ring-2 ring-purple-300/70 dark:ring-purple-700/45','dot_classes':'bg-purple-500','label_classes':'text-purple-800 dark:text-purple-200','badge_classes':'bg-purple-200 text-purple-800 dark:text-purple-900','chevron_classes':'text-purple-500/70 dark:text-purple-300/70'},
+    {'estado':'no_se_pudo','label':'No se pudo','title':'No se pudo','total':no_se_pudo_total,'button_classes':'border-rose-200 dark:border-rose-800/35 bg-rose-50 dark:bg-rose-950/15 hover:bg-rose-100 dark:hover:bg-rose-950/25','ring_classes':'ring-2 ring-rose-300/70 dark:ring-rose-700/45','dot_classes':'bg-rose-500','label_classes':'text-rose-800 dark:text-rose-200','badge_classes':'bg-rose-200 text-rose-800 dark:text-rose-900','chevron_classes':'text-rose-500/70 dark:text-rose-300/70'},
+    {'estado':'cancelado','label':'Cancelados','title':'Cancelados','total':cancelados_total,'button_classes':'border-red-200 dark:border-red-800/35 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30','ring_classes':'ring-2 ring-red-300/70 dark:ring-red-700/45','dot_classes':'bg-red-500','label_classes':'text-red-800 dark:text-red-200','badge_classes':'bg-red-200 text-red-800 dark:text-red-900','chevron_classes':'text-red-500/70 dark:text-red-300/70'},
+    {'estado':'antiguos','label':'Antiguos','title':'Antiguos','total':antiguos_total,'button_classes':'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-900/50','ring_classes':'ring-2 ring-slate-300 dark:ring-slate-600','dot_classes':'bg-slate-500 dark:bg-slate-300 ring-1 ring-slate-400/60 dark:ring-slate-500/70','dot_style':'background-color:#94a3b8;','label_classes':'text-slate-800 dark:text-slate-200','badge_classes':'bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-100','chevron_classes':'text-slate-500/80 dark:text-slate-300/80'}
+    ] %}
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5">
+            {% for item in estado_chips %}
+            {{ render_estado_chip(item) }}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div x-show="!estadoAbierto && !filtroNorm" x-cloak
+            class="text-center text-gray-400 dark:text-gray-500 py-10 text-sm">
+            Seleccioná un estado o buscá para ver resultados
+        </div>
+
+        <div x-show="estadoAbierto || filtroNorm" x-cloak>
+            <div x-show="(!filtroNorm && estadoAbierto === 'pendiente') || (filtroNorm && anyMatch('panelPendiente'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">Pendientes</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ pendientes_total }} equipos</span>
+                </div>
+                <div x-ref="panelPendiente" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {% for rep in pendientes %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        pendientes</div>
+                    {% endfor %}
+                </div>
+                {% if pendientes_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ pendientes_pag.page }} de {{ pendientes_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if pendientes_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='pendiente', pendientes_page=pendientes_pag.prev_num, pendientes_per_page=pendientes_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if pendientes_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='pendiente', pendientes_page=pendientes_pag.next_num, pendientes_per_page=pendientes_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div
+                x-show="(!filtroNorm && estadoAbierto === 'diagnostico') || (filtroNorm && anyMatch('panelDiagnostico'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">En Diagnóstico</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ diagnostico_total }} equipos</span>
+                </div>
+                <div x-ref="panelDiagnostico" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {% for rep in diagnostico %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        en diagnóstico</div>
+                    {% endfor %}
+                </div>
+                {% if diagnostico_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ diagnostico_pag.page }} de {{ diagnostico_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if diagnostico_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='diagnostico', diagnostico_page=diagnostico_pag.prev_num, diagnostico_per_page=diagnostico_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if diagnostico_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='diagnostico', diagnostico_page=diagnostico_pag.next_num, diagnostico_per_page=diagnostico_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div
+                x-show="(!filtroNorm && estadoAbierto === 'espera_presupuesto') || (filtroNorm && anyMatch('panelEsperaPresupuesto'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">A confirmar Presupuesto</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ espera_presupuesto_total }} equipos</span>
+                </div>
+                <div x-ref="panelEsperaPresupuesto" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {% for rep in espera_presupuesto %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        a confirmar presupuesto</div>
+                    {% endfor %}
+                </div>
+                {% if espera_presupuesto_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ espera_presupuesto_pag.page }} de {{ espera_presupuesto_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if espera_presupuesto_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='espera_presupuesto', espera_presupuesto_page=espera_presupuesto_pag.prev_num, espera_presupuesto_per_page=espera_presupuesto_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if espera_presupuesto_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='espera_presupuesto', espera_presupuesto_page=espera_presupuesto_pag.next_num, espera_presupuesto_per_page=espera_presupuesto_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div x-show="(!filtroNorm && estadoAbierto === 'espera') || (filtroNorm && anyMatch('panelEspera'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">En Espera</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ espera_total }} equipos</span>
+                </div>
+                <div x-ref="panelEspera" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {% for rep in espera %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        en espera</div>
+                    {% endfor %}
+                </div>
+                {% if espera_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ espera_pag.page }} de {{ espera_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if espera_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='espera', espera_page=espera_pag.prev_num, espera_per_page=espera_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if espera_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='espera', espera_page=espera_pag.next_num, espera_per_page=espera_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div x-show="(!filtroNorm && estadoAbierto === 'en_proceso') || (filtroNorm && anyMatch('panelEnProceso'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">En proceso</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ en_proceso_total }} equipos</span>
+                </div>
+                <div x-ref="panelEnProceso" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {% for rep in en_proceso %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        en proceso</div>
+                    {% endfor %}
+                </div>
+                {% if en_proceso_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ en_proceso_pag.page }} de {{ en_proceso_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if en_proceso_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='en_proceso', en_proceso_page=en_proceso_pag.prev_num, en_proceso_per_page=en_proceso_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if en_proceso_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='en_proceso', en_proceso_page=en_proceso_pag.next_num, en_proceso_per_page=en_proceso_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div x-show="(!filtroNorm && estadoAbierto === 'listo') || (filtroNorm && anyMatch('panelListo'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">Listos para entrega</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ listos_total }} equipos</span>
+                </div>
+                <div x-ref="panelListo" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {% for rep in listos %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        listos para entrega</div>
+                    {% endfor %}
+                </div>
+                {% if listos_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ listos_pag.page }} de {{ listos_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if listos_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='listo', listos_page=listos_pag.prev_num, listos_per_page=listos_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if listos_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='listo', listos_page=listos_pag.next_num, listos_per_page=listos_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div x-show="(!filtroNorm && estadoAbierto === 'entregado') || (filtroNorm && anyMatch('panelEntregado'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">Entregados</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ entregados_total }} equipos</span>
+                </div>
+                <div x-ref="panelEntregado" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 opacity-90">
+                    {% for rep in entregados %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        entregados</div>
+                    {% endfor %}
+                </div>
+                {% if entregados_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ entregados_pag.page }} de {{ entregados_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if entregados_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='entregado', entregados_page=entregados_pag.prev_num, entregados_per_page=entregados_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if entregados_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='entregado', entregados_page=entregados_pag.next_num, entregados_per_page=entregados_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div x-show="(!filtroNorm && estadoAbierto === 'no_se_pudo') || (filtroNorm && anyMatch('panelNoSePudo'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">No se pudo</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ no_se_pudo_total }} equipos</span>
+                </div>
+                <div x-ref="panelNoSePudo" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {% for rep in no_se_pudo %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        en este estado</div>
+                    {% endfor %}
+                </div>
+                {% if no_se_pudo_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ no_se_pudo_pag.page }} de {{ no_se_pudo_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if no_se_pudo_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='no_se_pudo', no_se_pudo_page=no_se_pudo_pag.prev_num, no_se_pudo_per_page=no_se_pudo_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if no_se_pudo_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='no_se_pudo', no_se_pudo_page=no_se_pudo_pag.next_num, no_se_pudo_per_page=no_se_pudo_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div x-show="(!filtroNorm && estadoAbierto === 'cancelado') || (filtroNorm && anyMatch('panelCancelado'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">Cancelados</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ cancelados_total }} equipos</span>
+                </div>
+                <div x-ref="panelCancelado" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 opacity-90">
+                    {% for rep in cancelados %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        cancelados</div>
+                    {% endfor %}
+                </div>
+                {% if cancelados_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ cancelados_pag.page }} de {{ cancelados_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if cancelados_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='cancelado', cancelados_page=cancelados_pag.prev_num, cancelados_per_page=cancelados_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if cancelados_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='cancelado', cancelados_page=cancelados_pag.next_num, cancelados_per_page=cancelados_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div x-show="(!filtroNorm && estadoAbierto === 'antiguos') || (filtroNorm && anyMatch('panelAntiguos'))">
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-bold text-gray-800 dark:text-gray-100">Antiguos</h2>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ antiguos_total }} equipos</span>
+                </div>
+                <div x-ref="panelAntiguos" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 opacity-85">
+                    {% for rep in antiguos %}
+                    <div data-search="{{ (rep.id_reparacion ~ ' ' ~ rep.cliente.nombre ~ ' ' ~ rep.tipo_equipo ~ ' ' ~
+                        rep.marca_modelo ~ ' ' ~ (rep.imei_serie or '') ~ ' ' ~ (rep.falla_reportada or '') ~ ' ' ~ (rep.diagnostico_tecnico or '') ~ ' ' ~ (rep.solucion or '') ~ ' ' ~ (rep.estado or '') ~ ' ' ~ ((rep.estado or '')|replace('_', ' ')))|lower|replace('\n', ' ')|replace('\r', ' ')|e }}"
+                        x-show="match($el)">
+                        {% include 'reparaciones/_card.html' %}
+                    </div>
+                    {% else %}
+                    <div class="col-span-full text-center text-gray-400 dark:text-gray-500 py-10 text-sm">No hay equipos
+                        antiguos</div>
+                    {% endfor %}
+                </div>
+                {% if antiguos_pag.pages > 1 %}
+                <div class="mt-4 flex items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Página {{ antiguos_pag.page }} de {{ antiguos_pag.pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if antiguos_pag.has_prev %}
+                        <a href="{{ url_for('reparaciones.listar', estado='antiguos', antiguos_page=antiguos_pag.prev_num, antiguos_per_page=antiguos_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Anterior
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Anterior
+                        </span>
+                        {% endif %}
+
+                        {% if antiguos_pag.has_next %}
+                        <a href="{{ url_for('reparaciones.listar', estado='antiguos', antiguos_page=antiguos_pag.next_num, antiguos_per_page=antiguos_pag.per_page, q=q or None) }}"
+                            @click.prevent="navigateWithFilter($el.href)"
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                            Siguiente
+                        </a>
+                        {% else %}
+                        <span
+                            class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                            Siguiente
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div x-show="filtroNorm && !(anyMatch('panelPendiente') || anyMatch('panelDiagnostico') || anyMatch('panelEsperaPresupuesto') || anyMatch('panelEspera') || anyMatch('panelEnProceso') || anyMatch('panelListo') || anyMatch('panelEntregado') || anyMatch('panelNoSePudo') || anyMatch('panelCancelado') || anyMatch('panelAntiguos'))"
+                class="text-center text-gray-400 dark:text-gray-500 py-10 text-sm">
+                Sin resultados para el filtro
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

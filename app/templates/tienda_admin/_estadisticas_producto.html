@@ -1,0 +1,361 @@
+<div id="modalEstadisticasProducto" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-estadisticas-title" role="dialog" aria-modal="true">
+    <div id="modalEstadisticasProductoBackdrop" class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 backdrop-blur-sm"></div>
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-6xl border border-gray-200 dark:border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold leading-6 text-gray-900 dark:text-white" id="modal-estadisticas-title">
+                            <i class="fas fa-chart-line mr-2 text-blue-500"></i>
+                            <span id="estadisticasProductoTitulo">Estadísticas del producto</span>
+                        </h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400" id="estadisticasProductoSubtitulo">Visitas totales, visitantes únicos y evolución diaria.</p>
+                    </div>
+                    <button type="button" onclick="cerrarModalEstadisticasProducto()" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                        <span class="sr-only">Cerrar</span>
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="px-6 py-5 space-y-5 bg-gradient-to-b from-white to-blue-50/40 dark:from-gray-800 dark:to-gray-900/70">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" data-stats-range="day" onclick="seleccionarRangoEstadisticasProducto('day')" class="stats-range-btn inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">Día</button>
+                            <button type="button" data-stats-range="week" onclick="seleccionarRangoEstadisticasProducto('week')" class="stats-range-btn inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-blue-600 text-white border border-blue-600">Semana</button>
+                            <button type="button" data-stats-range="month" onclick="seleccionarRangoEstadisticasProducto('month')" class="stats-range-btn inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">Mes</button>
+                            <button type="button" data-stats-range="custom" onclick="seleccionarRangoEstadisticasProducto('custom')" class="stats-range-btn inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">Personalizado</button>
+                        </div>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <label class="block">
+                                <span class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Desde</span>
+                                <input id="estadisticasFechaDesde" type="date" onchange="manejarCambioFechasEstadisticasProducto()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
+                            </label>
+                            <label class="block">
+                                <span class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Hasta</span>
+                                <input id="estadisticasFechaHasta" type="date" onchange="manejarCambioFechasEstadisticasProducto()" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
+                            </label>
+                            <button id="btnExportarEstadisticasCsv" type="button" class="inline-flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-medium transition">
+                                <i class="fas fa-file-csv mr-2"></i> CSV
+                            </button>
+                            <button id="btnExportarEstadisticasXlsx" type="button" class="inline-flex items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 text-sm font-medium transition">
+                                <i class="fas fa-file-excel mr-2"></i> Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <div class="rounded-2xl border border-blue-100 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20 p-4">
+                            <p class="text-xs uppercase tracking-wide font-semibold text-blue-700 dark:text-blue-300">Visitas totales</p>
+                            <p id="estadisticasTotalVisitas" class="mt-2 text-3xl font-bold text-blue-900 dark:text-white">0</p>
+                            <p class="mt-2 text-xs leading-5 text-blue-800/80 dark:text-blue-200/80">Suma todas las aperturas registradas del producto dentro del rango seleccionado.</p>
+                        </div>
+                        <div class="rounded-2xl border border-cyan-100 dark:border-cyan-900/50 bg-cyan-50 dark:bg-cyan-900/20 p-4">
+                            <p class="text-xs uppercase tracking-wide font-semibold text-cyan-700 dark:text-cyan-300">Visitantes únicos</p>
+                            <p id="estadisticasVisitantesUnicos" class="mt-2 text-3xl font-bold text-cyan-900 dark:text-white">0</p>
+                            <p class="mt-2 text-xs leading-5 text-cyan-800/80 dark:text-cyan-200/80">Cuenta visitantes distintos usando IP y navegador para evitar duplicados repetidos.</p>
+                        </div>
+                        <div class="rounded-2xl border border-violet-100 dark:border-violet-900/50 bg-violet-50 dark:bg-violet-900/20 p-4">
+                            <p class="text-xs uppercase tracking-wide font-semibold text-violet-700 dark:text-violet-300">Promedio diario</p>
+                            <p id="estadisticasPromedioDiario" class="mt-2 text-3xl font-bold text-violet-900 dark:text-white">0</p>
+                            <p class="mt-2 text-xs leading-5 text-violet-800/80 dark:text-violet-200/80">Divide las visitas totales entre la cantidad de días incluidos en el período.</p>
+                        </div>
+                        <div class="rounded-2xl border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/20 p-4">
+                            <p class="text-xs uppercase tracking-wide font-semibold text-emerald-700 dark:text-emerald-300">Conversión a lead</p>
+                            <p id="estadisticasConversionLeads" class="mt-2 text-3xl font-bold text-emerald-900 dark:text-white">0%</p>
+                            <p class="mt-2 text-xs leading-5 text-emerald-800/80 dark:text-emerald-200/80">Se calcula como leads generados ÷ visitas totales × 100 en este rango.</p>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/70 p-4">
+                        <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Visitas por día</h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Comparación de visitas totales vs visitantes únicos.</p>
+                            </div>
+                            <div id="estadisticasRangoActivo" class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-300"></div>
+                        </div>
+                        <div id="estadisticasProductoLoading" class="hidden py-16 text-center text-sm text-gray-500 dark:text-gray-400">
+                            <i class="fas fa-spinner fa-spin mr-2"></i> Cargando estadísticas...
+                        </div>
+                        <div class="h-80">
+                            <canvas id="estadisticasProductoChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/70 overflow-hidden">
+                        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Detalle diario</h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-800/70">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Fecha</th>
+                                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Totales</th>
+                                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Únicos</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="estadisticasProductoTabla" class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900/40">
+                                    <tr>
+                                        <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">Selecciona un producto para ver estadísticas.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const tiendaStatsState = {
+    productId: null,
+    productName: '',
+    range: 'week',
+    chart: null,
+    initialized: false,
+};
+
+function formatearNumeroEstadistica(value) {
+    return new Intl.NumberFormat('es-PY').format(Number(value || 0));
+}
+
+function obtenerControlesEstadisticasProducto() {
+    return {
+        modal: document.getElementById('modalEstadisticasProducto'),
+        loading: document.getElementById('estadisticasProductoLoading'),
+        title: document.getElementById('estadisticasProductoTitulo'),
+        subtitle: document.getElementById('estadisticasProductoSubtitulo'),
+        rangeLabel: document.getElementById('estadisticasRangoActivo'),
+        from: document.getElementById('estadisticasFechaDesde'),
+        to: document.getElementById('estadisticasFechaHasta'),
+        total: document.getElementById('estadisticasTotalVisitas'),
+        unique: document.getElementById('estadisticasVisitantesUnicos'),
+        average: document.getElementById('estadisticasPromedioDiario'),
+        conversion: document.getElementById('estadisticasConversionLeads'),
+        table: document.getElementById('estadisticasProductoTabla'),
+        chart: document.getElementById('estadisticasProductoChart'),
+        csv: document.getElementById('btnExportarEstadisticasCsv'),
+        xlsx: document.getElementById('btnExportarEstadisticasXlsx'),
+        rangeButtons: Array.from(document.querySelectorAll('.stats-range-btn')),
+    };
+}
+
+function actualizarBotonesRangeEstadisticas(range) {
+    const { rangeButtons } = obtenerControlesEstadisticasProducto();
+    rangeButtons.forEach((button) => {
+        const activo = button.dataset.statsRange === range;
+        button.className = activo
+            ? 'stats-range-btn inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-blue-600 text-white border border-blue-600'
+            : 'stats-range-btn inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700';
+    });
+}
+
+function actualizarRangoFechasPorPreset(range) {
+    const { from, to } = obtenerControlesEstadisticasProducto();
+    const hoy = new Date();
+    const fechaHasta = hoy.toISOString().slice(0, 10);
+    const fechaDesde = new Date(hoy);
+
+    if (range === 'day') {
+        from.value = fechaHasta;
+        to.value = fechaHasta;
+        return;
+    }
+    if (range === 'month') {
+        fechaDesde.setDate(fechaDesde.getDate() - 29);
+    } else {
+        fechaDesde.setDate(fechaDesde.getDate() - 6);
+    }
+
+    from.value = fechaDesde.toISOString().slice(0, 10);
+    to.value = fechaHasta;
+}
+
+function seleccionarRangoEstadisticasProducto(range) {
+    tiendaStatsState.range = range;
+    actualizarBotonesRangeEstadisticas(range);
+    if (range !== 'custom') {
+        actualizarRangoFechasPorPreset(range);
+    }
+    cargarEstadisticasProducto();
+}
+
+function manejarCambioFechasEstadisticasProducto() {
+    const { from, to } = obtenerControlesEstadisticasProducto();
+    tiendaStatsState.range = from.value === to.value ? 'day' : 'custom';
+    actualizarBotonesRangeEstadisticas(tiendaStatsState.range);
+    cargarEstadisticasProducto();
+}
+
+function construirQueryEstadisticasProducto() {
+    const { from, to } = obtenerControlesEstadisticasProducto();
+    const params = new URLSearchParams();
+    params.set('range', tiendaStatsState.range);
+
+    if (tiendaStatsState.range === 'day') {
+        params.set('fecha', from.value || to.value);
+        return params.toString();
+    }
+
+    params.set('desde', from.value);
+    params.set('hasta', to.value);
+    return params.toString();
+}
+
+function descargarEstadisticasProducto(format) {
+    if (!tiendaStatsState.productId) return;
+    const query = construirQueryEstadisticasProducto();
+    window.location.href = `/api/tienda/admin/producto/${tiendaStatsState.productId}/estadisticas/export?${query}&format=${format}`;
+}
+
+async function renderizarChartEstadisticasProducto(data) {
+    const { chart } = obtenerControlesEstadisticasProducto();
+    const ChartLib = await window.ensureChartJs();
+    const ctx = chart.getContext('2d');
+
+    if (tiendaStatsState.chart) {
+        tiendaStatsState.chart.destroy();
+    }
+
+    tiendaStatsState.chart = new ChartLib(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [
+                {
+                    label: 'Visitas totales',
+                    data: data.datasets.visitas,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+                    tension: 0.3,
+                    fill: true,
+                },
+                {
+                    label: 'Visitantes únicos',
+                    data: data.datasets.unicos,
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6, 182, 212, 0.12)',
+                    tension: 0.3,
+                    fill: true,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                    },
+                },
+            },
+        },
+    });
+}
+
+function renderizarTablaEstadisticasProducto(data) {
+    const { table } = obtenerControlesEstadisticasProducto();
+
+    if (!data.serie.length) {
+        table.innerHTML = '<tr><td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">No hay visitas registradas en este rango.</td></tr>';
+        return;
+    }
+
+    table.innerHTML = data.serie.map((item) => `
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">${item.fecha}</td>
+            <td class="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">${formatearNumeroEstadistica(item.total)}</td>
+            <td class="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">${formatearNumeroEstadistica(item.unicos)}</td>
+        </tr>
+    `).join('');
+}
+
+async function cargarEstadisticasProducto() {
+    if (!tiendaStatsState.productId) return;
+
+    const controls = obtenerControlesEstadisticasProducto();
+    controls.loading.classList.remove('hidden');
+
+    try {
+        const query = construirQueryEstadisticasProducto();
+        const res = await fetch(`/api/tienda/admin/producto/${tiendaStatsState.productId}/estadisticas?${query}`);
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+            throw new Error(data.error || 'No se pudieron cargar las estadísticas');
+        }
+
+        controls.title.textContent = `Estadísticas de ${data.producto.nombre}`;
+        controls.subtitle.textContent = `${data.producto.codigo || 'Sin código'} · Seguimiento de visitas y leads`;
+        controls.rangeLabel.textContent = `${data.desde} → ${data.hasta}`;
+        controls.total.textContent = formatearNumeroEstadistica(data.total_visitas);
+        controls.unique.textContent = formatearNumeroEstadistica(data.visitantes_unicos);
+        controls.average.textContent = formatearNumeroEstadistica(data.promedio_diario);
+        controls.conversion.textContent = `${data.conversion_leads}%`;
+
+        renderizarTablaEstadisticasProducto(data);
+        await renderizarChartEstadisticasProducto(data);
+    } catch (error) {
+        controls.table.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-sm text-red-500">${error.message}</td></tr>`;
+        if (tiendaStatsState.chart) {
+            tiendaStatsState.chart.destroy();
+            tiendaStatsState.chart = null;
+        }
+    } finally {
+        controls.loading.classList.add('hidden');
+    }
+}
+
+function abrirModalEstadisticasProducto(idProducto, nombreProducto) {
+    const { modal } = obtenerControlesEstadisticasProducto();
+    tiendaStatsState.productId = idProducto;
+    tiendaStatsState.productName = nombreProducto || '';
+    tiendaStatsState.range = 'week';
+    actualizarBotonesRangeEstadisticas('week');
+    actualizarRangoFechasPorPreset('week');
+    modal.classList.remove('hidden');
+    cargarEstadisticasProducto();
+}
+
+function cerrarModalEstadisticasProducto() {
+    const { modal } = obtenerControlesEstadisticasProducto();
+    modal.classList.add('hidden');
+    if (tiendaStatsState.chart) {
+        tiendaStatsState.chart.destroy();
+        tiendaStatsState.chart = null;
+    }
+}
+
+function inicializarEstadisticasProducto() {
+    if (tiendaStatsState.initialized) {
+        return;
+    }
+    tiendaStatsState.initialized = true;
+
+    const controls = obtenerControlesEstadisticasProducto();
+
+    controls.csv?.addEventListener('click', () => descargarEstadisticasProducto('csv'));
+    controls.xlsx?.addEventListener('click', () => descargarEstadisticasProducto('xlsx'));
+    document.getElementById('modalEstadisticasProductoBackdrop')?.addEventListener('click', cerrarModalEstadisticasProducto);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarEstadisticasProducto);
+} else {
+    inicializarEstadisticasProducto();
+}
+</script>

@@ -1,0 +1,568 @@
+{% extends "base.html" %}
+
+{% block title %}Cuenta #{{ detalle.cuenta.cuenta.id_cuenta_cobrar }}{% endblock %}
+
+{% block content %}
+{% set item = detalle.cuenta %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Cuenta #{{ item.cuenta.id_cuenta_cobrar }}</h1>
+                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ item.estado_classes }}">{{ item.estado_label }}</span>
+            </div>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">Ficha minima de cuenta con deuda actual, referencia a la venta y su historial de cobros.</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('cobranzas_cuentas.listar_cuentas') }}" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left mr-2"></i>Volver al listado
+            </a>
+            {% if item.cliente %}
+            <a href="{{ url_for('cobranzas_clientes.detalle_cliente', id_cliente=item.cliente.id_cliente) }}" class="inline-flex items-center rounded-lg border border-indigo-300 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-900/20">
+                <i class="fas fa-user mr-2"></i>Ver cliente en cobranzas
+            </a>
+            {% endif %}
+            {% if item.venta %}
+            <a href="{{ url_for('ventas.detalle', id=item.venta.id_venta) }}" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                <i class="fas fa-receipt mr-2"></i>Ver venta
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if item.esta_vencida %}
+    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-200">
+        Esta cuenta tiene {{ item.dias_vencido }} dia(s) de vencimiento acumulado.
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Monto total</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(item.monto_total).replace(",", ".") }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Cobrado</div>
+            <div class="mt-2 text-2xl font-bold text-green-600 dark:text-green-400">Gs. {{ "{:,.0f}".format(item.monto_cobrado).replace(",", ".") }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Saldo pendiente</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(item.saldo_pendiente).replace(",", ".") }}</div>
+        </div>
+    </div>
+
+    {% if current_user.es_admin() or current_user.tiene_permiso('registrar_cobro_credito') %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Registrar cobro</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Accion minima desde la ficha para cobrar sin salir del modulo.</p>
+            </div>
+            {% if not sesion_activa %}
+            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                Requiere caja abierta
+            </span>
+            {% endif %}
+        </div>
+
+        {% if item.tiene_saldo %}
+        <form method="POST" action="{{ url_for('cobranzas_cobros.registrar_cobro_html', id_cuenta=item.cuenta.id_cuenta_cobrar) }}" class="mt-5 space-y-4" data-no-ajax>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next_url" value="{{ request.path }}">
+            <input type="hidden" name="imprimir_ticket" value="0" data-imprimir-ticket>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto</label>
+                    <input type="number" name="monto" min="1" max="{{ item.saldo_pendiente }}" step="any" value="{{ item.monto_sugerido_cobro }}" required
+                           class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40">
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        {% if item.sugerencia_cobro.origen == 'proxima_cuota' and item.plan_credito and item.plan_credito.proxima_cuota %}
+                        Sugerido desde la proxima cuota #{{ item.plan_credito.proxima_cuota.numero_cuota }}: Gs. {{ "{:,.0f}".format(item.monto_sugerido_cobro).replace(",", ".") }}.
+                        Podes editarlo para cobrar otro monto sobre la cuenta.
+                        {% else %}
+                        El monto inicia con el saldo pendiente total de la cuenta. Podes editarlo si necesitas un cobro parcial.
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Metodo de pago</label>
+                    <select name="id_metodo_pago" required
+                            class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40">
+                        {% for metodo in metodos_pago %}
+                        <option value="{{ metodo.id_metodo_pago }}" data-requiere-referencia="{{ '1' if metodo.requiere_referencia else '0' }}">{{ metodo.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" data-referencia-label>Referencia</label>
+                    <input type="text" name="referencia" placeholder="Transferencia, recibo, comprobante" data-referencia-input
+                           class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40">
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" data-referencia-ayuda>
+                        Completa la referencia si el medio de pago la requiere.
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observaciones</label>
+                    <input type="text" name="observaciones" placeholder="Nota opcional del cobro"
+                           class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40">
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Saldo actual: <span class="font-semibold text-gray-800 dark:text-gray-200">Gs. {{ "{:,.0f}".format(item.saldo_pendiente).replace(",", ".") }}</span>
+                </p>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button type="button" {% if not sesion_activa %}disabled{% endif %} data-abrir-modal-cobro
+                            class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-money-bill-wave mr-2"></i>Registrar cobro
+                    </button>
+                    <button type="submit" formaction="{{ url_for('cobranzas_cobros.enviar_cobro_a_caja_html', id_cuenta=item.cuenta.id_cuenta_cobrar) }}" formmethod="post"
+                            class="inline-flex items-center rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 transition">
+                        <i class="fas fa-cash-register mr-2"></i>Enviar a caja
+                    </button>
+                </div>
+            </div>
+            <noscript>
+                <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    La confirmacion con ticket requiere JavaScript. Si no esta disponible, usa este envio directo.
+                    <button type="submit" class="ml-2 inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 font-semibold text-white">
+                        Registrar cobro sin modal
+                    </button>
+                </div>
+            </noscript>
+        </form>
+        <div id="modal-confirmar-cobro" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4" aria-hidden="true">
+            <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Confirmar cobro</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Verificá el monto y confirmá para registrar el pago e imprimir el ticket de la cuota.
+                        </p>
+                    </div>
+                    <button type="button" class="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700" data-cerrar-modal-cobro aria-label="Cerrar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200">
+                    <p>
+                        Monto a cobrar:
+                        <span class="font-semibold" data-resumen-monto-cobro></span>
+                    </p>
+                    <p class="mt-1">
+                        Metodo:
+                        <span class="font-semibold" data-resumen-metodo-cobro></span>
+                    </p>
+                </div>
+
+                <div class="mt-5 flex items-center justify-end gap-2">
+                    <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700" data-cerrar-modal-cobro>
+                        Cancelar
+                    </button>
+                    <button type="button" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition" data-confirmar-imprimir-cobro>
+                        <i class="fas fa-print mr-2"></i>Confirmar e imprimir
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="mt-5 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 dark:bg-green-900/20 dark:text-green-200">
+            La cuenta ya no tiene saldo pendiente.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Cliente</p>
+                <p class="font-semibold text-gray-900 dark:text-white">{{ item.cliente.nombre if item.cliente else ('Cliente #' ~ item.cuenta.id_cliente) }}</p>
+                {% if item.cliente and item.cliente.ruc_ci %}
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ item.cliente.ruc_ci }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Venta origen</p>
+                <p class="font-semibold text-gray-900 dark:text-white">#{{ item.cuenta.id_venta }}</p>
+                {% if item.venta and item.venta.fecha_venta %}
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ item.venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}</p>
+                {% endif %}
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Producto: {{ item.productos_venta.texto if item.productos_venta else 'Sin detalle de productos' }}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Vencimiento</p>
+                <p class="font-semibold text-gray-900 dark:text-white">
+                    {% if item.cuenta.fecha_vencimiento %}
+                        {{ item.cuenta.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Tipo venta</p>
+                <p class="font-semibold text-gray-900 dark:text-white">{{ item.venta.tipo_venta if item.venta and item.venta.tipo_venta else 'credito' }}</p>
+            </div>
+        </div>
+
+        <div class="mt-6 flex flex-wrap gap-3 text-sm">
+            {% if item.cliente %}
+            <a href="{{ url_for('clientes.detalle', id=item.cliente.id_cliente) }}" class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-address-card mr-2"></i>Cliente general
+            </a>
+            {% endif %}
+            <span class="inline-flex items-center rounded-lg bg-gray-100 px-3 py-2 font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                Cobros activos: {{ detalle.cantidad_pagos_activos }}
+            </span>
+            <span class="inline-flex items-center rounded-lg bg-green-50 px-3 py-2 font-medium text-green-700 dark:bg-green-900/20 dark:text-green-300">
+                Total cobrado activo: Gs. {{ "{:,.0f}".format(detalle.total_cobrado_activo).replace(",", ".") }}
+            </span>
+        </div>
+    </div>
+
+    {% if detalle.plan_credito %}
+    {% set plan = detalle.plan_credito %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Plan en cuotas</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Desglose real de la deuda financiada y su avance de cobro.</p>
+                </div>
+                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {% if plan.estado == 'pagado' %}bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300{% elif plan.estado == 'vencido' %}bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300{% endif %}">
+                    {{ plan.estado.replace('_', ' ').title() }}
+                </span>
+            </div>
+        </div>
+
+        <div class="p-6 space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                <div class="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-900/40">
+                    <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Cuotas</div>
+                    <div class="mt-2 text-xl font-bold text-gray-900 dark:text-white">{{ plan.cantidad_cuotas }}</div>
+                </div>
+                <div class="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-900/40">
+                    <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Frecuencia</div>
+                    <div class="mt-2 text-xl font-bold text-gray-900 dark:text-white">{{ plan.frecuencia_dias }} dias</div>
+                </div>
+                <div class="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-900/40">
+                    <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Pagadas</div>
+                    <div class="mt-2 text-xl font-bold text-green-600 dark:text-green-400">{{ plan.cuotas_pagadas }}</div>
+                </div>
+                <div class="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-900/40">
+                    <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Pendientes</div>
+                    <div class="mt-2 text-xl font-bold text-gray-900 dark:text-white">{{ plan.cuotas_pendientes }}</div>
+                </div>
+                <div class="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-900/40">
+                    <div class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Vencidas</div>
+                    <div class="mt-2 text-xl font-bold text-red-600 dark:text-red-400">{{ plan.cuotas_vencidas }}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="rounded-xl border border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Anticipo</div>
+                    <div class="mt-1 text-lg font-bold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(plan.monto_anticipo).replace(",", ".") }}</div>
+                </div>
+                <div class="rounded-xl border border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Cobrado en cuotas</div>
+                    <div class="mt-1 text-lg font-bold text-green-600 dark:text-green-400">Gs. {{ "{:,.0f}".format(plan.monto_cobrado).replace(",", ".") }}</div>
+                </div>
+                <div class="rounded-xl border border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Saldo del plan</div>
+                    <div class="mt-1 text-lg font-bold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(plan.saldo_pendiente).replace(",", ".") }}</div>
+                </div>
+            </div>
+
+            {% if plan.proxima_cuota %}
+            <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-100">
+                Próxima cuota:
+                <span class="font-semibold">#{{ plan.proxima_cuota.numero_cuota }}</span>
+                con vencimiento
+                <span class="font-semibold">
+                    {% if plan.proxima_cuota.fecha_vencimiento %}
+                        {{ plan.proxima_cuota.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        Sin fecha
+                    {% endif %}
+                </span>
+                por
+                <span class="font-semibold">Gs. {{ "{:,.0f}".format(plan.proxima_cuota.saldo_pendiente).replace(",", ".") }}</span>.
+            </div>
+            {% endif %}
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold">Cuota</th>
+                            <th class="px-4 py-3 text-left font-semibold">Vencimiento</th>
+                            <th class="px-4 py-3 text-right font-semibold">Programado</th>
+                            <th class="px-4 py-3 text-right font-semibold">Cobrado</th>
+                            <th class="px-4 py-3 text-right font-semibold">Saldo</th>
+                            <th class="px-4 py-3 text-left font-semibold">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for cuota in detalle.cuotas %}
+                        <tr>
+                            <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">#{{ cuota.numero_cuota }}</td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                                {% if cuota.fecha_vencimiento %}
+                                    {{ cuota.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-200">Gs. {{ "{:,.0f}".format(cuota.monto_programado).replace(",", ".") }}</td>
+                            <td class="px-4 py-3 text-right text-green-700 dark:text-green-400">Gs. {{ "{:,.0f}".format(cuota.monto_cobrado).replace(",", ".") }}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(cuota.saldo_pendiente).replace(",", ".") }}</td>
+                            <td class="px-4 py-3">
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {% if cuota.estado == 'pagada' %}bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300{% elif cuota.estado == 'vencida' %}bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300{% else %}bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300{% endif %}">
+                                    {{ cuota.estado.replace('_', ' ').title() }}
+                                </span>
+                                {% if cuota.dias_vencido > 0 %}
+                                <div class="mt-1 text-xs text-red-600 dark:text-red-400">{{ cuota.dias_vencido }} dia(s) vencida</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Historial de cobros</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Pagos activos y anulados asociados a esta cuenta.</p>
+        </div>
+
+        {% if detalle.pagos %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold">Fecha</th>
+                        <th class="px-4 py-3 text-left font-semibold">Producto</th>
+                        <th class="px-4 py-3 text-left font-semibold">Metodo</th>
+                        <th class="px-4 py-3 text-left font-semibold">Referencia</th>
+                        <th class="px-4 py-3 text-left font-semibold">Usuario</th>
+                        <th class="px-4 py-3 text-right font-semibold">Monto</th>
+                        <th class="px-4 py-3 text-left font-semibold">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for pago_item in detalle.pagos %}
+                    {% set pago = pago_item.pago %}
+                    <tr>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ pago.fecha_pago|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <div class="max-w-sm truncate" title="{{ pago_item.productos_venta.texto if pago_item.productos_venta else 'Sin detalle de productos' }}">
+                                {{ pago_item.productos_venta.texto if pago_item.productos_venta else 'Sin detalle de productos' }}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ pago.metodo.nombre if pago.metodo else '-' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <div>{{ pago.referencia or '-' }}</div>
+                            {% if pago_item.cuota_principal %}
+                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Cuota principal: #{{ pago_item.cuota_principal.numero_cuota }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ pago.usuario.nombre_completo if pago.usuario else ('Usuario #' ~ pago.id_usuario) }}</td>
+                        <td class="px-4 py-3 text-right font-semibold {% if pago_item.estado == 'anulado' %}text-gray-500 dark:text-gray-400{% else %}text-green-700 dark:text-green-400{% endif %}">Gs. {{ "{:,.0f}".format(pago.monto).replace(",", ".") }}</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ pago_item.estado_classes }}">{{ pago_item.estado_label }}</span>
+                            {% if pago_item.detalle_aplicacion and pago_item.detalle_aplicacion.cliente_nombre %}
+                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Cliente: {{ pago_item.detalle_aplicacion.cliente_nombre }}
+                            </div>
+                            {% endif %}
+                            {% if pago_item.cuotas_aplicadas %}
+                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Aplicado a:
+                                {% for cuota in pago_item.cuotas_aplicadas %}
+                                    #{{ cuota.numero_cuota }}{% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% if pago_item.estado == 'anulado' and pago.motivo_anulacion %}
+                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ pago.motivo_anulacion }}</div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-10 text-sm text-gray-500 dark:text-gray-400">
+            Esta cuenta todavia no tiene cobros registrados.
+        </div>
+        {% endif %}
+    </div>
+</div>
+<script>
+    (function () {
+        var form = document.querySelector('form[action*="/cobrar"]');
+        if (!form) {
+            return;
+        }
+        var btnAbrirModal = form.querySelector('[data-abrir-modal-cobro]');
+        var inputMonto = form.querySelector('input[name="monto"]');
+        var selectMetodo = form.querySelector('select[name="id_metodo_pago"]');
+        var inputReferencia = form.querySelector('[data-referencia-input]');
+        var labelReferencia = form.querySelector('[data-referencia-label]');
+        var ayudaReferencia = form.querySelector('[data-referencia-ayuda]');
+        var inputImprimir = form.querySelector('[data-imprimir-ticket]');
+        var modal = document.getElementById('modal-confirmar-cobro');
+        if (!btnAbrirModal || !inputMonto || !selectMetodo || !inputReferencia || !inputImprimir || !modal) {
+            return;
+        }
+
+        var resumenMonto = modal.querySelector('[data-resumen-monto-cobro]');
+        var resumenMetodo = modal.querySelector('[data-resumen-metodo-cobro]');
+        var btnConfirmar = modal.querySelector('[data-confirmar-imprimir-cobro]');
+        var botonesCerrar = modal.querySelectorAll('[data-cerrar-modal-cobro]');
+        var btnEnviarCaja = form.querySelector('button[formaction*="/enviar-a-caja"]');
+        var enviando = false;
+
+        function abrirModal() {
+            var monto = parseFloat((inputMonto.value || '').replace(',', '.')) || 0;
+            var metodoTexto = selectMetodo.options[selectMetodo.selectedIndex] ? selectMetodo.options[selectMetodo.selectedIndex].text : '-';
+            resumenMonto.textContent = 'Gs. ' + monto.toLocaleString('es-PY');
+            resumenMetodo.textContent = metodoTexto;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function cerrarModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function setEstadoEnvio(activo) {
+            enviando = !!activo;
+            if (btnAbrirModal) {
+                btnAbrirModal.disabled = enviando;
+            }
+            if (btnConfirmar) {
+                btnConfirmar.disabled = enviando;
+            }
+            if (btnEnviarCaja) {
+                btnEnviarCaja.disabled = enviando;
+            }
+        }
+
+        function esSubmitEnviarCaja(submitter) {
+            if (!submitter) {
+                return false;
+            }
+            var action = (submitter.getAttribute('formaction') || '').toLowerCase();
+            return action.indexOf('/enviar-a-caja') !== -1;
+        }
+
+        function resetearEstadoCobro() {
+            setEstadoEnvio(false);
+            inputImprimir.value = '0';
+            cerrarModal();
+        }
+
+        function sincronizarReferenciaRequerida() {
+            var opcion = selectMetodo.options[selectMetodo.selectedIndex];
+            var requiereReferencia = !!(opcion && opcion.dataset && opcion.dataset.requiereReferencia === '1');
+            inputReferencia.required = requiereReferencia;
+            inputReferencia.placeholder = requiereReferencia
+                ? 'Obligatoria para este metodo'
+                : 'Transferencia, recibo, comprobante';
+            if (labelReferencia) {
+                labelReferencia.textContent = requiereReferencia ? 'Referencia obligatoria' : 'Referencia';
+            }
+            if (ayudaReferencia) {
+                ayudaReferencia.textContent = requiereReferencia
+                    ? 'Este metodo requiere una referencia para registrar el cobro.'
+                    : 'Completa la referencia si el medio de pago la requiere.';
+            }
+        }
+
+        btnAbrirModal.addEventListener('click', function (event) {
+            event.preventDefault();
+            if (enviando) {
+                return;
+            }
+            if (typeof form.reportValidity === 'function' && !form.reportValidity()) {
+                return;
+            }
+            inputImprimir.value = '0';
+            abrirModal();
+        });
+        selectMetodo.addEventListener('change', sincronizarReferenciaRequerida);
+        botonesCerrar.forEach(function (btn) {
+            btn.addEventListener('click', cerrarModal);
+        });
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) {
+                cerrarModal();
+            }
+        });
+        btnConfirmar.addEventListener('click', function () {
+            if (enviando) {
+                return;
+            }
+            inputImprimir.value = '1';
+            cerrarModal();
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+                return;
+            }
+            form.submit();
+        });
+        form.addEventListener('submit', function (event) {
+            if (enviando) {
+                event.preventDefault();
+                return;
+            }
+
+            var submitter = event.submitter || null;
+            if (esSubmitEnviarCaja(submitter)) {
+                setEstadoEnvio(true);
+                return;
+            }
+
+            // Obliga el flujo de confirmación para evitar registros directos sin ticket.
+            if (inputImprimir.value !== '1') {
+                event.preventDefault();
+                if (typeof form.reportValidity === 'function' && !form.reportValidity()) {
+                    return;
+                }
+                abrirModal();
+                return;
+            }
+
+            setEstadoEnvio(true);
+        });
+        // Evita que el formulario quede bloqueado al volver con cache de navegador.
+        window.addEventListener('pageshow', resetearEstadoCobro);
+        window.addEventListener('focus', function () {
+            if (!enviando) {
+                return;
+            }
+            resetearEstadoCobro();
+        });
+        sincronizarReferenciaRequerida();
+        resetearEstadoCobro();
+    })();
+</script>
+{% endblock %}

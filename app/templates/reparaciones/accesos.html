@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Estadísticas de Accesos - Reparación #{{ reparacion.id_reparacion }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
+            <div class="px-6 py-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
+                <h1 class="text-xl font-bold text-white">
+                    <i class="fas fa-chart-bar mr-2"></i>
+                    Estadísticas de Seguimiento
+                </h1>
+                <a href="{{ url_for('reparaciones.detalle', id=reparacion.id_reparacion) }}"
+                    class="text-gray-300 hover:text-white">
+                    <i class="fas fa-times"></i> Cerrar
+                </a>
+            </div>
+
+            <div class="p-6">
+                <!-- Info de la reparación -->
+                <div class="mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                        Reparación #{{ reparacion.id_reparacion }}
+                    </h2>
+                    <p class="text-gray-600 dark:text-gray-400">
+                        <strong>Equipo:</strong> {{ reparacion.tipo_equipo }} - {{ reparacion.marca_modelo }}
+                    </p>
+                    <p class="text-gray-600 dark:text-gray-400">
+                        <strong>Cliente:</strong> {{ reparacion.cliente.nombre }}
+                    </p>
+                </div>
+
+                <!-- Estadísticas generales -->
+                {% if seguimiento %}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div
+                        class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-blue-600 dark:text-blue-400 font-medium">Total de Visitas</p>
+                                <p class="text-3xl font-bold text-blue-700 dark:text-blue-300">{{
+                                    seguimiento.access_count }}</p>
+                            </div>
+                            <i class="fas fa-eye text-4xl text-blue-300 dark:text-blue-700"></i>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-green-600 dark:text-green-400 font-medium">IPs Únicas</p>
+                                <p class="text-3xl font-bold text-green-700 dark:text-green-300">{{ ips_unicas }}</p>
+                            </div>
+                            <i class="fas fa-network-wired text-4xl text-green-300 dark:text-green-700"></i>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-purple-600 dark:text-purple-400 font-medium">Último Acceso</p>
+                                <p class="text-lg font-bold text-purple-700 dark:text-purple-300">
+                                    {% if seguimiento.last_accessed_at %}
+                                    {{ seguimiento.last_accessed_at|local_strftime('%d/%m %H:%M') }}
+                                    {% else %}
+                                    Nunca
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <i class="fas fa-clock text-4xl text-purple-300 dark:text-purple-700"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de accesos -->
+                <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            <i class="fas fa-list mr-2"></i>
+                            Últimos 50 Accesos
+                        </h3>
+                    </div>
+
+                    {% if accesos %}
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                                <tr>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Fecha y Hora
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Dirección IP
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Navegador / Dispositivo
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                {% for acceso in accesos %}
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                                        <i class="fas fa-calendar-alt text-gray-400 mr-2"></i>
+                                        {{ acceso.accessed_at|local_strftime('%d/%m/%Y %H:%M:%S') }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-700 dark:text-gray-300">
+                                        <i class="fas fa-globe text-gray-400 mr-2"></i>
+                                        {{ acceso.ip_address }}
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                                        <i class="fas fa-mobile-alt text-gray-400 mr-2"></i>
+                                        <span class="truncate max-w-md inline-block" title="{{ acceso.user_agent }}">
+                                            {{ acceso.user_agent[:80] }}{% if acceso.user_agent|length > 80 %}...{%
+                                            endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-inbox text-4xl mb-3"></i>
+                        <p>No hay accesos registrados todavía</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% else %}
+                <div
+                    class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-yellow-600 dark:text-yellow-400 mt-1 mr-3"></i>
+                        <div>
+                            <h3 class="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+                                Token de seguimiento no generado
+                            </h3>
+                            <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                                Esta reparación no tiene un token de seguimiento activo.
+                                El token se genera automáticamente al crear la reparación.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="flex justify-between items-center">
+            <a href="{{ url_for('reparaciones.detalle', id=reparacion.id_reparacion) }}"
+                class="px-4 py-2 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 rounded font-bold transition">
+                <i class="fas fa-arrow-left mr-2"></i>Volver a Detalle
+            </a>
+
+            {% if seguimiento %}
+            <form method="POST" action="{{ url_for('reparaciones.rotar_token', id=reparacion.id_reparacion) }}"
+                onsubmit="return confirm('¿Estás seguro? El link anterior dejará de funcionar y deberás imprimir un nuevo ticket.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit"
+                    class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded font-bold shadow transition">
+                    <i class="fas fa-sync-alt mr-2"></i>Rotar Token
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

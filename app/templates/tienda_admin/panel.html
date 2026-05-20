@@ -1,0 +1,573 @@
+{% extends "base.html" %}
+
+{% block title %}Mi Tienda Online{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+{% include "tienda_admin/_modal_imagenes.html" %}
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">🛒 Mi Tienda Online</h1>
+        <div class="flex gap-2">
+            <button
+                id="btnAbrirEstadisticasTienda"
+                type="button"
+                onclick="abrirModalEstadisticasTienda()"
+                class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition">
+                <i class="fas fa-chart-line mr-2"></i> Estadísticas
+            </button>
+            {% if show_publicidad_ads_analytics %}
+            <a
+                href="{{ url_for('publicidad_ads.admin_publicidad_ads') }}"
+                class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white transition">
+                <i class="fas fa-chart-area mr-2"></i> Analytics landing
+            </a>
+            {% endif %}
+            <button
+                id="btnAbrirConfiguracionTienda"
+                type="button"
+                onclick="abrirConfiguracion()"
+                class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
+                <i class="fas fa-cog mr-2"></i> Configuración
+            </button>
+            {% if tienda_config %}
+            <a href="{{ url_for('tienda_public.tienda_spa', slug=tienda_config.slug) }}" target="_blank" class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition">
+                <i class="fas fa-external-link-alt mr-2"></i> Ver tienda
+            </a>
+            <a href="{{ url_for('tienda_public.tienda_robot_spa', slug=tienda_config.slug) }}" target="_blank" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition">
+                <i class="fas fa-robot mr-2"></i> Ver link bot
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if tienda_config and tienda_config.slug %}
+    <div class="bg-gradient-to-r from-indigo-50 via-white to-sky-50 dark:from-indigo-950/40 dark:via-gray-800 dark:to-sky-950/30 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm p-4">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <p class="text-xs uppercase tracking-wide font-semibold text-indigo-600 dark:text-indigo-300 mb-1">Links del asistente</p>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Compartí el bot de la tienda sin armar la URL a mano</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Usá este link para compartir siempre la misma ventana exclusiva del asistente.</p>
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                Slug actual: <span class="font-semibold text-gray-700 dark:text-gray-200">{{ tienda_config.slug }}</span>
+            </div>
+        </div>
+        <div class="mt-4 grid grid-cols-1 gap-4">
+            <div class="rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-white/90 dark:bg-gray-900/50 p-4">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">Link bot</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Versión directa para campañas, QR o compartir por chat.</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 px-2.5 py-1 text-xs font-semibold">
+                        /robot/{{ tienda_config.slug }}
+                    </span>
+                </div>
+                <div class="mt-3 flex flex-col gap-3">
+                    <input id="linkBotStandalone" type="text" readonly value="{{ request.url_root.rstrip('/') }}{{ url_for('tienda_public.tienda_robot_spa', slug=tienda_config.slug) }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200">
+                    <div class="flex gap-2 flex-wrap">
+                        <button type="button" onclick="copiarLinkTienda('linkBotStandalone', this)" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition">
+                            <i class="fas fa-copy mr-2"></i>Copiar
+                        </button>
+                        <a href="{{ url_for('tienda_public.tienda_robot_spa', slug=tienda_config.slug) }}" target="_blank" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 text-sm font-medium transition hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <i class="fas fa-arrow-up-right-from-square mr-2"></i>Abrir
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% include "tienda_admin/_panel_promociones.html" %}
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+        <form
+            id="tienda-admin-search-form"
+            method="GET"
+            action="{{ url_for('tienda_admin.panel') }}"
+            class="flex gap-3 flex-wrap">
+            <div class="relative flex-1 min-w-64">
+                <input
+                    id="tienda-admin-search-input"
+                    type="text"
+                    name="q"
+                    value="{{ q }}"
+                    placeholder="Buscar productos..."
+                    oninput="tiendaAdminProgramarAutoBusqueda()"
+                    autocomplete="off"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 pl-3 pr-10 focus:border-blue-500 focus:outline-none">
+                <button
+                    id="tienda-admin-search-clear"
+                    type="button"
+                    onclick="tiendaAdminLimpiarBusqueda()"
+                    class="absolute inset-y-0 right-0 {% if q %}flex{% else %}hidden{% endif %} items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                    aria-label="Limpiar búsqueda">
+                    <i class="fas fa-times-circle"></i>
+                </button>
+            </div>
+            <button type="submit" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-900 text-white transition">Buscar</button>
+        </form>
+    </div>
+
+    <div id="tienda-admin-results" class="space-y-4">
+        {% with ocultar_busqueda=true %}
+        {% include "tienda_admin/_panel_productos.html" %}
+        {% endwith %}
+    </div>
+</div>
+
+{% include "tienda_admin/_estadisticas_producto.html" %}
+{% include "tienda_admin/_estadisticas_tienda.html" %}
+
+<!-- Modal de Configuración de Tienda -->
+<div id="modalConfiguracion" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 transition-opacity backdrop-blur-sm"></div>
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl border border-gray-200 dark:border-gray-700">
+                <!-- Header -->
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold leading-6 text-gray-900 dark:text-white" id="modal-title">
+                        <i class="fas fa-cogs mr-2 text-blue-500"></i> Configuración de la Tienda
+                    </h3>
+                    <button type="button" onclick="cerrarConfiguracion()" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                        <span class="sr-only">Cerrar</span>
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Body -->
+                <div class="px-6 py-6 bg-gradient-to-b from-white to-blue-50/40 dark:from-gray-800 dark:to-gray-900/70" x-data="{ tab: 'general' }">
+                    <!-- Tabs Nav -->
+                    <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+                        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                            <button @click="tab = 'general'" :class="tab === 'general' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'" class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                                Información General
+                            </button>
+                            <button @click="tab = 'apariencia'" :class="tab === 'apariencia' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'" class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                                Apariencia
+                            </button>
+                            <button @click="tab = 'contacto'" :class="tab === 'contacto' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'" class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                                Contacto
+                            </button>
+                            <button @click="tab = 'conversion'" :class="tab === 'conversion' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'" class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                                Conversión
+                            </button>
+                        </nav>
+                    </div>
+
+                    <form id="formConfiguracion" onsubmit="guardarConfiguracion(event)">
+                        <input type="hidden" name="id_config" value="{{ tienda_config.id_config if tienda_config else '' }}">
+                        <input type="hidden" name="slug_actual" value="{{ tienda_config.slug if tienda_config and tienda_config.slug else '' }}">
+                        <!-- Sección: Información General -->
+                        <div x-show="tab === 'general'" class="space-y-6">
+                            <div>
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+                                    <div class="sm:col-span-2">
+                                        <p class="text-xs uppercase tracking-wide font-semibold text-blue-600 dark:text-blue-400 mb-1">Identidad de la tienda</p>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">Configura cómo verán tu marca en la portada y en el pie de página.</p>
+                                    </div>
+                                    <div>
+                                        <label for="slug" class="block text-sm font-medium text-gray-700 dark:text-gray-300">URL de la Tienda (Slug) *</label>
+                                        <div class="mt-1 flex rounded-md shadow-sm">
+                                            <span class="inline-flex items-center rounded-l-md border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 text-gray-500 dark:text-gray-400 sm:text-sm">tienda/</span>
+                                            <input type="text" name="slug" id="slug" value="{{ tienda_config.slug if tienda_config and tienda_config.slug else '' }}" required
+                                                class="block w-full min-w-0 flex-1 rounded-none rounded-r-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        </div>
+                                        <p class="mt-1 text-xs text-gray-500">Sin espacios, ej: mi-negocio</p>
+                                    </div>
+                                    {% if tienda_config and tienda_config.slug %}
+                                    <div class="sm:col-span-2 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/80 dark:bg-indigo-950/20 p-4">
+                                        <div class="flex items-start justify-between gap-4 flex-wrap">
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-900 dark:text-white">Links del bot listos para compartir</p>
+                                                <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">Se generan automáticamente a partir del slug actual.</p>
+                                            </div>
+                                            <span class="text-xs text-indigo-700 dark:text-indigo-300 font-semibold">Slug: {{ tienda_config.slug }}</span>
+                                        </div>
+                                        <div class="mt-4 grid grid-cols-1 gap-3">
+                                            <div>
+                                                <label for="modalLinkBotStandalone" class="block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 mb-1">Link bot</label>
+                                                <div class="flex gap-2">
+                                                    <input id="modalLinkBotStandalone" type="text" readonly value="{{ request.url_root.rstrip('/') }}{{ url_for('tienda_public.tienda_robot_spa', slug=tienda_config.slug) }}" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                                    <button type="button" onclick="copiarLinkTienda('modalLinkBotStandalone', this)" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition text-sm font-medium">Copiar</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <label for="nombre_tienda" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la Tienda</label>
+                                        <input type="text" name="nombre_tienda" id="nombre_tienda" value="{{ tienda_config.nombre_tienda if tienda_config and tienda_config.nombre_tienda else '' }}"
+                                            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label for="titulo_footer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Título sección principal del pie</label>
+                                        <input type="text" name="titulo_footer" id="titulo_footer" value="{{ tienda_config.titulo_footer if tienda_config and tienda_config.titulo_footer else '' }}" placeholder="Ej: Nuestra Tienda"
+                                            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 sm:self-end">
+                                        <input type="checkbox" id="mostrar_titulo_footer" name="mostrar_titulo_footer" {% if not tienda_config or tienda_config.mostrar_titulo_footer %}checked{% endif %}
+                                            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                        Mostrar título en el pie
+                                    </label>
+                                </div>
+                                <div class="mt-4 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+                                    <label for="texto_portada" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Subtítulo / Texto de Portada</label>
+                                    <textarea name="texto_portada" id="texto_portada" rows="2"
+                                        class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.texto_portada if tienda_config and tienda_config.texto_portada else '' }}</textarea>
+                                </div>
+                                <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm space-y-3">
+                                        <div>
+                                            <p class="text-xs uppercase tracking-wide font-semibold text-blue-600 dark:text-blue-400 mb-1">Hero y portada</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Personaliza el bloque principal de bienvenida de la home.</p>
+                                        </div>
+                                        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <input type="checkbox" name="mostrar_hero_tienda" {% if not tienda_config or tienda_config.mostrar_hero_tienda %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar hero principal
+                                        </label>
+                                        <input type="text" name="titulo_hero_tienda" value="{{ tienda_config.titulo_hero_tienda if tienda_config and tienda_config.titulo_hero_tienda else '' }}" placeholder="Título principal del hero"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <textarea name="subtitulo_hero_tienda" rows="3" placeholder="Mensaje comercial corto para la portada"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.subtitulo_hero_tienda if tienda_config and tienda_config.subtitulo_hero_tienda else '' }}</textarea>
+                                        <input type="text" name="texto_boton_hero" value="{{ tienda_config.texto_boton_hero if tienda_config and tienda_config.texto_boton_hero else 'Explorar catálogo' }}" placeholder="Texto del botón principal"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <input type="checkbox" name="mostrar_bloque_beneficios_home" {% if tienda_config and tienda_config.mostrar_bloque_beneficios_home %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar beneficios cortos en home
+                                        </label>
+                                        <input type="text" name="beneficio_home_1_texto" value="{{ tienda_config.beneficio_home_1_texto if tienda_config and tienda_config.beneficio_home_1_texto else '' }}" placeholder="Beneficio home 1"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <input type="text" name="beneficio_home_2_texto" value="{{ tienda_config.beneficio_home_2_texto if tienda_config and tienda_config.beneficio_home_2_texto else '' }}" placeholder="Beneficio home 2"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <input type="text" name="beneficio_home_3_texto" value="{{ tienda_config.beneficio_home_3_texto if tienda_config and tienda_config.beneficio_home_3_texto else '' }}" placeholder="Beneficio home 3"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm space-y-3">
+                                        <div>
+                                            <p class="text-xs uppercase tracking-wide font-semibold text-blue-600 dark:text-blue-400 mb-1">Footer e institucional</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Configura texto institucional, enlaces rápidos y políticas.</p>
+                                        </div>
+                                        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <input type="checkbox" name="mostrar_footer_enlaces" {% if not tienda_config or tienda_config.mostrar_footer_enlaces %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar enlaces rápidos en footer
+                                        </label>
+                                        <textarea name="texto_footer_descripcion" rows="3" placeholder="Descripción comercial o institucional del pie"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.texto_footer_descripcion if tienda_config and tienda_config.texto_footer_descripcion else '' }}</textarea>
+                                        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <input type="checkbox" name="mostrar_politicas_envio" {% if tienda_config and tienda_config.mostrar_politicas_envio %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar políticas de envío
+                                        </label>
+                                        <input type="text" name="texto_politicas_envio" value="{{ tienda_config.texto_politicas_envio if tienda_config and tienda_config.texto_politicas_envio else '' }}" placeholder="Texto visible de políticas de envío"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <input type="url" name="link_politicas_envio" value="{{ tienda_config.link_politicas_envio if tienda_config and tienda_config.link_politicas_envio else '' }}" placeholder="URL opcional de políticas de envío"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <input type="checkbox" name="mostrar_politicas_cambios" {% if tienda_config and tienda_config.mostrar_politicas_cambios %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar cambios o devoluciones
+                                        </label>
+                                        <input type="text" name="texto_politicas_cambios" value="{{ tienda_config.texto_politicas_cambios if tienda_config and tienda_config.texto_politicas_cambios else '' }}" placeholder="Texto visible de cambios o devoluciones"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <input type="url" name="link_politicas_cambios" value="{{ tienda_config.link_politicas_cambios if tienda_config and tienda_config.link_politicas_cambios else '' }}" placeholder="URL opcional de cambios o devoluciones"
+                                            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sección: Apariencia -->
+                        <div x-show="tab === 'apariencia'" class="space-y-6" style="display: none;">
+                            <div>
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+                                    <div>
+                                        <label for="color_primario" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Color Primario</label>
+                                        <div class="mt-1 flex items-center gap-3">
+                                            <input type="color" name="color_primario" id="color_primario" value="{{ tienda_config.color_primario if tienda_config and tienda_config.color_primario else '#2563eb' }}"
+                                                class="h-10 w-14 rounded border border-gray-300 p-1 cursor-pointer">
+                                            <span class="text-sm text-gray-500 dark:text-gray-400" id="color_hex">{{ tienda_config.color_primario if tienda_config and tienda_config.color_primario else '#2563eb' }}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label for="estilo_tienda" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Estilo de la Tienda</label>
+                                        <select name="estilo_tienda" id="estilo_tienda"
+                                            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            <option value="moderno" {% if not tienda_config or tienda_config.estilo_tienda == 'moderno' %}selected{% endif %}>Moderno (Bordes redondeados)</option>
+                                            <option value="clasico" {% if tienda_config and tienda_config.estilo_tienda == 'clasico' %}selected{% endif %}>Clásico (Bordes cuadrados)</option>
+                                            <option value="minimalista" {% if tienda_config and tienda_config.estilo_tienda == 'minimalista' %}selected{% endif %}>Minimalista (Sin bordes, limpio)</option>
+                                            <option value="boutique" {% if tienda_config and tienda_config.estilo_tienda == 'boutique' %}selected{% endif %}>Boutique (Elegante editorial)</option>
+                                            <option value="tech" {% if tienda_config and tienda_config.estilo_tienda == 'tech' %}selected{% endif %}>Tech (Compacto y moderno)</option>
+                                            <option value="retail" {% if tienda_config and tienda_config.estilo_tienda == 'retail' %}selected{% endif %}>Retail (Comercial tipo vitrina)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Logo de la empresa</label>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Se muestra a la izquierda del título en el header. Recomendado: fondo transparente y formato horizontal.</p>
+
+                                    {% if tienda_config and tienda_config.logo_url %}
+                                    <div class="mt-3 mb-3 flex items-center gap-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 p-3">
+                                        <div class="h-16 w-16 overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/10">
+                                            <img src="{{ tienda_config.logo_url }}" alt="Logo actual" class="h-full w-full object-cover">
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">Logo actual</p>
+                                            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Se verá junto al nombre de la tienda.</p>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+
+                                    <div class="mt-3 flex items-center justify-center w-full">
+                                        <label for="logo_file" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600">
+                                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <i class="fas fa-image text-2xl text-gray-400 mb-2"></i>
+                                                <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">Haz clic para subir el logo</span> o arrastra y suelta</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, JPEG o WEBP (MAX. 5MB)</p>
+                                            </div>
+                                            <input id="logo_file" name="logo_file" type="file" class="hidden" accept="image/*" onchange="actualizarNombreArchivo(this)" data-target="nombre_archivo_logo" />
+                                        </label>
+                                    </div>
+                                    <p id="nombre_archivo_logo" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hidden"></p>
+
+                                    <div class="mt-3">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">O si prefieres, usa una URL externa:</p>
+                                        <input type="text" name="logo_url" id="logo_url" value="{{ tienda_config.logo_url if tienda_config and tienda_config.logo_url else '' }}" placeholder="https://ejemplo.com/logo.png o /static/tienda_uploads/logos/logo.webp"
+                                            class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Imagen para la Portada</label>
+                                    
+                                    {% if tienda_config and tienda_config.imagen_portada %}
+                                    <div class="mt-2 mb-3">
+                                        <p class="text-xs text-gray-500 mb-1">Imagen actual:</p>
+                                        <img src="{{ tienda_config.imagen_portada }}" alt="Portada actual" class="h-24 w-auto object-cover rounded-lg border border-gray-200 dark:border-gray-700">
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="mt-1 flex items-center justify-center w-full">
+                                        <label for="imagen_portada_file" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600">
+                                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-2"></i>
+                                                <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">Haz clic para subir</span> o arrastra y suelta</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, JPEG o WEBP (MAX. 5MB)</p>
+                                            </div>
+                                            <input id="imagen_portada_file" name="imagen_portada_file" type="file" class="hidden" accept="image/*" onchange="actualizarNombreArchivo(this)" data-target="nombre_archivo_portada" />
+                                        </label>
+                                    </div>
+                                    <p id="nombre_archivo_portada" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hidden"></p>
+                                    
+                                    <div class="mt-3">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">O si prefieres, usa una URL externa:</p>
+                                        <input type="text" name="imagen_portada" id="imagen_portada" value="{{ tienda_config.imagen_portada if tienda_config and tienda_config.imagen_portada else '' }}" placeholder="https://ejemplo.com/imagen.jpg o /static/tienda_uploads/portadas/imagen.webp"
+                                            class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sección: Contacto WhatsApp -->
+                        <div x-show="tab === 'contacto'" class="space-y-6" style="display: none;">
+                            <div class="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700 px-4 py-3">
+                                <h3 class="text-sm font-semibold text-blue-900 dark:text-blue-200">Configurá cómo te contactan</h3>
+                                <p class="mt-1 text-xs text-blue-700 dark:text-blue-300">Activá cada canal con su check y cargá el dato solo si querés mostrarlo en la tienda.</p>
+                            </div>
+                            <div>
+                                <div class="grid grid-cols-1 gap-4 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                                    <div>
+                                        <label for="telefono_whatsapp" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Número de WhatsApp (con código de país)</label>
+                                        <input type="text" name="telefono_whatsapp" id="telefono_whatsapp" value="{{ tienda_config.telefono_whatsapp if tienda_config and tienda_config.telefono_whatsapp else '' }}" placeholder="Ej: 595981234567"
+                                            class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label for="mensaje_whatsapp" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Mensaje por defecto (Opcional)</label>
+                                        <textarea name="mensaje_whatsapp" id="mensaje_whatsapp" rows="2" placeholder="Ej: ¡Hola! Vengo de la tienda online y quiero más información."
+                                            class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.mensaje_whatsapp if tienda_config and tienda_config.mensaje_whatsapp else '' }}</textarea>
+                                        <p class="mt-1 text-xs text-gray-500">Este mensaje aparecerá pre-escrito cuando el cliente haga clic en el botón de WhatsApp.</p>
+                                    </div>
+                                </div>
+                                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+                                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            <input type="checkbox" id="mostrar_email_contacto" name="mostrar_email_contacto" {% if tienda_config and tienda_config.mostrar_email_contacto %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar correo electrónico
+                                        </label>
+                                        <div id="email_contacto_wrap" class="mt-3 {{ '' if tienda_config and tienda_config.mostrar_email_contacto else 'hidden' }}">
+                                            <input type="email" name="email_contacto" id="email_contacto" value="{{ tienda_config.email_contacto if tienda_config and tienda_config.email_contacto else '' }}" placeholder="contacto@mitienda.com"
+                                                class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        </div>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+                                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            <input type="checkbox" id="mostrar_sitio_web" name="mostrar_sitio_web" {% if tienda_config and tienda_config.mostrar_sitio_web %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar sitio web
+                                        </label>
+                                        <div id="sitio_web_wrap" class="mt-3 {{ '' if tienda_config and tienda_config.mostrar_sitio_web else 'hidden' }}">
+                                            <input type="url" name="sitio_web" id="sitio_web" value="{{ tienda_config.sitio_web if tienda_config and tienda_config.sitio_web else '' }}" placeholder="https://mitienda.com"
+                                                class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        </div>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+                                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            <input type="checkbox" id="mostrar_instagram" name="mostrar_instagram" {% if tienda_config and tienda_config.mostrar_instagram %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar Instagram
+                                        </label>
+                                        <div id="instagram_url_wrap" class="mt-3 {{ '' if tienda_config and tienda_config.mostrar_instagram else 'hidden' }}">
+                                            <input type="url" name="instagram_url" id="instagram_url" value="{{ tienda_config.instagram_url if tienda_config and tienda_config.instagram_url else '' }}" placeholder="https://instagram.com/tuusuario"
+                                                class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        </div>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+                                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            <input type="checkbox" id="mostrar_facebook" name="mostrar_facebook" {% if tienda_config and tienda_config.mostrar_facebook %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar Facebook
+                                        </label>
+                                        <div id="facebook_url_wrap" class="mt-3 {{ '' if tienda_config and tienda_config.mostrar_facebook else 'hidden' }}">
+                                            <input type="url" name="facebook_url" id="facebook_url" value="{{ tienda_config.facebook_url if tienda_config and tienda_config.facebook_url else '' }}" placeholder="https://facebook.com/tupagina"
+                                                class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        </div>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm md:col-span-2">
+                                        <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            <input type="checkbox" id="mostrar_youtube" name="mostrar_youtube" {% if tienda_config and tienda_config.mostrar_youtube %}checked{% endif %}
+                                                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                            Mostrar YouTube
+                                        </label>
+                                        <div id="youtube_url_wrap" class="mt-3 {{ '' if tienda_config and tienda_config.mostrar_youtube else 'hidden' }}">
+                                            <input type="url" name="youtube_url" id="youtube_url" value="{{ tienda_config.youtube_url if tienda_config and tienda_config.youtube_url else '' }}" placeholder="https://youtube.com/@tu-canal"
+                                                class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div x-show="tab === 'conversion'" class="space-y-6" style="display: none;">
+                            <div class="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700 px-4 py-3">
+                                <h3 class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Mensajes que ayudan a vender más</h3>
+                                <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-300">Todo lo comercial queda editable para que cada tienda muestre solo lo que realmente ofrece.</p>
+                            </div>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                                <div>
+                                    <label for="texto_cta_catalogo" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">CTA del catálogo</label>
+                                    <input type="text" name="texto_cta_catalogo" id="texto_cta_catalogo" value="{{ tienda_config.texto_cta_catalogo if tienda_config and tienda_config.texto_cta_catalogo else 'Consultar' }}"
+                                        class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label for="texto_cta_producto" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">CTA de ficha de producto</label>
+                                    <input type="text" name="texto_cta_producto" id="texto_cta_producto" value="{{ tienda_config.texto_cta_producto if tienda_config and tienda_config.texto_cta_producto else 'Comprar por WhatsApp' }}"
+                                        class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label for="meta_pixel_id" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Meta Pixel ID</label>
+                                    <input type="text" name="meta_pixel_id" id="meta_pixel_id" inputmode="numeric" value="{{ tienda_config.meta_pixel_id if tienda_config and tienda_config.meta_pixel_id else '' }}" placeholder="Ej: 123456789012345"
+                                        class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    <p class="mt-1 text-xs text-gray-500">Si cargás un Pixel válido, la tienda enviará eventos base a Meta desde el link público.</p>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label for="mensaje_whatsapp_producto" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">Plantilla del mensaje para la ficha</label>
+                                    <textarea name="mensaje_whatsapp_producto" id="mensaje_whatsapp_producto" rows="3" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.mensaje_whatsapp_producto if tienda_config and tienda_config.mensaje_whatsapp_producto else 'Hola, vengo de la tienda web y me interesa el producto: {producto}' }}</textarea>
+                                    <p class="mt-1 text-xs text-gray-500">Podés usar {'{producto}'}, {'{precio}'}, {'{marca}'} y {'{modelo}'}.</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                                <div>
+                                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_destacados" {% if not tienda_config or tienda_config.mostrar_destacados %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar sección de destacados</label>
+                                    <input type="text" name="titulo_destacados" value="{{ tienda_config.titulo_destacados if tienda_config and tienda_config.titulo_destacados else '' }}" placeholder="Título para destacados"
+                                        class="mt-3 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_ofertas" {% if not tienda_config or tienda_config.mostrar_ofertas %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar sección de ofertas</label>
+                                    <input type="text" name="titulo_ofertas" value="{{ tienda_config.titulo_ofertas if tienda_config and tienda_config.titulo_ofertas else '' }}" placeholder="Título para ofertas"
+                                        class="mt-3 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                                <div>
+                                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_seccion_recomendados" {% if tienda_config and tienda_config.mostrar_seccion_recomendados %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar sección de recomendados</label>
+                                    <input type="text" name="titulo_recomendados" value="{{ tienda_config.titulo_recomendados if tienda_config and tienda_config.titulo_recomendados else '' }}" placeholder="Título para recomendados"
+                                        class="mt-3 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_seccion_imperdibles" {% if tienda_config and tienda_config.mostrar_seccion_imperdibles %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar sección de imperdibles</label>
+                                    <input type="text" name="titulo_imperdibles" value="{{ tienda_config.titulo_imperdibles if tienda_config and tienda_config.titulo_imperdibles else '' }}" placeholder="Título para imperdibles"
+                                        class="mt-3 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                                    <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Señales de confianza</h4>
+                                    <div class="mt-4 space-y-3">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_whatsapp_confianza" {% if tienda_config and tienda_config.mostrar_whatsapp_confianza %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> WhatsApp visible</label>
+                                        <input type="text" name="texto_whatsapp_confianza" value="{{ tienda_config.texto_whatsapp_confianza if tienda_config and tienda_config.texto_whatsapp_confianza else '' }}" placeholder="Atención rápida por WhatsApp" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_envios" {% if tienda_config and tienda_config.mostrar_envios %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Envíos</label>
+                                        <input type="text" name="texto_envios" value="{{ tienda_config.texto_envios if tienda_config and tienda_config.texto_envios else '' }}" placeholder="Envíos a todo el país" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_retiro_local" {% if tienda_config and tienda_config.mostrar_retiro_local %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Retiro en local</label>
+                                        <input type="text" name="texto_retiro_local" value="{{ tienda_config.texto_retiro_local if tienda_config and tienda_config.texto_retiro_local else '' }}" placeholder="Retirá en nuestro local" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_garantia" {% if tienda_config and tienda_config.mostrar_garantia %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Garantía</label>
+                                        <input type="text" name="texto_garantia" value="{{ tienda_config.texto_garantia if tienda_config and tienda_config.texto_garantia else '' }}" placeholder="Productos con garantía" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_horarios" {% if tienda_config and tienda_config.mostrar_horarios %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Horarios</label>
+                                        <input type="text" name="texto_horarios" value="{{ tienda_config.texto_horarios if tienda_config and tienda_config.texto_horarios else '' }}" placeholder="Atención de lunes a sábado" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_cobertura" {% if tienda_config and tienda_config.mostrar_cobertura %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Cobertura</label>
+                                        <input type="text" name="texto_cobertura" value="{{ tienda_config.texto_cobertura if tienda_config and tienda_config.texto_cobertura else '' }}" placeholder="Cobertura en Asunción y alrededores" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    </div>
+                                </div>
+                                <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                                    <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Ficha de producto</h4>
+                                    <div class="mt-4 space-y-3">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_texto_apoyo_whatsapp" {% if tienda_config and tienda_config.mostrar_texto_apoyo_whatsapp %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar texto de apoyo bajo el CTA</label>
+                                        <textarea name="texto_apoyo_whatsapp" rows="2" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.texto_apoyo_whatsapp if tienda_config and tienda_config.texto_apoyo_whatsapp else '' }}</textarea>
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_recordatorio_whatsapp" {% if tienda_config and tienda_config.mostrar_recordatorio_whatsapp %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar recordatorio comercial</label>
+                                        <input type="text" name="texto_recordatorio_whatsapp" value="{{ tienda_config.texto_recordatorio_whatsapp if tienda_config and tienda_config.texto_recordatorio_whatsapp else '' }}" placeholder="Consultá stock y disponibilidad antes de que se agote" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_beneficios_producto" {% if tienda_config and tienda_config.mostrar_beneficios_producto %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar beneficios del producto</label>
+                                        <input type="text" name="beneficio_producto_1" value="{{ tienda_config.beneficio_producto_1 if tienda_config and tienda_config.beneficio_producto_1 else '' }}" placeholder="Beneficio 1" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <input type="text" name="beneficio_producto_2" value="{{ tienda_config.beneficio_producto_2 if tienda_config and tienda_config.beneficio_producto_2 else '' }}" placeholder="Beneficio 2" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <input type="text" name="beneficio_producto_3" value="{{ tienda_config.beneficio_producto_3 if tienda_config and tienda_config.beneficio_producto_3 else '' }}" placeholder="Beneficio 3" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_bloque_confianza_producto" {% if tienda_config and tienda_config.mostrar_bloque_confianza_producto %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar bloque de confianza dentro de la ficha</label>
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_relacionados" {% if not tienda_config or tienda_config.mostrar_relacionados %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar productos relacionados</label>
+                                        <input type="text" name="titulo_relacionados" value="{{ tienda_config.titulo_relacionados if tienda_config and tienda_config.titulo_relacionados else 'Productos relacionados' }}" placeholder="Productos relacionados" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"><input type="checkbox" name="mostrar_descuento_porcentaje" {% if not tienda_config or tienda_config.mostrar_descuento_porcentaje %}checked{% endif %} class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"> Mostrar porcentaje de descuento cuando haya precio anterior</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Footer -->
+                <div class="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex flex-row-reverse gap-3 rounded-b-2xl border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="document.getElementById('formConfiguracion').requestSubmit()" class="inline-flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition-colors">
+                        Guardar Configuración
+                    </button>
+                    <button type="button" onclick="cerrarConfiguracion()" class="inline-flex w-full justify-center rounded-lg bg-white dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-gray-200 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 sm:w-auto transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include "tienda_admin/_modal_oferta.html" %}
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+{% include "tienda_admin/_panel_base_js.html" %}
+{% include "tienda_admin/_panel_media_js.html" %}
+{% include "tienda_admin/_panel_promociones_js.html" %}
+{% include "tienda_admin/_estadisticas_tienda_js.html" %}
+</script>
+{% endblock %}

@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Compra #{{ compra.id_compra }}{% endblock %}
+
+{% block content %}
+{% set form_id_proveedor = request.form.get('id_proveedor', compra.id_proveedor|string) %}
+{% set form_numero_factura = request.form.get('numero_factura', compra.numero_factura or '') %}
+{% set form_fecha = request.form.get('fecha_compra', compra.fecha_compra.strftime('%Y-%m-%d') if compra.fecha_compra else '') %}
+{% set form_hora = request.form.get('hora_compra', compra.hora_compra.strftime('%H:%M') if compra.hora_compra else '') %}
+{% set form_observaciones = request.form.get('observaciones', compra.observaciones or '') %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-pen-to-square text-purple-600 dark:text-purple-400 mr-2"></i>Editar Compra #{{ compra.id_compra }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Solo se pueden modificar datos administrativos no sensibles.
+            </p>
+        </div>
+        <a href="{{ url_for('compras.detalle', id=compra.id_compra) }}"
+            class="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+            <i class="fas fa-arrow-left mr-2"></i>Volver al detalle
+        </a>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Proveedor</label>
+                    <select name="id_proveedor"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                        <option value="">Sin proveedor especifico</option>
+                        {% for prov in proveedores %}
+                        {% if prov.id_proveedor != 1 %}
+                        <option value="{{ prov.id_proveedor }}" {% if form_id_proveedor == prov.id_proveedor|string %}selected{% endif %}>
+                            {{ prov.nombre }}
+                        </option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"># Factura</label>
+                    <input type="text" name="numero_factura" value="{{ form_numero_factura }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Fecha</label>
+                    <input type="date" name="fecha_compra" value="{{ form_fecha }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Hora</label>
+                    <input type="time" name="hora_compra" value="{{ form_hora }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+            </div>
+
+            <div class="mt-5">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Descripcion</label>
+                <textarea name="observaciones" rows="4"
+                    placeholder="Ej: correccion del numero de factura o detalle administrativo."
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-3 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">{{ form_observaciones }}</textarea>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Este cambio no modifica productos, cantidades, precios ni pagos.
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300 space-y-4">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">
+                    <i class="fas fa-file-invoice text-purple-600 dark:text-purple-400 mr-2"></i>Foto de factura
+                </h2>
+                {% if compra.factura_imagen_url %}
+                <a href="{{ compra.factura_imagen_url }}" target="_blank" rel="noopener"
+                    class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                    Abrir imagen actual
+                </a>
+                {% endif %}
+            </div>
+
+            {% if compra.factura_imagen_url %}
+            <img src="{{ compra.factura_imagen_url }}" alt="Factura actual de compra {{ compra.id_compra }}"
+                class="max-h-72 rounded-lg border border-gray-200 dark:border-gray-700 object-contain bg-gray-50 dark:bg-gray-900">
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                <input type="checkbox" name="quitar_factura"
+                    class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                Quitar la factura actual
+            </label>
+            {% else %}
+            <div class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-4 py-6 text-sm text-gray-500 dark:text-gray-400">
+                Esta compra no tiene una foto de factura adjunta.
+            </div>
+            {% endif %}
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Reemplazar imagen</label>
+                <input type="file" name="factura_imagen" accept=".png,.jpg,.jpeg,.webp,.gif,image/*"
+                    class="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-white file:mr-4 file:rounded-md file:border-0 file:bg-purple-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-purple-700">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Si carga una nueva imagen, reemplaza la actual y se conserva el historial en auditoria.
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                    <p class="text-gray-500 dark:text-gray-400">Productos</p>
+                    <p class="font-semibold text-gray-800 dark:text-white">{{ compra.cantidad_items }}</p>
+                </div>
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                    <p class="text-gray-500 dark:text-gray-400">Tipo</p>
+                    <p class="font-semibold text-gray-800 dark:text-white">{{ compra.tipo_compra|title }}</p>
+                </div>
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                    <p class="text-gray-500 dark:text-gray-400">Total</p>
+                    <p class="font-semibold text-gray-800 dark:text-white">₲ {{ "{:,.0f}".format(compra.total).replace(",", ".") }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <a href="{{ url_for('compras.detalle', id=compra.id_compra) }}"
+                class="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+                Cancelar
+            </a>
+            <button type="submit"
+                class="inline-flex items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700">
+                <i class="fas fa-save mr-2"></i>Guardar cambios
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,183 @@
+<div class="space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-4">
+        <div class="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4">
+            <p class="text-sm text-orange-700 dark:text-orange-300">Tomadas</p>
+            <p class="text-2xl font-bold text-orange-800 dark:text-orange-200">{{ resumen.tomadas }}</p>
+        </div>
+        <div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
+            <p class="text-sm text-green-700 dark:text-green-300">Finalizadas</p>
+            <p class="text-2xl font-bold text-green-800 dark:text-green-200">{{ resumen.finalizadas }}</p>
+        </div>
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
+            <p class="text-sm text-blue-700 dark:text-blue-300">Entregas cliente</p>
+            <p class="text-2xl font-bold text-blue-800 dark:text-blue-200">{{ resumen.entregas_cliente }}</p>
+        </div>
+        <div class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4">
+            <p class="text-sm text-emerald-700 dark:text-emerald-300">Total generado</p>
+            <p class="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
+                ₲ {{ "{:,.0f}".format(resumen.total_generado).replace(",", ".") }}
+            </p>
+        </div>
+        <div class="bg-slate-50 dark:bg-slate-900/30 rounded-xl p-4">
+            <p class="text-sm text-slate-700 dark:text-slate-300">Promedio toma</p>
+            <p class="text-2xl font-bold text-slate-800 dark:text-slate-100">
+                {{ resumen.promedio_toma_horas if resumen.promedio_toma_horas is not none else '—' }}
+                <span class="text-sm font-medium">h</span>
+            </p>
+        </div>
+        <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4">
+            <p class="text-sm text-purple-700 dark:text-purple-300">En curso</p>
+            <p class="text-2xl font-bold text-purple-800 dark:text-purple-200">{{ resumen.en_curso }}</p>
+        </div>
+        <div class="bg-violet-50 dark:bg-violet-900/20 rounded-xl p-4">
+            <p class="text-sm text-violet-700 dark:text-violet-300">Promedio resolución</p>
+            <p class="text-2xl font-bold text-violet-800 dark:text-violet-200">
+                {{ resumen.promedio_resolucion_horas if resumen.promedio_resolucion_horas is not none else '—' }}
+                <span class="text-sm font-medium">h</span>
+            </p>
+        </div>
+    </div>
+
+    <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-200 px-4 py-3 text-sm">
+        El técnico suma una reparación finalizada cuando la deja en <span class="font-semibold">Listo para entrega</span>, <span class="font-semibold">No se pudo</span> o <span class="font-semibold">Entregado</span>. La entrega al cliente se muestra aparte.
+    </div>
+
+    <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-200 px-4 py-3 text-sm">
+        {{ paginacion.total }} reparación{{ '' if paginacion.total == 1 else 'es' }} en total · Página {{ paginacion.page }} de {{ paginacion.pages }}
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-100">Ranking por técnico</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Técnico</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Tomadas</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Finalizadas</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Entregas cliente</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">En curso</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Generado</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Prom. resolución</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for row in ranking %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                            <div class="font-semibold">{{ row.nombre }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ row.rol or '—' }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">{{ row.tomadas }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">{{ row.finalizadas }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">{{ row.entregas_cliente }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">{{ row.en_curso }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(row.total_generado).replace(",", ".") }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">
+                            {{ row.promedio_resolucion_horas if row.promedio_resolucion_horas is not none else '—' }} h
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">Sin datos técnicos para el rango seleccionado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-100">Historial técnico</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Reparación</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Técnico</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Ingreso</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Toma</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Cierre técnico</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Entrega cliente</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Generado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for item in historial %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                            <a href="{{ item.url }}" class="text-blue-600 dark:text-blue-400 hover:underline font-semibold">
+                                #{{ item.id_reparacion }}
+                            </a>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.cliente }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.equipo }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.estado }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ item.tecnico }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ item.fecha_ingreso|local_strftime('%d/%m/%Y %H:%M') if item.fecha_ingreso else '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            {{ item.fecha_toma|local_strftime('%d/%m/%Y %H:%M') if item.fecha_toma else '—' }}
+                            {% if item.demora_toma_horas is not none %}
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.demora_toma_horas }} h desde ingreso</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            {{ item.fecha_listo|local_strftime('%d/%m/%Y %H:%M') if item.fecha_listo else '—' }}
+                            {% if item.demora_resolucion_horas is not none %}
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.demora_resolucion_horas }} h resolución</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ item.fecha_entrega|local_strftime('%d/%m/%Y %H:%M') if item.fecha_entrega else '—' }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">
+                            <div>₲ {{ "{:,.0f}".format(item.generado).replace(",", ".") }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">MO: ₲ {{ "{:,.0f}".format(item.mano_obra).replace(",", ".") }}</div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No hay reparaciones técnicas para mostrar.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if paginacion.pages > 1 %}
+        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                Mostrando {{ historial|length }} de {{ paginacion.total }} registros
+            </div>
+            <div class="flex items-center gap-2">
+                {% if paginacion.has_prev %}
+                <a href="{{ url_for('reportes_tecnicos.historial_tecnicos', desde=desde.isoformat(), hasta=hasta.isoformat(), id_tecnico=id_tecnico or None, estado=estado, page=paginacion.prev_num) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    Anterior
+                </a>
+                {% else %}
+                <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                    Anterior
+                </span>
+                {% endif %}
+
+                <span class="px-3 py-1.5 rounded-lg text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100">
+                    {{ paginacion.page }} / {{ paginacion.pages }}
+                </span>
+
+                {% if paginacion.has_next %}
+                <a href="{{ url_for('reportes_tecnicos.historial_tecnicos', desde=desde.isoformat(), hasta=hasta.isoformat(), id_tecnico=id_tecnico or None, estado=estado, page=paginacion.next_num) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    Siguiente
+                </a>
+                {% else %}
+                <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                    Siguiente
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

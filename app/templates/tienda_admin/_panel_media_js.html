@@ -1,0 +1,337 @@
+let productoActualImagenes = null;
+let imagenProductoPendiente = null;
+
+async function abrirModalImagenes(idProducto) {
+    productoActualImagenes = idProducto;
+    const modal = document.getElementById('modalImagenes');
+    modal.classList.remove('hidden');
+    await cargarGaleriaImagenes(idProducto);
+}
+
+function cerrarModalImagenes() {
+    document.getElementById('modalImagenes').classList.add('hidden');
+    productoActualImagenes = null;
+    limpiarEditorImagenProducto();
+    document.getElementById('galeriaImagenes').innerHTML = '<div class="col-span-full py-8 text-center text-gray-500 dark:text-gray-400 text-sm italic">Cargando imágenes...</div>';
+}
+
+async function cargarGaleriaImagenes(idProducto) {
+    const contenedor = document.getElementById('galeriaImagenes');
+    try {
+        const res = await fetch(`/api/tienda/admin/producto/${idProducto}/imagenes`);
+        const data = await res.json();
+
+        if (data.ok) {
+            if (data.imagenes.length === 0) {
+                contenedor.innerHTML = '<div class="col-span-full py-8 text-center text-gray-500 dark:text-gray-400 text-sm italic">Este producto no tiene imágenes.</div>';
+                return;
+            }
+
+            contenedor.innerHTML = data.imagenes.map(img => `
+                <div class="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    <img src="${img.url}" alt="Imagen de producto" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-sm">
+                        <button onclick="rotarImagenExistente(${img.id_imagen}, -90)" class="bg-gray-800/90 hover:bg-gray-900 text-white p-2 rounded-full transform hover:scale-110 transition" title="Girar a la izquierda">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                        <button onclick="rotarImagenExistente(${img.id_imagen}, 90)" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full transform hover:scale-110 transition" title="Girar a la derecha">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                        <button onclick="eliminarImagen(${img.id_imagen})" class="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transform hover:scale-110 transition" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (_error) {
+        contenedor.innerHTML = '<div class="col-span-full py-8 text-center text-red-500 text-sm">Error al cargar las imágenes.</div>';
+    }
+}
+
+function seleccionarImagenProducto(input) {
+    if (!input.files || input.files.length === 0) return;
+    if (!productoActualImagenes) return;
+
+    const file = input.files[0];
+    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+    if (!tiposPermitidos.includes(file.type)) {
+        alert('Solo se permiten imágenes PNG, JPG, WEBP o GIF.');
+        input.value = '';
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        alert('La imagen supera el máximo permitido de 5MB.');
+        input.value = '';
+        return;
+    }
+
+    limpiarEditorImagenProducto();
+    const previewUrl = URL.createObjectURL(file);
+    imagenProductoPendiente = {
+        file,
+        rotation: 0,
+        previewUrl,
+    };
+
+    document.getElementById('previewImagenProducto').src = previewUrl;
+    document.getElementById('nombreArchivoImagenProducto').textContent = file.name;
+    document.getElementById('editorImagenProducto').classList.remove('hidden');
+    actualizarVistaPreviaImagenProducto();
+}
+
+function actualizarVistaPreviaImagenProducto() {
+    if (!imagenProductoPendiente) return;
+    const angulo = ((imagenProductoPendiente.rotation % 360) + 360) % 360;
+    document.getElementById('previewImagenProducto').style.transform = `rotate(${angulo}deg)`;
+    document.getElementById('estadoRotacionImagenProducto').textContent = `${angulo}°`;
+}
+
+function rotarImagenProducto(delta) {
+    if (!imagenProductoPendiente) return;
+    imagenProductoPendiente.rotation += delta;
+    actualizarVistaPreviaImagenProducto();
+}
+
+function resetRotacionImagenProducto() {
+    if (!imagenProductoPendiente) return;
+    imagenProductoPendiente.rotation = 0;
+    actualizarVistaPreviaImagenProducto();
+}
+
+function cancelarImagenProductoPendiente() {
+    limpiarEditorImagenProducto();
+}
+
+function limpiarEditorImagenProducto() {
+    if (imagenProductoPendiente && imagenProductoPendiente.previewUrl) {
+        URL.revokeObjectURL(imagenProductoPendiente.previewUrl);
+    }
+
+    imagenProductoPendiente = null;
+    document.getElementById('editorImagenProducto').classList.add('hidden');
+    document.getElementById('previewImagenProducto').src = '';
+    document.getElementById('previewImagenProducto').style.transform = 'rotate(0deg)';
+    document.getElementById('nombreArchivoImagenProducto').textContent = '';
+    document.getElementById('estadoRotacionImagenProducto').textContent = '0°';
+    const input = document.getElementById('file-upload-producto');
+    if (input) {
+        input.value = '';
+    }
+}
+
+async function cargarImagenEnMemoria(url) {
+    return await new Promise((resolve, reject) => {
+        const imagen = new Image();
+        imagen.onload = () => resolve(imagen);
+        imagen.onerror = () => reject(new Error('No se pudo cargar la imagen.'));
+        imagen.src = url;
+    });
+}
+
+function obtenerNombreImagenTransformada(file, mimeType) {
+    const nombreBase = (file.name || 'imagen').replace(/\.[^.]+$/, '') || 'imagen';
+    const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+    return `${nombreBase}.${extension}`;
+}
+
+async function prepararImagenProductoParaSubida(file, rotation) {
+    const angulo = ((rotation % 360) + 360) % 360;
+    if (angulo === 0) {
+        return { blob: file, filename: file.name || 'imagen.jpg' };
+    }
+
+    const fuente = URL.createObjectURL(file);
+
+    try {
+        const imagen = await cargarImagenEnMemoria(fuente);
+        const rotacionVertical = angulo === 90 || angulo === 270;
+        const canvas = document.createElement('canvas');
+        canvas.width = rotacionVertical ? imagen.naturalHeight : imagen.naturalWidth;
+        canvas.height = rotacionVertical ? imagen.naturalWidth : imagen.naturalHeight;
+
+        const contexto = canvas.getContext('2d');
+        contexto.translate(canvas.width / 2, canvas.height / 2);
+        contexto.rotate((angulo * Math.PI) / 180);
+        contexto.drawImage(imagen, -imagen.naturalWidth / 2, -imagen.naturalHeight / 2);
+
+        const mimeType = ['image/png', 'image/webp'].includes(file.type) ? file.type : 'image/jpeg';
+        const blob = await new Promise((resolve, reject) => {
+            canvas.toBlob(
+                (resultado) => resultado ? resolve(resultado) : reject(new Error('No se pudo procesar la imagen.')),
+                mimeType,
+                mimeType === 'image/png' ? undefined : 0.92
+            );
+        });
+
+        return {
+            blob,
+            filename: obtenerNombreImagenTransformada(file, mimeType),
+        };
+    } finally {
+        URL.revokeObjectURL(fuente);
+    }
+}
+
+async function confirmarSubidaImagenProducto() {
+    if (!imagenProductoPendiente || !productoActualImagenes) return;
+
+    const file = imagenProductoPendiente.file;
+    const rotation = imagenProductoPendiente.rotation;
+    const formData = new FormData();
+
+    const loader = document.getElementById('uploadLoader');
+    loader.classList.remove('hidden');
+
+    try {
+        const archivoPreparado = await prepararImagenProductoParaSubida(file, rotation);
+        formData.append('imagen', archivoPreparado.blob, archivoPreparado.filename);
+
+        const res = await fetch(`/api/tienda/admin/producto/${productoActualImagenes}/imagen`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            await cargarGaleriaImagenes(productoActualImagenes);
+            limpiarEditorImagenProducto();
+        } else {
+            alert('Error al subir: ' + (data.error || 'Formato no permitido'));
+        }
+    } catch (_error) {
+        alert('Error de conexión al subir la imagen.');
+    } finally {
+        loader.classList.add('hidden');
+    }
+}
+
+async function eliminarImagen(idImagen) {
+    if (!confirm('¿Seguro que deseas eliminar esta imagen?')) return;
+
+    try {
+        const res = await fetch(`/api/tienda/admin/imagen/${idImagen}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            await cargarGaleriaImagenes(productoActualImagenes);
+        } else {
+            alert('No se pudo eliminar la imagen');
+        }
+    } catch (_error) {
+        alert('Error al intentar eliminar.');
+    }
+}
+
+async function rotarImagenExistente(idImagen, grados) {
+    try {
+        const res = await fetch(`/api/tienda/admin/imagen/${idImagen}/rotar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ grados })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            await cargarGaleriaImagenes(productoActualImagenes);
+        } else {
+            alert('No se pudo rotar la imagen: ' + (data.error || 'error desconocido'));
+        }
+    } catch (_error) {
+        alert('Error al intentar rotar la imagen.');
+    }
+}
+
+let productoActualOferta = null;
+let estadoActualOferta = null;
+
+function abrirModalOferta(idProducto, ofertaActual) {
+    productoActualOferta = idProducto;
+    estadoActualOferta = ofertaActual;
+    document.getElementById('precio_anterior_input').value = '';
+
+    const modal = document.getElementById('modalPrecioOferta');
+    modal.classList.remove('hidden');
+
+    setTimeout(() => {
+        document.getElementById('modalOfertaBackdrop').classList.add('opacity-100');
+        document.getElementById('modalOfertaPanel').classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
+        document.getElementById('precio_anterior_input').focus();
+    }, 10);
+}
+
+function cerrarModalOferta() {
+    document.getElementById('modalOfertaBackdrop').classList.remove('opacity-100');
+    document.getElementById('modalOfertaPanel').classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+
+    setTimeout(() => {
+        document.getElementById('modalPrecioOferta').classList.add('hidden');
+        productoActualOferta = null;
+        estadoActualOferta = null;
+    }, 300);
+}
+
+document.getElementById('btnConfirmarOferta')?.addEventListener('click', async () => {
+    if (!productoActualOferta) return;
+
+    const payload = { oferta: !estadoActualOferta };
+    const precioAnterior = document.getElementById('precio_anterior_input').value;
+
+    if (precioAnterior && precioAnterior.trim() !== '') {
+        payload.precio_anterior = parseFloat(precioAnterior);
+    }
+
+    try {
+        const res = await fetch(`/api/tienda/admin/producto/${productoActualOferta}/publicar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            alert('No se pudo actualizar el estado de oferta');
+        } else {
+            location.reload();
+        }
+    } catch (_error) {
+        alert('Error al conectar con el servidor');
+    } finally {
+        cerrarModalOferta();
+    }
+});
+
+async function toggleOferta(idProducto, ofertaActual) {
+    if (!ofertaActual) {
+        abrirModalOferta(idProducto, ofertaActual);
+        return;
+    }
+
+    const res = await fetch(`/api/tienda/admin/producto/${idProducto}/publicar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oferta: false }),
+    });
+    if (!res.ok) {
+        alert('No se pudo actualizar el estado de oferta');
+    } else {
+        location.reload();
+    }
+}
+
+async function editarDescripcion(idProducto, descActual) {
+    const nuevaDesc = prompt('Ingresa la descripción para la tienda online (puedes dejarlo vacío):', descActual || '');
+    if (nuevaDesc === null) return;
+
+    const res = await fetch(`/api/tienda/admin/producto/${idProducto}/publicar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ descripcion_tienda: nuevaDesc }),
+    });
+    if (!res.ok) {
+        alert('No se pudo actualizar la descripción');
+        return;
+    }
+    location.reload();
+}

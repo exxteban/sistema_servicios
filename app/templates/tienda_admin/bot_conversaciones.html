@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Conversaciones del Bot{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Conversaciones del Bot</h1>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                Historial del chat web para revisar consultas, herramientas usadas y derivaciones.
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <a
+                href="{{ url_for('tienda_admin.panel') }}"
+                class="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+                <i class="fas fa-arrow-left"></i>
+                Volver al panel
+            </a>
+        </div>
+    </div>
+
+    <form class="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 md:grid-cols-4">
+        <div class="md:col-span-2">
+            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Buscar</label>
+            <input
+                type="text"
+                name="q"
+                value="{{ q }}"
+                placeholder="Slug, email, teléfono o token"
+                class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+            >
+        </div>
+        <div>
+            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Estado</label>
+            <select
+                name="estado"
+                class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+            >
+                <option value="">Todos</option>
+                <option value="bot" {% if estado == 'bot' %}selected{% endif %}>Bot</option>
+                <option value="handoff" {% if estado == 'handoff' %}selected{% endif %}>Handoff</option>
+                <option value="blocked" {% if estado == 'blocked' %}selected{% endif %}>Blocked</option>
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Slug</label>
+            <input
+                type="text"
+                name="slug"
+                value="{{ slug }}"
+                placeholder="mi-tienda"
+                class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+            >
+        </div>
+        <div class="md:col-span-4 flex items-center gap-2">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+                <i class="fas fa-search"></i>
+                Filtrar
+            </button>
+            <a
+                href="{{ url_for('tienda_admin.bot_conversaciones') }}"
+                class="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+                Limpiar
+            </a>
+        </div>
+    </form>
+
+    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                <thead class="bg-gray-50 dark:bg-gray-950/60">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Sesión</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Visitante</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tienda</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Actividad</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Mensajes</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                    {% for sesion in sesiones %}
+                    <tr class="align-top">
+                        <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-200">
+                            <div class="font-semibold">#{{ sesion.id }}</div>
+                            <div class="mt-1 flex flex-wrap gap-2">
+                                <span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+                                    {{ sesion.estado }}
+                                </span>
+                                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                    {{ sesion.origen }}
+                                </span>
+                                {% if sesion.expirada %}
+                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                    expirada
+                                </span>
+                                {% endif %}
+                                {% if sesion.warning_count %}
+                                <span class="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">
+                                    {{ sesion.warning_count }} advertencia{{ 's' if sesion.warning_count != 1 else '' }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-200">
+                            <div>{{ sesion.nombre_visitante or 'Sin nombre' }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ sesion.telefono_visitante or 'Sin teléfono' }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ sesion.email_visitante or 'Sin email' }}</div>
+                        </td>
+                        <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-200">
+                            <div class="font-medium">{{ sesion.slug_tienda }}</div>
+                            <div class="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400">{{ sesion.ultimo_mensaje or 'Sin mensajes visibles' }}</div>
+                        </td>
+                        <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-200">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Creada</div>
+                            <div>{{ sesion.fecha_creacion or '—' }}</div>
+                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Última actividad</div>
+                            <div>{{ sesion.ultima_actividad or '—' }}</div>
+                        </td>
+                        <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-200">
+                            <div>{{ sesion.total_mensajes }} totales</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ sesion.total_tools }} eventos tool</div>
+                            {% if sesion.last_reason_label %}
+                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Última falta</div>
+                            <div class="text-xs font-semibold text-gray-700 dark:text-gray-200">{{ sesion.last_reason_label }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-4 text-right">
+                            <a
+                                href="{{ url_for('tienda_admin.bot_conversacion_detalle', id_sesion=sesion.id) }}"
+                                class="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                            >
+                                Ver detalle
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                            No hay conversaciones para los filtros seleccionados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <div class="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div class="text-gray-500 dark:text-gray-400">
+            Página {{ pagination.page }} de {{ pagination.pages }}
+        </div>
+        <div class="flex gap-2">
+            {% if pagination.has_prev %}
+            <a
+                href="{{ url_for('tienda_admin.bot_conversaciones', page=pagination.prev_num, q=q, estado=estado, slug=slug) }}"
+                class="rounded-xl border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+                Anterior
+            </a>
+            {% endif %}
+            {% if pagination.has_next %}
+            <a
+                href="{{ url_for('tienda_admin.bot_conversaciones', page=pagination.next_num, q=q, estado=estado, slug=slug) }}"
+                class="rounded-xl border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+                Siguiente
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

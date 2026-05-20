@@ -1,0 +1,1472 @@
+{% extends "base.html" %}
+
+{% block title %}Caja - {{ sesion.caja.nombre }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6"
+    x-data='cajaEstadoData({{ {
+        "csrfToken": csrf_token(),
+        "colaRealtimeActiva": current_user.tiene_permiso("ver_cola_cobro") and caja_alerta_pendientes_activa,
+        "colaPollingMs": 4000,
+        "colaFiltros": cola_filtros,
+        "idUsuarioActual": current_user.id_usuario,
+        "esAdmin": current_user.es_admin(),
+        "puedeTomarColaCobro": current_user.tiene_permiso("tomar_cola_cobro")
+    }|tojson }})'>
+    <!-- Header -->
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-wallet text-green-600 dark:text-green-400 mr-2"></i>Estado de Caja
+        </h1>
+        <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <a href="{{ url_for('caja.registrar_movimiento') }}"
+                data-permiso="movimiento_caja"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition w-full sm:w-auto text-center">
+                <i class="fas fa-exchange-alt mr-2"></i>Movimiento
+            </a>
+            <a href="{{ url_for('caja.cerrar') }}"
+                data-permiso="cerrar_caja"
+                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition w-full sm:w-auto text-center">
+                <i class="fas fa-lock mr-2"></i>Cerrar Caja
+            </a>
+        </div>
+    </div>
+
+    {% if current_user.tiene_permiso('ver_cola_cobro') and caja_alerta_pendientes_activa %}
+    <div id="cola-cobro-panel" x-ref="colaPanel" class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300 order-first">
+        <div class="bg-amber-50 dark:bg-amber-900/20 px-6 py-4 border-b border-amber-100 dark:border-amber-800 flex items-center justify-between gap-3">
+            <h2 class="font-semibold text-amber-900 dark:text-amber-200">
+                <i class="fas fa-bell mr-2"></i>Pendientes enviados a caja
+            </h2>
+            <div class="flex flex-wrap items-center justify-end gap-2 text-xs">
+                <span id="cola-visibles" class="px-2 py-1 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-100 font-bold">
+                    {{ cola_pendientes|length }} visibles
+                </span>
+                <span id="cola-total" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-100">
+                    {{ cola_totales.total }} activas
+                </span>
+                <span id="cola-pendientes-count" class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
+                    {{ cola_totales.pendiente }} pendientes
+                </span>
+                <span id="cola-en-proceso-count" class="px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    {{ cola_totales.en_proceso }} en proceso
+                </span>
+            </div>
+        </div>
+        <form method="get" @submit.prevent="aplicarFiltrosCola($event)" class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <label class="block text-sm">
+                    <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Origen</span>
+                    <select name="cola_tipo" x-model="colaFiltros.tipo" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
+                        <option value="todas" {% if cola_filtros.tipo == 'todas' %}selected{% endif %}>Todos</option>
+                        <option value="venta" {% if cola_filtros.tipo == 'venta' %}selected{% endif %}>Ventas</option>
+                        <option value="reparacion" {% if cola_filtros.tipo == 'reparacion' %}selected{% endif %}>Reparaciones</option>
+                        <option value="cobro_credito" {% if cola_filtros.tipo == 'cobro_credito' %}selected{% endif %}>Cobros de crédito</option>
+                        <option value="pedido" {% if cola_filtros.tipo == 'pedido' %}selected{% endif %}>Pedidos</option>
+                    </select>
+                </label>
+                <label class="block text-sm">
+                    <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Estado</span>
+                    <select name="cola_estado" x-model="colaFiltros.estado" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
+                        <option value="todas" {% if cola_filtros.estado == 'todas' %}selected{% endif %}>Todos</option>
+                        <option value="pendiente" {% if cola_filtros.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                        <option value="en_proceso" {% if cola_filtros.estado == 'en_proceso' %}selected{% endif %}>En proceso</option>
+                    </select>
+                </label>
+                <label class="block text-sm">
+                    <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Alcance</span>
+                    <select name="cola_scope" x-model="colaFiltros.scope" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
+                        <option value="todas" {% if cola_filtros.scope == 'todas' %}selected{% endif %}>Todas</option>
+                        <option value="mias" {% if cola_filtros.scope == 'mias' %}selected{% endif %}>Mis tomados</option>
+                        <option value="disponibles" {% if cola_filtros.scope == 'disponibles' %}selected{% endif %}>Sin asignar</option>
+                    </select>
+                </label>
+                <div class="flex items-end gap-2">
+                    <button type="submit" :disabled="colaUiRefrescando" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                        Filtrar
+                    </button>
+                    <button type="button" @click="limpiarFiltrosCola()" :disabled="colaUiRefrescando" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                        Limpiar
+                    </button>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-3 text-xs">
+                <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    <span id="cola-ventas-count">{{ cola_totales.venta }}</span> ventas
+                </span>
+                <span class="px-2 py-1 rounded-full bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300">
+                    <span id="cola-reparaciones-count">{{ cola_totales.reparacion }}</span> reparaciones
+                </span>
+                <span class="px-2 py-1 rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                    <span id="cola-cobros-credito-count">{{ cola_totales.cobro_credito }}</span> cobros de crédito
+                </span>
+                <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    <span id="cola-pedidos-count">{{ cola_totales.pedido }}</span> pedidos
+                </span>
+                <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200">
+                    Polling activo en el menú lateral
+                </span>
+            </div>
+        </form>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm cola-pendientes-table">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Origen</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Cliente</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Estado</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Asignado</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Enviado</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="cola-pendientes-tbody" class="cola-pendientes-tbody">
+                    {% if cola_pendientes %}
+                    {% for item in cola_pendientes %}
+                    <tr class="cola-pendiente-row hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                        data-cola-row-id="{{ item.id }}"
+                        data-cola-row-firma="{{ [item.estado or '', (item.monto_total or 0), (item.id_usuario_destino or ''), (item.fecha_envio.isoformat() if item.fecha_envio else ''), (item.cliente.nombre if item.cliente else 'Consumidor Final')]|join('|') }}">
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                            {% if item.tipo_origen == 'reparacion' %}
+                            Reparación #{{ item.id_origen or '-' }}
+                            {% elif item.tipo_origen == 'cobro_credito' %}
+                            Cobro de crédito #{{ item.id_origen or item.id }}
+                            {% elif item.tipo_origen == 'pedido' %}
+                            Pedido #{{ item.id_origen or item.id }}
+                            {% else %}
+                            Venta enviada #{{ item.id }}
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
+                            {{ item.cliente.nombre if item.cliente else 'Consumidor Final' }}
+                        </td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100">
+                            ₲ {{ "{:,.0f}".format(item.monto_total or 0).replace(",", ".") }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs {% if item.estado == 'pendiente' %}bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300{% else %}bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300{% endif %}">
+                                {{ item.estado.replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                            {{ item.usuario_destino.nombre_completo if item.usuario_destino else 'Sin asignar' }}
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                            {{ item.fecha_envio|local_strftime('%d/%m %H:%M') }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex flex-wrap justify-end gap-2">
+                                <button type="button" data-permiso="tomar_cola_cobro"
+                                    data-cola-action="tomar"
+                                    data-cola-id="{{ item.id }}"
+                                    data-cola-tipo="{{ item.tipo_origen }}"
+                                    data-cola-origen="{{ item.id_origen if item.id_origen is not none else '' }}"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs">
+                                    {% if item.tipo_origen in ['cobro_credito', 'pedido'] %}Abrir cobro{% else %}Abrir POS{% endif %}
+                                </button>
+                                {% if current_user.es_admin() or current_user.tiene_permiso('tomar_cola_cobro') %}
+                                <button type="button" data-permiso="tomar_cola_cobro"
+                                    data-cola-action="cancelar"
+                                    data-cola-id="{{ item.id }}"
+                                    class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs">
+                                    Cancelar
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            No hay pendientes de cobro en cola.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Info Principal y Arqueo en Tiempo Real -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Izquierda: Estado de Caja Física (Efectivo) -->
+        <div class="space-y-6">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 border-b pb-2 dark:border-gray-700">
+                <i class="fas fa-money-bill-wave mr-2"></i>Control de Efectivo
+            </h3>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Caja / Sesión</p>
+                    <p class="text-xl font-bold text-gray-800 dark:text-white">{{ sesion.caja.nombre }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Abierta: {{ sesion.fecha_apertura|local_strftime('%d/%m %H:%M') }}</p>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Monto Inicial</p>
+                    <p class="text-xl font-bold text-gray-800 dark:text-white">₲ {{ "{:,.0f}".format(sesion.monto_inicial).replace(",", ".") }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-green-50 dark:bg-green-900/20 rounded-xl shadow-md p-6 border-2 border-green-200 dark:border-green-700 flex items-center justify-between">
+                <div>
+                    <p class="text-green-600 dark:text-green-300 text-sm font-semibold uppercase tracking-wide">Total Efectivo Actual</p>
+                    <p id="caja-total-efectivo" class="text-3xl font-bold text-green-700 dark:text-green-300 mt-1">₲ {{ "{:,.0f}".format(total_efectivo).replace(",", ".") }}</p>
+                </div>
+                <div class="text-green-600 dark:text-green-400">
+                    <i class="fas fa-coins fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Derecha: Arqueo de Medios de Pago -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300 flex flex-col">
+            <div class="bg-blue-50 dark:bg-blue-900/20 px-6 py-4 border-b border-blue-100 dark:border-blue-800 flex justify-between items-center">
+                <h3 class="font-semibold text-blue-800 dark:text-blue-300">
+                    <i class="fas fa-chart-pie mr-2"></i>Cobros por Método (Sesión Actual)
+                </h3>
+                <div class="flex items-center gap-2">
+                    <span id="resumen-total-ventas" class="text-sm bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 px-2 py-1 rounded-md font-bold">
+                        Ventas: ₲ {{ "{:,.0f}".format(total_cobrado_ventas_sesion).replace(",", ".") }}
+                    </span>
+                    <span id="resumen-total-creditos" class="text-sm bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 px-2 py-1 rounded-md font-bold">
+                        Créditos: ₲ {{ "{:,.0f}".format(total_cobros_creditos_sesion).replace(",", ".") }}
+                    </span>
+                    <span id="resumen-total-pedidos" class="text-sm bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 px-2 py-1 rounded-md font-bold">
+                        Pedidos: ₲ {{ "{:,.0f}".format(total_cobros_pedidos_sesion).replace(",", ".") }}
+                    </span>
+                    <span id="resumen-total-egresos" class="text-sm bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 px-2 py-1 rounded-md font-bold">
+                        Egresos: ₲ {{ "{:,.0f}".format(total_egresos_sesion).replace(",", ".") }}
+                    </span>
+                    <span id="resumen-total-neto" class="text-sm bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 px-2 py-1 rounded-md font-bold">
+                        Neto: ₲ {{ "{:,.0f}".format(total_neto_sesion).replace(",", ".") }}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="p-0 flex-grow">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-6 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Medio de Pago</th>
+                            <th class="px-6 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Transacciones</th>
+                            <th class="px-6 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Cobrado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="desglose-pagos-tbody" class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for pago in desglose_pagos %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
+                            data-pago-id="{{ pago.id_metodo_pago }}"
+                            data-pago-nombre="{{ pago.nombre }}">
+                            <td class="px-6 py-3 text-gray-800 dark:text-gray-200">
+                                {% if pago.nombre == 'Efectivo' %}
+                                    <i class="fas fa-money-bill text-green-500 mr-2 w-5 text-center"></i>
+                                {% elif 'Tarjeta' in pago.nombre %}
+                                    <i class="fas fa-credit-card text-blue-500 mr-2 w-5 text-center"></i>
+                                {% elif 'QR' in pago.nombre %}
+                                    <i class="fas fa-qrcode text-purple-500 mr-2 w-5 text-center"></i>
+                                {% else %}
+                                    <i class="fas fa-wallet text-gray-500 mr-2 w-5 text-center"></i>
+                                {% endif %}
+                                {{ pago.nombre }}
+                            </td>
+                            <td class="px-6 py-3 text-center text-gray-600 dark:text-gray-400">
+                                <span class="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-xs font-medium">
+                                    {{ pago.cantidad }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-3 text-right font-bold text-gray-800 dark:text-gray-100">
+                                ₲ {{ "{:,.0f}".format(pago.total).replace(",", ".") }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div id="desglose-pagos-empty" class="flex flex-col items-center justify-center h-40 text-gray-400 dark:text-gray-500 {% if desglose_pagos %}hidden{% endif %}">
+                    <i class="fas fa-cash-register text-3xl mb-2 opacity-50"></i>
+                    <p>No hay cobros en ventas registrados en esta sesión</p>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/30 px-6 py-3 text-xs text-gray-500 dark:text-gray-400 text-center border-t border-gray-100 dark:border-gray-700">
+                Este panel muestra solo cobros al momento de la venta. Los cobros posteriores de crédito se resumen aparte y los movimientos inferiores siguen mostrando solo dinero físico.
+            </div>
+        </div>
+    </div>
+
+    <!-- Movimientos -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <div class="bg-gray-50 dark:bg-gray-700/60 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="font-semibold text-gray-700 dark:text-gray-200">Movimientos de Caja (Solo Efectivo)</h2>
+        </div>
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Tipo</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Motivo</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                </tr>
+            </thead>
+            <tbody id="movimientos-caja-tbody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for mov in movimientos %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors cursor-pointer"
+                    data-mov-open="1"
+                    data-fecha="{{ mov.fecha_movimiento|local_strftime('%d/%m/%Y %H:%M') }}"
+                    data-tipo="{{ mov.tipo }}"
+                    data-monto="{{ '{:,.0f}'.format(mov.monto).replace(',', '.') }}"
+                    data-motivo="{{ mov.motivo_detallado or mov.motivo }}"
+                    data-usuario="{{ mov.usuario.username if mov.usuario else 'Sistema' }}">
+                    <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">{{ mov.fecha_movimiento|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="px-4 py-3">
+                        <span
+                            class="px-2 py-1 rounded-full text-xs {% if mov.tipo == 'ingreso' %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300{% else %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300{% endif %}">
+                            {{ mov.tipo.upper() }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ mov.motivo_detallado or mov.motivo }}</td>
+                    <td
+                        class="px-4 py-3 text-right font-semibold {% if mov.tipo == 'ingreso' %}text-green-600 dark:text-green-300{% else %}text-red-600 dark:text-red-300{% endif %}">
+                        {% if mov.tipo == 'ingreso' %}+{% else %}-{% endif %}₲ {{
+                        "{:,.0f}".format(mov.monto).replace(",", ".") }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                        No hay movimientos registrados
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal Detalle -->
+    <div x-show="showModal" 
+         style="display: none;"
+         class="fixed inset-0 z-50 overflow-y-auto" 
+         aria-labelledby="modal-title" 
+         role="dialog" 
+         aria-modal="true">
+        
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div x-show="showModal"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+                 @click="showModal = false"
+                 aria-hidden="true"></div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div x-show="showModal"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+                
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fas fa-info text-blue-600 dark:text-blue-400"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                                Detalle del Movimiento
+                            </h3>
+                            <div class="mt-4 space-y-3">
+                                <div class="flex justify-between border-b border-gray-100 dark:border-gray-700 pb-2">
+                                    <span class="text-gray-500 dark:text-gray-400">Fecha:</span>
+                                    <span class="text-gray-900 dark:text-gray-200 font-medium" x-text="modalData.fecha"></span>
+                                </div>
+                                <div class="flex justify-between border-b border-gray-100 dark:border-gray-700 pb-2">
+                                    <span class="text-gray-500 dark:text-gray-400">Tipo:</span>
+                                    <span class="px-2 py-1 rounded-full text-xs font-semibold"
+                                          :class="modalData.tipo === 'ingreso' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'"
+                                          x-text="modalData.tipo.toUpperCase()"></span>
+                                </div>
+                                <div class="flex justify-between border-b border-gray-100 dark:border-gray-700 pb-2">
+                                    <span class="text-gray-500 dark:text-gray-400">Monto:</span>
+                                    <span class="font-bold" 
+                                          :class="modalData.tipo === 'ingreso' ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'"
+                                          x-text="(modalData.tipo === 'ingreso' ? '+' : '-') + ' ₲ ' + modalData.monto"></span>
+                                </div>
+                                <div class="flex justify-between border-b border-gray-100 dark:border-gray-700 pb-2">
+                                    <span class="text-gray-500 dark:text-gray-400">Usuario:</span>
+                                    <span class="text-gray-900 dark:text-gray-200" x-text="modalData.usuario"></span>
+                                </div>
+                                <div>
+                                    <span class="block text-gray-500 dark:text-gray-400 mb-1">Motivo:</span>
+                                    <p class="text-gray-900 dark:text-gray-200 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-sm" x-text="modalData.motivo"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/30 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" 
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" 
+                            @click="showModal = false">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div x-show="ventaModalOpen" class="fixed inset-0 overflow-y-auto" style="display: none; z-index: 60;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="ventaModalOpen = false">
+                <div class="absolute inset-0 bg-gray-900/70"></div>
+            </div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div
+                class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                                Detalle de Venta #<span x-text="venta?.id"></span>
+                            </h3>
+                            <div class="mt-2" x-show="isLoadingVenta">
+                                <p class="text-gray-500 dark:text-gray-400 text-center py-4">Cargando detalles...</p>
+                            </div>
+                            <div class="mt-4" x-show="!isLoadingVenta && venta">
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                    <strong>Cliente:</strong>
+                                    <span x-text="venta?.cliente"></span>
+                                </p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                                    <strong>Fecha:</strong>
+                                    <span x-text="venta?.fecha"></span>
+                                </p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                    <strong>Tipo de venta:</strong>
+                                    <span x-text="venta?.tipo_venta || 'Contado'"></span>
+                                </p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                    <strong>Estado de cobro:</strong>
+                                    <span x-text="venta?.estado_cobro || 'Pagada'"></span>
+                                </p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                    <strong>Cobrado al momento:</strong>
+                                    ₲ <span x-text="venta ? new Intl.NumberFormat('es-PY').format(venta.cobrado_al_momento || 0) : 0"></span>
+                                </p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                                    <strong>Saldo pendiente:</strong>
+                                    ₲ <span x-text="venta ? new Intl.NumberFormat('es-PY').format(venta.saldo_pendiente || 0) : 0"></span>
+                                </p>
+
+                                <div class="border-t border-gray-200 dark:border-gray-700 py-2">
+                                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                        <thead>
+                                            <tr>
+                                                <th class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Prod
+                                                </th>
+                                                <th class="text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Cant
+                                                </th>
+                                                <th class="text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Total
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <template x-for="item in venta?.items" :key="item.producto">
+                                                <tr>
+                                                    <td class="py-2 text-sm text-gray-900 dark:text-gray-100" x-text="item.producto"></td>
+                                                    <td class="py-2 text-sm text-gray-500 dark:text-gray-400 text-right" x-text="item.cantidad"></td>
+                                                    <td class="py-2 text-sm text-gray-900 dark:text-gray-100 text-right">
+                                                        ₲ <span x-text="new Intl.NumberFormat('es-PY').format(item.subtotal)"></span>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="font-bold border-t border-gray-200 dark:border-gray-700">
+                                                <td colspan="2" class="pt-2 text-right text-gray-800 dark:text-gray-100">Total:</td>
+                                                <td class="pt-2 text-right text-gray-800 dark:text-gray-100">
+                                                    ₲ <span x-text="venta ? new Intl.NumberFormat('es-PY').format(venta.total) : 0"></span>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <h4 class="text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">Pagos Realizados</h4>
+                                    <template x-for="pago in venta?.pagos" :key="pago.metodo">
+                                        <div class="flex justify-between text-sm text-gray-600 dark:text-gray-300 mb-1">
+                                            <span x-text="pago.metodo"></span>
+                                            <span>₲ <span x-text="new Intl.NumberFormat('es-PY').format(pago.monto)"></span></span>
+                                        </div>
+                                    </template>
+                                    <div x-show="!venta?.pagos || venta?.pagos.length === 0"
+                                         class="text-sm text-gray-500 dark:text-gray-400 italic">
+                                        No hay pagos registrados
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800/90 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                        @click="window.open('/ventas/' + venta.id + '/ticket', '_blank')">
+                        <i class="fas fa-print mr-2"></i> Reimprimir Ticket
+                    </button>
+                    <button type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-amber-500 hover:bg-amber-600 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        @click="volverArribaHistorial()">
+                        Volver arriba
+                    </button>
+                    <button type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        @click="ventaModalOpen = false">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Detalle Pagos -->
+    <div x-show="showPagosModal" 
+         style="display: none;"
+         class="fixed inset-0 z-50 overflow-y-auto" 
+         aria-labelledby="modal-pagos-title" 
+         role="dialog" 
+         aria-modal="true">
+        
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div x-show="showPagosModal"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+                 @click="showPagosModal = false"
+                 aria-hidden="true"></div>
+
+            <div x-show="showPagosModal"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 class="relative bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-2xl w-full">
+                
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fas fa-list text-blue-600 dark:text-blue-400"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-pagos-title">
+                                Detalle de Transacciones - <span x-text="pagosMetodoTitulo"></span>
+                            </h3>
+                            
+                            <div class="mt-4">
+                                <div x-show="isLoadingPagos" class="flex justify-center py-4">
+                                    <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
+                                </div>
+
+                                <div x-show="!isLoadingPagos" class="max-h-96 overflow-y-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                        <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Referencia</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cliente</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Monto</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    <template x-for="pago in pagosDetalle" :key="pago.row_key || `${pago.tipo_origen || 'tx'}-${pago.id_referencia || pago.id_venta || pago.fecha || Math.random()}`">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <span x-text="pago.fecha"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400">
+                                <template x-if="pago.id_venta">
+                                    <a href="#"
+                                       class="hover:underline"
+                                       @click.prevent="verDetalleVenta(pago.id_venta)"
+                                       x-text="pago.referencia_label || ('#' + pago.id_venta)"></a>
+                                </template>
+                                <template x-if="!pago.id_venta">
+                                    <span class="text-gray-700 dark:text-gray-200" x-text="pago.referencia_label || '-'"></span>
+                                </template>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100" x-text="pago.cliente">
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-gray-900 dark:text-gray-100">
+                                ₲ <span x-text="new Intl.NumberFormat('es-PY').format(pago.monto)"></span>
+                            </td>
+                        </tr>
+                    </template>
+                                            <template x-if="pagosDetalle.length === 0">
+                                                <tr>
+                                                    <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                        No hay transacciones registradas.
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/30 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" 
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" 
+                            @click="showPagosModal = false">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<style>
+@keyframes colaRowEnter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes colaRowChange {
+    0% { background-color: rgba(250, 204, 21, 0.22); }
+    100% { background-color: rgba(255, 255, 255, 0.96); }
+}
+@keyframes colaRowGlow {
+    0%, 100% {
+        box-shadow: 0 0 0 rgba(56, 189, 248, 0);
+        border-color: rgba(125, 211, 252, 0.22);
+    }
+    50% {
+        box-shadow: 0 0 0.85rem rgba(56, 189, 248, 0.22), 0 0 1.6rem rgba(34, 211, 238, 0.16);
+        border-color: rgba(103, 232, 249, 0.65);
+    }
+}
+@keyframes colaBadgeBump {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+.cola-pendientes-table {
+    border-collapse: separate;
+    border-spacing: 0 0.55rem;
+}
+.cola-pendientes-tbody::before,
+.cola-pendientes-tbody::after {
+    content: '';
+    display: table-row;
+    height: 0;
+}
+.cola-pendiente-row td {
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid rgba(56, 189, 248, 0.3);
+    border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -1px 0 rgba(14, 165, 233, 0.08);
+    transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.dark .cola-pendiente-row td {
+    background: rgba(17, 24, 39, 0.94);
+    border-top-color: rgba(103, 232, 249, 0.34);
+    border-bottom-color: rgba(103, 232, 249, 0.34);
+    box-shadow: inset 0 1px 0 rgba(165, 243, 252, 0.12), inset 0 -1px 0 rgba(34, 211, 238, 0.14);
+}
+.cola-pendiente-row td:first-child {
+    border-left: 4px solid rgba(14, 165, 233, 0.72);
+    border-top-left-radius: 0.9rem;
+    border-bottom-left-radius: 0.9rem;
+    padding-left: 1rem;
+}
+.cola-pendiente-row td:last-child {
+    border-right: 1px solid rgba(56, 189, 248, 0.3);
+    border-top-right-radius: 0.9rem;
+    border-bottom-right-radius: 0.9rem;
+    padding-right: 1rem;
+}
+.dark .cola-pendiente-row td:last-child {
+    border-right-color: rgba(103, 232, 249, 0.34);
+}
+.dark .cola-pendiente-row td:first-child {
+    border-left-color: rgba(34, 211, 238, 0.9);
+}
+.cola-pendiente-row:hover td {
+    background: rgba(240, 249, 255, 0.98);
+    border-top-color: rgba(14, 165, 233, 0.48);
+    border-bottom-color: rgba(14, 165, 233, 0.48);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), inset 0 -1px 0 rgba(14, 165, 233, 0.14);
+}
+.dark .cola-pendiente-row:hover td {
+    background: rgba(17, 24, 39, 0.98);
+    border-top-color: rgba(103, 232, 249, 0.52);
+    border-bottom-color: rgba(103, 232, 249, 0.52);
+    box-shadow: inset 0 1px 0 rgba(165, 243, 252, 0.18), inset 0 -1px 0 rgba(34, 211, 238, 0.2);
+}
+.cola-row-enter {
+    animation: colaRowEnter 180ms ease-out;
+}
+.cola-row-enter td {
+    animation: colaRowGlow 1.2s ease-in-out 0s 3;
+}
+.cola-row-change {
+    animation: colaRowChange 420ms ease-out;
+}
+.cola-row-change td {
+    animation: colaRowGlow 1s ease-in-out 0s 2;
+}
+.cola-badge-bump {
+    animation: colaBadgeBump 220ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+    .cola-row-enter,
+    .cola-row-change,
+    .cola-badge-bump {
+        animation: none !important;
+    }
+    .cola-row-enter td,
+    .cola-row-change td {
+        animation: none !important;
+    }
+}
+</style>
+<script>
+function cajaEstadoData(config) {
+    return {
+        showModal: false,
+        modalData: {
+            fecha: '',
+            tipo: '',
+            monto: '',
+            motivo: '',
+            usuario: ''
+        },
+        showPagosModal: false,
+        pagosDetalle: [],
+        pagosMetodoTitulo: '',
+        isLoadingPagos: false,
+        ventaModalOpen: false,
+        venta: null,
+        isLoadingVenta: false,
+        csrfToken: (config && config.csrfToken) ? String(config.csrfToken) : '',
+        idUsuarioActual: Number((config && config.idUsuarioActual) || 0),
+        esAdmin: !!(config && config.esAdmin),
+        puedeTomarColaCobro: !!(config && config.puedeTomarColaCobro),
+        colaRealtimeActiva: !!(config && config.colaRealtimeActiva),
+        colaPollingInterval: null,
+        colaPollingFirma: null,
+        colaPollingEnCurso: false,
+        colaAccionesDelegadas: false,
+        desgloseAccionesDelegadas: false,
+        movimientosAccionesDelegadas: false,
+        colaFilasFirmas: {},
+        colaUiRefrescando: false,
+        colaResumenRequestId: 0,
+        colaResumenController: null,
+        colaAccionesEnCurso: {},
+        cajaRefreshStorageKey: 'caja_estado_refresh_v1',
+        colaPollingMs: Number((config && config.colaPollingMs) || 4000),
+        colaFiltros: {
+            tipo: (config && config.colaFiltros && config.colaFiltros.tipo) ? config.colaFiltros.tipo : 'todas',
+            estado: (config && config.colaFiltros && config.colaFiltros.estado) ? config.colaFiltros.estado : 'todas',
+            scope: (config && config.colaFiltros && config.colaFiltros.scope) ? config.colaFiltros.scope : 'todas'
+        },
+        init() {
+            this.inicializarAccionesCola();
+            this.inicializarAccionesDesglosePagos();
+            this.inicializarAccionesMovimientos();
+            this.sincronizarFirmasColaDesdeDom();
+            this.initColaRealtime();
+            this.inicializarEventosCaja();
+        },
+        actualizarFiltrosDesdeForm(form) {
+            if (!form) return;
+            const fd = new FormData(form);
+            const tipo = String(fd.get('cola_tipo') || this.colaFiltros.tipo || 'todas').trim().toLowerCase();
+            const estado = String(fd.get('cola_estado') || this.colaFiltros.estado || 'todas').trim().toLowerCase();
+            const scope = String(fd.get('cola_scope') || this.colaFiltros.scope || 'todas').trim().toLowerCase();
+            this.colaFiltros = {
+                tipo: ['venta', 'reparacion'].includes(tipo) ? tipo : 'todas',
+                estado: ['pendiente', 'en_proceso'].includes(estado) ? estado : 'todas',
+                scope: ['mias', 'disponibles'].includes(scope) ? scope : 'todas'
+            };
+        },
+        _estadoColaUrl() {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('cola_tipo');
+            url.searchParams.delete('cola_estado');
+            url.searchParams.delete('cola_scope');
+            if (this.colaFiltros.tipo && this.colaFiltros.tipo !== 'todas') {
+                url.searchParams.set('cola_tipo', this.colaFiltros.tipo);
+            }
+            if (this.colaFiltros.estado && this.colaFiltros.estado !== 'todas') {
+                url.searchParams.set('cola_estado', this.colaFiltros.estado);
+            }
+            if (this.colaFiltros.scope && this.colaFiltros.scope !== 'todas') {
+                url.searchParams.set('cola_scope', this.colaFiltros.scope);
+            }
+            return url;
+        },
+        _colaResumenParams(detalle = '1', firma = '1') {
+            return new URLSearchParams({
+                detalle: String(detalle),
+                firma: String(firma),
+                cola_tipo: this.colaFiltros.tipo || 'todas',
+                cola_estado: this.colaFiltros.estado || 'todas',
+                cola_scope: this.colaFiltros.scope || 'todas'
+            });
+        },
+        _escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        },
+        _textoMonto(valor) {
+            const numero = Number(valor || 0);
+            return `₲ ${numero.toLocaleString('es-PY', { maximumFractionDigits: 0 })}`;
+        },
+        _badgeTipoMovimiento(tipo) {
+            return tipo === 'ingreso'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+        },
+        _claseMontoMovimiento(tipo) {
+            return tipo === 'ingreso'
+                ? 'text-green-600 dark:text-green-300'
+                : 'text-red-600 dark:text-red-300';
+        },
+        _renderDesglosePagosRows(items) {
+            const tbody = document.getElementById('desglose-pagos-tbody');
+            const empty = document.getElementById('desglose-pagos-empty');
+            if (!tbody) return;
+            const pagos = Array.isArray(items) ? items : [];
+            if (!pagos.length) {
+                tbody.innerHTML = '';
+                if (empty) empty.classList.remove('hidden');
+                return;
+            }
+            if (empty) empty.classList.add('hidden');
+            tbody.innerHTML = pagos.map((pago) => {
+                const idMetodo = Number((pago && pago.id_metodo_pago) || 0);
+                const nombre = this._escapeHtml((pago && pago.nombre) || '');
+                const cantidad = Number((pago && pago.cantidad) || 0);
+                const total = Number((pago && pago.total) || 0);
+                let iconHtml = '<i class="fas fa-wallet text-gray-500 mr-2 w-5 text-center"></i>';
+                if (nombre === 'Efectivo') {
+                    iconHtml = '<i class="fas fa-money-bill text-green-500 mr-2 w-5 text-center"></i>';
+                } else if (nombre.includes('Tarjeta')) {
+                    iconHtml = '<i class="fas fa-credit-card text-blue-500 mr-2 w-5 text-center"></i>';
+                } else if (nombre.includes('QR')) {
+                    iconHtml = '<i class="fas fa-qrcode text-purple-500 mr-2 w-5 text-center"></i>';
+                }
+                return `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
+                        data-pago-id="${idMetodo}"
+                        data-pago-nombre="${nombre}">
+                        <td class="px-6 py-3 text-gray-800 dark:text-gray-200">${iconHtml}${nombre}</td>
+                        <td class="px-6 py-3 text-center text-gray-600 dark:text-gray-400">
+                            <span class="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-xs font-medium">${cantidad}</span>
+                        </td>
+                        <td class="px-6 py-3 text-right font-bold text-gray-800 dark:text-gray-100">${this._textoMonto(total)}</td>
+                    </tr>
+                `;
+            }).join('');
+        },
+        _renderMovimientosRows(items) {
+            const tbody = document.getElementById('movimientos-caja-tbody');
+            if (!tbody) return;
+            const movimientos = Array.isArray(items) ? items : [];
+            if (!movimientos.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                            No hay movimientos registrados
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            tbody.innerHTML = movimientos.map((mov) => {
+                const fecha = this._escapeHtml((mov && mov.fecha) || '');
+                const tipo = String((mov && mov.tipo) || '').toLowerCase() === 'ingreso' ? 'ingreso' : 'egreso';
+                const tipoTexto = tipo === 'ingreso' ? 'INGRESO' : 'EGRESO';
+                const motivo = this._escapeHtml((mov && mov.motivo) || '');
+                const usuario = this._escapeHtml((mov && mov.usuario) || 'Sistema');
+                const monto = this._textoMonto(Number((mov && mov.monto) || 0));
+                const montoPlano = monto.replace('₲ ', '');
+                return `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors cursor-pointer"
+                        data-mov-open="1"
+                        data-fecha="${fecha}"
+                        data-tipo="${this._escapeHtml(tipo)}"
+                        data-monto="${this._escapeHtml(montoPlano)}"
+                        data-motivo="${motivo}"
+                        data-usuario="${usuario}">
+                        <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">${fecha}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs ${this._badgeTipoMovimiento(tipo)}">${tipoTexto}</span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">${motivo}</td>
+                        <td class="px-4 py-3 text-right font-semibold ${this._claseMontoMovimiento(tipo)}">${tipo === 'ingreso' ? '+' : '-'}${monto}</td>
+                    </tr>
+                `;
+            }).join('');
+        },
+        async refrescarResumenCaja(notificar = false) {
+            try {
+                const response = await fetch('/caja/api/estado/resumen', {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) return;
+                const data = await response.json().catch(() => null);
+                if (!data || !data.success) return;
+                const totalEfectivo = document.getElementById('caja-total-efectivo');
+                const totalVentas = document.getElementById('resumen-total-ventas');
+                const totalCreditos = document.getElementById('resumen-total-creditos');
+                const totalPedidos = document.getElementById('resumen-total-pedidos');
+                const totalEgresos = document.getElementById('resumen-total-egresos');
+                const totalNeto = document.getElementById('resumen-total-neto');
+                if (totalEfectivo) totalEfectivo.textContent = this._textoMonto(Number(data.total_efectivo || 0));
+                if (totalVentas) totalVentas.textContent = `Ventas: ${this._textoMonto(Number(data.total_cobrado_ventas_sesion || data.total_ventas_sesion || 0))}`;
+                if (totalCreditos) totalCreditos.textContent = `Créditos: ${this._textoMonto(Number(data.total_cobros_creditos_sesion || 0))}`;
+                if (totalPedidos) totalPedidos.textContent = `Pedidos: ${this._textoMonto(Number(data.total_cobros_pedidos_sesion || 0))}`;
+                if (totalEgresos) totalEgresos.textContent = `Egresos: ${this._textoMonto(Number(data.total_egresos_sesion || 0))}`;
+                if (totalNeto) totalNeto.textContent = `Neto: ${this._textoMonto(Number(data.total_neto_sesion || 0))}`;
+                this._renderDesglosePagosRows(data.desglose_pagos || []);
+                this._renderMovimientosRows(data.movimientos || []);
+                if (typeof window.aplicarPermisosUI === 'function') {
+                    window.aplicarPermisosUI();
+                }
+                if (notificar && window.mostrarNotificacion) {
+                    window.mostrarNotificacion('Estado de caja actualizado', 'success');
+                }
+            } catch (e) {
+            }
+        },
+        inicializarEventosCaja() {
+            window.addEventListener('dashboard:refresh-totals', () => {
+                this.refrescarResumenCaja(false);
+            });
+            window.addEventListener('caja:venta-cobrada', () => {
+                this.refrescarResumenCaja(false);
+                this.refrescarPanelCola(false, false);
+            });
+            window.addEventListener('storage', (event) => {
+                if (!event || event.key !== this.cajaRefreshStorageKey) return;
+                this.refrescarResumenCaja(false);
+                this.refrescarPanelCola(false, false);
+                this.verificarCambiosCola();
+            });
+        },
+        inicializarAccionesDesglosePagos() {
+            const tbody = document.getElementById('desglose-pagos-tbody');
+            if (!tbody || this.desgloseAccionesDelegadas) return;
+            tbody.addEventListener('click', async (event) => {
+                const row = event.target.closest('tr[data-pago-id]');
+                if (!row) return;
+                const idMetodo = Number(row.dataset.pagoId || 0);
+                const nombreMetodo = String(row.dataset.pagoNombre || '');
+                if (!idMetodo) return;
+                await this.verDetallesPagos(idMetodo, nombreMetodo);
+            });
+            this.desgloseAccionesDelegadas = true;
+        },
+        inicializarAccionesMovimientos() {
+            const tbody = document.getElementById('movimientos-caja-tbody');
+            if (!tbody || this.movimientosAccionesDelegadas) return;
+            tbody.addEventListener('click', (event) => {
+                const row = event.target.closest('tr[data-mov-open]');
+                if (!row) return;
+                this.openModal(row.dataset);
+            });
+            this.movimientosAccionesDelegadas = true;
+        },
+        _textoEstado(estado) {
+            const limpio = String(estado || '').replace(/_/g, ' ').trim();
+            if (!limpio) return 'Pendiente';
+            return limpio.charAt(0).toUpperCase() + limpio.slice(1);
+        },
+        _claseEstado(estado) {
+            return estado === 'pendiente'
+                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+        },
+        _firmaFila(item) {
+            const estado = String(item && item.estado ? item.estado : '');
+            const monto = Number(item && item.monto_total ? item.monto_total : 0);
+            const destino = item && item.id_usuario_destino !== undefined && item.id_usuario_destino !== null ? String(item.id_usuario_destino) : '';
+            const fecha = String(item && item.fecha_envio ? item.fecha_envio : '');
+            const cliente = String(item && item.cliente ? item.cliente : 'Consumidor Final');
+            return [estado, monto, destino, fecha, cliente].join('|');
+        },
+        _filaPendienteHtml(item, claseAnimacion = '', firmaFila = '') {
+            const id = Number(item && item.id ? item.id : 0);
+            const tipoOrigen = String(item && item.tipo_origen ? item.tipo_origen : 'venta');
+            const idOrigen = item && item.id_origen !== undefined && item.id_origen !== null ? String(item.id_origen) : '';
+            const estado = String(item && item.estado ? item.estado : 'pendiente');
+            const montoTotal = Number(item && item.monto_total ? item.monto_total : 0);
+            const cliente = this._escapeHtml(item && item.cliente ? item.cliente : 'Consumidor Final');
+            const usuarioDestino = this._escapeHtml(item && item.usuario_destino ? item.usuario_destino : 'Sin asignar');
+            const fechaEnvio = this._escapeHtml(item && item.fecha_envio ? item.fecha_envio : '');
+            let origenTexto = tipoOrigen === 'reparacion'
+                ? `Reparación #${this._escapeHtml(idOrigen || '-')}`
+                : `Venta enviada #${id}`;
+            if (tipoOrigen === 'cobro_credito') {
+                origenTexto = `Cobro de crédito #${this._escapeHtml(idOrigen || id || '-')}`;
+            } else if (tipoOrigen === 'pedido') {
+                origenTexto = `Pedido #${this._escapeHtml(idOrigen || id || '-')}`;
+            }
+            const puedeCancelar = this.esAdmin || this.puedeTomarColaCobro;
+            const estaProcesando = !!(id && this.colaAccionesEnCurso[id]);
+            const claseBotonAccion = estaProcesando ? 'opacity-60 pointer-events-none cursor-wait' : '';
+            const textoBotonAbrir = ['cobro_credito', 'pedido'].includes(tipoOrigen) ? 'Abrir cobro' : 'Abrir POS';
+
+            let acciones = `
+                <button type="button"
+                    data-permiso="tomar_cola_cobro"
+                    data-cola-action="tomar"
+                    data-cola-id="${id}"
+                    data-cola-tipo="${this._escapeHtml(tipoOrigen)}"
+                    data-cola-origen="${this._escapeHtml(idOrigen)}"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs ${claseBotonAccion}">
+                    ${textoBotonAbrir}
+                </button>
+            `;
+
+            if (puedeCancelar) {
+                acciones += `
+                    <button type="button"
+                        data-permiso="tomar_cola_cobro"
+                        data-cola-action="cancelar"
+                        data-cola-id="${id}"
+                        class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs ${claseBotonAccion}">
+                        Cancelar
+                    </button>
+                `;
+            }
+
+            return `
+                <tr class="cola-pendiente-row hover:bg-gray-50 dark:hover:bg-gray-700/30 ${claseAnimacion}"
+                    data-cola-row-id="${id}"
+                    data-cola-row-firma="${this._escapeHtml(firmaFila)}">
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">${origenTexto}</td>
+                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">${cliente}</td>
+                    <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100">${this._textoMonto(montoTotal)}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs ${this._claseEstado(estado)}">${this._textoEstado(estado)}</span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300">${usuarioDestino}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">${fechaEnvio}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex flex-wrap justify-end gap-2">${acciones}</div>
+                    </td>
+                </tr>
+            `;
+        },
+        sincronizarFirmasColaDesdeDom() {
+            const tbody = document.getElementById('cola-pendientes-tbody');
+            if (!tbody) {
+                this.colaFilasFirmas = {};
+                return;
+            }
+            const firmas = {};
+            tbody.querySelectorAll('tr[data-cola-row-id]').forEach((fila) => {
+                const id = Number(fila.dataset.colaRowId || 0);
+                if (!id) return;
+                firmas[id] = String(fila.dataset.colaRowFirma || '');
+            });
+            this.colaFilasFirmas = firmas;
+        },
+        inicializarAccionesCola() {
+            const tbody = document.getElementById('cola-pendientes-tbody');
+            if (!tbody || this.colaAccionesDelegadas) return;
+            tbody.addEventListener('click', async (event) => {
+                const boton = event.target.closest('button[data-cola-action]');
+                if (!boton) return;
+                event.preventDefault();
+                const accion = String(boton.dataset.colaAction || '').trim();
+                const idCola = Number(boton.dataset.colaId || 0);
+                if (!idCola) return;
+                if (accion === 'tomar') {
+                    await this.tomarPendienteCobro(idCola, boton.dataset.colaTipo || 'venta', boton.dataset.colaOrigen || null);
+                    return;
+                }
+                if (accion === 'liberar') {
+                    await this.liberarPendienteCobro(idCola);
+                    return;
+                }
+                if (accion === 'cancelar') {
+                    await this.cancelarPendienteCobro(idCola);
+                }
+            });
+            this.colaAccionesDelegadas = true;
+        },
+        async _obtenerResumenCola(detalle = '1', firma = '1') {
+            const requestId = ++this.colaResumenRequestId;
+            try {
+                if (this.colaResumenController) {
+                    this.colaResumenController.abort();
+                }
+                const controller = new AbortController();
+                this.colaResumenController = controller;
+                const params = this._colaResumenParams(detalle, firma);
+                const response = await fetch(`/caja/api/cola-cobro/resumen?${params.toString()}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (requestId !== this.colaResumenRequestId) return null;
+                if (!response.ok) return null;
+                const data = await response.json().catch(() => null);
+                if (requestId !== this.colaResumenRequestId) return null;
+                if (!data || !data.alerta_activa) return null;
+                return data;
+            } catch (e) {
+                if (e && e.name === 'AbortError') return null;
+                return null;
+            } finally {
+                if (requestId === this.colaResumenRequestId) {
+                    this.colaResumenController = null;
+                }
+            }
+        },
+        _actualizarBadgesCola(data) {
+            const totales = data && data.totales ? data.totales : {};
+            const visibles = Number(data && data.count ? data.count : 0);
+            const total = Number(totales.total || visibles || 0);
+            const pendientes = Number(totales.pendiente || 0);
+            const enProceso = Number(totales.en_proceso || 0);
+            const ventas = Number(totales.venta || 0);
+            const reparaciones = Number(totales.reparacion || 0);
+            const cobrosCredito = Number(totales.cobro_credito || 0);
+            const pedidos = Number(totales.pedido || 0);
+            const badgeVisibles = document.getElementById('cola-visibles');
+            const badgeTotal = document.getElementById('cola-total');
+            const badgePendientes = document.getElementById('cola-pendientes-count');
+            const badgeEnProceso = document.getElementById('cola-en-proceso-count');
+            const badgeVentas = document.getElementById('cola-ventas-count');
+            const badgeReparaciones = document.getElementById('cola-reparaciones-count');
+            const badgeCobrosCredito = document.getElementById('cola-cobros-credito-count');
+            const badgePedidos = document.getElementById('cola-pedidos-count');
+            const actualizarBadge = (nodo, texto) => {
+                if (!nodo) return;
+                if (nodo.textContent && nodo.textContent.trim() === texto) return;
+                nodo.textContent = texto;
+                nodo.classList.remove('cola-badge-bump');
+                void nodo.offsetWidth;
+                nodo.classList.add('cola-badge-bump');
+            };
+            actualizarBadge(badgeVisibles, `${visibles} visibles`);
+            actualizarBadge(badgeTotal, `${total} activas`);
+            actualizarBadge(badgePendientes, `${pendientes} pendientes`);
+            actualizarBadge(badgeEnProceso, `${enProceso} en proceso`);
+            actualizarBadge(badgeVentas, `${ventas}`);
+            actualizarBadge(badgeReparaciones, `${reparaciones}`);
+            actualizarBadge(badgeCobrosCredito, `${cobrosCredito}`);
+            actualizarBadge(badgePedidos, `${pedidos}`);
+        },
+        _renderPendientesRows(items) {
+            const tbody = document.getElementById('cola-pendientes-tbody');
+            if (!tbody) return;
+            if (!Array.isArray(items) || items.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            No hay pendientes de cobro en cola.
+                        </td>
+                    </tr>
+                `;
+                this.colaFilasFirmas = {};
+                if (typeof window.aplicarPermisosUI === 'function') {
+                    window.aplicarPermisosUI();
+                }
+                return;
+            }
+            const firmasNuevas = {};
+            const html = items.map((item) => {
+                const id = Number(item && item.id ? item.id : 0);
+                const firma = this._firmaFila(item);
+                let claseAnimacion = '';
+                if (id && this.colaFilasFirmas[id] === undefined) {
+                    claseAnimacion = 'cola-row-enter';
+                } else if (id && this.colaFilasFirmas[id] !== firma) {
+                    claseAnimacion = 'cola-row-change';
+                }
+                if (id) firmasNuevas[id] = firma;
+                return this._filaPendienteHtml(item, claseAnimacion, firma);
+            }).join('');
+            tbody.innerHTML = html;
+            this.colaFilasFirmas = firmasNuevas;
+            if (typeof window.aplicarPermisosUI === 'function') {
+                window.aplicarPermisosUI();
+            }
+        },
+        async refrescarPanelCola(mostrarNotificacion = false, marcarRefrescando = true) {
+            if (marcarRefrescando) this.colaUiRefrescando = true;
+            try {
+                const data = await this._obtenerResumenCola('1', '1');
+                if (!data) return;
+                if (data.firma) this.colaPollingFirma = data.firma;
+                this._actualizarBadgesCola(data);
+                this._renderPendientesRows(data.pendientes || []);
+                if (typeof window.dispatchEvent === 'function') {
+                    window.dispatchEvent(new CustomEvent('caja:cola-cobro-actualizada', {
+                        detail: {
+                            count: Number(data.count || 0),
+                            alertaActiva: Boolean(data.alerta_activa)
+                        }
+                    }));
+                }
+                const url = this._estadoColaUrl();
+                const nuevoUrl = `${url.pathname}${url.search}${url.hash}`;
+                const actualUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+                if (nuevoUrl !== actualUrl) {
+                    window.history.replaceState({}, document.title, nuevoUrl);
+                }
+                if (mostrarNotificacion && window.mostrarNotificacion) {
+                    window.mostrarNotificacion('Pendientes de caja actualizados', 'info');
+                }
+            } catch (e) {
+            } finally {
+                if (marcarRefrescando) this.colaUiRefrescando = false;
+            }
+        },
+        async aplicarFiltrosCola(event) {
+            this.actualizarFiltrosDesdeForm(event && event.target ? event.target : null);
+            await this.refrescarPanelCola(false, true);
+        },
+        async limpiarFiltrosCola() {
+            this.colaFiltros = { tipo: 'todas', estado: 'todas', scope: 'todas' };
+            await this.refrescarPanelCola(false, true);
+        },
+        openModal(dataset) {
+            this.modalData = {
+                fecha: dataset.fecha,
+                tipo: dataset.tipo,
+                monto: dataset.monto,
+                motivo: dataset.motivo,
+                usuario: dataset.usuario
+            };
+            this.showModal = true;
+        },
+        async verDetallesPagos(idMetodo, nombreMetodo) {
+            this.pagosMetodoTitulo = nombreMetodo;
+            this.isLoadingPagos = true;
+            this.showPagosModal = true;
+            this.pagosDetalle = [];
+            try {
+                const response = await fetch(`/caja/api/pagos-detalle/${idMetodo}`);
+                if (response.ok) {
+                    this.pagosDetalle = await response.json();
+                } else {
+                    console.error('Error fetching details');
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.isLoadingPagos = false;
+            }
+        },
+        async verDetalleVenta(idVenta) {
+            this.isLoadingVenta = true;
+            this.ventaModalOpen = true;
+            this.venta = null;
+            try {
+                const response = await fetch(`/reportes/ventas/${idVenta}/detalle`);
+                if (!response.ok) {
+                    throw new Error('Error al obtener detalle de la venta');
+                }
+                this.venta = await response.json();
+            } catch (error) {
+                console.error(error);
+                if (window.mostrarNotificacion) {
+                    window.mostrarNotificacion('Error al cargar detalles de la venta', 'error');
+                }
+            } finally {
+                this.isLoadingVenta = false;
+            }
+        },
+        volverArribaHistorial() {
+            this.ventaModalOpen = false;
+            const target = document.querySelector('#historialVendedoresResults, #cola-cobro-panel');
+            if (target && typeof target.scrollIntoView === 'function') {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+        initColaRealtime() {
+            if (!this.colaRealtimeActiva) return;
+            this.iniciarPollingCola();
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.detenerPollingCola();
+                } else {
+                    this.iniciarPollingCola();
+                    this.verificarCambiosCola();
+                }
+            });
+        },
+        iniciarPollingCola() {
+            this.verificarCambiosCola();
+            if (this.colaPollingInterval) {
+                clearInterval(this.colaPollingInterval);
+            }
+            this.colaPollingInterval = setInterval(() => this.verificarCambiosCola(), this.colaPollingMs);
+        },
+        detenerPollingCola() {
+            if (!this.colaPollingInterval) return;
+            clearInterval(this.colaPollingInterval);
+            this.colaPollingInterval = null;
+        },
+        async verificarCambiosCola() {
+            if (!this.colaRealtimeActiva || this.colaPollingEnCurso) return;
+            this.colaPollingEnCurso = true;
+            try {
+                const data = await this._obtenerResumenCola('0', '1');
+                if (!data || !data.firma) return;
+                if (this.colaPollingFirma === null) {
+                    this.colaPollingFirma = data.firma;
+                    return;
+                }
+                if (this.colaPollingFirma !== data.firma) {
+                    this.colaPollingFirma = data.firma;
+                    await this.refrescarPanelCola(true, false);
+                    await this.refrescarResumenCaja(false);
+                }
+            } catch (e) {
+            } finally {
+                this.colaPollingEnCurso = false;
+            }
+        },
+        async tomarPendienteCobro(idCola, tipoOrigen, idOrigen) {
+            if (this.colaAccionesEnCurso[idCola]) return;
+            this.colaAccionesEnCurso[idCola] = true;
+            this._setFilaAccionEstado(idCola, true);
+            const fd = new FormData();
+            fd.append('csrf_token', this.csrfToken);
+            try {
+                const response = await fetch(`/caja/api/cola-cobro/${idCola}/tomar`, {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok || !data || !data.success || !data.redirect_url) {
+                    if (window.mostrarNotificacion) {
+                        window.mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo tomar el pendiente', 'error');
+                    }
+                    return;
+                }
+                let titulo = tipoOrigen === 'reparacion'
+                    ? `POS - Reparación #${idOrigen}`
+                    : `POS - Venta #${idCola}`;
+                if (tipoOrigen === 'cobro_credito') {
+                    titulo = `Cobro de crédito #${idOrigen || idCola}`;
+                } else if (tipoOrigen === 'pedido') {
+                    titulo = `Cobro de pedido #${idOrigen || idCola}`;
+                }
+                if (typeof window.appOpenTab === 'function') {
+                    window.appOpenTab(data.redirect_url, titulo, 'fas fa-cash-register');
+                    return;
+                }
+                window.location.href = data.redirect_url;
+            } finally {
+                delete this.colaAccionesEnCurso[idCola];
+                this._setFilaAccionEstado(idCola, false);
+            }
+        },
+        _setFilaAccionEstado(idCola, activa) {
+            const fila = document.querySelector(`tr[data-cola-row-id="${idCola}"]`);
+            if (!fila) return;
+            fila.querySelectorAll('button[data-cola-action]').forEach((btn) => {
+                btn.disabled = !!activa;
+                btn.classList.toggle('opacity-60', !!activa);
+                btn.classList.toggle('pointer-events-none', !!activa);
+                btn.classList.toggle('cursor-wait', !!activa);
+            });
+        },
+        async accionPendienteCobro(idCola, accion, mensajeExito, extra = {}) {
+            if (this.colaAccionesEnCurso[idCola]) return null;
+            this.colaAccionesEnCurso[idCola] = true;
+            this._setFilaAccionEstado(idCola, true);
+            const fd = new FormData();
+            fd.append('csrf_token', this.csrfToken);
+            Object.entries(extra || {}).forEach(([key, value]) => {
+                if (value !== null && value !== undefined && value !== '') {
+                    fd.append(key, value);
+                }
+            });
+            try {
+                const response = await fetch(`/caja/api/cola-cobro/${idCola}/${accion}`, {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok || !data || data.success === false) {
+                    if (window.mostrarNotificacion) {
+                        window.mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo completar la acción', 'error');
+                    }
+                    return null;
+                }
+                if (window.mostrarNotificacion) {
+                    window.mostrarNotificacion((data && (data.message || data.mensaje)) ? (data.message || data.mensaje) : mensajeExito, 'success');
+                }
+                if (accion === 'cobrar') {
+                    try {
+                        localStorage.setItem(this.cajaRefreshStorageKey, String(Date.now()));
+                        window.dispatchEvent(new CustomEvent('caja:venta-cobrada'));
+                    } catch (e) {
+                    }
+                }
+                await this.refrescarResumenCaja(false);
+                await this.refrescarPanelCola(false, false);
+                return data;
+            } finally {
+                delete this.colaAccionesEnCurso[idCola];
+                this._setFilaAccionEstado(idCola, false);
+            }
+        },
+        async cobrarPendienteRapido(idCola) {
+            await this.accionPendienteCobro(idCola, 'cobrar', `Pendiente #${idCola} cobrado`);
+        },
+        async liberarPendienteCobro(idCola) {
+            await this.accionPendienteCobro(idCola, 'liberar', `Pendiente #${idCola} liberado`);
+        },
+        async cancelarPendienteCobro(idCola) {
+            if (!window.confirm(`Cancelar el pendiente #${idCola}?`)) {
+                return;
+            }
+            await this.accionPendienteCobro(idCola, 'cancelar', `Pendiente #${idCola} cancelado`);
+        }
+    };
+}
+</script>
+{% endblock %}

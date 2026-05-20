@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Presupuesto Nº {{ presupuesto.numero_presupuesto_display }}{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <div class="text-sm uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 font-semibold">Documento comercial</div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Presupuesto Nº {{ presupuesto.numero_presupuesto_display }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Emitido el {{ presupuesto.fecha_emision.strftime('%d/%m/%Y') if presupuesto.fecha_emision else '-' }}
+                por {{ presupuesto.usuario.nombre_completo if presupuesto.usuario else '-' }}.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ url_for('presupuestos_empresariales.listar') }}" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Volver</a>
+            <a href="{{ url_for('presupuestos_empresariales.nuevo') }}" class="px-4 py-2 rounded-lg bg-gray-800 dark:bg-gray-700 text-white hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Nuevo presupuesto</a>
+            <a href="{{ url_for('presupuestos_empresariales.pdf', id_presupuesto=presupuesto.id_presupuesto_empresarial) }}" target="_blank" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">Abrir PDF</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <section class="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Destinatario</h2>
+                    <dl class="space-y-3 text-sm">
+                        <div><dt class="text-gray-500 dark:text-gray-400">Empresa</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.destinatario_nombre }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Contacto</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.destinatario_contacto or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">RUC / CI</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.destinatario_ruc or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Teléfono</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.destinatario_telefono or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Email</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.destinatario_email or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Dirección</dt><dd class="font-medium text-gray-800 dark:text-gray-100 whitespace-pre-line">{{ presupuesto.destinatario_direccion or '-' }}</dd></div>
+                    </dl>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Documento</h2>
+                    <dl class="space-y-3 text-sm">
+                        <div><dt class="text-gray-500 dark:text-gray-400">Asunto</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.asunto }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Validez</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.validez_dias }} día(s) | Hasta {{ presupuesto.valido_hasta.strftime('%d/%m/%Y') if presupuesto.valido_hasta else '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Cliente vinculado</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.cliente.nombre if presupuesto.cliente else 'No vinculado' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Impresiones / aperturas PDF</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.cantidad_impresiones or 0 }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Última generación PDF</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.fecha_ultima_impresion.strftime('%d/%m/%Y %H:%M') if presupuesto.fecha_ultima_impresion else '-' }}</dd></div>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Ítems presupuestados</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[720px]">
+                        <thead class="bg-gray-50 dark:bg-gray-700/60">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Descripción</th>
+                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Cantidad</th>
+                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Precio unitario</th>
+                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Importe</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            {% for item in presupuesto.items %}
+                            <tr>
+                                <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ item.descripcion }}</td>
+                                <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ item.cantidad }}</td>
+                                <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">₲ {{ '{:,.0f}'.format(item.precio_unitario or 0) }}</td>
+                                <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100">₲ {{ '{:,.0f}'.format(item.total or 0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4 text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                    <div class="font-semibold text-gray-800 dark:text-gray-100">Observaciones</div>
+                    <div class="whitespace-pre-line">{{ presupuesto.observaciones or 'Sin observaciones.' }}</div>
+                </div>
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4 text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                    <div class="font-semibold text-gray-800 dark:text-gray-100">Condiciones</div>
+                    <div class="whitespace-pre-line">{{ presupuesto.condiciones or 'Sin condiciones.' }}</div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="space-y-6">
+            <section class="bg-slate-900 text-white rounded-2xl shadow-md p-6 space-y-4">
+                <h2 class="text-lg font-semibold">Totales</h2>
+                <div class="space-y-3 text-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Subtotal</span>
+                        <span class="font-semibold">₲ {{ '{:,.0f}'.format(presupuesto.subtotal or 0) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-300">Descuento</span>
+                        <span class="font-semibold">₲ {{ '{:,.0f}'.format(presupuesto.descuento or 0) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between border-t border-white/10 pt-3">
+                        <span class="text-white font-semibold">Total</span>
+                        <span class="text-2xl font-bold">₲ {{ '{:,.0f}'.format(presupuesto.total or 0) }}</span>
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </div>
+</div>
+{% endblock %}

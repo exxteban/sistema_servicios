@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Proveedores{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <!-- Encabezado -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-truck text-purple-600 dark:text-purple-400 mr-2"></i>Proveedores
+        </h1>
+        <a href="{{ url_for('proveedores.nuevo') }}" data-permiso="crear_proveedor"
+            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition">
+            <i class="fas fa-plus mr-1"></i> Nuevo Proveedor
+        </a>
+    </div>
+
+    <!-- Buscador -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+        <form method="GET" action="{{ url_for('proveedores.listar') }}" class="flex gap-2">
+            <input type="text" name="q" value="{{ busqueda }}" placeholder="Buscar por nombre o RUC..."
+                class="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 transition-colors">
+            <button type="submit"
+                class="bg-gray-800 dark:bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition">
+                <i class="fas fa-search"></i> Buscar
+            </button>
+            {% if busqueda %}
+            <a href="{{ url_for('proveedores.listar') }}"
+                class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                <i class="fas fa-times"></i> Limpiar
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Tabla de Proveedores -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Nombre</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">RUC</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Teléfono</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Email</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Contacto</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Días
+                        Crédito</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for proveedor in proveedores %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                    <td class="px-4 py-3 font-semibold text-gray-800 dark:text-gray-100">{{ proveedor.nombre }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ proveedor.ruc or '-' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        {% if proveedor.telefono %}
+                        <i class="fas fa-phone text-green-500 mr-1"></i>{{ proveedor.telefono }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        {% if proveedor.email %}
+                        <i class="fas fa-envelope text-blue-500 mr-1"></i>{{ proveedor.email }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        {% if proveedor.contacto_nombre %}
+                        <div class="text-sm">
+                            <div>{{ proveedor.contacto_nombre }}</div>
+                            {% if proveedor.contacto_telefono %}
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ proveedor.contacto_telefono }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        {% if proveedor.dias_credito > 0 %}
+                        <span
+                            class="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded text-sm">
+                            {{ proveedor.dias_credito }} días
+                        </span>
+                        {% else %}
+                        <span class="text-gray-400 dark:text-gray-500">Contado</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex justify-end gap-2">
+                            <a href="{{ url_for('proveedores.editar', id_proveedor=proveedor.id_proveedor) }}"
+                                data-permiso="editar_proveedor"
+                                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form method="POST"
+                                action="{{ url_for('proveedores.eliminar', id_proveedor=proveedor.id_proveedor) }}"
+                                class="inline" data-autorizacion-form="1" data-codigo-permiso="eliminar_proveedor"
+                                data-accion="Desactivar proveedor {{ proveedor.nombre }}"
+                                data-confirm="¿Está seguro de desactivar este proveedor?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="id_autorizacion" value="">
+                                <button type="submit"
+                                    class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                    data-permiso="eliminar_proveedor" title="Desactivar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                        {% if busqueda %}
+                        No se encontraron proveedores con "{{ busqueda }}"
+                        {% else %}
+                        No hay proveedores registrados
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if proveedores %}
+    <div class="text-sm text-gray-500 dark:text-gray-400 text-right">
+        Total: {{ proveedores|length }} proveedor{{ 'es' if proveedores|length != 1 else '' }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

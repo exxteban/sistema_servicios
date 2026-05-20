@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}Historial de Pagos - {{ empleado.nombre_completo }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Historial de Pagos</h1>
+            <p class="mt-1 text-sm text-gray-500">Empleado: <strong>{{ empleado.nombre_completo }}</strong></p>
+        </div>
+        <div>
+            <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado) }}"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                <i class="fas fa-arrow-left"></i>
+                Volver al detalle
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Periodo</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha de Pago</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Método</th>
+                        <th class="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Sueldo Base</th>
+                        <th class="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Total Pagado</th>
+                        <th class="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for pago in paginacion.items %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 text-sm font-semibold text-gray-900">{{ pago.periodo }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700">{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700">{{ pago.metodo_pago or '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-right text-gray-600">Gs. {{ '{:,.0f}'.format(pago.salario_base).replace(',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm font-bold text-right text-green-600">Gs. {{ '{:,.0f}'.format(pago.total_pagado).replace(',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-right">
+                            <div class="inline-flex items-center gap-2">
+                                <a href="{{ url_for('control_empleados.recibo_pago_pdf', id_pago=pago.id_pago) }}" target="_blank"
+                                   class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors font-medium"
+                                   title="Imprimir Recibo">
+                                    <i class="fas fa-print"></i>
+                                    <span>Recibo</span>
+                                </a>
+                                {% if puede_gestionar %}
+                                <form method="post" action="{{ url_for('control_empleados.eliminar_pago', id_pago=pago.id_pago) }}" class="inline-flex">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="periodo" value="{{ pago.periodo }}">
+                                    <button type="submit"
+                                        onclick="return confirm('Se eliminará este pago registrado. ¿Continuar?')"
+                                        class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 transition-colors font-medium">
+                                        <i class="fas fa-trash-alt"></i>
+                                        <span>Eliminar</span>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center">
+                            <div class="mx-auto max-w-md">
+                                <div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 text-xl">
+                                    <i class="fas fa-receipt"></i>
+                                </div>
+                                <h3 class="mt-4 text-lg font-semibold text-gray-900">Sin historial de pagos</h3>
+                                <p class="mt-2 text-sm text-gray-500">Todavía no se ha registrado ningún pago para este empleado.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if paginacion.pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+            <p class="text-sm text-gray-700">
+                Mostrando <span class="font-semibold">{{ paginacion.first }}</span> a <span class="font-semibold">{{ paginacion.last }}</span> de <span class="font-semibold">{{ paginacion.total }}</span> pagos
+            </p>
+            <div class="flex gap-2">
+                {% if paginacion.has_prev %}
+                <a href="{{ url_for('control_empleados.historial_pagos', id_empleado=empleado.id_empleado, page=paginacion.prev_num) }}"
+                    class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Anterior
+                </a>
+                {% endif %}
+                {% if paginacion.has_next %}
+                <a href="{{ url_for('control_empleados.historial_pagos', id_empleado=empleado.id_empleado, page=paginacion.next_num) }}"
+                    class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Siguiente
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

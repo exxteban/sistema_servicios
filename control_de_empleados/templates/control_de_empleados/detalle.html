@@ -1,0 +1,637 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ empleado.nombre_completo }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    [x-cloak] {
+        display: none !important;
+    }
+
+    .ce-stats-grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .ce-stats-grid--summary,
+    .ce-stats-grid--quad {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    @media (min-width: 768px) {
+        .ce-stats-grid--summary,
+        .ce-stats-grid--quad {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .ce-stats-grid--summary {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 1280px) {
+        .ce-stats-grid--quad {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+
+    .ce-kpi-card {
+        min-width: 0;
+        min-height: 112px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 0.55rem;
+        padding: 0.82rem 0.9rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 1.25rem;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: 0 14px 32px -28px rgba(15, 23, 42, 0.55), 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+
+    .ce-kpi-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.45rem;
+    }
+
+    .ce-kpi-copy {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .ce-kpi-eyebrow {
+        margin: 0;
+        font-size: 0.6rem;
+        line-height: 1.1;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #94a3b8;
+    }
+
+    .ce-kpi-value {
+        margin: 0.32rem 0 0;
+        font-size: clamp(1rem, 1.02vw, 1.32rem);
+        line-height: 1.02;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        color: #0f172a;
+        white-space: nowrap;
+    }
+
+    .ce-kpi-value--compact {
+        font-size: clamp(0.95rem, 0.94vw, 1.18rem);
+    }
+
+    .ce-kpi-value--blue {
+        color: #1d4ed8;
+    }
+
+    .ce-kpi-value--green {
+        color: #059669;
+    }
+
+    .ce-kpi-value--amber {
+        color: #d97706;
+    }
+
+    .ce-kpi-value--red {
+        color: #dc2626;
+    }
+
+    .ce-kpi-meta {
+        margin: 0;
+        max-width: none;
+        font-size: 0.64rem;
+        line-height: 1.22;
+        color: #64748b;
+    }
+
+    .ce-kpi-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.3rem 0.55rem;
+        border-radius: 9999px;
+        font-size: 0.54rem;
+        line-height: 1;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .ce-kpi-icon {
+        flex: 0 0 auto;
+        width: 2rem;
+        height: 2rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.75rem;
+        font-size: 0.72rem;
+    }
+
+    .ce-kpi-card--slate {
+        border-color: #dbe3ee;
+    }
+
+    .ce-kpi-card--slate .ce-kpi-icon {
+        background: #eff4fb;
+        color: #334155;
+    }
+
+    .ce-kpi-card--slate .ce-kpi-badge {
+        background: #eff4fb;
+        color: #475569;
+    }
+
+    .ce-kpi-card--blue {
+        border-color: #dbeafe;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .ce-kpi-card--blue .ce-kpi-icon {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+
+    .ce-kpi-card--blue .ce-kpi-badge {
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    .ce-kpi-card--green {
+        border-color: #d1fae5;
+        background: linear-gradient(180deg, #ffffff 0%, #f5fdf8 100%);
+    }
+
+    .ce-kpi-card--green .ce-kpi-icon {
+        background: #ecfdf5;
+        color: #059669;
+    }
+
+    .ce-kpi-card--green .ce-kpi-badge {
+        background: #ecfdf5;
+        color: #047857;
+    }
+
+    .ce-kpi-card--amber {
+        border-color: #fde68a;
+        background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
+    }
+
+    .ce-kpi-card--amber .ce-kpi-icon {
+        background: #fff7ed;
+        color: #d97706;
+    }
+
+    .ce-kpi-card--amber .ce-kpi-badge {
+        background: #fff7ed;
+        color: #b45309;
+    }
+
+    .ce-kpi-card--red {
+        border-color: #fecaca;
+        background: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+    }
+
+    .ce-kpi-card--red .ce-kpi-icon {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .ce-kpi-card--red .ce-kpi-badge {
+        background: #fef2f2;
+        color: #b91c1c;
+    }
+
+    .ce-kpi-card--total {
+        border-color: #0f172a;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+
+    .ce-kpi-card--total .ce-kpi-eyebrow,
+    .ce-kpi-card--total .ce-kpi-meta {
+        color: #cbd5e1;
+    }
+
+    .ce-kpi-card--total .ce-kpi-value {
+        color: #ffffff;
+    }
+
+    .ce-kpi-card--total .ce-kpi-icon,
+    .ce-kpi-card--total .ce-kpi-badge {
+        background: rgba(255, 255, 255, 0.14);
+        color: #f8fafc;
+    }
+
+    .ce-subtabs-shell {
+        overflow: hidden;
+        border: 1px solid #e5e7eb;
+        border-radius: 1rem;
+        background: #fff;
+        box-shadow: 0 10px 24px -24px rgba(15, 23, 42, 0.45);
+    }
+
+    .ce-subtabs-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+
+    .ce-subtab {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.72rem 0.95rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 9999px;
+        background: #ffffff;
+        color: #64748b;
+        font-size: 0.84rem;
+        font-weight: 700;
+        line-height: 1;
+        transition: all 0.18s ease;
+        cursor: pointer;
+    }
+
+    .ce-subtab:hover {
+        border-color: #cbd5e1;
+        color: #334155;
+        background: #f8fafc;
+        transform: translateY(-1px);
+    }
+
+    /* Historial — teal/cyan */
+    .ce-subtab.ce-subtab--historial.is-active {
+        background: linear-gradient(135deg, #0f766e, #0d9488);
+        border-color: #0f766e;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(13, 148, 136, 0.45);
+        transform: scale(1.04);
+    }
+
+    /* Agregar movimiento — azul índigo */
+    .ce-subtab.ce-subtab--movimientos.is-active {
+        background: linear-gradient(135deg, #3730a3, #4f46e5);
+        border-color: #3730a3;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(79, 70, 229, 0.45);
+        transform: scale(1.04);
+    }
+
+    /* Registrar tardía — naranja ámbar */
+    .ce-subtab.ce-subtab--tardias.is-active {
+        background: linear-gradient(135deg, #b45309, #d97706);
+        border-color: #b45309;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(217, 119, 6, 0.45);
+        transform: scale(1.04);
+    }
+
+    /* Registrar pago — verde esmeralda */
+    .ce-subtab.ce-subtab--pago.is-active {
+        background: linear-gradient(135deg, #065f46, #059669);
+        border-color: #065f46;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45);
+        transform: scale(1.04);
+    }
+
+    .ce-subtab-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.55rem;
+        padding: 0.28rem 0.48rem;
+        border-radius: 9999px;
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 0.7rem;
+        font-weight: 800;
+        transition: background 0.18s, color 0.18s;
+    }
+
+    .ce-subtab.is-active .ce-subtab-badge {
+        background: rgba(255, 255, 255, 0.22);
+        color: #ffffff;
+    }
+
+    .ce-subtab-panel {
+        padding: 1.2rem;
+        background: #ffffff;
+    }
+
+    @media (max-width: 640px) {
+        .ce-kpi-card {
+            min-height: 108px;
+            padding: 0.82rem 0.82rem;
+        }
+
+        .ce-kpi-meta {
+            font-size: 0.72rem;
+        }
+
+        .ce-subtabs-nav {
+            padding: 0.85rem 0.85rem 0.75rem;
+            gap: 0.5rem;
+        }
+
+        .ce-subtab-panel {
+            padding: 0.9rem;
+        }
+    }
+
+    /* ---------- Dark Mode overrides for Control de Empleados ---------- */
+    .dark .ce-kpi-card {
+        background: linear-gradient(180deg, #1e2130 0%, #181b28 100%);
+        border-color: rgba(255, 255, 255, 0.07);
+        box-shadow: 0 14px 32px -28px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .dark .ce-kpi-eyebrow {
+        color: #6b7280;
+    }
+
+    .dark .ce-kpi-value {
+        color: #e8eaf0;
+    }
+
+    .dark .ce-kpi-meta {
+        color: #8b90a0;
+    }
+
+    .dark .ce-kpi-card--slate {
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .dark .ce-kpi-card--slate .ce-kpi-icon {
+        background: rgba(255, 255, 255, 0.06);
+        color: #94a3b8;
+    }
+
+    .dark .ce-kpi-card--slate .ce-kpi-badge {
+        background: rgba(255, 255, 255, 0.06);
+        color: #94a3b8;
+    }
+
+    .dark .ce-kpi-card--blue {
+        border-color: rgba(59, 130, 246, 0.25);
+        background: linear-gradient(180deg, #1e2130 0%, #172554 100%);
+    }
+
+    .dark .ce-kpi-card--blue .ce-kpi-icon {
+        background: rgba(59, 130, 246, 0.12);
+        color: #60a5fa;
+    }
+
+    .dark .ce-kpi-card--blue .ce-kpi-badge {
+        background: rgba(59, 130, 246, 0.12);
+        color: #93c5fd;
+    }
+
+    .dark .ce-kpi-card--green {
+        border-color: rgba(34, 197, 94, 0.25);
+        background: linear-gradient(180deg, #1e2130 0%, #064e3b 100%);
+    }
+
+    .dark .ce-kpi-card--green .ce-kpi-icon {
+        background: rgba(34, 197, 94, 0.12);
+        color: #4ade80;
+    }
+
+    .dark .ce-kpi-card--green .ce-kpi-badge {
+        background: rgba(34, 197, 94, 0.12);
+        color: #86efac;
+    }
+
+    .dark .ce-kpi-card--amber {
+        border-color: rgba(245, 158, 11, 0.25);
+        background: linear-gradient(180deg, #1e2130 0%, #451a03 100%);
+    }
+
+    .dark .ce-kpi-card--amber .ce-kpi-icon {
+        background: rgba(245, 158, 11, 0.12);
+        color: #fbbf24;
+    }
+
+    .dark .ce-kpi-card--amber .ce-kpi-badge {
+        background: rgba(245, 158, 11, 0.12);
+        color: #fcd34d;
+    }
+
+    .dark .ce-kpi-card--red {
+        border-color: rgba(239, 68, 68, 0.25);
+        background: linear-gradient(180deg, #1e2130 0%, #450a0a 100%);
+    }
+
+    .dark .ce-kpi-card--red .ce-kpi-icon {
+        background: rgba(239, 68, 68, 0.12);
+        color: #f87171;
+    }
+
+    .dark .ce-kpi-card--red .ce-kpi-badge {
+        background: rgba(239, 68, 68, 0.12);
+        color: #fca5a5;
+    }
+
+    .dark .ce-kpi-card--total {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+
+    .dark .ce-subtabs-shell {
+        border-color: rgba(255, 255, 255, 0.07);
+        background: #1a1d27;
+        box-shadow: 0 10px 24px -24px rgba(0, 0, 0, 0.5);
+    }
+
+    .dark .ce-subtabs-nav {
+        border-bottom-color: rgba(255, 255, 255, 0.07);
+        background: linear-gradient(180deg, #1e2130 0%, #181b28 100%);
+    }
+
+    .dark .ce-subtab {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: #1a1d27;
+        color: #8b90a0;
+    }
+
+    .dark .ce-subtab:hover {
+        border-color: rgba(255, 255, 255, 0.14);
+        color: #d1d5e0;
+        background: #21253a;
+    }
+
+    /* Historial dark — teal */
+    .dark .ce-subtab.ce-subtab--historial.is-active {
+        background: linear-gradient(135deg, #0f766e, #0d9488);
+        border-color: #0d9488;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+    }
+
+    /* Agregar movimiento dark — índigo */
+    .dark .ce-subtab.ce-subtab--movimientos.is-active {
+        background: linear-gradient(135deg, #3730a3, #4f46e5);
+        border-color: #4f46e5;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+    }
+
+    /* Registrar tardía dark — ámbar */
+    .dark .ce-subtab.ce-subtab--tardias.is-active {
+        background: linear-gradient(135deg, #b45309, #d97706);
+        border-color: #d97706;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+    }
+
+    /* Registrar pago dark — esmeralda */
+    .dark .ce-subtab.ce-subtab--pago.is-active {
+        background: linear-gradient(135deg, #065f46, #059669);
+        border-color: #059669;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+    }
+
+    .dark .ce-subtab-badge {
+        background: rgba(255, 255, 255, 0.06);
+        color: #94a3b8;
+    }
+
+    .dark .ce-subtab.is-active .ce-subtab-badge {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+    }
+
+    .dark .ce-subtab-panel {
+        background: #1a1d27;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-bold text-gray-900">{{ empleado.nombre_completo }}</h1>
+                {% if empleado.activo %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Activo</span>
+                {% else %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Inactivo</span>
+                {% endif %}
+                {% if resumen.esta_pagado %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Pagado el {{ resumen.pago.fecha_pago.strftime('%d/%m/%Y') }}</span>
+                {% else %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Pendiente de Pago</span>
+                {% endif %}
+            </div>
+            <p class="mt-2 text-sm text-gray-500">{{ empleado.cargo or 'Sin cargo' }} · {{ empleado.area or 'Sin área' }} · {{ empleado.tipo_pago|capitalize }}</p>
+        </div>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <form method="get" action="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado) }}" class="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+                <label for="periodo" class="text-sm font-medium text-gray-600">Mes</label>
+                <input id="periodo" name="periodo" type="month" value="{{ periodo }}"
+                    class="border-0 bg-transparent text-sm font-semibold text-gray-900 focus:ring-0">
+                <input type="hidden" name="tab" value="{{ tab }}">
+                {% if panel_ausencias %}
+                <input type="hidden" name="anio" value="{{ panel_ausencias.filtros.anio }}">
+                <input type="hidden" name="tipo_ausencia" value="{{ panel_ausencias.filtros.tipo }}">
+                <input type="hidden" name="estado_ausencia" value="{{ panel_ausencias.filtros.estado }}">
+                {% endif %}
+                <button type="submit" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold">Ver mes</button>
+            </form>
+            {% if puede_gestionar %}
+            <a href="{{ url_for('control_empleados.editar', id_empleado=empleado.id_empleado) }}"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-blue-200 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors">
+                <i class="fas fa-pen"></i>
+                Editar empleado
+            </a>
+            {% endif %}
+            <a href="{{ url_for('control_empleados.historial_pagos', id_empleado=empleado.id_empleado) }}"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                <i class="fas fa-history"></i>
+                Pagos
+            </a>
+            <a href="{{ url_for('control_empleados.index', periodo=periodo) }}"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                <i class="fas fa-arrow-left"></i>
+                Volver
+            </a>
+        </div>
+    </div>
+
+    {# ── Barra de tabs con pill coloreado ── #}
+    <div class="bg-gray-100 border-b border-gray-200 px-4 py-3">
+        <nav class="flex flex-wrap gap-2">
+
+            {# ── Resumen salarial — violeta oscuro ── #}
+            <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab='resumen') }}"
+               style="{% if tab == 'resumen' %}background:linear-gradient(135deg,#4c1d95,#6d28d9);color:#fff;box-shadow:0 4px 14px rgba(109,40,217,.45);{% endif %}"
+               class="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold border transition-all duration-200
+                      {% if tab == 'resumen' %}border-violet-700 scale-105{% else %}border-gray-200 hover:border-violet-300 hover:text-violet-700 hover:bg-violet-50 bg-white text-gray-600{% endif %}">
+                <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs
+                             {% if tab == 'resumen' %}bg-white/20{% else %}bg-violet-100 text-violet-600{% endif %}">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </span>
+                Resumen salarial
+            </a>
+
+            {# ── Asistencia — índigo ── #}
+            <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab='asistencia') }}"
+               style="{% if tab == 'asistencia' %}background:linear-gradient(135deg,#1e3a8a,#3730a3);color:#fff;box-shadow:0 4px 14px rgba(55,48,163,.45);{% endif %}"
+               class="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold border transition-all duration-200
+                      {% if tab == 'asistencia' %}border-indigo-800 scale-105{% else %}border-gray-200 hover:border-indigo-300 hover:text-indigo-700 hover:bg-indigo-50 bg-white text-gray-600{% endif %}">
+                <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs
+                             {% if tab == 'asistencia' %}bg-white/20{% else %}bg-indigo-100 text-indigo-600{% endif %}">
+                    <i class="fas fa-calendar-check"></i>
+                </span>
+                Asistencia
+            </a>
+
+            {# ── Aguinaldo — azul petróleo ── #}
+            <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab='aguinaldo') }}"
+               style="{% if tab == 'aguinaldo' %}background:linear-gradient(135deg,#0c4a6e,#0369a1);color:#fff;box-shadow:0 4px 14px rgba(3,105,161,.45);{% endif %}"
+               class="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold border transition-all duration-200
+                      {% if tab == 'aguinaldo' %}border-sky-800 scale-105{% else %}border-gray-200 hover:border-sky-300 hover:text-sky-700 hover:bg-sky-50 bg-white text-gray-600{% endif %}">
+                <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs
+                             {% if tab == 'aguinaldo' %}bg-white/20{% else %}bg-sky-100 text-sky-600{% endif %}">
+                    <i class="fas fa-gift"></i>
+                </span>
+                Control de aguinaldo
+            </a>
+
+            {# ── Vacaciones — verde esmeralda ── #}
+            <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab='vacaciones', anio=panel_ausencias.filtros.anio if panel_ausencias else periodo[:4]) }}"
+               style="{% if tab == 'vacaciones' %}background:linear-gradient(135deg,#064e3b,#047857);color:#fff;box-shadow:0 4px 14px rgba(4,120,87,.45);{% endif %}"
+               class="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold border transition-all duration-200
+                      {% if tab == 'vacaciones' %}border-emerald-800 scale-105{% else %}border-gray-200 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50 bg-white text-gray-600{% endif %}">
+                <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs
+                             {% if tab == 'vacaciones' %}bg-white/20{% else %}bg-emerald-100 text-emerald-600{% endif %}">
+                    <i class="fas fa-umbrella-beach"></i>
+                </span>
+                Vacaciones y días libres
+            </a>
+
+        </nav>
+    </div>
+
+    {% if tab == 'resumen' %}
+    {% include 'control_de_empleados/_detalle_resumen.html' %}
+    {% elif tab == 'asistencia' %}
+    {% include 'control_de_empleados/_detalle_asistencia.html' %}
+    {% elif tab == 'aguinaldo' %}
+    {% include 'control_de_empleados/_detalle_aguinaldo.html' %}
+    {% else %}
+    {% include 'control_de_empleados/_detalle_ausencias.html' %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,166 @@
+<script>
+    (function () {
+        const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+        const root = scope.querySelector('[data-dashboard-range]');
+        if (!root) return;
+
+        const ventasHoyEl = root.querySelector('#dashboard-ventas-hoy');
+        const totalVendidoEl = root.querySelector('#dashboard-total-vendido');
+        const totalVendidoLabelEl = root.querySelector('#dashboard-total-vendido-label');
+        const totalVendidoMetaEl = root.querySelector('#dashboard-total-vendido-meta');
+        const ventasHoyNuevoEl = root.querySelector('#dashboard-new-ventas-hoy');
+        const totalCobradoNuevoEl = root.querySelector('#dashboard-new-total-cobrado');
+        const totalCobradoNuevoMetaEl = root.querySelector('#dashboard-new-total-cobrado-meta');
+        const agendaPendientesNuevoEl = root.querySelector('#dashboard-new-agenda-pendientes');
+        const agendaRoot = scope.querySelector('[data-dashboard-agenda-root="1"]');
+        const agendaPendientesHoyEl = agendaRoot ? agendaRoot.querySelector('#dashboard-agenda-pendientes-hoy') : null;
+        const agendaTotalEl = agendaRoot ? agendaRoot.querySelector('#dashboard-agenda-total') : null;
+        const agendaVencidasEl = agendaRoot ? agendaRoot.querySelector('#dashboard-agenda-vencidas') : null;
+        const agendaListEl = agendaRoot ? agendaRoot.querySelector('#dashboard-agenda-list') : null;
+        const agendaListUrl = agendaListEl ? (agendaListEl.getAttribute('data-agenda-list-url') || '') : '';
+        if (!ventasHoyEl && !ventasHoyNuevoEl && !totalVendidoEl && !totalCobradoNuevoEl && !totalVendidoLabelEl && !agendaRoot && !agendaPendientesNuevoEl) return;
+
+        let inFlight = false;
+        let timerId = null;
+
+        function isAlive() {
+            try {
+                return document.contains(root);
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatMonto(value) {
+            return `₲ ${new Intl.NumberFormat('es-PY').format(Number(value || 0))}`;
+        }
+
+        function pluralizePendientes(count) {
+            return `${count} pendiente${count === 1 ? '' : 's'}`;
+        }
+
+        function priorityClass(prioridad) {
+            const value = String(prioridad || '').toLowerCase();
+            if (value === 'critica') return 'bg-rose-500/20 text-rose-100 ring-1 ring-rose-300/30';
+            if (value === 'alta') return 'bg-orange-500/20 text-orange-100 ring-1 ring-orange-300/30';
+            if (value === 'media') return 'bg-sky-500/20 text-sky-100 ring-1 ring-sky-300/30';
+            return 'bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-300/30';
+        }
+
+        function renderAgenda(agenda) {
+            if (!agendaRoot || !agenda || typeof agenda !== 'object') {
+                return;
+            }
+            const pendientesHoy = Number(agenda.pendientes_hoy || 0);
+            const totalPendientes = Number(agenda.total_pendientes || 0);
+            const vencidas = Number(agenda.vencidas || 0);
+            const items = Array.isArray(agenda.proximas_actividades) ? agenda.proximas_actividades : [];
+
+            if (agendaPendientesHoyEl) {
+                agendaPendientesHoyEl.textContent = pluralizePendientes(pendientesHoy);
+            }
+            if (agendaPendientesNuevoEl) {
+                agendaPendientesNuevoEl.textContent = pluralizePendientes(pendientesHoy);
+            }
+            if (agendaTotalEl) {
+                agendaTotalEl.textContent = `Total: ${totalPendientes}`;
+            }
+            if (agendaVencidasEl) {
+                agendaVencidasEl.textContent = `Vencidas: ${vencidas}`;
+            }
+            if (!agendaListEl) {
+                return;
+            }
+            if (!items.length) {
+                agendaListEl.innerHTML = '<div class="rounded-xl border border-dashed border-white/10 bg-white/[0.04] px-3 py-3 text-xs text-slate-300/75">No hay actividades pendientes para hoy.</div>';
+                return;
+            }
+
+            agendaListEl.innerHTML = items.map((actividad) => {
+                const prioridad = String(actividad && actividad.prioridad ? actividad.prioridad : '');
+                const prioridadLabel = String(actividad && actividad.prioridad_label ? actividad.prioridad_label : 'Baja');
+                const titulo = escapeHtml(actividad && actividad.titulo ? actividad.titulo : 'Actividad');
+                const horaLabel = escapeHtml(actividad && actividad.hora_label ? actividad.hora_label : '--:--');
+                const tipoLabel = escapeHtml(actividad && actividad.tipo_label ? actividad.tipo_label : 'Actividad');
+                const badgeClass = priorityClass(prioridad);
+                return `<a href="${agendaListUrl}" data-tab-url="${agendaListUrl}" data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check" class="app-tab-link flex items-start justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2.5 hover:bg-white/[0.07] transition"><div class="min-w-0"><p class="text-[13px] sm:text-sm font-semibold text-slate-100 truncate">${titulo}</p><p class="text-[11px] text-slate-300/80">${horaLabel} · ${tipoLabel}</p></div><span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeClass}">${escapeHtml(prioridadLabel)}</span></a>`;
+            }).join('');
+        }
+
+        async function refresh() {
+            if (!isAlive()) {
+                if (timerId) clearInterval(timerId);
+                timerId = null;
+                return;
+            }
+            if (inFlight) return;
+            inFlight = true;
+            try {
+                const params = new URLSearchParams();
+                const range = root.getAttribute('data-dashboard-range') || 'hoy';
+                const desde = root.getAttribute('data-dashboard-desde') || '';
+                const hasta = root.getAttribute('data-dashboard-hasta') || '';
+                if (range) params.set('range', range);
+                if (desde) params.set('desde', desde);
+                if (hasta) params.set('hasta', hasta);
+
+                const res = await fetch(`/api/dashboard/totales?${params.toString()}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (ventasHoyEl && typeof data.ventas_hoy === 'number') {
+                    ventasHoyEl.textContent = String(data.ventas_hoy);
+                }
+                if (ventasHoyNuevoEl && typeof data.ventas_hoy === 'number') {
+                    ventasHoyNuevoEl.textContent = String(data.ventas_hoy);
+                }
+                if (totalVendidoEl && (data.total_cobrado_formatted || data.total_ventas_formatted)) {
+                    totalVendidoEl.textContent = String(data.total_cobrado_formatted || data.total_ventas_formatted);
+                }
+                if (totalCobradoNuevoEl && (data.total_cobrado_formatted || data.total_ventas_formatted)) {
+                    totalCobradoNuevoEl.textContent = String(data.total_cobrado_formatted || data.total_ventas_formatted).replace(/^\D+\s*/, 'Gs. ');
+                }
+                if (totalVendidoLabelEl && data.range_label) {
+                    totalVendidoLabelEl.textContent = `Cobrado real (${data.range_label})`;
+                }
+                if (totalVendidoMetaEl) {
+                    const cobradoVentas = Number(data.cobrado_en_ventas || 0);
+                    const cobradoCreditos = Number(data.cobrado_en_creditos || 0);
+                    const cobradoPedidos = Number(data.cobrado_en_pedidos || 0);
+                    totalVendidoMetaEl.textContent = `Ventas cobradas: ${formatMonto(cobradoVentas)} | Creditos cobrados: ${formatMonto(cobradoCreditos)} | Pedidos cobrados: ${formatMonto(cobradoPedidos)}`;
+                }
+                if (totalCobradoNuevoMetaEl) {
+                    const cobradoVentas = Number(data.cobrado_en_ventas || 0);
+                    totalCobradoNuevoMetaEl.textContent = `Ventas cobradas: Gs. ${new Intl.NumberFormat('es-PY').format(cobradoVentas)}`;
+                }
+                renderAgenda(data.agenda);
+            } catch (e) {
+            } finally {
+                inFlight = false;
+            }
+        }
+
+        window.dashboardRefreshTotals = refresh;
+        window.addEventListener('dashboard:refresh-totals', refresh);
+        window.addEventListener('agenda:alertas-actualizadas', refresh);
+        window.addEventListener('agenda:resolver-actividad', refresh);
+        window.addEventListener('storage', (event) => {
+            if (!event || event.key !== 'agenda-activity-sync') {
+                return;
+            }
+            refresh();
+        });
+
+        refresh();
+        timerId = setInterval(refresh, 15000);
+    })();
+</script>

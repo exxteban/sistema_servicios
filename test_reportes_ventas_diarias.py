@@ -1,0 +1,125 @@
+import unittest
+from datetime import UTC, datetime
+
+from app import create_app, db
+
+
+class TestReportesVentasDiarias(unittest.TestCase):
+    def setUp(self):
+        self.app = create_app('testing')
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+
+        from app.models import Caja, Cliente, MetodoPago, SesionCaja, Usuario
+
+        self.admin = Usuario.query.filter_by(username='admin').first()
+        self.assertIsNotNone(self.admin)
+
+        self.cliente = db.session.get(Cliente, 1)
+        if self.cliente is None:
+            self.cliente = Cliente(nombre='Consumidor Final', tipo='minorista', activo=True)
+            db.session.add(self.cliente)
+            db.session.flush()
+
+        self.metodo_efectivo = MetodoPago.query.filter(MetodoPago.nombre.ilike('%efectivo%')).first()
+        self.assertIsNotNone(self.metodo_efectivo)
+
+        caja = Caja.query.first()
+        if caja is None:
+            caja = Caja(nombre='Caja Test', activa=True)
+            db.session.add(caja)
+            db.session.flush()
+
+        self.sesion = SesionCaja(
+            id_caja=int(caja.id_caja),
+            id_usuario=int(self.admin.id_usuario),
+            monto_inicial=100000,
+            estado='abierta',
+        )
+        db.session.add(self.sesion)
+        db.session.commit()
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        self.ctx.pop()
+
+    def test_desglosa_cobros_de_pedidos_por_pedido(self):
+        from app.models import PedidoCliente, PedidoClientePago, Venta
+        from app.routes.reportes_ventas_diarias import construir_contexto_ventas_diarias
+        from app.utils.helpers import utc_naive_to_local
+
+        ahora = datetime.now(UTC).replace(tzinfo=None)
+        venta = Venta(
+            id_cliente=int(self.cliente.id_cliente),
+            id_sesion_caja=int(self.sesion.id_sesion),
+            id_usuario_vendedor=int(self.admin.id_usuario),
+            fecha_venta=ahora,
+            subtotal=145000,
+            total=145000,
+            total_iva_10=0,
+            total_iva_5=0,
+            total_exenta=0,
+            estado='completada',
+            tipo_venta='contado',
+            saldo_pendiente=0,
+        )
+        db.session.add(venta)
+        db.session.flush()
+
+        pedido_con_venta = PedidoCliente(
+            numero_pedido=2,
+            id_cliente=int(self.cliente.id_cliente),
+            id_usuario_creacion=int(self.admin.id_usuario),
+            id_venta_generada=int(venta.id_venta),
+            estado='entregado',
+            total=145000,
+            total_pagado=145000,
+            saldo_pendiente=0,
+        )
+        pedido_parcial = PedidoCliente(
+            numero_pedido=1,
+            id_cliente=int(self.cliente.id_cliente),
+            id_usuario_creacion=int(self.admin.id_usuario),
+            estado='pago_parcial',
+            total=10000,
+            total_pagado=6300,
+            saldo_pendiente=3700,
+        )
+        db.session.add_all([pedido_con_venta, pedido_parcial])
+        db.session.flush()
+
+        pagos = [
+            (pedido_con_venta, 'sena', 3000),
+            (pedido_con_venta, 'pago_total', 142000),
+            (pedido_parcial, 'sena', 1000),
+            (pedido_parcial, 'pago_parcial', 5300),
+        ]
+        for pedido, tipo_pago, monto in pagos:
+            db.session.add(
+                PedidoClientePago(
+                    id_pedido=int(pedido.id_pedido),
+                    id_metodo_pago=int(self.metodo_efectivo.id_metodo_pago),
+                    id_sesion_caja=int(self.sesion.id_sesion),
+                    id_usuario=int(self.admin.id_usuario),
+                    tipo_pago=tipo_pago,
+                    monto=monto,
+                    estado='activo',
+                    fecha_pago=ahora,
+                )
+            )
+        db.session.commit()
+
+        fecha_local = utc_naive_to_local(ahora).date().isoformat()
+        contexto = construir_contexto_ventas_diarias(raw_fecha=fecha_local)
+
+        self.assertAlmostEqual(float(contexto['cobros_pedidos_dia']), 151300.0)
+        desglose = contexto['desglose_cobros_pedidos']
+        self.assertEqual([item['numero_pedido'] for item in desglose], ['PED-000002', 'PED-000001'])
+        self.assertAlmostEqual(float(desglose[0]['total_cobrado']), 145000.0)
+        self.assertAlmostEqual(float(desglose[1]['total_cobrado']), 6300.0)
+        self.assertEqual(int(desglose[0]['id_venta_generada']), int(venta.id_venta))
+
+
+if __name__ == '__main__':
+    unittest.main()

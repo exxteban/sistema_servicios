@@ -1,0 +1,2530 @@
+"""
+Rutas de gestión de caja
+"""
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, g, make_response
+from flask_login import login_required, current_user
+from datetime import datetime
+from flask import current_app
+from xhtml2pdf import pisa
+from io import BytesIO
+from app import db
+from app.models import (
+    Auditoria,
+    Caja,
+    Compra,
+    CuentaPorCobrar,
+    DetalleCompra,
+    DetalleDevolucion,
+    DetalleVenta,
+    MetodoPago,
+    MovimientoCaja,
+    PagoCompra,
+    PagoCuentaCobrar,
+    PagoVenta,
+    SesionCaja,
+    Venta,
+)
+from app.utils.auditoria_utils import registrar_auditoria
+from app.utils.helpers import local_strftime, now_local, parse_iso_date, today_local, utc_bounds_for_local_dates
+from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
+
+caja_bp = Blueprint('caja', __name__)
+
+
+def _puede_ver_sesion(sesion: SesionCaja) -> bool:
+    if current_user.es_admin():
+        return True
+    if current_user.tiene_permiso('ver_otras_cajas'):
+        return True
+    return sesion.id_usuario == current_user.id_usuario or sesion.id_usuario_cierre == current_user.id_usuario
+
+
+def _norm_metodo_pago_nombre(nombre: str) -> str:
+    s = (nombre or '').strip().lower()
+    s = s.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ñ', 'n')
+    return ' '.join(s.split())
+
+
+def _resolver_metodo_efectivo_id(metodos, metodos_por_id):
+    for m in metodos:
+        if _norm_metodo_pago_nombre(getattr(m, 'nombre', '') or '') == 'efectivo':
+            return int(getattr(m, 'id_metodo_pago', 0) or 0) or None
+    candidatos = [m for m in metodos if 'efectivo' in _norm_metodo_pago_nombre(getattr(m, 'nombre', '') or '')]
+    if candidatos:
+        candidatos.sort(key=lambda x: (int(getattr(x, 'orden_display', 0) or 0), int(getattr(x, 'id_metodo_pago', 0) or 0)))
+        return int(getattr(candidatos[0], 'id_metodo_pago', 0) or 0) or None
+    if metodos_por_id and 1 in metodos_por_id:
+        return 1
+    return None
+
+
+def _calcular_informe_cierre_sesion(sesion: SesionCaja):
+    id_sesion = sesion.id_sesion
+
+    metodos = (
+        MetodoPago.query.filter_by(activo=True)
+        .order_by(MetodoPago.orden_display.asc(), MetodoPago.nombre.asc())
+        .all()
+    )
+    metodos_por_id = {m.id_metodo_pago: m for m in metodos}
+
+    pagos_ventas_agg_rows = (
+        db.session.query(
+            PagoVenta.id_metodo_pago,
+            func.sum(PagoVenta.monto).label('total'),
+            func.count(PagoVenta.id_pago).label('cantidad'),
+        )
+        .join(Venta, PagoVenta.id_venta == Venta.id_venta)
+        .filter(Venta.id_sesion_caja == id_sesion, Venta.estado == 'completada')
+        .group_by(PagoVenta.id_metodo_pago)
+        .all()
+    )
+    pagos_ventas_agg = {int(r.id_metodo_pago): r for r in pagos_ventas_agg_rows}
+
+    start_ts = sesion.fecha_apertura or datetime.min
+    end_ts = sesion.fecha_cierre or datetime.utcnow()
+    anulaciones_auditoria = (
+        db.session.query(Auditoria.referencia_id, Auditoria.fecha_accion)
+        .join(Venta, Venta.id_venta == Auditoria.referencia_id)
+        .filter(
+            Venta.id_sesion_caja == id_sesion,
+            Auditoria.accion == 'anular_venta',
+            Auditoria.modulo == 'ventas',
+            Auditoria.referencia_tipo == 'venta',
+            Auditoria.referencia_id.isnot(None),
+            Auditoria.fecha_accion >= start_ts,
+            Auditoria.fecha_accion < end_ts,
+        )
+        .order_by(Auditoria.fecha_accion.asc(), Auditoria.id_auditoria.asc())
+        .all()
+    )
+    anulacion_fecha_por_venta = {}
+    venta_ids_anuladas = []
+    for ref_id, fecha_accion in anulaciones_auditoria:
+        try:
+            vid = int(ref_id)
+        except Exception:
+            continue
+        if vid not in anulacion_fecha_por_venta:
+            anulacion_fecha_por_venta[vid] = fecha_accion
+            venta_ids_anuladas.append(vid)
+
+    anulaciones_pagos_rows = []
+    ventas_anuladas = {}
+    anulaciones_por_metodo = {}
+    if venta_ids_anuladas:
+        anulaciones_pagos_rows = (
+            db.session.query(PagoVenta.id_venta, PagoVenta.id_metodo_pago, func.sum(PagoVenta.monto).label('total'))
+            .filter(PagoVenta.id_venta.in_(sorted(set(venta_ids_anuladas))))
+            .group_by(PagoVenta.id_venta, PagoVenta.id_metodo_pago)
+            .all()
+        )
+        ventas_anuladas_rows = (
+            Venta.query.options(joinedload(Venta.cliente))
+            .filter(Venta.id_venta.in_(sorted(set(venta_ids_anuladas))))
+            .all()
+        )
+        ventas_anuladas = {int(v.id_venta): v for v in ventas_anuladas_rows}
+        for r in anulaciones_pagos_rows:
+            try:
+                mid = int(r.id_metodo_pago)
+            except Exception:
+                continue
+            anulaciones_por_metodo[mid] = float(anulaciones_por_metodo.get(mid, 0.0) or 0.0) + float(r.total or 0)
+
+    pagos_creditos_agg_rows = (
+        db.session.query(
+            PagoCuentaCobrar.id_metodo_pago,
+            func.sum(PagoCuentaCobrar.monto).label('total'),
+            func.count(PagoCuentaCobrar.id_pago_cuenta).label('cantidad'),
+        )
+        .filter(PagoCuentaCobrar.id_sesion_caja == id_sesion)
+        .group_by(PagoCuentaCobrar.id_metodo_pago)
+        .all()
+    )
+    pagos_creditos_agg = {int(r.id_metodo_pago): r for r in pagos_creditos_agg_rows}
+
+    pagos_compras_agg_rows = (
+        db.session.query(
+            PagoCompra.id_metodo_pago,
+            func.sum(PagoCompra.monto).label('total'),
+            func.count(PagoCompra.id_pago_compra).label('cantidad'),
+        )
+        .filter(PagoCompra.id_sesion_caja == id_sesion)
+        .group_by(PagoCompra.id_metodo_pago)
+        .all()
+    )
+    pagos_compras_agg = {int(r.id_metodo_pago): r for r in pagos_compras_agg_rows}
+
+    movimientos = (
+        MovimientoCaja.query.options(joinedload(MovimientoCaja.usuario))
+        .filter(MovimientoCaja.id_sesion_caja == id_sesion)
+        .order_by(MovimientoCaja.fecha_movimiento.asc(), MovimientoCaja.id_movimiento_caja.asc())
+        .all()
+    )
+    _enriquecer_motivos_movimientos(movimientos)
+
+    def _money(x):
+        try:
+            return float(x or 0)
+        except Exception:
+            return 0.0
+
+    monto_inicial = _money(sesion.monto_inicial)
+
+    mov_ingresos = 0.0
+    mov_egresos = 0.0
+    ventas_efectivo_mov = 0.0
+    vuelto = 0.0
+    reembolsos = 0.0
+    ingresos_varios = 0.0
+    egresos_varios = 0.0
+
+    for mov in movimientos:
+        monto = _money(mov.monto)
+        referencia_tipo = (mov.referencia_tipo or '').strip().lower()
+        if mov.tipo == 'egreso' and referencia_tipo == 'compra':
+            continue
+        if mov.tipo == 'egreso' and referencia_tipo == 'anulacion_venta':
+            continue
+        if mov.tipo == 'ingreso':
+            mov_ingresos += monto
+            if referencia_tipo == 'venta':
+                ventas_efectivo_mov += monto
+            else:
+                ingresos_varios += monto
+        else:
+            mov_egresos += monto
+            ref = referencia_tipo
+            motivo = (mov.motivo or '').strip().lower()
+            if ref == 'venta' and motivo.startswith('vuelto'):
+                vuelto += monto
+            elif ref == 'devolucion':
+                reembolsos += monto
+            else:
+                egresos_varios += monto
+
+    ventas_por_metodo = []
+    creditos_por_metodo = []
+    compras_por_metodo = []
+
+    for m in metodos:
+        total_v = pagos_ventas_agg.get(m.id_metodo_pago)
+        total_c = pagos_creditos_agg.get(m.id_metodo_pago)
+        total_p = pagos_compras_agg.get(m.id_metodo_pago)
+        ventas_por_metodo.append(
+            {
+                'id_metodo_pago': m.id_metodo_pago,
+                'nombre': m.nombre,
+                'total': _money(total_v.total) if total_v else 0.0,
+                'cantidad': int(total_v.cantidad) if total_v and total_v.cantidad else 0,
+            }
+        )
+        creditos_por_metodo.append(
+            {
+                'id_metodo_pago': m.id_metodo_pago,
+                'nombre': m.nombre,
+                'total': _money(total_c.total) if total_c else 0.0,
+                'cantidad': int(total_c.cantidad) if total_c and total_c.cantidad else 0,
+            }
+        )
+        compras_por_metodo.append(
+            {
+                'id_metodo_pago': m.id_metodo_pago,
+                'nombre': m.nombre,
+                'total': _money(total_p.total) if total_p else 0.0,
+                'cantidad': int(total_p.cantidad) if total_p and total_p.cantidad else 0,
+            }
+        )
+
+    efectivo_id = _resolver_metodo_efectivo_id(metodos, metodos_por_id)
+
+    ventas_efectivo = 0.0
+    for item in ventas_por_metodo:
+        if efectivo_id is not None and item['id_metodo_pago'] == efectivo_id:
+            ventas_efectivo = item['total']
+            break
+    if ventas_efectivo <= 0:
+        ventas_efectivo = ventas_efectivo_mov
+
+    total_ventas = sum(x['total'] for x in ventas_por_metodo)
+    total_cobros_creditos = sum(x['total'] for x in creditos_por_metodo)
+    total_pagos_compras = sum(x['total'] for x in compras_por_metodo)
+    total_anulaciones = sum(float(v or 0) for v in anulaciones_por_metodo.values())
+
+    total_ingresos = monto_inicial + total_ventas + total_cobros_creditos + ingresos_varios
+    total_egresos = total_pagos_compras + mov_egresos + total_anulaciones
+    neto = total_ingresos - total_egresos
+
+    try:
+        total_efectivo_sistema = float(sesion.calcular_total_efectivo() or 0)
+    except Exception:
+        total_efectivo_sistema = _money(sesion.monto_final_sistema)
+    if efectivo_id is not None:
+        anulaciones_efectivo_pagos = float(anulaciones_por_metodo.get(int(efectivo_id), 0.0) or 0.0)
+        anulaciones_efectivo_mov = 0.0
+        for mov in movimientos:
+            if mov.tipo != 'egreso':
+                continue
+            referencia_tipo = (mov.referencia_tipo or '').strip().lower()
+            if referencia_tipo != 'anulacion_venta':
+                continue
+            anulaciones_efectivo_mov += _money(mov.monto)
+        faltante_anulaciones_efectivo = anulaciones_efectivo_pagos - anulaciones_efectivo_mov
+        if faltante_anulaciones_efectivo > 0:
+            total_efectivo_sistema -= faltante_anulaciones_efectivo
+    ingreso_real_efectivo = total_efectivo_sistema - monto_inicial
+    declarado = _money(sesion.monto_final_declarado)
+    diferencia_efectivo = _money(sesion.diferencia)
+
+    conceptos = []
+    conceptos.append({'concepto': 'Caja Inicial', 'entrada': monto_inicial, 'salida': 0.0, 'key': 'caja_inicial'})
+    if ventas_efectivo:
+        ventas_efectivo_key = 'ventas_metodo' if efectivo_id is not None else 'ventas_efectivo_mov'
+        conceptos.append(
+            {
+                'concepto': 'Ventas en Efectivo',
+                'entrada': ventas_efectivo,
+                'salida': 0.0,
+                'key': ventas_efectivo_key,
+                'metodo_id': efectivo_id,
+            }
+        )
+
+    for v in ventas_por_metodo:
+        if efectivo_id is not None and v['id_metodo_pago'] == efectivo_id:
+            continue
+        if v['total']:
+            conceptos.append(
+                {
+                    'concepto': f'Ventas - {v["nombre"]}',
+                    'entrada': v['total'],
+                    'salida': 0.0,
+                    'key': 'ventas_metodo',
+                    'metodo_id': v['id_metodo_pago'],
+                }
+            )
+
+    for m in metodos:
+        mid = int(m.id_metodo_pago)
+        total_anul = float(anulaciones_por_metodo.get(mid, 0.0) or 0.0)
+        if total_anul:
+            conceptos.append(
+                {
+                    'concepto': f'Anulaciones - {m.nombre}',
+                    'entrada': 0.0,
+                    'salida': total_anul,
+                    'key': 'anulaciones_ventas_metodo',
+                    'metodo_id': mid,
+                }
+            )
+
+    for c in creditos_por_metodo:
+        if c['total']:
+            conceptos.append(
+                {
+                    'concepto': f'Cobros de Créditos - {c["nombre"]}',
+                    'entrada': c['total'],
+                    'salida': 0.0,
+                    'key': 'cobros_creditos_metodo',
+                    'metodo_id': c['id_metodo_pago'],
+                }
+            )
+
+    if ingresos_varios:
+        conceptos.append({'concepto': 'Ingresos Varios', 'entrada': ingresos_varios, 'salida': 0.0, 'key': 'ingresos_varios'})
+
+    if total_pagos_compras:
+        for p in compras_por_metodo:
+            if p['total']:
+                conceptos.append(
+                    {
+                        'concepto': f'Pagos de Compras - {p["nombre"]}',
+                        'entrada': 0.0,
+                        'salida': p['total'],
+                        'key': 'pagos_compras_metodo',
+                        'metodo_id': p['id_metodo_pago'],
+                    }
+                )
+
+    if vuelto:
+        conceptos.append({'concepto': 'Vuelto', 'entrada': 0.0, 'salida': vuelto, 'key': 'vuelto'})
+    if reembolsos:
+        conceptos.append({'concepto': 'Reembolsos', 'entrada': 0.0, 'salida': reembolsos, 'key': 'reembolsos'})
+    if egresos_varios:
+        conceptos.append({'concepto': 'Egresos Varios', 'entrada': 0.0, 'salida': egresos_varios, 'key': 'egresos_varios'})
+
+    detalles = []
+    if sesion.fecha_apertura:
+        detalles.append(
+            {
+                'fecha': sesion.fecha_apertura,
+                'concepto': 'Caja Inicial',
+                'referencia': f'Sesión #{sesion.id_sesion}',
+                'forma_pago': 'Efectivo',
+                'entrada': monto_inicial,
+                'salida': 0.0,
+                'detalle': '',
+                'tx_tipo': 'sesion_apertura',
+                'tx_id': int(sesion.id_sesion),
+            }
+        )
+
+    pagos_ventas_detalle = (
+        db.session.query(PagoVenta, Venta, MetodoPago)
+        .join(Venta, PagoVenta.id_venta == Venta.id_venta)
+        .outerjoin(MetodoPago, PagoVenta.id_metodo_pago == MetodoPago.id_metodo_pago)
+        .options(joinedload(Venta.cliente))
+        .filter(Venta.id_sesion_caja == id_sesion, Venta.estado == 'completada')
+        .order_by(Venta.fecha_venta.asc(), PagoVenta.id_pago.asc())
+        .all()
+    )
+    for pago, venta, metodo in pagos_ventas_detalle:
+        descripcion = _descripcion_venta_detalle(venta)
+        forma_pago = metodo.nombre if metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
+        detalles.append(
+            {
+                'fecha': venta.fecha_venta,
+                'concepto': 'Venta',
+                'referencia': f'Venta #{venta.id_venta}',
+                'forma_pago': forma_pago,
+                'entrada': _money(pago.monto),
+                'salida': 0.0,
+                'detalle': descripcion,
+                'tx_tipo': 'venta',
+                'tx_id': int(venta.id_venta),
+                'tx_pago_id': int(pago.id_pago),
+            }
+        )
+
+    for r in anulaciones_pagos_rows:
+        venta = ventas_anuladas.get(int(r.id_venta))
+        if not venta:
+            continue
+        fecha_anulacion = anulacion_fecha_por_venta.get(int(venta.id_venta)) or venta.fecha_venta
+        metodo = metodos_por_id.get(int(r.id_metodo_pago))
+        forma_pago = metodo.nombre if metodo else f'Método #{int(r.id_metodo_pago or 0)}'
+        detalles.append(
+            {
+                'fecha': fecha_anulacion,
+                'concepto': 'Anulación de Venta',
+                'referencia': f'Venta #{venta.id_venta}',
+                'forma_pago': forma_pago,
+                'entrada': 0.0,
+                'salida': _money(r.total),
+                'detalle': _descripcion_venta_detalle(venta),
+                'tx_tipo': 'venta',
+                'tx_id': int(venta.id_venta),
+            }
+        )
+
+    pagos_creditos_detalle = (
+        db.session.query(PagoCuentaCobrar, CuentaPorCobrar, MetodoPago)
+        .join(CuentaPorCobrar, PagoCuentaCobrar.id_cuenta_cobrar == CuentaPorCobrar.id_cuenta_cobrar)
+        .outerjoin(MetodoPago, PagoCuentaCobrar.id_metodo_pago == MetodoPago.id_metodo_pago)
+        .filter(PagoCuentaCobrar.id_sesion_caja == id_sesion)
+        .order_by(PagoCuentaCobrar.fecha_pago.asc(), PagoCuentaCobrar.id_pago_cuenta.asc())
+        .all()
+    )
+    for pago, cuenta, metodo in pagos_creditos_detalle:
+        ref = f'Cuenta #{cuenta.id_cuenta_cobrar}'
+        if cuenta.id_venta:
+            ref = f'Venta #{cuenta.id_venta} (Cuenta #{cuenta.id_cuenta_cobrar})'
+        forma_pago = metodo.nombre if metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
+        detalles.append(
+            {
+                'fecha': pago.fecha_pago,
+                'concepto': 'Cobro de Crédito',
+                'referencia': ref,
+                'forma_pago': forma_pago,
+                'entrada': _money(pago.monto),
+                'salida': 0.0,
+                'detalle': '',
+                'tx_tipo': 'cobro_credito',
+                'tx_id': int(pago.id_pago_cuenta),
+                'tx_cuenta_id': int(cuenta.id_cuenta_cobrar),
+                'tx_venta_id': int(cuenta.id_venta) if cuenta.id_venta else None,
+            }
+        )
+
+    pagos_compras_detalle = (
+        db.session.query(PagoCompra, MetodoPago)
+        .outerjoin(MetodoPago, PagoCompra.id_metodo_pago == MetodoPago.id_metodo_pago)
+        .filter(PagoCompra.id_sesion_caja == id_sesion)
+        .order_by(PagoCompra.fecha_pago.asc(), PagoCompra.id_pago_compra.asc())
+        .all()
+    )
+    for pago, metodo in pagos_compras_detalle:
+        descripcion = _descripcion_compra_detalle(getattr(pago, 'compra', None))
+        forma_pago = metodo.nombre if metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
+        detalles.append(
+            {
+                'fecha': pago.fecha_pago,
+                'concepto': 'Pago de Compra',
+                'referencia': f'Compra #{pago.id_compra}',
+                'forma_pago': forma_pago,
+                'entrada': 0.0,
+                'salida': _money(pago.monto),
+                'detalle': descripcion,
+                'tx_tipo': 'pago_compra',
+                'tx_id': int(pago.id_pago_compra),
+                'tx_compra_id': int(pago.id_compra),
+            }
+        )
+
+    for mov in movimientos:
+        referencia_tipo = (mov.referencia_tipo or '').strip().lower()
+        if referencia_tipo == 'compra':
+            continue
+        if mov.tipo == 'egreso' and referencia_tipo == 'anulacion_venta':
+            continue
+        if mov.tipo == 'ingreso' and referencia_tipo == 'venta':
+            continue
+
+        detalles.append(
+            {
+                'fecha': mov.fecha_movimiento,
+                'concepto': 'Movimiento de Caja',
+                'referencia': getattr(mov, 'motivo_detallado', None) or mov.motivo,
+                'forma_pago': 'Efectivo',
+                'entrada': _money(mov.monto) if mov.tipo == 'ingreso' else 0.0,
+                'salida': _money(mov.monto) if mov.tipo == 'egreso' else 0.0,
+                'detalle': '',
+                'tx_tipo': 'movimiento_caja',
+                'tx_id': int(mov.id_movimiento_caja),
+            }
+        )
+
+    detalles.sort(key=lambda x: (x['fecha'] or datetime.min, x['concepto'], x['referencia']))
+
+    return {
+        'sesion': sesion,
+        'ventas_por_metodo': ventas_por_metodo,
+        'creditos_por_metodo': creditos_por_metodo,
+        'compras_por_metodo': compras_por_metodo,
+        'movimientos': movimientos,
+        'conceptos': conceptos,
+        'detalles': detalles,
+        'total_ingresos': total_ingresos,
+        'total_egresos': total_egresos,
+        'neto': neto,
+        'total_efectivo_sistema': total_efectivo_sistema,
+        'ingreso_real_efectivo': ingreso_real_efectivo,
+        'declarado': declarado,
+        'diferencia_efectivo': diferencia_efectivo,
+        'efectivo_id': efectivo_id,
+    }
+
+
+@caja_bp.route('/cierres/<int:id_sesion>/transacciones/detalle')
+@login_required
+def cierre_transaccion_detalle(id_sesion):
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
+        return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
+
+    sesion = (
+        SesionCaja.query.options(
+            joinedload(SesionCaja.caja),
+            joinedload(SesionCaja.usuario),
+            joinedload(SesionCaja.usuario_cierre),
+        )
+        .get_or_404(id_sesion)
+    )
+    if not _puede_ver_sesion(sesion):
+        if getattr(current_user, 'modo_demo', False):
+            return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
+        return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
+
+    tipo = (request.args.get('tipo') or '').strip().lower()
+    ref_id = request.args.get('id', type=int)
+    if not tipo or not ref_id:
+        return jsonify({'error': 'Solicitud inválida'}), 400
+
+    if tipo == 'sesion_apertura':
+        return jsonify(
+            {
+                'tipo': 'sesion_apertura',
+                'id': int(sesion.id_sesion),
+                'caja': sesion.caja.nombre if sesion.caja else '',
+                'usuario_apertura': sesion.usuario.nombre_completo if sesion.usuario else '',
+                'usuario_cierre': sesion.usuario_cierre.nombre_completo if sesion.usuario_cierre else '',
+                'fecha_apertura': local_strftime(sesion.fecha_apertura, '%d/%m/%Y %H:%M'),
+                'fecha_cierre': local_strftime(sesion.fecha_cierre, '%d/%m/%Y %H:%M'),
+                'monto_inicial': float(sesion.monto_inicial or 0),
+            }
+        )
+
+    if tipo == 'venta':
+        venta = (
+            Venta.query.options(
+                joinedload(Venta.cliente),
+                joinedload(Venta.sesion_caja).joinedload(SesionCaja.usuario),
+            )
+            .get_or_404(ref_id)
+        )
+        if int(venta.id_sesion_caja) != int(id_sesion):
+            return jsonify({'error': 'No encontrado'}), 404
+
+        detalles = (
+            DetalleVenta.query.options(joinedload(DetalleVenta.producto))
+            .filter(DetalleVenta.id_venta == venta.id_venta)
+            .all()
+        )
+        items = [
+            {
+                'producto': d.producto.nombre if d.producto else '',
+                'cantidad': int(d.cantidad or 0),
+                'precio_unitario': float(d.precio_unitario or 0),
+                'subtotal': float(d.subtotal or 0),
+                'descuento': float(getattr(d, 'descuento_linea', 0) or 0),
+            }
+            for d in detalles
+        ]
+
+        pagos = (
+            PagoVenta.query.options(joinedload(PagoVenta.metodo))
+            .filter(PagoVenta.id_venta == venta.id_venta)
+            .order_by(PagoVenta.id_pago.asc())
+            .all()
+        )
+        pagos_json = [
+            {
+                'metodo': p.metodo.nombre if p.metodo else '',
+                'monto': float(p.monto or 0),
+            }
+            for p in pagos
+        ]
+
+        vendedor = None
+        if getattr(venta, 'sesion_caja', None) and getattr(venta.sesion_caja, 'usuario', None):
+            vendedor = venta.sesion_caja.usuario.nombre_completo
+
+        return jsonify(
+            {
+                'tipo': 'venta',
+                'id': int(venta.id_venta),
+                'fecha': local_strftime(venta.fecha_venta, '%d/%m/%Y %H:%M'),
+                'cliente': venta.cliente.nombre if venta.cliente else '',
+                'vendedor': vendedor,
+                'items': items,
+                'total': float(venta.total or 0),
+                'pagos': pagos_json,
+                'urls': {
+                    'detalle': url_for('ventas.detalle', id=int(venta.id_venta)),
+                    'ticket': url_for('ventas.ticket', id=int(venta.id_venta)),
+                },
+            }
+        )
+
+    if tipo == 'pago_compra':
+        pago = (
+            PagoCompra.query.options(
+                joinedload(PagoCompra.metodo),
+                joinedload(PagoCompra.usuario),
+            )
+            .get_or_404(ref_id)
+        )
+        if int(pago.id_sesion_caja or 0) != int(id_sesion):
+            return jsonify({'error': 'No encontrado'}), 404
+
+        compra = (
+            Compra.query.options(
+                joinedload(Compra.proveedor),
+                joinedload(Compra.usuario),
+            )
+            .get_or_404(int(pago.id_compra))
+        )
+
+        detalles = (
+            DetalleCompra.query.options(joinedload(DetalleCompra.producto))
+            .filter(DetalleCompra.id_compra == compra.id_compra)
+            .all()
+        )
+        items = [
+            {
+                'producto': d.producto.nombre if d.producto else '',
+                'cantidad': int(d.cantidad or 0),
+                'subtotal': float(d.subtotal or 0),
+            }
+            for d in detalles
+        ]
+
+        pagos_compra = (
+            PagoCompra.query.options(joinedload(PagoCompra.metodo))
+            .filter(PagoCompra.id_compra == compra.id_compra)
+            .order_by(PagoCompra.fecha_pago.asc(), PagoCompra.id_pago_compra.asc())
+            .all()
+        )
+        pagos_json = [
+            {
+                'metodo': p.metodo.nombre if p.metodo else '',
+                'monto': float(p.monto or 0),
+            }
+            for p in pagos_compra
+        ]
+
+        return jsonify(
+            {
+                'tipo': 'pago_compra',
+                'id': int(pago.id_pago_compra),
+                'fecha': local_strftime(pago.fecha_pago, '%d/%m/%Y %H:%M'),
+                'monto': float(pago.monto or 0),
+                'metodo': pago.metodo.nombre if pago.metodo else '',
+                'usuario': pago.usuario.nombre_completo if pago.usuario else '',
+                'compra': {
+                    'id': int(compra.id_compra),
+                    'fecha': compra.fecha_compra.strftime('%d/%m/%Y') if compra.fecha_compra else '',
+                    'proveedor': compra.proveedor.nombre if compra.proveedor else '',
+                    'factura': compra.numero_factura or '',
+                    'total': float(compra.total or 0),
+                    'items': items,
+                    'pagos': pagos_json,
+                },
+                'urls': {
+                    'compra': url_for('compras.detalle', id=int(compra.id_compra)),
+                },
+            }
+        )
+
+    if tipo == 'cobro_credito':
+        pago = (
+            PagoCuentaCobrar.query.options(
+                joinedload(PagoCuentaCobrar.metodo),
+                joinedload(PagoCuentaCobrar.usuario),
+            )
+            .get_or_404(ref_id)
+        )
+        if int(pago.id_sesion_caja or 0) != int(id_sesion):
+            return jsonify({'error': 'No encontrado'}), 404
+
+        cuenta = (
+            CuentaPorCobrar.query.options(joinedload(CuentaPorCobrar.cliente)).get_or_404(int(pago.id_cuenta_cobrar))
+        )
+
+        venta_url = url_for('ventas.detalle', id=int(cuenta.id_venta)) if cuenta.id_venta else None
+
+        return jsonify(
+            {
+                'tipo': 'cobro_credito',
+                'id': int(pago.id_pago_cuenta),
+                'fecha': local_strftime(pago.fecha_pago, '%d/%m/%Y %H:%M'),
+                'monto': float(pago.monto or 0),
+                'metodo': pago.metodo.nombre if pago.metodo else '',
+                'usuario': pago.usuario.nombre_completo if pago.usuario else '',
+                'cuenta': {
+                    'id': int(cuenta.id_cuenta_cobrar),
+                    'cliente': cuenta.cliente.nombre if cuenta.cliente else '',
+                    'monto_total': float(cuenta.monto_total or 0),
+                    'monto_cobrado': float(cuenta.monto_cobrado or 0),
+                    'saldo_pendiente': float(cuenta.saldo_pendiente or 0),
+                    'venta_id': int(cuenta.id_venta) if cuenta.id_venta else None,
+                },
+                'urls': {
+                    'venta': venta_url,
+                },
+            }
+        )
+
+    if tipo == 'movimiento_caja':
+        mov = MovimientoCaja.query.options(joinedload(MovimientoCaja.usuario)).get_or_404(ref_id)
+        if int(mov.id_sesion_caja) != int(id_sesion):
+            return jsonify({'error': 'No encontrado'}), 404
+        _enriquecer_motivos_movimientos([mov])
+
+        return jsonify(
+            {
+                'tipo': 'movimiento_caja',
+                'id': int(mov.id_movimiento_caja),
+                'fecha': local_strftime(mov.fecha_movimiento, '%d/%m/%Y %H:%M'),
+                'movimiento_tipo': mov.tipo,
+                'monto': float(mov.monto or 0),
+                'motivo': getattr(mov, 'motivo_detallado', None) or mov.motivo or '',
+                'usuario': mov.usuario.nombre_completo if mov.usuario else '',
+                'referencia_tipo': (mov.referencia_tipo or '').strip(),
+                'referencia_id': int(mov.referencia_id) if mov.referencia_id else None,
+            }
+        )
+
+    return jsonify({'error': 'Tipo no soportado'}), 400
+
+
+@caja_bp.route('/cierres/<int:id_sesion>/conceptos/transacciones')
+@login_required
+def cierre_concepto_transacciones(id_sesion):
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
+        return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
+
+    sesion = (
+        SesionCaja.query.options(
+            joinedload(SesionCaja.caja),
+            joinedload(SesionCaja.usuario),
+            joinedload(SesionCaja.usuario_cierre),
+        )
+        .get_or_404(id_sesion)
+    )
+    if not _puede_ver_sesion(sesion):
+        if getattr(current_user, 'modo_demo', False):
+            return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
+        return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
+
+    key = (request.args.get('key') or '').strip().lower()
+    metodo_id = request.args.get('metodo_id', type=int)
+    if not key:
+        return jsonify({'error': 'Solicitud inválida'}), 400
+
+    def _money(x):
+        try:
+            return float(x or 0)
+        except Exception:
+            return 0.0
+
+    items = []
+
+    if key == 'caja_inicial':
+        if sesion.fecha_apertura:
+            items.append(
+                {
+                    'fecha': local_strftime(sesion.fecha_apertura, '%d/%m/%Y %H:%M'),
+                    'concepto': 'Caja Inicial',
+                    'referencia': f'Sesión #{sesion.id_sesion}',
+                    'detalle': '',
+                    'forma_pago': 'Efectivo',
+                    'entrada': _money(sesion.monto_inicial),
+                    'salida': 0.0,
+                    'tx_tipo': 'sesion_apertura',
+                    'tx_id': int(sesion.id_sesion),
+                }
+            )
+
+    elif key in {'ventas_metodo', 'ventas_efectivo_mov'}:
+        if key == 'ventas_metodo' and not metodo_id:
+            return jsonify({'error': 'Solicitud inválida'}), 400
+
+        if key == 'ventas_metodo':
+            pagos = (
+                db.session.query(PagoVenta, Venta, MetodoPago)
+                .join(Venta, PagoVenta.id_venta == Venta.id_venta)
+                .outerjoin(MetodoPago, PagoVenta.id_metodo_pago == MetodoPago.id_metodo_pago)
+                .options(joinedload(Venta.cliente))
+                .filter(
+                    Venta.id_sesion_caja == id_sesion,
+                    Venta.estado == 'completada',
+                    PagoVenta.id_metodo_pago == metodo_id,
+                )
+                .order_by(Venta.fecha_venta.asc(), PagoVenta.id_pago.asc())
+                .all()
+            )
+            for pago, venta, metodo in pagos:
+                forma_pago = metodo.nombre if metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
+                items.append(
+                    {
+                        'fecha': local_strftime(venta.fecha_venta, '%d/%m/%Y %H:%M'),
+                        'concepto': 'Venta',
+                        'referencia': f'Venta #{venta.id_venta}',
+                        'detalle': _descripcion_venta_detalle(venta),
+                        'forma_pago': forma_pago,
+                        'entrada': _money(pago.monto),
+                        'salida': 0.0,
+                        'tx_tipo': 'venta',
+                        'tx_id': int(venta.id_venta),
+                    }
+                )
+        else:
+            movimientos = (
+                MovimientoCaja.query.options(joinedload(MovimientoCaja.usuario))
+                .filter(
+                    MovimientoCaja.id_sesion_caja == id_sesion,
+                    MovimientoCaja.tipo == 'ingreso',
+                )
+                .order_by(MovimientoCaja.fecha_movimiento.asc(), MovimientoCaja.id_movimiento_caja.asc())
+                .all()
+            )
+            _enriquecer_motivos_movimientos(movimientos)
+            for mov in movimientos:
+                referencia_tipo = (mov.referencia_tipo or '').strip().lower()
+                if referencia_tipo != 'venta':
+                    continue
+                items.append(
+                    {
+                        'fecha': local_strftime(mov.fecha_movimiento, '%d/%m/%Y %H:%M'),
+                        'concepto': 'Movimiento de Caja',
+                        'referencia': getattr(mov, 'motivo_detallado', None) or mov.motivo,
+                        'detalle': '',
+                        'forma_pago': 'Efectivo',
+                        'entrada': _money(mov.monto),
+                        'salida': 0.0,
+                        'tx_tipo': 'movimiento_caja',
+                        'tx_id': int(mov.id_movimiento_caja),
+                    }
+                )
+
+    elif key == 'cobros_creditos_metodo':
+        if not metodo_id:
+            return jsonify({'error': 'Solicitud inválida'}), 400
+
+        pagos = (
+            db.session.query(PagoCuentaCobrar, CuentaPorCobrar, MetodoPago)
+            .join(CuentaPorCobrar, PagoCuentaCobrar.id_cuenta_cobrar == CuentaPorCobrar.id_cuenta_cobrar)
+            .outerjoin(MetodoPago, PagoCuentaCobrar.id_metodo_pago == MetodoPago.id_metodo_pago)
+            .filter(
+                PagoCuentaCobrar.id_sesion_caja == id_sesion,
+                PagoCuentaCobrar.id_metodo_pago == metodo_id,
+            )
+            .order_by(PagoCuentaCobrar.fecha_pago.asc(), PagoCuentaCobrar.id_pago_cuenta.asc())
+            .all()
+        )
+        for pago, cuenta, metodo in pagos:
+            ref = f'Cuenta #{cuenta.id_cuenta_cobrar}'
+            if cuenta.id_venta:
+                ref = f'Venta #{cuenta.id_venta} (Cuenta #{cuenta.id_cuenta_cobrar})'
+            forma_pago = metodo.nombre if metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
+            items.append(
+                {
+                    'fecha': local_strftime(pago.fecha_pago, '%d/%m/%Y %H:%M'),
+                    'concepto': 'Cobro de Crédito',
+                    'referencia': ref,
+                    'detalle': '',
+                    'forma_pago': forma_pago,
+                    'entrada': _money(pago.monto),
+                    'salida': 0.0,
+                    'tx_tipo': 'cobro_credito',
+                    'tx_id': int(pago.id_pago_cuenta),
+                }
+            )
+
+    elif key == 'pagos_compras_metodo':
+        if not metodo_id:
+            return jsonify({'error': 'Solicitud inválida'}), 400
+
+        pagos = (
+            PagoCompra.query.options(
+                joinedload(PagoCompra.metodo),
+                joinedload(PagoCompra.usuario),
+            )
+            .filter(PagoCompra.id_sesion_caja == id_sesion, PagoCompra.id_metodo_pago == metodo_id)
+            .order_by(PagoCompra.fecha_pago.asc(), PagoCompra.id_pago_compra.asc())
+            .all()
+        )
+        for pago in pagos:
+            forma_pago = pago.metodo.nombre if pago.metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
+            items.append(
+                {
+                    'fecha': local_strftime(pago.fecha_pago, '%d/%m/%Y %H:%M'),
+                    'concepto': 'Pago de Compra',
+                    'referencia': f'Compra #{pago.id_compra}',
+                    'detalle': _descripcion_compra_detalle(getattr(pago, 'compra', None)),
+                    'forma_pago': forma_pago,
+                    'entrada': 0.0,
+                    'salida': _money(pago.monto),
+                    'tx_tipo': 'pago_compra',
+                    'tx_id': int(pago.id_pago_compra),
+                }
+            )
+
+    elif key in {'ingresos_varios', 'vuelto', 'reembolsos', 'egresos_varios'}:
+        movimientos = (
+            MovimientoCaja.query.options(joinedload(MovimientoCaja.usuario))
+            .filter(MovimientoCaja.id_sesion_caja == id_sesion)
+            .order_by(MovimientoCaja.fecha_movimiento.asc(), MovimientoCaja.id_movimiento_caja.asc())
+            .all()
+        )
+        _enriquecer_motivos_movimientos(movimientos)
+        for mov in movimientos:
+            referencia_tipo = (mov.referencia_tipo or '').strip().lower()
+            motivo = (mov.motivo or '').strip()
+            motivo_lower = motivo.lower()
+
+            if key == 'ingresos_varios':
+                if mov.tipo != 'ingreso':
+                    continue
+                if referencia_tipo == 'venta':
+                    continue
+            elif key == 'vuelto':
+                if mov.tipo != 'egreso':
+                    continue
+                if referencia_tipo != 'venta':
+                    continue
+                if not motivo_lower.startswith('vuelto'):
+                    continue
+            elif key == 'reembolsos':
+                if mov.tipo != 'egreso':
+                    continue
+                if referencia_tipo != 'devolucion':
+                    continue
+            elif key == 'egresos_varios':
+                if mov.tipo != 'egreso':
+                    continue
+                if referencia_tipo == 'compra':
+                    continue
+                if referencia_tipo == 'devolucion':
+                    continue
+                if referencia_tipo == 'venta' and motivo_lower.startswith('vuelto'):
+                    continue
+
+            items.append(
+                {
+                    'fecha': local_strftime(mov.fecha_movimiento, '%d/%m/%Y %H:%M'),
+                    'concepto': 'Movimiento de Caja',
+                    'referencia': getattr(mov, 'motivo_detallado', None) or mov.motivo,
+                    'detalle': '',
+                    'forma_pago': 'Efectivo',
+                    'entrada': _money(mov.monto) if mov.tipo == 'ingreso' else 0.0,
+                    'salida': _money(mov.monto) if mov.tipo == 'egreso' else 0.0,
+                    'tx_tipo': 'movimiento_caja',
+                    'tx_id': int(mov.id_movimiento_caja),
+                }
+            )
+
+    elif key == 'anulaciones_ventas_metodo':
+        if not metodo_id:
+            return jsonify({'error': 'Solicitud inválida'}), 400
+        start_ts = sesion.fecha_apertura or datetime.min
+        end_ts = sesion.fecha_cierre or datetime.utcnow()
+
+        rows = (
+            db.session.query(Auditoria.fecha_accion, Venta, PagoVenta, MetodoPago)
+            .join(Venta, Venta.id_venta == Auditoria.referencia_id)
+            .join(PagoVenta, PagoVenta.id_venta == Venta.id_venta)
+            .outerjoin(MetodoPago, PagoVenta.id_metodo_pago == MetodoPago.id_metodo_pago)
+            .options(joinedload(Venta.cliente))
+            .filter(
+                Venta.id_sesion_caja == id_sesion,
+                Auditoria.accion == 'anular_venta',
+                Auditoria.modulo == 'ventas',
+                Auditoria.referencia_tipo == 'venta',
+                Auditoria.referencia_id.isnot(None),
+                Auditoria.fecha_accion >= start_ts,
+                Auditoria.fecha_accion < end_ts,
+                PagoVenta.id_metodo_pago == metodo_id,
+            )
+            .order_by(Auditoria.fecha_accion.asc(), PagoVenta.id_pago.asc())
+            .all()
+        )
+        for fecha_accion, venta, pago, metodo in rows:
+            forma_pago = metodo.nombre if metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
+            items.append(
+                {
+                    'fecha': local_strftime(fecha_accion, '%d/%m/%Y %H:%M'),
+                    'concepto': 'Anulación de Venta',
+                    'referencia': f'Venta #{venta.id_venta}',
+                    'detalle': _descripcion_venta_detalle(venta),
+                    'forma_pago': forma_pago,
+                    'entrada': 0.0,
+                    'salida': _money(pago.monto),
+                    'tx_tipo': 'venta',
+                    'tx_id': int(venta.id_venta),
+                }
+            )
+
+    else:
+        return jsonify({'error': 'Concepto no soportado'}), 400
+
+    entrada_total = sum(_money(i.get('entrada')) for i in items)
+    salida_total = sum(_money(i.get('salida')) for i in items)
+
+    return jsonify(
+        {
+            'key': key,
+            'metodo_id': metodo_id,
+            'entrada_total': entrada_total,
+            'salida_total': salida_total,
+            'items': items,
+        }
+    )
+
+
+def _calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
+    """
+    Calcula un informe contable consolidado para un rango de fechas.
+    Similar a _calcular_informe_cierre_sesion pero agrupa TODAS las operaciones del período.
+    """
+    metodos = (
+        MetodoPago.query.filter_by(activo=True)
+        .order_by(MetodoPago.orden_display.asc(), MetodoPago.nombre.asc())
+        .all()
+    )
+    metodos_por_id = {m.id_metodo_pago: m for m in metodos}
+
+    # Pagos de ventas en el rango
+    pagos_ventas_agg_rows = (
+        db.session.query(
+            PagoVenta.id_metodo_pago,
+            func.sum(PagoVenta.monto).label('total'),
+            func.count(PagoVenta.id_pago).label('cantidad'),
+        )
+        .join(Venta, PagoVenta.id_venta == Venta.id_venta)
+        .filter(
+            Venta.estado == 'completada',
+            Venta.fecha_venta >= start_utc,
+            Venta.fecha_venta < end_utc,
+        )
+        .group_by(PagoVenta.id_metodo_pago)
+        .all()
+    )
+    pagos_ventas_agg = {int(r.id_metodo_pago): r for r in pagos_ventas_agg_rows}
+
+    # Cobros de créditos en el rango
+    pagos_creditos_agg_rows = (
+        db.session.query(
+            PagoCuentaCobrar.id_metodo_pago,
+            func.sum(PagoCuentaCobrar.monto).label('total'),
+            func.count(PagoCuentaCobrar.id_pago_cuenta).label('cantidad'),
+        )
+        .filter(
+            PagoCuentaCobrar.fecha_pago >= start_utc,
+            PagoCuentaCobrar.fecha_pago < end_utc,
+        )
+        .group_by(PagoCuentaCobrar.id_metodo_pago)
+        .all()
+    )
+    pagos_creditos_agg = {int(r.id_metodo_pago): r for r in pagos_creditos_agg_rows}
+
+    # Pagos de compras en el rango
+    pagos_compras_agg_rows = (
+        db.session.query(
+            PagoCompra.id_metodo_pago,
+            func.sum(PagoCompra.monto).label('total'),
+            func.count(PagoCompra.id_pago_compra).label('cantidad'),
+        )
+        .filter(
+            PagoCompra.fecha_pago >= start_utc,
+            PagoCompra.fecha_pago < end_utc,
+        )
+        .group_by(PagoCompra.id_metodo_pago)
+        .all()
+    )
+    pagos_compras_agg = {int(r.id_metodo_pago): r for r in pagos_compras_agg_rows}
+
+    anulaciones_auditoria = (
+        db.session.query(Auditoria.referencia_id, Auditoria.fecha_accion)
+        .filter(
+            Auditoria.accion == 'anular_venta',
+            Auditoria.modulo == 'ventas',
+            Auditoria.referencia_tipo == 'venta',
+            Auditoria.referencia_id.isnot(None),
+            Auditoria.fecha_accion >= start_utc,
+            Auditoria.fecha_accion < end_utc,
+        )
+        .order_by(Auditoria.fecha_accion.asc(), Auditoria.id_auditoria.asc())
+        .all()
+    )
+    anulacion_fecha_por_venta = {}
+    venta_ids_anuladas = []
+    for ref_id, fecha_accion in anulaciones_auditoria:
+        try:
+            vid = int(ref_id)
+        except Exception:
+            continue
+        if vid not in anulacion_fecha_por_venta:
+            anulacion_fecha_por_venta[vid] = fecha_accion
+            venta_ids_anuladas.append(vid)
+
+    anulaciones_pagos_rows = []
+    ventas_anuladas = {}
+    anulaciones_por_metodo = {}
+    if venta_ids_anuladas:
+        anulaciones_pagos_rows = (
+            db.session.query(PagoVenta.id_venta, PagoVenta.id_metodo_pago, func.sum(PagoVenta.monto).label('total'))
+            .filter(PagoVenta.id_venta.in_(sorted(set(venta_ids_anuladas))))
+            .group_by(PagoVenta.id_venta, PagoVenta.id_metodo_pago)
+            .all()
+        )
+        ventas_anuladas_rows = (
+            Venta.query.options(joinedload(Venta.cliente))
+            .filter(Venta.id_venta.in_(sorted(set(venta_ids_anuladas))))
+            .all()
+        )
+        ventas_anuladas = {int(v.id_venta): v for v in ventas_anuladas_rows}
+        for r in anulaciones_pagos_rows:
+            try:
+                mid = int(r.id_metodo_pago)
+            except Exception:
+                continue
+            anulaciones_por_metodo[mid] = float(anulaciones_por_metodo.get(mid, 0.0) or 0.0) + float(r.total or 0)
+
+    # Movimientos de caja en el rango
+    movimientos = (
+        MovimientoCaja.query.options(joinedload(MovimientoCaja.usuario))
+        .filter(
+            MovimientoCaja.fecha_movimiento >= start_utc,
+            MovimientoCaja.fecha_movimiento < end_utc,
+        )
+        .order_by(MovimientoCaja.fecha_movimiento.asc(), MovimientoCaja.id_movimiento_caja.asc())
+        .all()
+    )
+    _enriquecer_motivos_movimientos(movimientos)
+
+    def _money(x):
+        try:
+            return float(x or 0)
+        except Exception:
+            return 0.0
+
+    mov_ingresos = 0.0
+    mov_egresos = 0.0
+    ventas_efectivo_mov = 0.0
+    vuelto = 0.0
+    reembolsos = 0.0
+    ingresos_varios = 0.0
+    egresos_varios = 0.0
+
+    for mov in movimientos:
+        monto = _money(mov.monto)
+        referencia_tipo = (mov.referencia_tipo or '').strip().lower()
+        # Los pagos de compra ya se contabilizan por separado
+        if mov.tipo == 'egreso' and referencia_tipo == 'compra':
+            continue
+        if mov.tipo == 'egreso' and referencia_tipo == 'anulacion_venta':
+            continue
+        if mov.tipo == 'ingreso':
+            mov_ingresos += monto
+            if referencia_tipo == 'venta':
+                ventas_efectivo_mov += monto
+            else:
+                ingresos_varios += monto
+        else:
+            mov_egresos += monto
+            ref = referencia_tipo
+            motivo = (mov.motivo or '').strip().lower()
+            if ref == 'venta' and motivo.startswith('vuelto'):
+                vuelto += monto
+            elif ref == 'devolucion':
+                reembolsos += monto
+            else:
+                egresos_varios += monto
+
+    ventas_por_metodo = []
+    creditos_por_metodo = []
+    compras_por_metodo = []
+
+    for m in metodos:
+        total_v = pagos_ventas_agg.get(m.id_metodo_pago)
+        total_c = pagos_creditos_agg.get(m.id_metodo_pago)
+        total_p = pagos_compras_agg.get(m.id_metodo_pago)
+        ventas_por_metodo.append(
+            {
+                'id_metodo_pago': m.id_metodo_pago,
+                'nombre': m.nombre,
+                'total': _money(total_v.total) if total_v else 0.0,
+                'cantidad': int(total_v.cantidad) if total_v and total_v.cantidad else 0,
+            }
+        )
+        creditos_por_metodo.append(
+            {
+                'id_metodo_pago': m.id_metodo_pago,
+                'nombre': m.nombre,
+                'total': _money(total_c.total) if total_c else 0.0,
+                'cantidad': int(total_c.cantidad) if total_c and total_c.cantidad else 0,
+            }
+        )
+        compras_por_metodo.append(
+            {
+                'id_metodo_pago': m.id_metodo_pago,
+                'nombre': m.nombre,
+                'total': _money(total_p.total) if total_p else 0.0,
+                'cantidad': int(total_p.cantidad) if total_p and total_p.cantidad else 0,
+            }
+        )
+
+    efectivo_id = _resolver_metodo_efectivo_id(metodos, metodos_por_id)
+
+    ventas_efectivo = 0.0
+    for item in ventas_por_metodo:
+        if efectivo_id is not None and item['id_metodo_pago'] == efectivo_id:
+            ventas_efectivo = item['total']
+            break
+    if ventas_efectivo <= 0:
+        ventas_efectivo = ventas_efectivo_mov
+
+    total_ventas = sum(x['total'] for x in ventas_por_metodo)
+    total_cobros_creditos = sum(x['total'] for x in creditos_por_metodo)
+    total_pagos_compras = sum(x['total'] for x in compras_por_metodo)
+    total_anulaciones = sum(float(v or 0) for v in anulaciones_por_metodo.values())
+
+    total_ingresos = total_ventas + total_cobros_creditos + ingresos_varios
+    total_egresos = total_pagos_compras + mov_egresos + total_anulaciones
+    neto = total_ingresos - total_egresos
+
+    # Construir conceptos para resumen
+    conceptos = []
+    if ventas_efectivo:
+        conceptos.append({'concepto': 'Ventas en Efectivo', 'entrada': ventas_efectivo, 'salida': 0.0})
+
+    for v in ventas_por_metodo:
+        if efectivo_id is not None and v['id_metodo_pago'] == efectivo_id:
+            continue
+        if v['total']:
+            conceptos.append({'concepto': f'Ventas - {v["nombre"]}', 'entrada': v['total'], 'salida': 0.0})
+
+    for m in metodos:
+        mid = int(m.id_metodo_pago)
+        total_anul = float(anulaciones_por_metodo.get(mid, 0.0) or 0.0)
+        if total_anul:
+            conceptos.append({'concepto': f'Anulaciones - {m.nombre}', 'entrada': 0.0, 'salida': total_anul})
+
+    for c in creditos_por_metodo:
+        if c['total']:
+            conceptos.append({'concepto': f'Cobros de Créditos - {c["nombre"]}', 'entrada': c['total'], 'salida': 0.0})
+
+    if ingresos_varios:
+        conceptos.append({'concepto': 'Ingresos Varios', 'entrada': ingresos_varios, 'salida': 0.0})
+
+    if total_pagos_compras:
+        for p in compras_por_metodo:
+            if p['total']:
+                conceptos.append({'concepto': f'Pagos de Compras - {p["nombre"]}', 'entrada': 0.0, 'salida': p['total']})
+
+    if vuelto:
+        conceptos.append({'concepto': 'Vuelto', 'entrada': 0.0, 'salida': vuelto})
+    if reembolsos:
+        conceptos.append({'concepto': 'Reembolsos', 'entrada': 0.0, 'salida': reembolsos})
+    if egresos_varios:
+        conceptos.append({'concepto': 'Egresos Varios', 'entrada': 0.0, 'salida': egresos_varios})
+
+    # Construir detalles
+    detalles = []
+
+    # Detalle de pagos de ventas
+    pagos_ventas_detalle = (
+        db.session.query(PagoVenta, Venta, MetodoPago)
+        .join(Venta, PagoVenta.id_venta == Venta.id_venta)
+        .join(MetodoPago, PagoVenta.id_metodo_pago == MetodoPago.id_metodo_pago)
+        .options(joinedload(Venta.cliente))
+        .filter(
+            Venta.estado == 'completada',
+            Venta.fecha_venta >= start_utc,
+            Venta.fecha_venta < end_utc,
+        )
+        .order_by(Venta.fecha_venta.asc(), PagoVenta.id_pago.asc())
+        .all()
+    )
+    for pago, venta, metodo in pagos_ventas_detalle:
+        descripcion = _descripcion_venta_detalle(venta)
+        detalles.append(
+            {
+                'fecha': venta.fecha_venta,
+                'concepto': 'Venta',
+                'referencia': f'Venta #{venta.id_venta}',
+                'forma_pago': metodo.nombre if metodo else '',
+                'entrada': _money(pago.monto),
+                'salida': 0.0,
+                'detalle': descripcion,
+            }
+        )
+
+    for r in anulaciones_pagos_rows:
+        venta = ventas_anuladas.get(int(r.id_venta))
+        if not venta:
+            continue
+        fecha_anulacion = anulacion_fecha_por_venta.get(int(venta.id_venta)) or venta.fecha_venta
+        metodo = metodos_por_id.get(int(r.id_metodo_pago))
+        forma_pago = metodo.nombre if metodo else ''
+        detalles.append(
+            {
+                'fecha': fecha_anulacion,
+                'concepto': 'Anulación de Venta',
+                'referencia': f'Venta #{venta.id_venta}',
+                'forma_pago': forma_pago,
+                'entrada': 0.0,
+                'salida': _money(r.total),
+                'detalle': _descripcion_venta_detalle(venta),
+            }
+        )
+
+    # Detalle de cobros de créditos
+    pagos_creditos_detalle = (
+        db.session.query(PagoCuentaCobrar, CuentaPorCobrar, MetodoPago)
+        .join(CuentaPorCobrar, PagoCuentaCobrar.id_cuenta_cobrar == CuentaPorCobrar.id_cuenta_cobrar)
+        .join(MetodoPago, PagoCuentaCobrar.id_metodo_pago == MetodoPago.id_metodo_pago)
+        .filter(
+            PagoCuentaCobrar.fecha_pago >= start_utc,
+            PagoCuentaCobrar.fecha_pago < end_utc,
+        )
+        .order_by(PagoCuentaCobrar.fecha_pago.asc(), PagoCuentaCobrar.id_pago_cuenta.asc())
+        .all()
+    )
+    for pago, cuenta, metodo in pagos_creditos_detalle:
+        ref = f'Cuenta #{cuenta.id_cuenta_cobrar}'
+        if cuenta.id_venta:
+            ref = f'Venta #{cuenta.id_venta} (Cuenta #{cuenta.id_cuenta_cobrar})'
+        detalles.append(
+            {
+                'fecha': pago.fecha_pago,
+                'concepto': 'Cobro de Crédito',
+                'referencia': ref,
+                'forma_pago': metodo.nombre if metodo else '',
+                'entrada': _money(pago.monto),
+                'salida': 0.0,
+                'detalle': '',
+            }
+        )
+
+    # Detalle de pagos de compras
+    pagos_compras_detalle = (
+        db.session.query(PagoCompra, MetodoPago)
+        .join(MetodoPago, PagoCompra.id_metodo_pago == MetodoPago.id_metodo_pago)
+        .filter(
+            PagoCompra.fecha_pago >= start_utc,
+            PagoCompra.fecha_pago < end_utc,
+        )
+        .order_by(PagoCompra.fecha_pago.asc(), PagoCompra.id_pago_compra.asc())
+        .all()
+    )
+    for pago, metodo in pagos_compras_detalle:
+        descripcion = _descripcion_compra_detalle(getattr(pago, 'compra', None))
+        detalles.append(
+            {
+                'fecha': pago.fecha_pago,
+                'concepto': 'Pago de Compra',
+                'referencia': f'Compra #{pago.id_compra}',
+                'forma_pago': metodo.nombre if metodo else '',
+                'entrada': 0.0,
+                'salida': _money(pago.monto),
+                'detalle': descripcion,
+            }
+        )
+
+    # Detalle de movimientos varios
+    for mov in movimientos:
+        referencia_tipo = (mov.referencia_tipo or '').strip().lower()
+        if referencia_tipo == 'compra':
+            continue
+        if mov.tipo == 'egreso' and referencia_tipo == 'anulacion_venta':
+            continue
+        if mov.tipo == 'ingreso' and referencia_tipo == 'venta':
+            continue
+
+        detalles.append(
+            {
+                'fecha': mov.fecha_movimiento,
+                'concepto': 'Movimiento de Caja',
+                'referencia': getattr(mov, 'motivo_detallado', None) or mov.motivo,
+                'forma_pago': 'Efectivo',
+                'entrada': _money(mov.monto) if mov.tipo == 'ingreso' else 0.0,
+                'salida': _money(mov.monto) if mov.tipo == 'egreso' else 0.0,
+                'detalle': '',
+            }
+        )
+
+    detalles.sort(key=lambda x: (x['fecha'] or datetime.min, x['concepto'], x['referencia']))
+
+    return {
+        'ventas_por_metodo': ventas_por_metodo,
+        'creditos_por_metodo': creditos_por_metodo,
+        'compras_por_metodo': compras_por_metodo,
+        'movimientos': movimientos,
+        'conceptos': conceptos,
+        'detalles': detalles,
+        'total_ingresos': total_ingresos,
+        'total_egresos': total_egresos,
+        'neto': neto,
+        'total_ventas': total_ventas,
+        'total_cobros_creditos': total_cobros_creditos,
+        'total_pagos_compras': total_pagos_compras,
+        'efectivo_id': efectivo_id,
+    }
+
+
+def _resumen_productos(detalles):
+    try:
+        items = list(detalles)
+    except Exception:
+        return ''
+    if not items:
+        return ''
+    partes = []
+    restantes = 0
+    for index, det in enumerate(items):
+        producto = getattr(det, 'producto', None)
+        nombre = getattr(producto, 'nombre', '') if producto else ''
+        if not nombre:
+            nombre = 'Producto'
+        cantidad = getattr(det, 'cantidad', None)
+        if index < 3:
+            if cantidad is not None:
+                partes.append(f'{cantidad} x {nombre}')
+            else:
+                partes.append(nombre)
+        else:
+            restantes += 1
+    if restantes:
+        partes.append(f'+ {restantes} más')
+    return ', '.join(partes)
+
+
+def _enriquecer_motivos_movimientos(movimientos):
+    if not movimientos:
+        return movimientos
+
+    venta_ids = set()
+    compra_ids = set()
+    devolucion_ids = set()
+
+    for mov in movimientos:
+        rid = getattr(mov, 'referencia_id', None)
+        if not rid:
+            continue
+        ref = (getattr(mov, 'referencia_tipo', '') or '').strip().lower()
+        try:
+            rid_int = int(rid)
+        except Exception:
+            continue
+        if ref == 'venta':
+            venta_ids.add(rid_int)
+        elif ref == 'anulacion_venta':
+            venta_ids.add(rid_int)
+        elif ref == 'compra':
+            compra_ids.add(rid_int)
+        elif ref == 'devolucion':
+            devolucion_ids.add(rid_int)
+
+    detalles_ventas_por_id = {}
+    if venta_ids:
+        rows = (
+            DetalleVenta.query.options(joinedload(DetalleVenta.producto))
+            .filter(DetalleVenta.id_venta.in_(sorted(venta_ids)))
+            .order_by(DetalleVenta.id_venta.asc(), DetalleVenta.id_detalle_venta.asc())
+            .all()
+        )
+        for d in rows:
+            detalles_ventas_por_id.setdefault(int(d.id_venta), []).append(d)
+
+    detalles_compras_por_id = {}
+    if compra_ids:
+        rows = (
+            DetalleCompra.query.options(joinedload(DetalleCompra.producto))
+            .filter(DetalleCompra.id_compra.in_(sorted(compra_ids)))
+            .order_by(DetalleCompra.id_compra.asc(), DetalleCompra.id_detalle_compra.asc())
+            .all()
+        )
+        for d in rows:
+            detalles_compras_por_id.setdefault(int(d.id_compra), []).append(d)
+
+    detalles_devoluciones_por_id = {}
+    if devolucion_ids:
+        rows = (
+            DetalleDevolucion.query.options(joinedload(DetalleDevolucion.producto))
+            .filter(DetalleDevolucion.id_devolucion.in_(sorted(devolucion_ids)))
+            .order_by(DetalleDevolucion.id_devolucion.asc(), DetalleDevolucion.id_detalle_devolucion.asc())
+            .all()
+        )
+        for d in rows:
+            detalles_devoluciones_por_id.setdefault(int(d.id_devolucion), []).append(d)
+
+    resumen_ventas = {k: _resumen_productos(v) for k, v in detalles_ventas_por_id.items()}
+    resumen_compras = {k: _resumen_productos(v) for k, v in detalles_compras_por_id.items()}
+    resumen_devoluciones = {k: _resumen_productos(v) for k, v in detalles_devoluciones_por_id.items()}
+    estados_ventas = {}
+    if venta_ids:
+        rows = (
+            Venta.query.with_entities(Venta.id_venta, Venta.estado)
+            .filter(Venta.id_venta.in_(sorted(venta_ids)))
+            .all()
+        )
+        for r in rows:
+            try:
+                estados_ventas[int(r[0])] = (r[1] or '').strip().lower()
+            except Exception:
+                continue
+
+    for mov in movimientos:
+        base = (getattr(mov, 'motivo', '') or '').strip()
+        rid = getattr(mov, 'referencia_id', None)
+        ref = (getattr(mov, 'referencia_tipo', '') or '').strip().lower()
+
+        resumen = ''
+        try:
+            rid_int = int(rid) if rid else None
+        except Exception:
+            rid_int = None
+
+        if ref in {'venta', 'anulacion_venta'} and rid_int:
+            resumen = (resumen_ventas.get(rid_int) or '').strip()
+        elif ref == 'compra' and rid_int:
+            resumen = (resumen_compras.get(rid_int) or '').strip()
+        elif ref == 'devolucion' and rid_int:
+            resumen = (resumen_devoluciones.get(rid_int) or '').strip()
+
+        motivo_detallado = base
+        estado_venta = estados_ventas.get(rid_int) if rid_int else None
+        if estado_venta == 'anulada' and '(ANULADA)' not in motivo_detallado:
+            motivo_detallado = f'{motivo_detallado} (ANULADA)'.strip()
+        if resumen and resumen not in motivo_detallado:
+            motivo_detallado = f'{motivo_detallado}: {resumen}' if motivo_detallado else resumen
+        setattr(mov, 'motivo_detallado', motivo_detallado)
+
+    return movimientos
+
+
+def _descripcion_venta_detalle(venta):
+    if not venta:
+        return ''
+    return _resumen_productos(venta.detalles)
+
+
+def _descripcion_compra_detalle(compra):
+    if not compra:
+        return ''
+    return _resumen_productos(compra.detalles)
+
+
+@caja_bp.route('/')
+@login_required
+def estado():
+    """Estado actual de la caja"""
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver la caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    sesion = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta'
+    ).first()
+    
+    if not sesion:
+        return redirect(url_for('caja.abrir'))
+    
+    # Calcular totales
+    total_efectivo = sesion.calcular_total_efectivo()
+    
+    # Calcular desglose de medios de pago para arqueo (KPIs)
+    from app.models import Venta, PagoVenta, MetodoPago
+    from sqlalchemy import func
+    
+    # Obtener totales por método de pago para ventas completadas en esta sesión
+    desglose_pagos = db.session.query(
+        MetodoPago.id_metodo_pago,
+        MetodoPago.nombre,
+        func.sum(PagoVenta.monto).label('total'),
+        func.count(PagoVenta.id_pago).label('cantidad')
+    ).join(
+        Venta, PagoVenta.id_venta == Venta.id_venta
+    ).join(
+        MetodoPago, PagoVenta.id_metodo_pago == MetodoPago.id_metodo_pago
+    ).filter(
+        Venta.id_sesion_caja == sesion.id_sesion,
+        Venta.estado == 'completada'
+    ).group_by(
+        MetodoPago.id_metodo_pago,
+        MetodoPago.nombre
+    ).all()
+    
+    # Totalizar ventas globales (suma de todos los medios)
+    total_ventas_sesion = sum(d.total for d in desglose_pagos) if desglose_pagos else 0
+    total_ventas_sesion = float(total_ventas_sesion or 0)
+    total_egresos_sesion = (
+        db.session.query(func.sum(MovimientoCaja.monto))
+        .filter(
+            MovimientoCaja.id_sesion_caja == sesion.id_sesion,
+            MovimientoCaja.tipo == 'egreso',
+            func.lower(func.coalesce(MovimientoCaja.referencia_tipo, '')) != 'anulacion_venta',
+        )
+        .scalar()
+    )
+    total_egresos_sesion = float(total_egresos_sesion or 0)
+    total_neto_sesion = total_ventas_sesion - total_egresos_sesion
+
+    # Movimientos del día
+    movimientos = sesion.movimientos.order_by(MovimientoCaja.fecha_movimiento.desc()).all()
+    _enriquecer_motivos_movimientos(movimientos)
+    
+    return render_template('caja/estado.html',
+        sesion=sesion,
+        total_efectivo=total_efectivo,
+        movimientos=movimientos,
+        desglose_pagos=desglose_pagos,
+        total_ventas_sesion=total_ventas_sesion,
+        total_egresos_sesion=total_egresos_sesion,
+        total_neto_sesion=total_neto_sesion,
+    )
+
+
+@caja_bp.route('/api/pagos-detalle/<int:id_metodo>')
+@login_required
+def detalle_pagos_metodo(id_metodo):
+    """Obtener detalle de pagos por método para la sesión actual"""
+    sesion = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta'
+    ).first()
+    
+    if not sesion:
+        return jsonify({'error': 'No hay sesión abierta'}), 404
+
+    from app.models import PagoVenta, Venta
+    
+    pagos = db.session.query(
+        PagoVenta, Venta
+    ).join(
+        Venta, PagoVenta.id_venta == Venta.id_venta
+    ).filter(
+        Venta.id_sesion_caja == sesion.id_sesion,
+        Venta.estado == 'completada',
+        PagoVenta.id_metodo_pago == id_metodo
+    ).order_by(Venta.fecha_venta.desc()).all()
+
+    resultado = []
+    for pago, venta in pagos:
+        cliente_nombre = 'Consumidor Final'
+        if venta.cliente:
+            cliente_nombre = venta.cliente.nombre or 'Consumidor Final'
+            
+        resultado.append({
+            'id_venta': venta.id_venta,
+            'fecha': local_strftime(venta.fecha_venta),
+            'monto': float(pago.monto),
+            'cliente': cliente_nombre,
+            'referencia': pago.referencia or ''
+        })
+
+    return jsonify(resultado)
+
+
+@caja_bp.route('/abrir', methods=['GET', 'POST'])
+@login_required
+def abrir():
+    """Abrir caja"""
+    if not current_user.tiene_permiso('abrir_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para abrir caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    # Verificar si ya tiene caja abierta
+    sesion_existente = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta'
+    ).first()
+    
+    if sesion_existente:
+        flash('Ya tiene una caja abierta.', 'info')
+        return redirect(url_for('caja.estado'))
+    
+    if request.method == 'POST':
+        id_caja = request.form.get('id_caja', type=int)
+        monto_inicial = request.form.get('monto_inicial', 0, type=float)
+        
+        if not id_caja:
+            flash('Debe seleccionar una caja.', 'warning')
+            cajas = Caja.query.filter_by(activa=True).all()
+            sesiones_abiertas = SesionCaja.query.filter_by(estado='abierta').all()
+            sesiones_abiertas_por_caja = {s.id_caja: s for s in sesiones_abiertas}
+            return render_template('caja/abrir.html', cajas=cajas, sesiones_abiertas_por_caja=sesiones_abiertas_por_caja)
+        
+        # Verificar que la caja no esté en uso
+        caja_en_uso = SesionCaja.query.filter_by(
+            id_caja=id_caja,
+            estado='abierta'
+        ).first()
+        
+        if caja_en_uso:
+            nombre_usuario = (caja_en_uso.usuario.nombre_completo if caja_en_uso.usuario else 'Usuario desconocido')
+            username = (caja_en_uso.usuario.username if caja_en_uso.usuario else '')
+            fecha = local_strftime(caja_en_uso.fecha_apertura) if caja_en_uso.fecha_apertura else ''
+            quien = f'{nombre_usuario} ({username})' if username else nombre_usuario
+            flash(f'Esta caja ya está siendo utilizada por {quien} desde {fecha}. Debe cerrarse primero por ese usuario.', 'danger')
+            cajas = Caja.query.filter_by(activa=True).all()
+            sesiones_abiertas = SesionCaja.query.filter_by(estado='abierta').all()
+            sesiones_abiertas_por_caja = {s.id_caja: s for s in sesiones_abiertas}
+            return render_template('caja/abrir.html', cajas=cajas, sesiones_abiertas_por_caja=sesiones_abiertas_por_caja)
+        
+        sesion = SesionCaja(
+            id_caja=id_caja,
+            id_usuario=current_user.id_usuario,
+            monto_inicial=monto_inicial
+        )
+        
+        db.session.add(sesion)
+        db.session.flush()
+
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='abrir_caja',
+                    modulo='caja',
+                    descripcion=f'Apertura de caja #{id_caja} (sesión #{sesion.id_sesion})',
+                    referencia_tipo='sesion_caja',
+                    referencia_id=sesion.id_sesion,
+                    datos_nuevos={
+                        'id_caja': id_caja,
+                        'monto_inicial': float(monto_inicial or 0),
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+        db.session.commit()
+        
+        flash('Caja abierta correctamente.', 'success')
+        return redirect(url_for('caja.estado'))
+    
+    cajas = Caja.query.filter_by(activa=True).all()
+    sesiones_abiertas = SesionCaja.query.filter_by(estado='abierta').all()
+    sesiones_abiertas_por_caja = {s.id_caja: s for s in sesiones_abiertas}
+    return render_template('caja/abrir.html', cajas=cajas, sesiones_abiertas_por_caja=sesiones_abiertas_por_caja)
+
+
+@caja_bp.route('/cerrar', methods=['GET', 'POST'])
+@login_required
+def cerrar():
+    """Cerrar caja"""
+    if not current_user.tiene_permiso('cerrar_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para cerrar caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    sesion = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta'
+    ).first()
+    
+    if not sesion:
+        try:
+            req_id = getattr(g, 'request_id', None)
+            prefix = f'[{req_id}] ' if req_id else ''
+            current_app.logger.info(f"{prefix}Caja cerrar: sin sesión abierta user_id={current_user.id_usuario}")
+        except Exception:
+            pass
+        flash('No tiene ninguna caja abierta.', 'warning')
+        return redirect(url_for('caja.abrir'))
+    
+    total_sistema = sesion.calcular_total_efectivo()
+    try:
+        req_id = getattr(g, 'request_id', None)
+        prefix = f'[{req_id}] ' if req_id else ''
+        current_app.logger.info(
+            f"{prefix}Caja cerrar: inicio method={request.method} sesion_id={sesion.id_sesion} user_id={current_user.id_usuario} total_sistema={float(total_sistema or 0)}"
+        )
+    except Exception:
+        pass
+    
+    if request.method == 'POST':
+        monto_declarado = request.form.get('monto_declarado', 0, type=float)
+        observaciones = request.form.get('observaciones', '')
+        try:
+            req_id = getattr(g, 'request_id', None)
+            prefix = f'[{req_id}] ' if req_id else ''
+            current_app.logger.info(
+                f"{prefix}Caja cerrar: POST sesion_id={sesion.id_sesion} declarado={float(monto_declarado or 0)} obs_len={len(observaciones or '')}"
+            )
+        except Exception:
+            pass
+        
+        datos_anteriores = {
+            'monto_final_declarado': float(sesion.monto_final_declarado or 0) if sesion.monto_final_declarado is not None else None,
+            'monto_final_sistema': float(sesion.monto_final_sistema or 0) if sesion.monto_final_sistema is not None else None,
+            'diferencia': float(sesion.diferencia or 0) if sesion.diferencia is not None else None,
+            'estado': sesion.estado,
+            'fecha_cierre': sesion.fecha_cierre.isoformat() if sesion.fecha_cierre else None,
+            'id_usuario_cierre': sesion.id_usuario_cierre,
+            'observaciones': sesion.observaciones,
+        }
+
+        sesion.monto_final_declarado = monto_declarado
+        sesion.monto_final_sistema = total_sistema
+        sesion.diferencia = monto_declarado - total_sistema
+        sesion.fecha_cierre = datetime.utcnow()
+        sesion.estado = 'cerrada'
+        sesion.id_usuario_cierre = current_user.id_usuario
+        sesion.observaciones = observaciones
+        
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='cerrar_caja',
+                    modulo='caja',
+                    descripcion=f'Cierre de sesión de caja #{sesion.id_sesion}',
+                    referencia_tipo='sesion_caja',
+                    referencia_id=sesion.id_sesion,
+                    datos_anteriores=datos_anteriores,
+                    datos_nuevos={
+                        'monto_final_declarado': float(monto_declarado or 0),
+                        'monto_final_sistema': float(total_sistema or 0),
+                        'diferencia': float((monto_declarado - total_sistema) or 0),
+                        'estado': 'cerrada',
+                        'fecha_cierre': sesion.fecha_cierre.isoformat() if sesion.fecha_cierre else None,
+                        'id_usuario_cierre': current_user.id_usuario,
+                        'observaciones': observaciones,
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+        db.session.commit()
+        try:
+            req_id = getattr(g, 'request_id', None)
+            prefix = f'[{req_id}] ' if req_id else ''
+            current_app.logger.info(
+                f"{prefix}Caja cerrar: commit sesion_id={sesion.id_sesion} estado={sesion.estado} diferencia={float(sesion.diferencia or 0)} redirect_cierre_id={sesion.id_sesion}"
+            )
+        except Exception:
+            pass
+        
+        if sesion.diferencia != 0:
+            if sesion.diferencia > 0:
+                flash(f'Caja cerrada con sobrante de ₲ {sesion.diferencia:,.0f}', 'warning')
+            else:
+                flash(f'Caja cerrada con faltante de ₲ {abs(sesion.diferencia):,.0f}', 'danger')
+        else:
+            flash('Caja cerrada correctamente. Cuadre perfecto.', 'success')
+        
+        return redirect(url_for('main.dashboard', cierre_id=sesion.id_sesion))
+    
+    return render_template('caja/cerrar.html',
+        sesion=sesion,
+        total_sistema=total_sistema
+    )
+
+
+@caja_bp.route('/cierres')
+@login_required
+def cierres_listar():
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver la caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    raw_desde = request.args.get('desde')
+    raw_hasta = request.args.get('hasta')
+    cierre_abierto = request.args.get('cierre_abierto', type=int)
+
+    if raw_desde or raw_hasta:
+        desde = parse_iso_date(raw_desde) or parse_iso_date(raw_hasta) or today_local()
+        hasta = parse_iso_date(raw_hasta) or parse_iso_date(raw_desde) or desde
+    else:
+        hasta = today_local()
+        desde = today_local().replace(day=1) if hasattr(today_local(), 'replace') else hasta
+
+    if desde and hasta and desde > hasta:
+        desde, hasta = hasta, desde
+
+    start_utc, end_utc = utc_bounds_for_local_dates(desde, hasta)
+
+    query = (
+        SesionCaja.query.options(
+            joinedload(SesionCaja.caja),
+            joinedload(SesionCaja.usuario),
+            joinedload(SesionCaja.usuario_cierre),
+        )
+        .filter(
+            SesionCaja.estado == 'cerrada',
+            SesionCaja.fecha_cierre.isnot(None),
+            SesionCaja.fecha_cierre >= start_utc,
+            SesionCaja.fecha_cierre < end_utc,
+        )
+    )
+
+    puede_ver_otras = current_user.es_admin() or current_user.tiene_permiso('ver_otras_cajas')
+    if not puede_ver_otras:
+        query = query.filter(
+            or_(
+                SesionCaja.id_usuario == current_user.id_usuario,
+                SesionCaja.id_usuario_cierre == current_user.id_usuario,
+            )
+        )
+
+    cierres = query.order_by(SesionCaja.fecha_cierre.desc(), SesionCaja.id_sesion.desc()).limit(200).all()
+
+    return render_template(
+        'caja/cierres_list.html',
+        cierres= cierres,
+        desde=desde,
+        hasta=hasta,
+        puede_ver_otras=puede_ver_otras,
+        cierre_abierto=cierre_abierto,
+    )
+
+
+@caja_bp.route('/cierres/<int:id_sesion>')
+@login_required
+def cierre_detalle(id_sesion):
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver la caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    try:
+        req_id = getattr(g, 'request_id', None)
+        prefix = f'[{req_id}] ' if req_id else ''
+        embed = request.args.get('embed')
+        current_app.logger.info(
+            f"{prefix}Cierre detalle: request sesion_id={id_sesion} embed={embed} user_id={current_user.id_usuario}"
+        )
+    except Exception:
+        pass
+
+    sesion = (
+        SesionCaja.query.options(
+            joinedload(SesionCaja.caja),
+            joinedload(SesionCaja.usuario),
+            joinedload(SesionCaja.usuario_cierre),
+        )
+        .get_or_404(id_sesion)
+    )
+    if sesion.estado != 'cerrada':
+        flash('La sesión aún no está cerrada.', 'warning')
+        return redirect(url_for('caja.estado'))
+    if not _puede_ver_sesion(sesion):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver este cierre de caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    informe = _calcular_informe_cierre_sesion(sesion)
+    try:
+        req_id = getattr(g, 'request_id', None)
+        prefix = f'[{req_id}] ' if req_id else ''
+        current_app.logger.info(
+            f"{prefix}Cierre detalle: render sesion_id={id_sesion} estado={sesion.estado}"
+        )
+    except Exception:
+        pass
+    return render_template('caja/cierre_detalle.html', **informe)
+
+
+@caja_bp.route('/cierres/<int:id_sesion>/imprimir')
+@login_required
+def cierre_imprimir(id_sesion):
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver la caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    sesion = (
+        SesionCaja.query.options(
+            joinedload(SesionCaja.caja),
+            joinedload(SesionCaja.usuario),
+            joinedload(SesionCaja.usuario_cierre),
+        )
+        .get_or_404(id_sesion)
+    )
+    if sesion.estado != 'cerrada':
+        flash('La sesión aún no está cerrada.', 'warning')
+        return redirect(url_for('caja.estado'))
+    if not _puede_ver_sesion(sesion):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver este cierre de caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    informe = _calcular_informe_cierre_sesion(sesion)
+    return render_template('caja/cierre_imprimir.html', **informe)
+
+
+@caja_bp.route('/contabilidad')
+@login_required
+def contabilidad():
+    """Cierre contable por rango de fechas (ingresos - egresos)"""
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver la contabilidad.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    raw_desde = request.args.get('desde')
+    raw_hasta = request.args.get('hasta')
+
+    # Por defecto: mes actual
+    if raw_desde or raw_hasta:
+        desde = parse_iso_date(raw_desde) or parse_iso_date(raw_hasta) or today_local()
+        hasta = parse_iso_date(raw_hasta) or parse_iso_date(raw_desde) or desde
+    else:
+        hasta = today_local()
+        desde = today_local().replace(day=1) if hasattr(today_local(), 'replace') else hasta
+
+    if desde and hasta and desde > hasta:
+        desde, hasta = hasta, desde
+
+    start_utc, end_utc = utc_bounds_for_local_dates(desde, hasta)
+
+    informe = _calcular_informe_contable_rango(start_utc, end_utc)
+
+    return render_template(
+        'caja/contabilidad.html',
+        desde=desde,
+        hasta=hasta,
+        **informe,
+    )
+
+
+@caja_bp.route('/contabilidad/imprimir')
+@login_required
+def contabilidad_imprimir():
+    """Versión para imprimir del cierre contable"""
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver la contabilidad.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    raw_desde = request.args.get('desde')
+    raw_hasta = request.args.get('hasta')
+
+    if raw_desde or raw_hasta:
+        desde = parse_iso_date(raw_desde) or parse_iso_date(raw_hasta) or today_local()
+        hasta = parse_iso_date(raw_hasta) or parse_iso_date(raw_desde) or desde
+    else:
+        hasta = today_local()
+        desde = today_local().replace(day=1) if hasattr(today_local(), 'replace') else hasta
+
+    if desde and hasta and desde > hasta:
+        desde, hasta = hasta, desde
+
+    start_utc, end_utc = utc_bounds_for_local_dates(desde, hasta)
+
+    informe = _calcular_informe_contable_rango(start_utc, end_utc)
+
+    return render_template(
+        'caja/contabilidad_imprimir.html',
+        desde=desde,
+        hasta=hasta,
+        **informe,
+    )
+
+
+@caja_bp.route('/contabilidad/pdf')
+@login_required
+def contabilidad_pdf():
+    """Generar PDF del cierre contable (Server-side)"""
+    if not current_user.tiene_permiso('ver_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver la contabilidad.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    raw_desde = request.args.get('desde')
+    raw_hasta = request.args.get('hasta')
+
+    if raw_desde or raw_hasta:
+        desde = parse_iso_date(raw_desde) or parse_iso_date(raw_hasta) or today_local()
+        hasta = parse_iso_date(raw_hasta) or parse_iso_date(raw_desde) or desde
+    else:
+        hasta = today_local()
+        desde = today_local().replace(day=1) if hasattr(today_local(), 'replace') else hasta
+
+    if desde and hasta and desde > hasta:
+        desde, hasta = hasta, desde
+
+    start_utc, end_utc = utc_bounds_for_local_dates(desde, hasta)
+
+    informe = _calcular_informe_contable_rango(start_utc, end_utc)
+
+    # Render HTML
+    html = render_template(
+        'caja/contabilidad_pdf.html',
+        desde=desde,
+        hasta=hasta,
+        now=now_local(),
+        **informe,
+    )
+    
+    # Generate PDF
+    pdf_buffer = BytesIO()
+    pisa_status = pisa.CreatePDF(html, dest=pdf_buffer)
+    
+    if pisa_status.err:
+        flash('Error al generar el PDF', 'danger')
+        return redirect(url_for('caja.contabilidad'))
+        
+    pdf_buffer.seek(0)
+    
+    response = make_response(pdf_buffer.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=contabilidad_{desde.strftime("%Y%m%d")}_{hasta.strftime("%Y%m%d")}.pdf'
+    
+    return response
+
+
+@caja_bp.route('/cierres/<int:id_sesion>/editar', methods=['GET', 'POST'])
+@login_required
+def cierre_editar(id_sesion):
+    """Editar un cierre de caja (requiere permiso especial)"""
+    if not current_user.tiene_permiso('editar_cierre_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para editar cierres de caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    sesion = (
+        SesionCaja.query.options(
+            joinedload(SesionCaja.caja),
+            joinedload(SesionCaja.usuario),
+            joinedload(SesionCaja.usuario_cierre),
+        )
+        .get_or_404(id_sesion)
+    )
+    if sesion.estado != 'cerrada':
+        flash('Solo se pueden editar cierres ya realizados.', 'warning')
+        return redirect(url_for('caja.estado'))
+
+    if request.method == 'POST':
+        nuevo_declarado = request.form.get('monto_declarado', type=float)
+        nuevas_observaciones = request.form.get('observaciones', '').strip()
+        motivo_edicion = request.form.get('motivo_edicion', '').strip()
+        recalcular_sistema = bool(request.form.get('recalcular_sistema'))
+
+        if nuevo_declarado is None:
+            flash('Debe ingresar el monto declarado.', 'warning')
+            return render_template('caja/cierre_editar.html', sesion=sesion)
+
+        if not motivo_edicion:
+            flash('Debe indicar el motivo de la edición.', 'warning')
+            return render_template('caja/cierre_editar.html', sesion=sesion)
+
+        # Guardar datos anteriores para auditoría
+        datos_anteriores = {
+            'monto_final_declarado': float(sesion.monto_final_declarado or 0),
+            'monto_final_sistema': float(sesion.monto_final_sistema or 0),
+            'diferencia': float(sesion.diferencia or 0),
+            'observaciones': sesion.observaciones or '',
+        }
+
+        # Actualizar valores
+        diferencia_anterior = sesion.diferencia
+        monto_sistema_anterior = float(sesion.monto_final_sistema or 0)
+
+        if recalcular_sistema:
+            sesion.monto_final_sistema = float(sesion.calcular_total_efectivo() or 0)
+
+        sesion.monto_final_declarado = nuevo_declarado
+        sesion.diferencia = nuevo_declarado - float(sesion.monto_final_sistema or 0)
+        
+        # Agregar nota de edición a observaciones
+        nota_edicion = f"\n\n[EDITADO {local_strftime(datetime.utcnow(), '%d/%m/%Y %H:%M')} por {current_user.username}]: {motivo_edicion}"
+        if nuevas_observaciones:
+            sesion.observaciones = nuevas_observaciones + nota_edicion
+        else:
+            sesion.observaciones = (sesion.observaciones or '') + nota_edicion
+
+        datos_nuevos = {
+            'monto_final_declarado': float(nuevo_declarado),
+            'monto_final_sistema': float(sesion.monto_final_sistema or 0),
+            'diferencia': float(sesion.diferencia),
+            'observaciones': sesion.observaciones,
+            'motivo_edicion': motivo_edicion,
+            'recalcular_sistema': bool(recalcular_sistema),
+            'monto_final_sistema_anterior': float(monto_sistema_anterior),
+        }
+
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='editar_cierre_caja',
+                    modulo='caja',
+                    descripcion=f'Editó cierre de caja sesión #{id_sesion}. Motivo: {motivo_edicion}',
+                    referencia_tipo='sesion_caja',
+                    referencia_id=id_sesion,
+                    datos_anteriores=datos_anteriores,
+                    datos_nuevos=datos_nuevos,
+                    commit=False
+                )
+        except Exception:
+            current_app.logger.exception('Error registrando auditoría de edición de cierre')
+
+        try:
+            db.session.commit()
+            flash(f'Cierre editado correctamente. Diferencia anterior: ₲ {diferencia_anterior:,.0f}, nueva: ₲ {sesion.diferencia:,.0f}', 'success')
+            return redirect(url_for('caja.cierre_detalle', id_sesion=id_sesion))
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('Error guardando edición de cierre')
+            flash('Error al guardar la edición.', 'danger')
+            return render_template('caja/cierre_editar.html', sesion=sesion)
+
+    return render_template('caja/cierre_editar.html', sesion=sesion)
+
+
+@caja_bp.route('/movimiento', methods=['GET', 'POST'])
+@login_required
+def registrar_movimiento():
+    """Registrar ingreso/egreso de caja"""
+    if not current_user.tiene_permiso('movimiento_caja'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para registrar movimientos de caja.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    sesion = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta'
+    ).first()
+    
+    if not sesion:
+        flash('Debe tener una caja abierta.', 'warning')
+        return redirect(url_for('caja.abrir'))
+    
+    if request.method == 'POST':
+        tipo = request.form.get('tipo')
+        monto = request.form.get('monto', 0, type=float)
+        motivo = request.form.get('motivo', '').strip()
+        
+        if tipo not in ['ingreso', 'egreso']:
+            flash('Tipo de movimiento inválido.', 'danger')
+            return render_template('caja/movimiento.html', sesion=sesion)
+        
+        if monto <= 0:
+            flash('El monto debe ser mayor a cero.', 'warning')
+            return render_template('caja/movimiento.html', sesion=sesion)
+        
+        if not motivo:
+            flash('Debe indicar el motivo del movimiento.', 'warning')
+            return render_template('caja/movimiento.html', sesion=sesion)
+        
+        movimiento = MovimientoCaja(
+            id_sesion_caja=sesion.id_sesion,
+            id_usuario=current_user.id_usuario,
+            tipo=tipo,
+            monto=monto,
+            motivo=motivo
+        )
+        
+        db.session.add(movimiento)
+        db.session.flush()
+
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='movimiento_caja',
+                    modulo='caja',
+                    descripcion=f'Movimiento de caja ({tipo}) en sesión #{sesion.id_sesion}',
+                    referencia_tipo='movimiento_caja',
+                    referencia_id=movimiento.id_movimiento_caja,
+                    datos_nuevos={
+                        'id_sesion_caja': sesion.id_sesion,
+                        'tipo': tipo,
+                        'monto': float(monto or 0),
+                        'motivo': motivo,
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('Error guardando movimiento de caja')
+            flash('No se pudo guardar el movimiento. Revise el log del servidor.', 'danger')
+            return render_template('caja/movimiento.html', sesion=sesion)
+        
+        tipo_texto = 'Ingreso' if tipo == 'ingreso' else 'Egreso'
+        flash(f'{tipo_texto} de ₲ {monto:,.0f} registrado.', 'success')
+        return redirect(url_for('caja.estado'))
+    
+    return render_template('caja/movimiento.html', sesion=sesion)
+
+
+@caja_bp.route('/cajas')
+@login_required
+def cajas_listar():
+    if not current_user.tiene_permiso('gestionar_cajas'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para gestionar cajas.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    cajas = Caja.query.order_by(Caja.nombre.asc()).all()
+    sesiones_abiertas = SesionCaja.query.filter_by(estado='abierta').all()
+    sesiones_abiertas_por_caja = {s.id_caja: s for s in sesiones_abiertas}
+    return render_template(
+        'caja/cajas_listar.html',
+        cajas=cajas,
+        sesiones_abiertas_por_caja=sesiones_abiertas_por_caja
+    )
+
+
+@caja_bp.route('/cajas/nueva', methods=['GET', 'POST'])
+@login_required
+def cajas_nueva():
+    if not current_user.tiene_permiso('gestionar_cajas'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para gestionar cajas.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    if request.method == 'POST':
+        nombre = (request.form.get('nombre') or '').strip()
+        ubicacion = (request.form.get('ubicacion') or '').strip()
+        activa = bool(request.form.get('activa'))
+
+        if not nombre:
+            flash('El nombre es obligatorio.', 'warning')
+            return render_template('caja/cajas_form.html', caja=None)
+
+        existente = Caja.query.filter(Caja.nombre == nombre).first()
+        if existente:
+            flash('Ya existe una caja con ese nombre.', 'danger')
+            return render_template('caja/cajas_form.html', caja=None)
+
+        caja = Caja(nombre=nombre, ubicacion=ubicacion or None, activa=activa)
+        db.session.add(caja)
+        db.session.flush()
+
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='crear_caja',
+                    modulo='caja',
+                    descripcion=f'Creó caja "{caja.nombre}"',
+                    referencia_tipo='caja',
+                    referencia_id=caja.id_caja,
+                    datos_nuevos={
+                        'id_caja': caja.id_caja,
+                        'nombre': caja.nombre,
+                        'ubicacion': caja.ubicacion,
+                        'activa': bool(caja.activa),
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('No se pudo crear la caja (nombre duplicado).', 'danger')
+            return render_template('caja/cajas_form.html', caja=None)
+
+        flash('Caja creada correctamente.', 'success')
+        return redirect(url_for('caja.cajas_listar'))
+
+    return render_template('caja/cajas_form.html', caja=None)
+
+
+@caja_bp.route('/cajas/<int:id_caja>/editar', methods=['GET', 'POST'])
+@login_required
+def cajas_editar(id_caja):
+    if not current_user.tiene_permiso('gestionar_cajas'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para gestionar cajas.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    caja = Caja.query.get_or_404(id_caja)
+
+    if request.method == 'POST':
+        nombre = (request.form.get('nombre') or '').strip()
+        ubicacion = (request.form.get('ubicacion') or '').strip()
+        activa = bool(request.form.get('activa'))
+
+        if not nombre:
+            flash('El nombre es obligatorio.', 'warning')
+            return render_template('caja/cajas_form.html', caja=caja)
+
+        existente = Caja.query.filter(Caja.nombre == nombre, Caja.id_caja != caja.id_caja).first()
+        if existente:
+            flash('Ya existe una caja con ese nombre.', 'danger')
+            return render_template('caja/cajas_form.html', caja=caja)
+
+        datos_anteriores = {
+            'nombre': caja.nombre,
+            'ubicacion': caja.ubicacion,
+            'activa': bool(caja.activa),
+        }
+
+        if not activa and caja.sesion_activa():
+            flash('No se puede desactivar una caja con sesión abierta.', 'danger')
+            return render_template('caja/cajas_form.html', caja=caja)
+
+        caja.nombre = nombre
+        caja.ubicacion = ubicacion or None
+        caja.activa = activa
+
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='editar_caja',
+                    modulo='caja',
+                    descripcion=f'Editó caja "{caja.nombre}"',
+                    referencia_tipo='caja',
+                    referencia_id=caja.id_caja,
+                    datos_anteriores=datos_anteriores,
+                    datos_nuevos={
+                        'nombre': caja.nombre,
+                        'ubicacion': caja.ubicacion,
+                        'activa': bool(caja.activa),
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('No se pudo guardar (nombre duplicado).', 'danger')
+            return render_template('caja/cajas_form.html', caja=caja)
+
+        flash('Caja actualizada correctamente.', 'success')
+        return redirect(url_for('caja.cajas_listar'))
+
+    return render_template('caja/cajas_form.html', caja=caja)
+
+
+@caja_bp.route('/cajas/<int:id_caja>/toggle', methods=['POST'])
+@login_required
+def cajas_toggle(id_caja):
+    if not current_user.tiene_permiso('gestionar_cajas'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para gestionar cajas.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    caja = Caja.query.get_or_404(id_caja)
+    if caja.activa and caja.sesion_activa():
+        flash('No se puede desactivar una caja con sesión abierta.', 'danger')
+        return redirect(url_for('caja.cajas_listar'))
+
+    datos_anteriores = {'activa': bool(caja.activa)}
+    caja.activa = not bool(caja.activa)
+    accion = 'activar_caja' if caja.activa else 'desactivar_caja'
+
+    try:
+        with db.session.begin_nested():
+            registrar_auditoria(
+                accion=accion,
+                modulo='caja',
+                descripcion=f'Actualizó estado de caja "{caja.nombre}"',
+                referencia_tipo='caja',
+                referencia_id=caja.id_caja,
+                datos_anteriores=datos_anteriores,
+                datos_nuevos={'activa': bool(caja.activa)},
+                commit=False
+            )
+    except Exception:
+        pass
+
+    db.session.commit()
+    flash('Estado de caja actualizado.', 'success')
+    return redirect(url_for('caja.cajas_listar'))

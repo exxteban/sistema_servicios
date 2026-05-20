@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Recepción de usados{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-file-signature text-amber-600 dark:text-amber-400 mr-2"></i>Recepción de compra de equipos usados
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Registro legal, vendedor, inventario y comprobante imprimible en un solo flujo.</p>
+        </div>
+        <a href="{{ url_for('recepcion_usados.nueva') }}" data-permiso="crear_recepcion_usados"
+            class="inline-flex items-center justify-center gap-2 border border-amber-500 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md shadow-amber-600/30 transition-colors">
+            <i class="fas fa-plus"></i>
+            <span>Nuevo formulario</span>
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+        <form method="GET" class="flex flex-col gap-3 md:flex-row">
+            <input type="text" name="q" value="{{ q }}" placeholder="Buscar por número, vendedor, documento, equipo o código..."
+                class="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <div class="flex gap-2">
+                <button type="submit" class="inline-flex items-center justify-center gap-2 border border-gray-700 dark:border-gray-500 bg-gray-800 dark:bg-gray-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+                    <i class="fas fa-search mr-1"></i> Buscar
+                </button>
+                {% if q %}
+                <a href="{{ url_for('recepcion_usados.listar') }}" class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Limpiar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[980px]">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Formulario</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Vendedor</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Documento</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Equipo</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Veces</th>
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Impreso</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for recepcion in recepciones.items %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-gray-800 dark:text-gray-100">Nº {{ recepcion.numero_formulario_display }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ recepcion.producto.codigo if recepcion.producto else '-' }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ recepcion.fecha_formulario.strftime('%d/%m/%Y') if recepcion.fecha_formulario else '-' }}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_nombres_apellidos }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ recepcion.vendedor_ciudad or '-' }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ recepcion.vendedor_tipo_documento }} {{ recepcion.vendedor_numero_documento }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300 max-w-sm">
+                            <div class="truncate">{{ recepcion.resumen_producto }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100">₲ {{ '{:,.0f}'.format(recepcion.monto_compra or 0) }}</td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="inline-flex items-center justify-center min-w-10 px-2 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 text-sm">
+                                {{ recepcion.vendedor.total_ventas_usados }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-center text-gray-600 dark:text-gray-300">{{ recepcion.cantidad_impresiones or 0 }}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex justify-end gap-3 text-sm">
+                                <a href="{{ url_for('recepcion_usados.detalle', id_recepcion=recepcion.id_recepcion_compra_usado) }}" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                                    Ver
+                                </a>
+                                <a href="{{ url_for('recepcion_usados.imprimir', id_recepcion=recepcion.id_recepcion_compra_usado) }}" target="_blank" class="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300">
+                                    Imprimir
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="px-4 py-10 text-center text-gray-400 dark:text-gray-500">
+                            {% if q %}
+                            No se encontraron formularios con "{{ q }}".
+                            {% else %}
+                            Aún no hay compras de usados registradas.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if recepciones.pages > 1 %}
+    <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+        <span>Página {{ recepciones.page }} de {{ recepciones.pages }}</span>
+        <div class="flex gap-2">
+            {% if recepciones.has_prev %}
+            <a href="{{ url_for('recepcion_usados.listar', page=recepciones.prev_num, q=q) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100">Anterior</a>
+            {% endif %}
+            {% if recepciones.has_next %}
+            <a href="{{ url_for('recepcion_usados.listar', page=recepciones.next_num, q=q) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100">Siguiente</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Abrir Caja{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-6 text-center">
+            <i class="fas fa-wallet text-green-600 dark:text-green-400 mr-2"></i>Abrir Caja
+        </h1>
+
+        {% set sesiones = sesiones_abiertas_por_caja or {} %}
+        <form method="POST" action="{{ url_for('caja.abrir') }}" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Seleccione Caja</label>
+                <select id="id_caja" name="id_caja" required
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-3 px-4 text-lg bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    <option value="">Seleccione...</option>
+                    {% for caja in cajas %}
+                    {% set sesion = sesiones.get(caja.id_caja) %}
+                    <option value="{{ caja.id_caja }}"
+                        {% if sesion and sesion.id_usuario != current_user.id_usuario and not (sesion.usuario and sesion.usuario.modo_demo) %}disabled{% endif %}
+                        {% if sesion and sesion.id_usuario != current_user.id_usuario %}
+                        data-en-uso="1"
+                        data-caja="{{ caja.nombre }}"
+                        data-usuario="{{ sesion.usuario.nombre_completo if sesion.usuario else 'otro usuario' }}"
+                        data-username="{{ sesion.usuario.username if sesion.usuario and sesion.usuario.username else '' }}"
+                        {% endif %}>
+                        {{ caja.nombre }}
+                        {% if sesion and sesion.id_usuario != current_user.id_usuario %}
+                            (En uso por {{ sesion.usuario.nombre_completo if sesion.usuario else 'otro usuario' }}{% if sesion.usuario and sesion.usuario.username %} - {{ sesion.usuario.username }}{% endif %})
+                        {% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Monto Inicial (Fondo de
+                    Cambio)</label>
+                <input type="number" name="monto_inicial" value="0" min="0"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-3 px-4 text-lg text-right bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Ingrese el efectivo con el que inicia</p>
+            </div>
+
+            <button type="submit"
+                class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold text-lg transition">
+                <i class="fas fa-unlock mr-2"></i>Abrir Caja
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        function getInUseItems(selectEl) {
+            const options = Array.from(selectEl.querySelectorAll('option[data-en-uso="1"]'));
+            return options.map(opt => {
+                const caja = (opt.getAttribute('data-caja') || '').trim();
+                const usuario = (opt.getAttribute('data-usuario') || '').trim();
+                const username = (opt.getAttribute('data-username') || '').trim();
+                const quien = username ? `${usuario} - ${username}` : usuario;
+                return { caja, quien };
+            }).filter(x => x.caja && x.quien);
+        }
+
+        function buildMessage(items) {
+            if (!items || items.length === 0) return '';
+            if (items.length === 1) {
+                return `La caja "${items[0].caja}" ya está abierta en otra sesión.\nUsuario: ${items[0].quien}`;
+            }
+            const lines = items.slice(0, 4).map(x => `- ${x.caja}: ${x.quien}`);
+            const extra = items.length > 4 ? `\n(+${items.length - 4} más)` : '';
+            return `Hay cajas abiertas en otras sesiones:\n${lines.join('\n')}${extra}`;
+        }
+
+        const selectEl = document.getElementById('id_caja');
+        if (!selectEl) return;
+
+        let alreadyShown = false;
+        function maybeShow() {
+            if (alreadyShown) return;
+            const items = getInUseItems(selectEl);
+            const message = buildMessage(items);
+            if (!message) return;
+            alreadyShown = true;
+            if (typeof window.mostrarNotificacion === 'function') {
+                window.mostrarNotificacion(message, 'warning');
+            } else {
+                alert(message);
+            }
+        }
+
+        selectEl.addEventListener('mousedown', maybeShow);
+        selectEl.addEventListener('focus', maybeShow);
+    })();
+</script>
+{% endblock %}

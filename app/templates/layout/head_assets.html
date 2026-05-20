@@ -1,0 +1,388 @@
+    <script>
+        (function () {
+            if (window.__appShellViewportInit) return;
+            window.__appShellViewportInit = true;
+
+            let rafId = null;
+
+            function getViewportHeight() {
+                const vv = window.visualViewport;
+                const rawHeight = vv && typeof vv.height === 'number'
+                    ? vv.height
+                    : (window.innerHeight || document.documentElement.clientHeight || 0);
+                return Math.max(0, Math.round(rawHeight || 0));
+            }
+
+            function applyViewportHeight() {
+                rafId = null;
+                const viewportHeight = getViewportHeight();
+                if (!viewportHeight) return;
+                document.documentElement.style.setProperty('--app-shell-vh', `${viewportHeight}px`);
+                window.__appShellViewportHeight = viewportHeight;
+            }
+
+            function queueViewportHeightUpdate() {
+                if (rafId !== null) return;
+                rafId = window.requestAnimationFrame(applyViewportHeight);
+            }
+
+            window.__appShellGetViewportHeight = getViewportHeight;
+
+            ['resize', 'orientationchange', 'pageshow', 'load'].forEach((eventName) => {
+                window.addEventListener(eventName, queueViewportHeightUpdate, { passive: true });
+            });
+
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    queueViewportHeightUpdate();
+                }
+            });
+
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', queueViewportHeightUpdate, { passive: true });
+            }
+
+            queueViewportHeightUpdate();
+        })();
+    </script>
+
+    <script>
+        (function () {
+            if (window.__appShellTopbarInit) return;
+            window.__appShellTopbarInit = true;
+
+            let resizeObserver = null;
+
+            function syncTopbarHeight() {
+                const topbar = document.querySelector('[data-app-topnav]');
+                if (!topbar) return;
+                const height = Math.max(56, Math.ceil(topbar.getBoundingClientRect().height || 0));
+                document.documentElement.style.setProperty('--app-shell-topbar-height', `${height}px`);
+            }
+
+            function bindTopbarHeight() {
+                syncTopbarHeight();
+                const topbar = document.querySelector('[data-app-topnav]');
+                if (!topbar || typeof ResizeObserver !== 'function') return;
+                resizeObserver = new ResizeObserver(syncTopbarHeight);
+                resizeObserver.observe(topbar);
+            }
+
+            window.addEventListener('resize', syncTopbarHeight, { passive: true });
+            window.addEventListener('load', syncTopbarHeight, { passive: true });
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', bindTopbarHeight, { once: true });
+            } else {
+                bindTopbarHeight();
+            }
+        })();
+    </script>
+
+    <script>
+        (function () {
+            const originalFetch = window.fetch;
+            if (!originalFetch) return;
+            window.fetch = function (input, init) {
+                init = init || {};
+                const method = String(init.method || 'GET').toUpperCase();
+                const safe = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                const token = meta ? (meta.getAttribute('content') || '') : '';
+                if (!safe && token) {
+                    let sameOrigin = true;
+                    try {
+                        const url = (typeof input === 'string' || input instanceof URL)
+                            ? new URL(input, window.location.origin)
+                            : new URL(input.url, window.location.origin);
+                        sameOrigin = url.origin === window.location.origin;
+                    } catch { }
+                    if (sameOrigin) {
+                        if (init.headers instanceof Headers) {
+                            if (!init.headers.has('X-CSRFToken') && !init.headers.has('X-CSRF-Token')) {
+                                init.headers.set('X-CSRFToken', token);
+                            }
+                        } else {
+                            init.headers = init.headers || {};
+                            if (!('X-CSRFToken' in init.headers) && !('X-CSRF-Token' in init.headers)) {
+                                init.headers['X-CSRFToken'] = token;
+                            }
+                        }
+                    }
+                }
+                return new Promise((resolve, reject) => {
+                    originalFetch(input, init).then(async (response) => {
+                        let responseUrl = null;
+                        try { responseUrl = new URL(response.url, window.location.origin); } catch { }
+
+                        const isLoginPath = responseUrl && responseUrl.pathname && responseUrl.pathname.startsWith('/auth/login');
+                        const isLoginRedirect = response.redirected && isLoginPath && responseUrl.origin === window.location.origin;
+
+                        if (response.status === 401 || isLoginRedirect) {
+                            try {
+                                const next = window.location.pathname + window.location.search + window.location.hash;
+                                const dest = new URL('/auth/login', window.location.origin);
+                                dest.searchParams.set('next', next);
+                                window.location.replace(dest.toString());
+                            } catch {
+                                window.location.reload();
+                            }
+                            return;
+                        }
+
+                        resolve(response);
+                    }).catch(reject);
+                }).then(async (response) => {
+                    if (safe || response.status !== 400) return response;
+                    if (init && init.__csrfRetried) return response;
+
+                    let sameOrigin = true;
+                    try {
+                        const url = (typeof input === 'string' || input instanceof URL)
+                            ? new URL(input, window.location.origin)
+                            : new URL(input.url, window.location.origin);
+                        sameOrigin = url.origin === window.location.origin;
+                    } catch { }
+                    if (!sameOrigin) return response;
+
+                    let data = null;
+                    try {
+                        data = await response.clone().json();
+                    } catch { }
+                    if (!data || data.error !== 'csrf') return response;
+
+                    let refreshed = null;
+                    try {
+                        const r = await originalFetch('/auth/csrf', { method: 'GET', headers: { 'Accept': 'application/json' } });
+                        if (r.ok) refreshed = await r.json();
+                    } catch { }
+                    if (!refreshed || !refreshed.csrf_token) return response;
+
+                    const meta2 = document.querySelector('meta[name="csrf-token"]');
+                    if (meta2) meta2.setAttribute('content', refreshed.csrf_token);
+
+                    const retryInit = Object.assign({}, init, { __csrfRetried: true });
+                    if (retryInit.headers instanceof Headers) {
+                        retryInit.headers.set('X-CSRFToken', refreshed.csrf_token);
+                    } else {
+                        retryInit.headers = retryInit.headers || {};
+                        retryInit.headers['X-CSRFToken'] = refreshed.csrf_token;
+                    }
+                    return originalFetch(input, retryInit);
+                });
+            };
+        })();
+    </script>
+
+    <script>
+        (function () {
+            try {
+                const stored = localStorage.getItem('darkMode');
+                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const shouldDark = stored === 'true' || (stored === null && prefersDark);
+                if (shouldDark) document.documentElement.classList.add('dark');
+            } catch { }
+        })();
+    </script>
+
+    <style>
+        :root {
+            --app-shell-vh: 100vh;
+            --app-shell-topbar-height: 3.5rem;
+        }
+
+        @supports (height: 100dvh) {
+            :root {
+                --app-shell-vh: 100dvh;
+            }
+        }
+
+        @media (min-width: 1536px) {
+            :root {
+                --app-shell-topbar-height: 4rem;
+            }
+        }
+
+        html,
+        body {
+            background-color: #f3f4f6;
+            color: #111827;
+        }
+
+        body.app-shell-body {
+            min-height: var(--app-shell-vh);
+            height: var(--app-shell-vh);
+        }
+
+        html.dark,
+        html.dark body {
+            background-color: #0f1117;
+            color: #e8eaf0;
+        }
+
+        @keyframes flashPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+
+            50% {
+                transform: scale(1.02);
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
+        }
+    </style>
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+
+    <link rel="stylesheet" href="{{ static_url('css/style.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/custom.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/daily_insights.css') }}">
+
+    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+    <script>
+        (function () {
+            let chartJsPromise = null;
+            window.ensureChartJs = function () {
+                if (window.Chart) return Promise.resolve(window.Chart);
+                if (chartJsPromise) return chartJsPromise;
+
+                chartJsPromise = new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
+                    s.async = true;
+                    s.onload = () => window.Chart ? resolve(window.Chart) : reject(new Error('Chart.js no disponible'));
+                    s.onerror = () => reject(new Error('No se pudo cargar Chart.js'));
+                    document.head.appendChild(s);
+                });
+
+                return chartJsPromise;
+            };
+        })();
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .app-shell-sidebar {
+            top: var(--app-shell-topbar-height);
+            height: calc(var(--app-shell-vh) - var(--app-shell-topbar-height));
+            max-height: calc(var(--app-shell-vh) - var(--app-shell-topbar-height));
+        }
+
+        @media (min-width: 768px) {
+            .app-shell-sidebar {
+                top: 0;
+                height: auto;
+                max-height: none;
+            }
+        }
+
+        .app-shell-flyout-menu {
+            max-height: calc(var(--app-shell-vh) - 1rem);
+        }
+
+        .app-tab-panel[hidden] {
+            display: none !important;
+        }
+
+        .app-tab-panel {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+            touch-action: pan-y pinch-zoom;
+        }
+
+        body.crm-config-active input[type="number"] {
+            border-radius: 0.75rem;
+            border-color: rgba(45, 212, 191, 0.35) !important;
+            background-color: rgba(31, 41, 55, 0.55);
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.25);
+        }
+
+        body.crm-config-active input[type="number"]:focus {
+            border-color: rgba(45, 212, 191, 0.8) !important;
+            box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.22);
+        }
+
+        body.crm-config-active input[type="number"]::-webkit-inner-spin-button {
+            opacity: 1;
+            cursor: pointer;
+            background: linear-gradient(180deg, rgba(20, 184, 166, 0.3), rgba(45, 212, 191, 0.18));
+            border-left: 1px solid rgba(45, 212, 191, 0.35);
+            border-radius: 0 0.6rem 0.6rem 0;
+            width: 14px;
+        }
+
+        body.crm-config-active input[type="number"]::-webkit-outer-spin-button {
+            opacity: 1;
+            cursor: pointer;
+        }
+
+        body.crm-config-active .app-alert-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.66);
+            backdrop-filter: blur(3px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        body.crm-config-active .app-alert-modal {
+            width: min(480px, 92vw);
+            background: linear-gradient(180deg, rgba(10, 20, 35, 0.98), rgba(15, 23, 42, 0.98));
+            border: 1px solid rgba(45, 212, 191, 0.32);
+            border-radius: 1rem;
+            box-shadow: 0 28px 65px rgba(2, 6, 23, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        body.crm-config-active .app-alert-head {
+            padding: 0.85rem 1rem;
+            font-size: 0.78rem;
+            color: #94a3b8;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(15, 23, 42, 0.55);
+        }
+
+        body.crm-config-active .app-alert-body {
+            padding: 1.15rem 1rem 0.9rem;
+            font-size: 0.98rem;
+            line-height: 1.45;
+            white-space: pre-line;
+        }
+
+        body.crm-config-active .app-alert-actions {
+            padding: 0 1rem 1rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        body.crm-config-active .app-alert-btn {
+            border: 1px solid rgba(45, 212, 191, 0.7);
+            background: linear-gradient(180deg, rgba(34, 211, 238, 0.26), rgba(45, 212, 191, 0.14));
+            color: #ccfbf1;
+            font-weight: 600;
+            padding: 0.5rem 1.1rem;
+            border-radius: 9999px;
+            transition: all 0.2s ease;
+        }
+
+        body.crm-config-active .app-alert-btn:hover {
+            background: linear-gradient(180deg, rgba(34, 211, 238, 0.33), rgba(45, 212, 191, 0.2));
+            box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.2);
+        }
+    </style>
+
+    <script src="{{ static_url('js/autorizacion.js') }}" defer></script>

@@ -1,0 +1,142 @@
+<div class="space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
+            <p class="text-sm text-green-700 dark:text-green-300">Ventas</p>
+            <p class="text-2xl font-bold text-green-800 dark:text-green-200">{{ totales.ventas }}</p>
+        </div>
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
+            <p class="text-sm text-blue-700 dark:text-blue-300">Total Vendido</p>
+            <p class="text-2xl font-bold text-blue-800 dark:text-blue-200">₲ {{ "{:,.0f}".format(totales.total_ventas).replace(",", ".") }}</p>
+        </div>
+        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4">
+            <p class="text-sm text-amber-700 dark:text-amber-300">Recepciones</p>
+            <p class="text-2xl font-bold text-amber-800 dark:text-amber-200">{{ totales.reparaciones }}</p>
+        </div>
+    </div>
+
+    <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-200 px-4 py-3 text-sm">
+        {{ historial_pag.total }} movimiento{{ '' if historial_pag.total == 1 else 's' }} en total · Página {{ historial_pag.page }} de {{ historial_pag.pages }}
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-100">Ranking por Vendedor/Cajero</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Vendedor</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Rol</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Ventas</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Total Vendido</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Recepciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for row in ranking %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ row.nombre }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ row.rol or '—' }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">{{ row.ventas }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(row.total_ventas).replace(",", ".") }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">{{ row.reparaciones }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">Sin datos para el rango seleccionado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="font-semibold text-gray-800 dark:text-gray-100">Historial</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Tipo</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Vendedor</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Cliente</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Condición</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Referencia</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Saldo</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for item in historial %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ item.fecha|local_strftime('%d/%m/%Y %H:%M') if item.fecha else '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ item.tipo }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ item.vendedor }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ item.cliente }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ item.condicion }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <a href="{{ item.url }}" class="text-blue-600 dark:text-blue-400 hover:underline">
+                                {{ item.referencia }}
+                            </a>
+                        </td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">
+                            {% if item.saldo_pendiente and item.saldo_pendiente > 0 %}
+                            ₲ {{ "{:,.0f}".format(item.saldo_pendiente).replace(",", ".") }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(item.monto).replace(",", ".") }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No hay movimientos para mostrar.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if historial_pag.pages > 1 %}
+        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                Mostrando {{ historial|length }} de {{ historial_pag.total }} registros
+            </div>
+            <div class="flex items-center gap-2">
+                {% if historial_pag.has_prev %}
+                <a href="{{ url_for('reportes.historial_vendedores', desde=desde.isoformat(), hasta=hasta.isoformat(), id_vendedor=id_vendedor or None, historial_page=historial_pag.prev_num, partial=request.args.get('partial')) }}"
+                    data-historial-page-link="1"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    Anterior
+                </a>
+                {% else %}
+                <span
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                    Anterior
+                </span>
+                {% endif %}
+
+                <span class="px-3 py-1.5 rounded-lg text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100">
+                    {{ historial_pag.page }} / {{ historial_pag.pages }}
+                </span>
+
+                {% if historial_pag.has_next %}
+                <a href="{{ url_for('reportes.historial_vendedores', desde=desde.isoformat(), hasta=hasta.isoformat(), id_vendedor=id_vendedor or None, historial_page=historial_pag.next_num, partial=request.args.get('partial')) }}"
+                    data-historial-page-link="1"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    Siguiente
+                </a>
+                {% else %}
+                <span
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                    Siguiente
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

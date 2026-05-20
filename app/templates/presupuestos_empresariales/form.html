@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+{% block title %}Nuevo presupuesto empresarial{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <div class="text-sm uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 font-semibold">Documentos comerciales</div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Presupuesto empresarial</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Cargá los datos, agregá los ítems y dejá el PDF listo para enviar por WhatsApp.</p>
+        </div>
+        <div class="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-5 py-3">
+            <div class="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Próximo presupuesto</div>
+            <div class="text-2xl font-bold text-emerald-900 dark:text-emerald-100">Nº {{ '%06d'|format(numero_preview or 1) }}</div>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('presupuestos_empresariales.nuevo') }}" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="id_cliente" id="id_cliente" value="{{ form_seed.id_cliente }}">
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <section class="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 space-y-6">
+                <div class="flex items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Empresa destinataria</h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Podés buscar un cliente existente para autocompletar o completar manualmente.</p>
+                    </div>
+                    <div id="clienteSeleccionadoBadge" class="hidden text-sm rounded-full px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2 relative">
+                        <label for="cliente_busqueda" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Buscar cliente del sistema</label>
+                        <input
+                            type="text"
+                            id="cliente_busqueda"
+                            name="cliente_busqueda"
+                            value="{{ form_seed.cliente_busqueda }}"
+                            autocomplete="off"
+                            placeholder="Buscar por nombre o RUC..."
+                            class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        >
+                        <div id="clienteResultados" class="hidden absolute z-20 mt-2 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl overflow-hidden"></div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Empresa / razón social</label>
+                        <input type="text" name="destinatario_nombre" id="destinatario_nombre" value="{{ form_seed.destinatario_nombre }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Atención / contacto</label>
+                        <input type="text" name="destinatario_contacto" id="destinatario_contacto" value="{{ form_seed.destinatario_contacto }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">RUC / CI</label>
+                        <input type="text" name="destinatario_ruc" id="destinatario_ruc" value="{{ form_seed.destinatario_ruc }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Teléfono</label>
+                        <input type="text" name="destinatario_telefono" id="destinatario_telefono" value="{{ form_seed.destinatario_telefono }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Email</label>
+                        <input type="email" name="destinatario_email" id="destinatario_email" value="{{ form_seed.destinatario_email }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Dirección</label>
+                        <textarea name="destinatario_direccion" id="destinatario_direccion" rows="2" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">{{ form_seed.destinatario_direccion }}</textarea>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="space-y-6">
+                <section class="bg-slate-900 text-white rounded-2xl shadow-md p-6 space-y-4">
+                    <div>
+                        <h2 class="text-lg font-semibold">Cabecera del documento</h2>
+                        <p class="text-sm text-slate-300 mt-1">El PDF tomará el nombre comercial y el logo configurados en el sistema.</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div class="rounded-xl bg-white/10 p-4">
+                            <div class="text-slate-300">Fecha de emisión</div>
+                            <input type="date" name="fecha_emision" value="{{ form_seed.fecha_emision }}" required class="mt-2 w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                        </div>
+                        <div class="rounded-xl bg-white/10 p-4">
+                            <div class="text-slate-300">Validez (días)</div>
+                            <input type="number" min="0" step="1" name="validez_dias" value="{{ form_seed.validez_dias }}" required class="mt-2 w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-200 mb-1">Asunto</label>
+                        <input type="text" name="asunto" value="{{ form_seed.asunto }}" required class="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    </div>
+                    <div class="rounded-xl bg-white/10 p-4">
+                        <div class="text-slate-300 text-xs uppercase tracking-wide">Total estimado</div>
+                        <div id="totalResumen" class="text-3xl font-bold mt-2">₲ 0</div>
+                        <div id="subtotalResumen" class="text-xs text-slate-300 mt-1">Subtotal: ₲ 0</div>
+                        <div id="descuentoResumen" class="text-xs text-slate-300">Descuento: ₲ 0</div>
+                    </div>
+                </section>
+            </aside>
+        </div>
+
+        <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 space-y-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-gray-200 dark:border-gray-700 pb-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Detalle presupuestado</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Agregá productos, servicios o conceptos. El total se recalcula automáticamente.</p>
+                </div>
+                <button type="button" id="agregarItem" class="inline-flex items-center justify-center gap-2 border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+                    <i class="fas fa-plus"></i>
+                    <span>Agregar ítem</span>
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[760px]">
+                    <thead class="bg-gray-50 dark:bg-gray-700/60">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Descripción</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300 w-32">Cantidad</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300 w-44">Precio unitario</th>
+                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300 w-40">Importe</th>
+                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300 w-20"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for item in form_seed.item_rows %}
+                        <tr class="item-row">
+                            <td class="px-4 py-3">
+                                <input type="text" name="item_descripcion[]" value="{{ item.descripcion }}" placeholder="Ej.: Mantenimiento mensual, lote de accesorios, soporte técnico..." class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            </td>
+                            <td class="px-4 py-3">
+                                <input type="number" name="item_cantidad[]" value="{{ item.cantidad }}" min="0" step="0.01" class="item-cantidad w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            </td>
+                            <td class="px-4 py-3">
+                                <input type="text" name="item_precio_unitario[]" value="{{ item.precio_unitario }}" class="item-precio w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="0">
+                            </td>
+                            <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100 item-total">₲ 0</td>
+                            <td class="px-4 py-3 text-right">
+                                <button type="button" class="eliminar-item inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 transition-colors">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="lg:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Observaciones</label>
+                    <textarea name="observaciones" rows="4" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">{{ form_seed.observaciones }}</textarea>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Descuento global</label>
+                        <input type="text" name="descuento" id="descuento" value="{{ form_seed.descuento }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="0">
+                    </div>
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4 text-sm space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Subtotal</span>
+                            <span id="subtotalBox" class="font-semibold text-gray-800 dark:text-gray-100">₲ 0</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Descuento</span>
+                            <span id="descuentoBox" class="font-semibold text-gray-800 dark:text-gray-100">₲ 0</span>
+                        </div>
+                        <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-2">
+                            <span class="text-gray-700 dark:text-gray-200 font-semibold">Total</span>
+                            <span id="totalBox" class="text-xl font-bold text-emerald-700 dark:text-emerald-400">₲ 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Condiciones comerciales</label>
+                <textarea name="condiciones" rows="4" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">{{ form_seed.condiciones or condiciones_default }}</textarea>
+            </div>
+        </section>
+
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+            <a href="{{ url_for('presupuestos_empresariales.listar') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-center font-medium">
+                Cancelar
+            </a>
+            <button type="submit" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md shadow-emerald-600/30 transition-colors">
+                <i class="fas fa-file-pdf"></i>Guardar y generar presupuesto
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const itemsBody = document.getElementById('itemsBody');
+        const agregarItemBtn = document.getElementById('agregarItem');
+        const descuentoInput = document.getElementById('descuento');
+        const clienteBusqueda = document.getElementById('cliente_busqueda');
+        const clienteResultados = document.getElementById('clienteResultados');
+        const clienteBadge = document.getElementById('clienteSeleccionadoBadge');
+        const clienteIdInput = document.getElementById('id_cliente');
+        const currencyFormatter = new Intl.NumberFormat('es-PY');
+        let searchTimeout = null;
+
+        function parseMoney(value) {
+            const raw = String(value || '').trim().replace(/₲|Gs\.?| /g, '');
+            if (!raw) return 0;
+            if (raw.includes(',') && raw.includes('.')) {
+                return parseFloat(raw.replace(/\./g, '').replace(',', '.')) || 0;
+            }
+            if ((raw.match(/\./g) || []).length > 1) {
+                return parseFloat(raw.replace(/\./g, '')) || 0;
+            }
+            return parseFloat(raw.replace(',', '.')) || 0;
+        }
+
+        function formatMoney(value) {
+            return `₲ ${currencyFormatter.format(Math.max(value || 0, 0))}`;
+        }
+
+        function updateTotals() {
+            let subtotal = 0;
+            document.querySelectorAll('.item-row').forEach((row) => {
+                const qty = parseMoney(row.querySelector('.item-cantidad')?.value);
+                const price = parseMoney(row.querySelector('.item-precio')?.value);
+                const total = qty * price;
+                subtotal += total;
+                row.querySelector('.item-total').textContent = formatMoney(total);
+            });
+
+            const descuento = parseMoney(descuentoInput?.value);
+            const total = Math.max(subtotal - descuento, 0);
+
+            document.getElementById('subtotalBox').textContent = formatMoney(subtotal);
+            document.getElementById('descuentoBox').textContent = formatMoney(descuento);
+            document.getElementById('totalBox').textContent = formatMoney(total);
+            document.getElementById('totalResumen').textContent = formatMoney(total);
+            document.getElementById('subtotalResumen').textContent = `Subtotal: ${formatMoney(subtotal)}`;
+            document.getElementById('descuentoResumen').textContent = `Descuento: ${formatMoney(descuento)}`;
+        }
+
+        function bindRow(row) {
+            row.querySelectorAll('input').forEach((input) => {
+                input.addEventListener('input', updateTotals);
+            });
+            row.querySelector('.eliminar-item')?.addEventListener('click', function () {
+                const rows = document.querySelectorAll('.item-row');
+                if (rows.length <= 1) {
+                    row.querySelectorAll('input').forEach((input) => {
+                        input.value = '';
+                    });
+                    updateTotals();
+                    return;
+                }
+                row.remove();
+                updateTotals();
+            });
+        }
+
+        function addEmptyRow() {
+            const row = document.createElement('tr');
+            row.className = 'item-row';
+            row.innerHTML = `
+                <td class="px-4 py-3">
+                    <input type="text" name="item_descripcion[]" placeholder="Ej.: Servicio o producto..." class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </td>
+                <td class="px-4 py-3">
+                    <input type="number" name="item_cantidad[]" min="0" step="0.01" class="item-cantidad w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="1">
+                </td>
+                <td class="px-4 py-3">
+                    <input type="text" name="item_precio_unitario[]" class="item-precio w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="0">
+                </td>
+                <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100 item-total">₲ 0</td>
+                <td class="px-4 py-3 text-right">
+                    <button type="button" class="eliminar-item inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 transition-colors">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            itemsBody.appendChild(row);
+            bindRow(row);
+            updateTotals();
+        }
+
+        function clearClientSelection() {
+            clienteIdInput.value = '';
+            clienteBadge.classList.add('hidden');
+            clienteBadge.textContent = '';
+        }
+
+        function setClientBadge(text) {
+            clienteBadge.textContent = text;
+            clienteBadge.classList.remove('hidden');
+        }
+
+        function applyClient(cliente) {
+            clienteIdInput.value = cliente.id_cliente || '';
+            clienteBusqueda.value = cliente.nombre || '';
+            document.getElementById('destinatario_nombre').value = cliente.nombre || '';
+            document.getElementById('destinatario_ruc').value = cliente.ruc_ci || '';
+            document.getElementById('destinatario_telefono').value = cliente.telefono || '';
+            document.getElementById('destinatario_email').value = cliente.email || '';
+            document.getElementById('destinatario_direccion').value = cliente.direccion || '';
+            setClientBadge(`Cliente vinculado: ${cliente.nombre}`);
+            clienteResultados.classList.add('hidden');
+            clienteResultados.innerHTML = '';
+        }
+
+        async function searchClients() {
+            const q = (clienteBusqueda.value || '').trim();
+            if (q.length < 2) {
+                clienteResultados.classList.add('hidden');
+                clienteResultados.innerHTML = '';
+                return;
+            }
+            try {
+                const resp = await fetch(`{{ url_for('clientes.buscar_json') }}?q=${encodeURIComponent(q)}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!resp.ok) {
+                    clienteResultados.classList.add('hidden');
+                    return;
+                }
+                const data = await resp.json();
+                const items = data.items || [];
+                if (!items.length) {
+                    clienteResultados.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">Sin resultados.</div>';
+                    clienteResultados.classList.remove('hidden');
+                    return;
+                }
+                clienteResultados.innerHTML = '';
+                items.forEach((cliente) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'cliente-opcion w-full text-left px-4 py-3 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-b border-gray-100 dark:border-gray-800';
+                    button.dataset.cliente = JSON.stringify(cliente);
+
+                    const title = document.createElement('div');
+                    title.className = 'font-medium text-gray-800 dark:text-gray-100';
+                    title.textContent = cliente.nombre || '';
+
+                    const meta = document.createElement('div');
+                    meta.className = 'text-xs text-gray-500 dark:text-gray-400';
+                    meta.textContent = `${cliente.ruc_ci || 'Sin RUC'}${cliente.telefono ? ' · ' + cliente.telefono : ''}`;
+
+                    button.appendChild(title);
+                    button.appendChild(meta);
+                    button.addEventListener('click', function () {
+                        applyClient(JSON.parse(this.dataset.cliente || '{}'));
+                    });
+                    clienteResultados.appendChild(button);
+                });
+                clienteResultados.classList.remove('hidden');
+            } catch (_error) {
+                clienteResultados.classList.add('hidden');
+            }
+        }
+
+        document.querySelectorAll('.item-row').forEach(bindRow);
+        agregarItemBtn?.addEventListener('click', addEmptyRow);
+        descuentoInput?.addEventListener('input', updateTotals);
+        clienteBusqueda?.addEventListener('input', function () {
+            clearClientSelection();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(searchClients, 220);
+        });
+        document.addEventListener('click', function (event) {
+            if (!clienteResultados.contains(event.target) && event.target !== clienteBusqueda) {
+                clienteResultados.classList.add('hidden');
+            }
+        });
+
+        if (clienteIdInput.value && clienteBusqueda.value) {
+            setClientBadge(`Cliente vinculado: ${clienteBusqueda.value}`);
+        }
+
+        updateTotals();
+    })();
+</script>
+{% endblock %}

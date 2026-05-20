@@ -1,0 +1,471 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iniciar Sesion - Sistema de Gestion Comercial</title>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+
+@keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes floatUp{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-22px) scale(1.04)}}
+@keyframes floatDown{0%,100%{transform:translateY(0) scale(1.04)}50%{transform:translateY(22px) scale(1)}}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideInLeft{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.55)}50%{box-shadow:0 0 0 14px rgba(99,102,241,0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes iconFloat1{0%,100%{transform:translateY(0) rotate(0deg)}33%{transform:translateY(-14px) rotate(5deg)}66%{transform:translateY(7px) rotate(-3deg)}}
+@keyframes iconFloat2{0%,100%{transform:translateY(0) rotate(0deg)}40%{transform:translateY(12px) rotate(-6deg)}70%{transform:translateY(-9px) rotate(4deg)}}
+@keyframes iconFloat3{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-16px) scale(1.1)}}
+@keyframes iconFloat4{0%,100%{transform:translateY(0) rotate(0deg)}45%{transform:translateY(9px) rotate(7deg)}80%{transform:translateY(-11px) rotate(-5deg)}}
+@keyframes titleGlow{0%,100%{text-shadow:0 0 20px rgba(165,180,252,.3)}50%{text-shadow:0 0 40px rgba(165,180,252,.65),0 0 80px rgba(99,102,241,.25)}}
+@keyframes featureIn{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+
+body{
+  background:linear-gradient(-45deg,#0f172a,#1e1b4b,#1a2f5e,#0f172a);
+  background-size:400% 400%;
+  animation:gradientShift 16s ease infinite;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:1rem;
+  overflow:hidden;
+  position:relative;
+}
+
+/* Orbes */
+.orb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0}
+.orb-1{width:520px;height:520px;background:radial-gradient(circle,rgba(99,102,241,.22) 0%,transparent 70%);top:-130px;left:-130px;animation:floatUp 10s ease-in-out infinite}
+.orb-2{width:420px;height:420px;background:radial-gradient(circle,rgba(139,92,246,.18) 0%,transparent 70%);bottom:-100px;right:-100px;animation:floatDown 12s ease-in-out infinite}
+.orb-3{width:280px;height:280px;background:radial-gradient(circle,rgba(59,130,246,.14) 0%,transparent 70%);top:45%;left:45%;animation:floatUp 15s ease-in-out infinite 3s}
+
+/* Topbar nombre */
+.topbar{
+  position:relative;z-index:10;
+  width:100%;max-width:900px;
+  text-align:center;
+  margin-bottom:1.25rem;
+  animation:fadeInUp .5s ease both;
+}
+.topbar-sub{font-size:.7rem;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:rgba(129,140,248,.7);margin-bottom:.35rem}
+.topbar-title{
+  font-size:1.6rem;font-weight:800;color:#fff;letter-spacing:-.02em;
+  animation:titleGlow 3s ease-in-out infinite;
+}
+.topbar-divider{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-top:.5rem}
+.topbar-divider span.line{height:1px;width:60px;background:linear-gradient(to right,transparent,rgba(99,102,241,.55))}
+.topbar-divider span.line.rev{background:linear-gradient(to left,transparent,rgba(99,102,241,.55))}
+.topbar-divider span.dot{color:rgba(99,102,241,.5);font-size:.5rem}
+
+/* Contenedor principal */
+.main-card{
+  position:relative;z-index:10;
+  width:100%;max-width:900px;
+  display:flex;
+  border-radius:1.5rem;
+  overflow:hidden;
+  box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06);
+  min-height:520px;
+}
+
+/* Panel izquierdo */
+.brand-panel{
+  width:42%;
+  padding:2.5rem;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  position:relative;
+  overflow:hidden;
+  background:linear-gradient(150deg,rgba(79,70,229,.42) 0%,rgba(109,40,217,.28) 60%,rgba(30,27,75,.5) 100%);
+  border-right:1px solid rgba(255,255,255,.09);
+  animation:slideInLeft .7s cubic-bezier(.22,1,.36,1) both;
+}
+.brand-dots{
+  position:absolute;inset:0;opacity:.07;
+  background-image:radial-gradient(circle,rgba(255,255,255,.9) 1px,transparent 1px);
+  background-size:26px 26px;
+}
+
+/* Iconos flotantes */
+.fi{
+  position:absolute;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:14px;
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.15);
+  color:#fff;
+}
+.fi-1{width:50px;height:50px;background:rgba(99,102,241,.38);top:17%;right:10%;font-size:1.2rem;animation:iconFloat1 6s ease-in-out infinite}
+.fi-2{width:42px;height:42px;background:rgba(16,185,129,.32);top:36%;right:22%;font-size:1rem;animation:iconFloat2 7.5s ease-in-out infinite 1s}
+.fi-3{width:46px;height:46px;background:rgba(245,158,11,.32);bottom:30%;right:7%;font-size:1.1rem;animation:iconFloat3 8s ease-in-out infinite .5s}
+.fi-4{width:38px;height:38px;background:rgba(236,72,153,.3);bottom:17%;right:27%;font-size:.9rem;animation:iconFloat4 6.5s ease-in-out infinite 2s}
+.fi-5{width:34px;height:34px;background:rgba(59,130,246,.34);top:54%;right:4%;font-size:.85rem;animation:iconFloat1 9s ease-in-out infinite 1.5s}
+
+/* Logo */
+.logo-wrap{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:60px;height:60px;border-radius:16px;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  margin-bottom:1.25rem;
+  animation:pulseGlow 2.6s ease-out infinite;
+  font-size:1.5rem;color:#fff;
+}
+.brand-title{color:#fff;font-size:1.15rem;font-weight:700;line-height:1.35;margin-bottom:.6rem}
+.brand-desc{color:rgba(199,210,254,.75);font-size:.8rem;line-height:1.55}
+
+/* Features */
+.features{list-style:none;margin:1.5rem 0}
+.feature-item{
+  display:flex;align-items:center;gap:.75rem;
+  margin-bottom:.85rem;
+  opacity:0;
+  animation:featureIn .5s ease both;
+}
+.feature-item:nth-child(1){animation-delay:.45s}
+.feature-item:nth-child(2){animation-delay:.6s}
+.feature-item:nth-child(3){animation-delay:.75s}
+.feature-item:nth-child(4){animation-delay:.9s}
+.feature-item:nth-child(5){animation-delay:1.05s}
+.fi-badge{
+  flex-shrink:0;width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.8rem;
+}
+.feature-text p{color:#fff;font-size:.75rem;font-weight:600;line-height:1.2}
+.feature-text small{color:rgba(165,180,252,.65);font-size:.7rem}
+
+.brand-footer{color:rgba(129,140,248,.45);font-size:.7rem}
+
+/* Panel derecho */
+.form-panel{
+  flex:1;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:2.5rem 3rem;
+  background:rgba(255,255,255,.055);
+  backdrop-filter:blur(28px);
+  -webkit-backdrop-filter:blur(28px);
+  border:1px solid rgba(255,255,255,.11);
+  animation:fadeInUp .65s cubic-bezier(.22,1,.36,1) .15s both;
+}
+
+.form-title{color:#fff;font-size:1.5rem;font-weight:700;margin-bottom:.3rem}
+.form-subtitle{color:rgba(148,163,184,.8);font-size:.82rem;margin-bottom:1.75rem}
+
+/* Demo banner */
+.demo-banner{
+  display:none;
+  margin-bottom:1.25rem;
+  padding:.85rem 1rem;
+  border-radius:.75rem;
+  border:1px solid rgba(251,191,36,.3);
+  background:rgba(245,158,11,.12);
+}
+.demo-banner p{color:rgba(254,243,199,.9);font-size:.8rem;font-weight:600;margin-bottom:.25rem}
+.demo-banner small{color:rgba(253,230,138,.7);font-size:.72rem;display:block;margin-bottom:.6rem}
+.demo-banner a{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.35rem .75rem;border-radius:.5rem;
+  background:#25d366;color:#fff;font-size:.72rem;font-weight:600;
+  text-decoration:none;transition:filter .2s;
+}
+.demo-banner a:hover{filter:brightness(1.1)}
+
+/* Flash messages */
+.flash-list{margin-bottom:1rem}
+.flash-msg{
+  display:flex;align-items:flex-start;gap:.6rem;
+  padding:.65rem .9rem;border-radius:.65rem;
+  font-size:.8rem;margin-bottom:.4rem;
+}
+.flash-msg.success{background:rgba(16,185,129,.12);color:rgba(167,243,208,.9);border:1px solid rgba(16,185,129,.3)}
+.flash-msg.danger{background:rgba(239,68,68,.12);color:rgba(252,165,165,.9);border:1px solid rgba(239,68,68,.3)}
+.flash-msg.warning{background:rgba(245,158,11,.12);color:rgba(253,230,138,.9);border:1px solid rgba(245,158,11,.3)}
+.flash-msg i{margin-top:1px;flex-shrink:0}
+
+/* Formulario */
+.field{margin-bottom:1.1rem}
+.field label{
+  display:block;font-size:.68rem;font-weight:600;
+  color:rgba(203,213,225,.8);text-transform:uppercase;letter-spacing:.12em;
+  margin-bottom:.45rem;
+}
+.input-wrap{position:relative}
+.input-icon{
+  position:absolute;top:50%;left:.9rem;
+  transform:translateY(-50%);
+  color:rgba(148,163,184,.6);
+  font-size:.82rem;width:1rem;text-align:center;
+  pointer-events:none;transition:color .2s;
+}
+.login-input{
+  width:100%;
+  padding:.75rem 1rem .75rem 2.6rem;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:.75rem;
+  color:#f1f5f9;font-size:.875rem;
+  outline:none;transition:border-color .2s,background .2s,box-shadow .2s;
+}
+.login-input::placeholder{color:rgba(148,163,184,.45)}
+.login-input:focus{
+  border-color:rgba(99,102,241,.65);
+  background:rgba(255,255,255,.1);
+  box-shadow:0 0 0 3px rgba(99,102,241,.16);
+}
+.input-wrap:focus-within .input-icon{color:#a5b4fc}
+.login-input.has-toggle{padding-right:2.8rem}
+.toggle-btn{
+  position:absolute;top:50%;right:.75rem;
+  transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;
+  color:rgba(148,163,184,.6);font-size:.82rem;
+  padding:.25rem;border-radius:6px;
+  transition:color .2s;line-height:1;
+}
+.toggle-btn:hover{color:#e2e8f0}
+.toggle-btn:focus-visible{outline:2px solid rgba(99,102,241,.7);outline-offset:2px}
+
+/* Checkbox */
+.check-row{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;cursor:pointer}
+.check-row input{accent-color:#6366f1;width:15px;height:15px;cursor:pointer}
+.check-row span{color:rgba(203,213,225,.8);font-size:.82rem}
+
+/* Botón */
+.btn-login{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:.5rem;
+  padding:.9rem 1rem;border-radius:.75rem;
+  background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);
+  color:#fff;font-size:.875rem;font-weight:600;
+  border:none;cursor:pointer;
+  box-shadow:0 4px 22px rgba(99,102,241,.38);
+  transition:filter .2s,transform .15s,box-shadow .2s;
+}
+.btn-login:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 7px 30px rgba(99,102,241,.52)}
+.btn-login:active:not(:disabled){transform:translateY(0)}
+.btn-login:disabled{opacity:.65;cursor:not-allowed}
+.btn-spinner{
+  display:none;width:17px;height:17px;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+.btn-login.loading .btn-spinner{display:inline-block}
+.btn-login.loading .btn-text{display:none}
+
+.form-footer{text-align:center;color:rgba(100,116,139,.7);font-size:.72rem;margin-top:1.5rem}
+
+/* Responsive */
+@media(max-width:700px){
+  .brand-panel{display:none}
+  .main-card{max-width:440px}
+  .form-panel{padding:2rem 1.75rem}
+  .topbar-title{font-size:1.2rem}
+  .fi-1,.fi-2,.fi-3,.fi-4,.fi-5,.orb-1,.orb-2,.orb-3{display:none}
+}
+</style>
+</head>
+
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Nombre del sistema arriba -->
+  <div class="topbar">
+    {% if app_brand_logo_path %}
+    <div style="margin-bottom:.5rem;">
+      <img src="{{ static_url(app_brand_logo_path) }}" alt="Logo empresa"
+           style="height:48px;width:auto;max-width:180px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35));">
+    </div>
+    {% endif %}
+    <p class="topbar-sub">Bienvenido a</p>
+    <h1 class="topbar-title">Sistema de Gesti&#243;n Comercial Integral</h1>
+    <div class="topbar-divider">
+      <span class="line"></span>
+      <span class="dot">&#9679;</span>
+      <span class="line rev"></span>
+    </div>
+  </div>
+
+  <!-- Tarjeta principal -->
+  <div class="main-card">
+
+    <!-- Panel izquierdo: branding + iconos animados -->
+    <div class="brand-panel">
+      <div class="brand-dots"></div>
+
+      <!-- Iconos flotantes decorativos -->
+      <div class="fi fi-1"><i class="fas fa-cash-register"></i></div>
+      <div class="fi fi-2"><i class="fas fa-boxes"></i></div>
+      <div class="fi fi-3"><i class="fas fa-users-gear"></i></div>
+      <div class="fi fi-4"><i class="fas fa-chart-pie"></i></div>
+      <div class="fi fi-5"><i class="fas fa-robot"></i></div>
+
+      <!-- Logo y descripcion -->
+      <div style="position:relative;z-index:1">
+        <div class="logo-wrap">
+          {% if app_brand_logo_path %}
+          <img src="{{ static_url(app_brand_logo_path) }}" alt="Logo empresa"
+               style="width:100%;height:100%;object-fit:contain;padding:4px;border-radius:12px;">
+          {% else %}
+          <i class="fas fa-store"></i>
+          {% endif %}
+        </div>
+        <h2 class="brand-title">Todo tu negocio,<br>en un solo lugar</h2>
+        <p class="brand-desc">Gestion&#225; ventas, stock, clientes y empleados desde un panel unificado e inteligente.</p>
+      </div>
+
+      <!-- Features -->
+      <ul class="features" style="position:relative;z-index:1">
+        <li class="feature-item">
+          <span class="fi-badge" style="background:rgba(99,102,241,.35)"><i class="fas fa-cash-register" style="color:#c7d2fe"></i></span>
+          <div class="feature-text"><p>Punto de Venta</p><small>Ventas r&#225;pidas con caja integrada</small></div>
+        </li>
+        <li class="feature-item">
+          <span class="fi-badge" style="background:rgba(16,185,129,.3)"><i class="fas fa-boxes" style="color:#6ee7b7"></i></span>
+          <div class="feature-text"><p>Inventario</p><small>Stock en tiempo real con alertas</small></div>
+        </li>
+        <li class="feature-item">
+          <span class="fi-badge" style="background:rgba(245,158,11,.28)"><i class="fas fa-users-gear" style="color:#fcd34d"></i></span>
+          <div class="feature-text"><p>Control de Empleados</p><small>Asistencia, turnos y rendimiento</small></div>
+        </li>
+        <li class="feature-item">
+          <span class="fi-badge" style="background:rgba(236,72,153,.28)"><i class="fas fa-chart-line" style="color:#f9a8d4"></i></span>
+          <div class="feature-text"><p>Reportes y An&#225;lisis</p><small>Estad&#237;sticas y gr&#225;ficos al instante</small></div>
+        </li>
+        <li class="feature-item">
+          <span class="fi-badge" style="background:rgba(59,130,246,.3)"><i class="fas fa-robot" style="color:#93c5fd"></i></span>
+          <div class="feature-text"><p>Asistente IA</p><small>Insights inteligentes de tu negocio</small></div>
+        </li>
+      </ul>
+
+      <div class="brand-footer" style="position:relative;z-index:1">
+        &copy; {{ now().year }} {% if app_brand_name %}{{ app_brand_name }}{% else %}Sistema de Gesti&#243;n Comercial{% endif %}
+      </div>
+    </div>
+
+    <!-- Panel derecho: formulario -->
+    <div class="form-panel">
+
+      <h3 class="form-title">Iniciar sesi&#243;n</h3>
+      <p class="form-subtitle">Ingres&#225; tus credenciales para acceder al panel</p>
+
+      <!-- Banner demo -->
+      <div id="demo-contact-message" class="demo-banner">
+        <p><i class="fas fa-star" style="color:#fbbf24;margin-right:.3rem"></i>&#191;Te interesa este sistema?</p>
+        <small>Contact&#225; a Esteban Lezcano &middot; 0961862624</small>
+        <a href="https://wa.me/595961862624?text=Hola%20Esteban%2C%20me%20interesa%20este%20sistema." target="_blank" rel="noopener noreferrer">
+          <i class="fab fa-whatsapp"></i> Escribir por WhatsApp
+        </a>
+      </div>
+
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flash-list">
+        {% for category, message in messages %}
+        <div class="flash-msg {{ category }}">
+          <i class="{% if category == 'success' %}fas fa-check-circle{% elif category == 'danger' %}fas fa-exclamation-circle{% else %}fas fa-exclamation-triangle{% endif %}"></i>
+          <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- Formulario -->
+      <form method="POST" action="{{ url_for('auth.login') }}" id="login-form" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="field">
+          <label for="username">Usuario</label>
+          <div class="input-wrap">
+            <span class="input-icon"><i class="fas fa-user"></i></span>
+            <input type="text" name="username" id="username" required autocomplete="username"
+                   class="login-input" placeholder="Tu nombre de usuario">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password">Contrase&#241;a</label>
+          <div class="input-wrap">
+            <span class="input-icon"><i class="fas fa-lock"></i></span>
+            <input type="password" name="password" id="password" required autocomplete="current-password"
+                   class="login-input has-toggle" placeholder="Tu contrase&#241;a">
+            <button type="button" id="toggle-password" class="toggle-btn" aria-label="Mostrar contrase&#241;a">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <label class="check-row">
+          <input type="checkbox" name="remember" id="remember">
+          <span>Recordarme en este dispositivo</span>
+        </label>
+
+        <button type="submit" id="btn-submit" class="btn-login">
+          <span class="btn-spinner"></span>
+          <span class="btn-text"><i class="fas fa-right-to-bracket" style="margin-right:.4rem"></i>Ingresar al sistema</span>
+        </button>
+      </form>
+
+      <p class="form-footer">&copy; {{ now().year }} {% if app_brand_name %}{{ app_brand_name }}{% else %}Sistema de Gesti&#243;n Comercial{% endif %}</p>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var usernameInput = document.getElementById('username');
+      var passwordInput = document.getElementById('password');
+      var toggleBtn     = document.getElementById('toggle-password');
+      var demoMsg       = document.getElementById('demo-contact-message');
+      var form          = document.getElementById('login-form');
+      var btnSubmit     = document.getElementById('btn-submit');
+      var toggleIcon    = toggleBtn ? toggleBtn.querySelector('i') : null;
+
+      var pwVisible = false;
+      function setPwVisible(v) {
+        if (!passwordInput || !toggleIcon) return;
+        pwVisible = v;
+        passwordInput.type = v ? 'text' : 'password';
+        toggleIcon.className = v ? 'fas fa-eye-slash' : 'fas fa-eye';
+        toggleBtn.setAttribute('aria-label', v ? 'Ocultar contrasena' : 'Mostrar contrasena');
+      }
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+          setPwVisible(!pwVisible);
+          try { passwordInput.focus({preventScroll:true}); } catch(e) { passwordInput.focus(); }
+        });
+      }
+
+      function syncDemo() {
+        if (!usernameInput || !demoMsg) return;
+        var isDemo = (usernameInput.value || '').trim().toLowerCase() === 'demo';
+        demoMsg.style.display = isDemo ? 'block' : 'none';
+      }
+      if (usernameInput) {
+        usernameInput.addEventListener('input', syncDemo);
+        syncDemo();
+      }
+
+      if (form && btnSubmit) {
+        form.addEventListener('submit', function() {
+          btnSubmit.classList.add('loading');
+          btnSubmit.disabled = true;
+          setTimeout(function() {
+            btnSubmit.classList.remove('loading');
+            btnSubmit.disabled = false;
+          }, 8000);
+        });
+      }
+
+      if (usernameInput) usernameInput.focus();
+    });
+  </script>
+</body>
+</html>

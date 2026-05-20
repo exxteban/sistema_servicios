@@ -1,0 +1,372 @@
+<script>
+function crmAsesor() {
+    return {
+        online: false,
+        tab: 'pendientes',
+        pendientes: [],
+        misConversaciones: [],
+        historialesWeb: [],
+        historialTotal: 0,
+        historialPage: 1,
+        historialPages: 1,
+        historialPerPage: 20,
+        historialBusqueda: '',
+        historialEstado: 'activas',
+        historialPeriodo: '30',
+        historialResumen: '',
+        historialCargando: false,
+        historialSearchTimer: null,
+        convActiva: null,
+        mensajes: [],
+        notas: [],
+        cargandoMensajes: false,
+        timelineCursor: '',
+        timelineHasMore: false,
+        timelineLoadingMore: false,
+        timelineBatchSize: 80,
+        textMensaje: '',
+        textNota: '',
+        enviando: false,
+        mostrandoNota: false,
+        mostrandoPlantillas: false,
+        plantillas: {{ plantillas | tojson }},
+        puedeOperar: {{ puede_operar_panel | tojson }},
+        panelModo: 'asesor',
+        pollInterval: null,
+
+        async fetchJson(url, options = {}) {
+            const response = await fetch(url, options);
+            return response.json().catch(() => ({}));
+        },
+
+        async cargarConversaciones() {
+            try {
+                const data = await this.fetchJson('/crm/api/asesor/conversaciones');
+                this.pendientes = data.pendientes || [];
+                this.misConversaciones = data.mis_conversaciones || [];
+                this.panelModo = data.panel_mode || this.panelModo;
+                this.historialTotal = data.historiales_total || 0;
+                if (data.estado_asesor && typeof data.estado_asesor.online !== 'undefined') {
+                    this.online = !!data.estado_asesor.online;
+                }
+                if (this.panelModo !== 'control') {
+                    this.historialesWeb = [];
+                    this.historialTotal = 0;
+                    if (this.tab === 'historiales') {
+                        this.tab = this.pendientes.length ? 'pendientes' : 'mias';
+                    }
+                } else if (this.tab === 'historiales') {
+                    await this.cargarHistorialesWeb();
+                }
+                this.actualizarHistorialResumen();
+                this.normalizarTabActiva();
+                if (this.panelModo === 'control' && this.tab === 'historiales' && this.historialTotal > 0 && this.historialesWeb.length === 0) {
+                    await this.cargarHistorialesWeb();
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        },
+
+        normalizarTabActiva() {
+            const tabActual = this.getTabItems();
+            if (tabActual.length) return;
+            if (this.tab === 'historiales' && this.panelModo !== 'control') {
+                this.tab = 'pendientes';
+                return;
+            }
+            if (this.pendientes.length) this.tab = 'pendientes';
+            else if (this.misConversaciones.length) this.tab = 'mias';
+            else if (this.panelModo === 'control' && this.historialTotal > 0) this.tab = 'historiales';
+        },
+
+        getTabItems() {
+            if (this.tab === 'mias') return this.misConversaciones;
+            if (this.tab === 'historiales') return this.historialesWeb;
+            return this.pendientes;
+        },
+
+        get historialCount() {
+            if (this.tab === 'historiales') return this.historialTotal;
+            return this.historialTotal;
+        },
+
+        setTab(nextTab) {
+            this.tab = nextTab;
+            if (nextTab === 'historiales' && this.panelModo === 'control') {
+                this.cargarHistorialesWeb();
+            }
+        },
+
+        programarBusquedaHistoriales() {
+            if (this.historialSearchTimer) clearTimeout(this.historialSearchTimer);
+            this.historialSearchTimer = setTimeout(() => {
+                this.cargarHistorialesWeb({ resetPage: true });
+            }, 250);
+        },
+
+        async cargarHistorialesWeb({ resetPage = false } = {}) {
+            if (this.panelModo !== 'control') return;
+            if (resetPage) this.historialPage = 1;
+            this.historialCargando = true;
+            try {
+                const params = new URLSearchParams({
+                    page: String(this.historialPage || 1),
+                    per_page: String(this.historialPerPage),
+                    q: this.historialBusqueda || '',
+                    estado: this.historialEstado,
+                    periodo: this.historialPeriodo,
+                });
+                const data = await this.fetchJson(`/crm/api/asesor/historiales-web?${params.toString()}`);
+                this.historialesWeb = data.items || [];
+                this.historialTotal = data.total || 0;
+                this.historialPage = data.page || 1;
+                this.historialPages = data.pages || 1;
+                this.historialPerPage = data.per_page || this.historialPerPage;
+                this.actualizarHistorialResumen();
+            } catch (error) {
+                console.error(error);
+            } finally {
+                this.historialCargando = false;
+            }
+        },
+
+        irPaginaHistorial(page) {
+            if (page < 1 || page > this.historialPages || page === this.historialPage) return;
+            this.historialPage = page;
+            this.cargarHistorialesWeb();
+        },
+
+        actualizarHistorialResumen() {
+            const total = this.historialTotal || 0;
+            const chunks = [`${total} resultado${total === 1 ? '' : 's'}`];
+            if (this.historialEstado === 'cerradas') chunks.push('solo cerradas');
+            if (this.historialEstado === 'todas') chunks.push('activas y cerradas');
+            if (this.historialPeriodo !== '30') {
+                chunks.push(this.historialPeriodo === 'all' ? 'sin límite de fecha' : `últimos ${this.historialPeriodo} días`);
+            }
+            if ((this.historialBusqueda || '').trim()) {
+                chunks.push(`filtro: "${this.historialBusqueda.trim()}"`);
+            }
+            this.historialResumen = chunks.join(' · ');
+        },
+
+        async seleccionar(conv) {
+            this.convActiva = conv;
+            this.mensajes = [];
+            this.notas = [];
+            this.timelineCursor = '';
+            this.timelineHasMore = false;
+            await this.cargarTimelineInicial();
+        },
+
+        async cargarTimelineInicial() {
+            if (!this.convActiva) return;
+            this.cargandoMensajes = true;
+            try {
+                const params = new URLSearchParams({ limit: String(this.timelineBatchSize) });
+                const data = await this.fetchJson(`/crm/api/asesor/conversacion/${this.convActiva.id}/mensajes?${params.toString()}`);
+                this.mensajes = this.normalizarTimelineItems(data.items || []);
+                this.notas = data.notas || [];
+                this.timelineCursor = data.next_cursor || '';
+                this.timelineHasMore = !!data.has_more;
+                this.$nextTick(() => this.scrollAbajo());
+            } catch (error) {
+                console.error(error);
+            } finally {
+                this.cargandoMensajes = false;
+            }
+        },
+
+        async cargarMensajesAnteriores() {
+            if (!this.convActiva || !this.timelineHasMore || !this.timelineCursor || this.timelineLoadingMore) return;
+            this.timelineLoadingMore = true;
+            const chat = this.$refs.chatMessages;
+            const previousHeight = chat ? chat.scrollHeight : 0;
+            try {
+                const params = new URLSearchParams({
+                    limit: String(this.timelineBatchSize),
+                    cursor: this.timelineCursor,
+                });
+                const data = await this.fetchJson(`/crm/api/asesor/conversacion/${this.convActiva.id}/mensajes?${params.toString()}`);
+                const older = this.normalizarTimelineItems(data.items || []);
+                this.mensajes = [...older, ...this.mensajes];
+                this.notas = data.notas || this.notas;
+                this.timelineCursor = data.next_cursor || '';
+                this.timelineHasMore = !!data.has_more;
+                this.$nextTick(() => {
+                    if (!chat) return;
+                    chat.scrollTop = chat.scrollHeight - previousHeight;
+                });
+            } catch (error) {
+                console.error(error);
+            } finally {
+                this.timelineLoadingMore = false;
+            }
+        },
+
+        normalizarTimelineItems(items) {
+            return (items || []).map(item => {
+                if (!item.es_evento) return item;
+                const detalle = this.parseJson(item.detalle);
+                return {
+                    ...item,
+                    detalle,
+                    contenido: this.describeEvento({
+                        tipo: item.contenido,
+                        detalle,
+                        usuario: item.autor || item.usuario || '',
+                    }),
+                };
+            });
+        },
+
+        parseJson(raw) {
+            if (!raw || typeof raw !== 'string') return raw || {};
+            try {
+                return JSON.parse(raw);
+            } catch (_error) {
+                return {};
+            }
+        },
+
+        async tomar() {
+            if (!this.convActiva) return;
+            const data = await this.fetchJson(`/crm/api/asesor/tomar/${this.convActiva.id}`, { method: 'POST' });
+            if (data.ok) {
+                await this.cargarConversaciones();
+                await this.cargarTimelineInicial();
+            }
+        },
+
+        async devolver() {
+            if (!this.convActiva) return;
+            if (!confirm('¿Devolver esta conversación a la cola?')) return;
+            await fetch(`/crm/api/asesor/devolver/${this.convActiva.id}`, { method: 'POST' });
+            this.convActiva = null;
+            this.mensajes = [];
+            this.notas = [];
+            await this.cargarConversaciones();
+        },
+
+        async cerrar() {
+            if (!this.convActiva) return;
+            if (!confirm('¿Cerrar esta conversación?')) return;
+            await fetch(`/crm/api/asesor/cerrar/${this.convActiva.id}`, { method: 'POST' });
+            this.convActiva = null;
+            this.mensajes = [];
+            this.notas = [];
+            await this.cargarConversaciones();
+        },
+
+        async enviar() {
+            if (!this.textMensaje.trim() || !this.convActiva || this.enviando) return;
+            this.enviando = true;
+            try {
+                const response = await fetch(`/crm/api/asesor/responder/${this.convActiva.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensaje: this.textMensaje }),
+                });
+                if (response.ok) {
+                    this.textMensaje = '';
+                    await this.cargarTimelineInicial();
+                    await this.cargarConversaciones();
+                }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                this.enviando = false;
+            }
+        },
+
+        async enviarNota() {
+            if (!this.textNota.trim() || !this.convActiva) return;
+            try {
+                await fetch(`/crm/api/asesor/conversacion/${this.convActiva.id}/notas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contenido: this.textNota }),
+                });
+                this.textNota = '';
+                this.mostrandoNota = false;
+                await this.cargarTimelineInicial();
+            } catch (error) {
+                console.error(error);
+            }
+        },
+
+        usarPlantilla(p) {
+            this.textMensaje = p.contenido;
+            this.mostrandoPlantillas = false;
+        },
+
+        async toggleOnline() {
+            if (!this.puedeOperar) return;
+            const next = !this.online;
+            try {
+                const data = await this.fetchJson('/crm/api/asesor/online', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ online: next }),
+                });
+                if (typeof data.online !== 'undefined') this.online = !!data.online;
+                else this.online = next;
+            } catch (_error) {
+                this.online = !next;
+            }
+        },
+
+        scrollAbajo() {
+            const el = this.$refs.chatMessages;
+            if (el) el.scrollTop = el.scrollHeight;
+        },
+
+        parseServerDate(isoStr) {
+            if (!isoStr) return null;
+            const s = String(isoStr).trim();
+            if (!s) return null;
+            const hasTz = /[zZ]$/.test(s) || /[+-]\d\d:\d\d$/.test(s);
+            const d = new Date(hasTz ? s : `${s}Z`);
+            return isNaN(d.getTime()) ? null : d;
+        },
+
+        formatHora(iso) {
+            if (!iso) return '';
+            const d = this.parseServerDate(iso);
+            if (!d) return '';
+            return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        },
+
+        describeEvento(evento) {
+            const d = evento?.detalle || {};
+            switch (evento?.tipo) {
+                case 'asignacion_creada': return `Asignada a asesor #${d.id_asesor || '-'} para atención.`;
+                case 'asignacion_actualizada': return `Reasignada a asesor #${d.id_asesor || '-'}${d.id_asesor_anterior ? ` desde #${d.id_asesor_anterior}` : ''}.`;
+                case 'asesor_tomo_conversacion': return `${evento.usuario || 'Un asesor'} tomó la conversación.`;
+                case 'asesor_acepto_conversacion': return `${evento.usuario || 'Un asesor'} aceptó la conversación.`;
+                case 'asesor_devolvio_conversacion': return `${evento.usuario || 'Un asesor'} devolvió la conversación a la cola.`;
+                case 'asesor_cerro_conversacion': return `${evento.usuario || 'Un asesor'} cerró la conversación.`;
+                case 'asignacion_transferida': return `${evento.usuario || 'Un asesor'} transfirió la conversación a asesor #${d.id_asesor_destino || '-'}.`;
+                case 'timeout_asignacion': return `Timeout de asignación: ${d.motivo || 'sin detalle'} (${d.accion || 'cola_general'}).`;
+                case 'asesor_offline': return `La conversación volvió a cola porque el asesor #${d.id_asesor || '-'} quedó offline.`;
+                case 'cola_asesores': return 'La conversación quedó en cola para asesores.';
+                case 'handoff_web_creado': return 'Se creó un handoff desde el bot web.';
+                case 'handoff_web_consumido': return 'Se vinculó una conversación de WhatsApp con un handoff del bot web.';
+                default: return evento?.tipo || 'Evento';
+            }
+        },
+
+        async init() {
+            await this.cargarConversaciones();
+            this.pollInterval = setInterval(async () => {
+                await this.cargarConversaciones();
+                if (this.convActiva) await this.cargarTimelineInicial();
+                if (this.puedeOperar) {
+                    fetch('/crm/api/asesor/heartbeat', { method: 'POST' });
+                }
+            }, 15000);
+        }
+    };
+}
+</script>

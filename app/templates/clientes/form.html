@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}{% if cliente %}Editar{% else %}Nuevo{% endif %} Cliente{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-6">
+            <i class="fas fa-user text-blue-600 dark:text-blue-400 mr-2"></i>
+            {% if cliente %}Editar Cliente{% else %}Nuevo Cliente{% endif %}
+        </h1>
+
+        <form method="POST"
+            action="{{ url_for('clientes.editar', id=cliente.id_cliente) if cliente else url_for('clientes.nuevo') }}"
+            class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nombre *</label>
+                    <input type="text" name="nombre" required value="{{ cliente.nombre if cliente else (prefill_nombre|default('')) }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">RUC/CI</label>
+                    <input type="text" name="ruc_ci" value="{{ cliente.ruc_ci if cliente else '' }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Teléfono</label>
+                    <input type="text" name="telefono" value="{{ cliente.telefono if cliente else (prefill_telefono|default('')) }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Email</label>
+                    <input type="email" name="email" value="{{ cliente.email if cliente else '' }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Tipo</label>
+                    <select name="tipo"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                        <option value="minorista" {% if not cliente or cliente.tipo=='minorista' %}selected{% endif %}>
+                            Minorista</option>
+                        <option value="mayorista" {% if cliente and cliente.tipo=='mayorista' %}selected{% endif %}>
+                            Mayorista</option>
+                        <option value="empresa" {% if cliente and cliente.tipo=='empresa' %}selected{% endif %}>Empresa
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nivel del Cliente</label>
+                    <select name="nivel_estrellas"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                        {% set estrellas_actual = cliente.nivel_estrellas_seguro if cliente else 3 %}
+                        <option value="1" {% if estrellas_actual == 1 %}selected{% endif %}>★☆☆☆☆ (1)</option>
+                        <option value="2" {% if estrellas_actual == 2 %}selected{% endif %}>★★☆☆☆ (2)</option>
+                        <option value="3" {% if estrellas_actual == 3 %}selected{% endif %}>★★★☆☆ (3)</option>
+                        <option value="4" {% if estrellas_actual == 4 %}selected{% endif %}>★★★★☆ (4)</option>
+                        <option value="5" {% if estrellas_actual == 5 %}selected{% endif %}>★★★★★ (5)</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Dirección</label>
+                    <input type="text" name="direccion" value="{{ cliente.direccion if cliente else '' }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Límite de
+                        Crédito</label>
+                    <input type="number" name="limite_credito" value="{{ cliente.limite_credito if cliente else 0 }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nota general</label>
+                    <textarea name="observacion" rows="3"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">{{ cliente.notas if cliente else '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-4 pt-4">
+                <a href="{{ url_for('clientes.listar') }}"
+                    class="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">Cancelar</a>
+                <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                    <i class="fas fa-save mr-2"></i>Guardar
+                </button>
+            </div>
+        </form>
+
+        {% if cliente %}
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Observaciones con fecha</h2>
+            <form method="POST" action="{{ url_for('clientes.agregar_observacion', id=cliente.id_cliente) }}" class="space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+                <textarea name="observacion" rows="3" required
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                    placeholder="Registrar observación del cliente..."></textarea>
+                <div class="flex justify-end">
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm">
+                        Agregar observación
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                {% for obs in observaciones %}
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ obs.fecha_observacion|local_strftime('%d/%m/%Y %H:%M') }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ (obs.usuario.nombre_completo or obs.usuario.username) if obs.usuario else 'Usuario no disponible' }}</p>
+                    </div>
+                    <p class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line">{{ obs.observacion }}</p>
+                </div>
+                {% else %}
+                <div class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                    Sin observaciones cargadas aún.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

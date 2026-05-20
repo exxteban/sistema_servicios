@@ -1,0 +1,267 @@
+<div x-show="inteligenciaTab === 'comercial'" {% if vista_activa != 'comercial' %}style="display: none;"{% endif %} class="app-tab-panel space-y-4 2xl:space-y-5">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="xl:col-span-2 rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5">
+            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <p class="text-[11px] uppercase tracking-wider text-cyan-600 dark:text-cyan-400 font-semibold">Campañas</p>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Campañas sugeridas</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Lectura del período {{ panel.campanas.periodo_label }} para convertir señales en ejecución comercial.</p>
+                </div>
+                <div class="rounded-xl bg-cyan-50 dark:bg-cyan-900/20 px-3 py-2">
+                    <p class="text-xs text-cyan-700 dark:text-cyan-300">Activables ahora</p>
+                    <p class="text-xl font-bold text-cyan-900 dark:text-cyan-100">{{ panel.campanas.resumen.campanas_activables }}</p>
+                </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 2xl:grid-cols-3 gap-3">
+                {% for campana in panel.campanas.campanas %}
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ campana.titulo }}</p>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ campana.segmento }} · {{ campana.cantidad_objetivo_label }} · {{ campana.canal }}</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {% if campana.prioridad == 'alta' %}bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300{% elif campana.prioridad == 'media' %}bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                            {{ campana.prioridad|title }}
+                        </span>
+                    </div>
+                    <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">{{ campana.detalle }}</p>
+                    {% if campana.muestra %}
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Muestra: {{ campana.muestra }}</p>
+                    {% endif %}
+                    <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ campana.accion }}</p>
+                    <div class="mt-3 rounded-lg bg-gray-50 dark:bg-gray-900/40 p-3">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ campana.plantilla_titulo }}</p>
+                        <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">{{ campana.plantilla_preview }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5 space-y-3">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider text-cyan-600 dark:text-cyan-400 font-semibold">Automatizaciones</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Disparadores sugeridos</h2>
+            </div>
+            {% for automatizacion in panel.campanas.automatizaciones %}
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                <div class="flex items-start justify-between gap-3">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">{{ automatizacion.titulo }}</p>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {% if automatizacion.prioridad == 'alta' %}bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300{% elif automatizacion.prioridad == 'media' %}bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                        {{ automatizacion.prioridad|title }}
+                    </span>
+                </div>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ automatizacion.detalle }}</p>
+                <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ automatizacion.accion }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="xl:col-span-2 rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5">
+            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <p class="text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">Ventas</p>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Categorías que sostienen ingresos</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Lectura del período {{ panel.ventas.periodo_label }}.</p>
+                </div>
+                <div class="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
+                    <p class="text-xs text-emerald-700 dark:text-emerald-300">{{ panel.ventas.cantidad_ventas.titulo }}</p>
+                    <p class="text-xl font-bold text-emerald-900 dark:text-emerald-100">{{ panel.ventas.cantidad_ventas.actual_label }}</p>
+                    <p class="text-xs {% if panel.ventas.cantidad_ventas.direccion == 'up' %}text-emerald-700 dark:text-emerald-300{% elif panel.ventas.cantidad_ventas.direccion == 'down' %}text-rose-700 dark:text-rose-300{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                        {{ panel.ventas.cantidad_ventas.variacion_label }} vs anterior
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.95fr)]">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead>
+                            <tr class="text-left text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                <th class="py-3 pr-3">Categoría</th>
+                                <th class="py-3 pr-3">Facturación</th>
+                                <th class="py-3 pr-3">Participación</th>
+                                <th class="py-3 pr-3">Unidades</th>
+                                <th class="py-3 pr-3">Variación</th>
+                                <th class="py-3 pr-3">Acción sugerida</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            {% for categoria in panel.ventas.categorias %}
+                            <tr class="align-top">
+                                <td class="py-3 pr-3 text-sm font-semibold text-gray-900 dark:text-white">{{ categoria.nombre }}</td>
+                                <td class="py-3 pr-3 text-sm text-gray-700 dark:text-gray-300">{{ categoria.facturacion_label }}</td>
+                                <td class="py-3 pr-3 text-sm text-gray-700 dark:text-gray-300">{{ categoria.participacion_label }}</td>
+                                <td class="py-3 pr-3 text-sm text-gray-700 dark:text-gray-300">{{ categoria.unidades }}</td>
+                                <td class="py-3 pr-3">
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {% if categoria.direccion == 'up' %}bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300{% elif categoria.direccion == 'down' %}bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                                        {{ categoria.variacion_label }}
+                                    </span>
+                                </td>
+                                <td class="py-3 pr-3 text-sm text-gray-700 dark:text-gray-300">{{ categoria.accion }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                                    Todavía no hay ventas suficientes para leer el aporte por categoría.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">Participación por categoría</p>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Top 5 categorías del período actual.</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            {{ panel.ventas.categorias|length }} visibles
+                        </span>
+                    </div>
+
+                    {% if panel.ventas.categorias %}
+                    <div class="mt-4 h-64">
+                        <canvas id="inteligenciaCategoriasChart" aria-label="Participación por categoría" role="img"></canvas>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        {% for categoria in panel.ventas.categorias %}
+                        <div class="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300">
+                            <span class="h-2.5 w-2.5 rounded-full {% if loop.index0 == 0 %}bg-emerald-500{% elif loop.index0 == 1 %}bg-cyan-500{% elif loop.index0 == 2 %}bg-amber-500{% elif loop.index0 == 3 %}bg-violet-500{% else %}bg-rose-500{% endif %}"></span>
+                            <span class="font-medium text-gray-800 dark:text-gray-100">{{ categoria.nombre }}</span>
+                            <span>{{ categoria.participacion_label }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="mt-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-4">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Todavía no hay categorías suficientes para graficar participación.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5 space-y-4">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider text-sky-600 dark:text-sky-400 font-semibold">Salud comercial</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ panel.ventas.salud.mensaje }}</h2>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ panel.ventas.salud.detalle }}</p>
+                <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ panel.ventas.salud.accion }}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Facturación</p>
+                    <p class="mt-1 text-lg font-bold {% if panel.ventas.salud.facturacion_direccion == 'up' %}text-emerald-600 dark:text-emerald-400{% elif panel.ventas.salud.facturacion_direccion == 'down' %}text-rose-600 dark:text-rose-400{% else %}text-gray-900 dark:text-white{% endif %}">
+                        {{ panel.ventas.salud.facturacion_variacion_label }}
+                    </p>
+                </div>
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Ticket promedio</p>
+                    <p class="mt-1 text-lg font-bold {% if panel.ventas.salud.ticket_direccion == 'up' %}text-emerald-600 dark:text-emerald-400{% elif panel.ventas.salud.ticket_direccion == 'down' %}text-rose-600 dark:text-rose-400{% else %}text-gray-900 dark:text-white{% endif %}">
+                        {{ panel.ventas.salud.ticket_variacion_label }}
+                    </p>
+                </div>
+            </div>
+
+            <div>
+                <p class="text-sm font-semibold text-gray-900 dark:text-white">Tendencia de ventas</p>
+                {% if panel.ventas.tendencia %}
+                <div class="mt-3 rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                    <div class="h-64">
+                        <canvas id="inteligenciaVentasTrendChart" aria-label="Tendencia semanal de ventas" role="img"></canvas>
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                        <span class="inline-flex items-center gap-1.5">
+                            <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                            Crece vs tramo anterior
+                        </span>
+                        <span class="inline-flex items-center gap-1.5">
+                            <span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>
+                            Baja vs tramo anterior
+                        </span>
+                        <span class="inline-flex items-center gap-1.5">
+                            <span class="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
+                            Base o sin comparación
+                        </span>
+                    </div>
+                    {% set ultimo_tramo = panel.ventas.tendencia|last %}
+                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                        Último tramo: <span class="font-semibold text-gray-800 dark:text-gray-100">{{ ultimo_tramo.facturacion_label }}</span>
+                        en {{ ultimo_tramo.rango_label }}.
+                    </p>
+                </div>
+                {% else %}
+                <div class="mt-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-4">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Todavía no hay semanas suficientes para leer la tendencia.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5">
+        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-semibold">Acción comercial</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Clientes para activar hoy</h2>
+            </div>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Se priorizan clientes dormidos con valor, frecuencia o ticket relevante.</span>
+        </div>
+
+        <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead>
+                    <tr class="text-left text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        <th class="py-3 pr-3">Cliente</th>
+                        <th class="py-3 pr-3">Última compra</th>
+                        <th class="py-3 pr-3">Compras</th>
+                        <th class="py-3 pr-3">Total</th>
+                        <th class="py-3 pr-3">Ticket</th>
+                        <th class="py-3 pr-3">Motivo</th>
+                        <th class="py-3 pr-3">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for cliente in panel.clientes.clientes_para_activar %}
+                    <tr class="align-top">
+                        <td class="py-3 pr-3">
+                            {% if current_user.tiene_permiso('ver_clientes') %}
+                            <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente) }}" data-tab-url="{{ url_for('clientes.detalle', id=cliente.id_cliente) }}" data-tab-title="Cliente" data-tab-icon="fas fa-user" class="app-tab-link font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                                {{ cliente.nombre }}
+                            </a>
+                            {% else %}
+                            <span class="font-semibold text-gray-900 dark:text-white">{{ cliente.nombre }}</span>
+                            {% endif %}
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ cliente.dias_inactivo }} días sin comprar</p>
+                        </td>
+                        <td class="py-3 pr-3 text-sm text-gray-700 dark:text-gray-300">{{ cliente.ultima_compra_label }}</td>
+                        <td class="py-3 pr-3 text-sm text-gray-700 dark:text-gray-300">{{ cliente.cantidad_compras }}</td>
+                        <td class="py-3 pr-3 text-sm text-gray-700 dark:text-gray-300">{{ cliente.total_gastado_label }}</td>
+                        <td class="py-3 pr-3 text-sm text-gray-700 dark:text-gray-300">{{ cliente.ticket_promedio_label }}</td>
+                        <td class="py-3 pr-3">
+                            <p class="text-sm text-gray-700 dark:text-gray-300">{{ cliente.motivo }}</p>
+                            <span class="mt-1 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {% if cliente.prioridad == 'alta' %}bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300{% elif cliente.prioridad == 'media' %}bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                                {{ cliente.prioridad|title }}
+                            </span>
+                        </td>
+                        <td class="py-3 pr-3 text-sm font-medium text-gray-900 dark:text-white">{{ cliente.accion }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                            Todavía no hay clientes dormidos con suficiente señal comercial para priorizar.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

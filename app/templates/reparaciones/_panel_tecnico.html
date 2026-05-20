@@ -1,0 +1,84 @@
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">
+        Control técnico
+    </h3>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Técnico asignado</p>
+            <p class="font-semibold text-gray-900 dark:text-gray-100">
+                {{ reparacion.tecnico.nombre_completo if reparacion.tecnico else 'Sin asignar' }}
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Fecha toma técnico</p>
+            <p class="font-semibold text-gray-900 dark:text-gray-100">
+                {{ reparacion.fecha_toma_tecnico|local_strftime('%d/%m/%Y %H:%M') if reparacion.fecha_toma_tecnico else 'Pendiente' }}
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Fecha listo técnico</p>
+            <p class="font-semibold text-gray-900 dark:text-gray-100">
+                {{ reparacion.fecha_listo_tecnico|local_strftime('%d/%m/%Y %H:%M') if reparacion.fecha_listo_tecnico else 'Pendiente' }}
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Entrega al cliente</p>
+            <p class="font-semibold text-gray-900 dark:text-gray-100">
+                {{ reparacion.fecha_entrega|local_strftime('%d/%m/%Y %H:%M') if reparacion.fecha_entrega else 'Pendiente' }}
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Generado reparación</p>
+            <p class="font-semibold text-gray-900 dark:text-gray-100">
+                ₲ {{ "{:,.0f}".format(reparacion.total_generado or 0).replace(",", ".") }}
+            </p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Mano de obra estimada</p>
+            <p class="font-semibold text-gray-900 dark:text-gray-100">
+                ₲ {{ "{:,.0f}".format(reparacion.mano_obra_generada or 0).replace(",", ".") }}
+            </p>
+        </div>
+    </div>
+
+    {% if puede_asignar_tecnico or puede_tomar_reparacion %}
+    <form method="POST" action="{{ url_for('reparaciones.asignar_tecnico', id=reparacion.id_reparacion) }}" class="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if puede_asignar_tecnico %}
+        <div class="w-full lg:max-w-sm">
+            <label for="id_usuario_tecnico" class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Asignar técnico</label>
+            <select id="id_usuario_tecnico" name="id_usuario_tecnico"
+                class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded px-3 h-[42px]">
+                <option value="">Seleccionar...</option>
+                {% for tecnico in tecnicos_activos %}
+                <option value="{{ tecnico.id_usuario }}"
+                    {% if reparacion.id_usuario_tecnico == tecnico.id_usuario %}selected{% endif %}>
+                    {{ tecnico.nombre_completo }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="flex gap-3 mt-auto lg:mt-0">
+            <div class="flex flex-col">
+                <span class="block text-sm mb-1 invisible">Acción</span>
+                <div class="flex gap-3">
+                    {% if puede_asignar_tecnico %}
+                    <button type="submit" name="accion" value="asignar"
+                        class="bg-slate-700 hover:bg-slate-800 text-white font-bold px-4 rounded shadow whitespace-nowrap h-[42px] flex items-center justify-center">
+                        Guardar técnico
+                    </button>
+                    {% endif %}
+                    {% if puede_tomar_reparacion %}
+                    <button type="submit" name="accion" value="tomar"
+                        class="bg-orange-600 hover:bg-orange-700 text-white font-bold px-4 rounded shadow whitespace-nowrap h-[42px] flex items-center justify-center">
+                        Tomar reparación
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+</div>

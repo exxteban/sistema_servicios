@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ticket Venta #{{ venta.id_venta }}</title>
+    {% set paper_width_value = paper_width_mm if paper_width_mm in [48, 58, 80] else 58 %}
+    <style>
+        /* Reset agresivo para impresoras termicas */
+        @page {
+            size: {{ paper_width_value }}mm auto;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: {{ paper_width_value }}mm;
+            max-width: {{ paper_width_value }}mm;
+            margin: 0;
+            padding: 0;
+            background: #fff !important;
+            color: #000 !important;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            text-rendering: geometricPrecision;
+        }
+
+        body {
+            padding: 2mm {{ 4 if paper_width_value == 80 else 3 }}mm;
+        }
+
+        /* Estilos para tablas - compatibles con impresoras termicas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        td,
+        th {
+            padding: 1px 0;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .left {
+            text-align: left;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .small {
+            font-size: 10px;
+        }
+
+        .muted {
+            color: #333;
+        }
+
+        .ticket-thermal-layout {
+            display: none;
+        }
+
+        .thermal-print {
+            margin: 0;
+            width: 100%;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            font-family: 'Lucida Console', 'Courier New', Courier, monospace;
+            font-size: {{ 10 if paper_width_value == 48 else 11 if paper_width_value == 58 else 12 }}px;
+            line-height: 1.25;
+            font-weight: 700;
+            padding: 2mm {{ 4 if paper_width_value == 80 else 3 }}mm 3mm;
+            text-rendering: geometricPrecision;
+        }
+
+        /* Separador simple con guiones */
+        .sep {
+            border: none;
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+            height: 0;
+        }
+
+        /* Encabezado empresa */
+        .header {
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .header .nombre {
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        /* Sin flex - todo con tablas */
+        .info-row td {
+            padding: 1px 0;
+        }
+
+        .info-label {
+            width: {{ 30 if paper_width_value == 80 else 35 }}%;
+        }
+
+        .info-value {
+            width: {{ 70 if paper_width_value == 80 else 65 }}%;
+        }
+
+        /* Columnas productos */
+        .col-prod {
+            width: {{ 58 if paper_width_value == 80 else 50 }}%;
+        }
+
+        .col-cant {
+            width: {{ 12 if paper_width_value == 80 else 15 }}%;
+            text-align: right;
+        }
+
+        .col-total {
+            width: {{ 30 if paper_width_value == 80 else 35 }}%;
+            text-align: right;
+        }
+
+        /* No imprimir ciertos elementos */
+        @media print {
+
+            html,
+            body {
+                width: {{ paper_width_value }}mm !important;
+                max-width: {{ paper_width_value }}mm !important;
+                background: #fff !important;
+                color: #000 !important;
+            }
+
+            .ticket-preview-layout {
+                display: none !important;
+            }
+
+            .ticket-thermal-layout {
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    {% set thermal_width = 24 if paper_width_value == 48 else 32 if paper_width_value == 58 else 44 %}
+    {% set vendedor_nombre = (venta.vendedor.nombre_completo if venta.vendedor else
+    (venta.sesion_caja.usuario.nombre_completo if venta.sesion_caja and venta.sesion_caja.usuario else 'Desconocido'))|thermal_safe %}
+    {% macro thermal_center(text, width=32) -%}
+    {%- set value = ((text or '')|string)|trim -%}
+    {%- if not value -%}{%- elif value|length >= width -%}{{ value }}{%- else -%}{{ ' ' * ((width - value|length) // 2) }}{{ value }}{%- endif -%}
+    {%- endmacro %}
+    {% macro thermal_pair(left, right, width=32) -%}
+    {%- set left_value = ((left or '')|string)|trim -%}
+    {%- set right_value = ((right or '')|string)|trim -%}
+    {%- set remaining = width - left_value|length - right_value|length -%}
+    {%- if not left_value and not right_value -%}{%- elif remaining < 1 -%}{{ left_value }}
+{{ right_value }}{%- else -%}{{ left_value }}{{ ' ' * remaining }}{{ right_value }}{%- endif -%}
+    {%- endmacro %}
+    {% macro thermal_amount(value) -%}{{ moneda_simbolo }} {{ "{:,.0f}".format(value).replace(",", ".") }}{%- endmacro %}
+
+    <div class="ticket-preview-layout">
+        <!-- ENCABEZADO EMPRESA -->
+        <div class="header">
+            {% if empresa.nombre %}
+            <div class="nombre">{{ empresa.nombre|thermal_safe }}</div>
+            {% endif %}
+            {% if empresa.ruc %}
+            <div class="small">RUC: {{ empresa.ruc|thermal_safe }}</div>
+            {% endif %}
+            {% if empresa.telefono %}
+            <div class="small">Tel: {{ empresa.telefono|thermal_safe }}</div>
+            {% endif %}
+            {% if empresa.direccion %}
+            <div class="small">{{ empresa.direccion|thermal_safe }}</div>
+            {% endif %}
+        </div>
+
+        <hr class="sep" />
+
+        <!-- INFO VENTA -->
+        <table>
+            <tr class="info-row">
+                <td class="info-label">Venta:</td>
+                <td class="info-value">#{{ venta.id_venta }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Fecha:</td>
+                <td class="info-value">{{ venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Cliente:</td>
+                <td class="info-value">{{ venta.cliente.nombre|thermal_safe }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Vendedor:</td>
+                <td class="info-value">{{ vendedor_nombre }}</td>
+            </tr>
+        </table>
+
+        <hr class="sep" />
+
+        <!-- PRODUCTOS -->
+        <table>
+            <thead>
+                <tr>
+                    <th class="left col-prod">Producto</th>
+                    <th class="right col-cant">Cant</th>
+                    <th class="right col-total">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in detalles %}
+                <tr>
+                    <td class="col-prod">
+                        {{ item.producto.nombre|thermal_safe }}<br />
+                        <span class="small muted">{{ thermal_amount(item.precio_unitario) }}</span>
+                    </td>
+                    <td class="right col-cant">{{ item.cantidad }}</td>
+                    <td class="right col-total">{{ thermal_amount(item.subtotal) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <hr class="sep" />
+
+        <!-- TOTALES -->
+        <table>
+            <tr>
+                <td class="left">Subtotal</td>
+                <td class="right">{{ thermal_amount(subtotal) }}</td>
+            </tr>
+            {% if descuento_manual and descuento_manual > 0 %}
+            <tr>
+                <td class="left">Descuento manual</td>
+                <td class="right">- {{ thermal_amount(descuento_manual) }}</td>
+            </tr>
+            {% endif %}
+            {% if descuento_fidelizacion and descuento_fidelizacion > 0 %}
+            <tr>
+                <td class="left">Descuento fidelización</td>
+                <td class="right">- {{ thermal_amount(descuento_fidelizacion) }}</td>
+            </tr>
+            {% elif descuento and descuento > 0 and not descuento_manual %}
+            <tr>
+                <td class="left">Descuento</td>
+                <td class="right">- {{ thermal_amount(descuento) }}</td>
+            </tr>
+            {% endif %}
+            {% if beneficio_aplicado_texto %}
+            <tr>
+                <td colspan="2" class="small muted">Beneficio aplicado: {{ beneficio_aplicado_texto|thermal_safe }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td class="left bold">TOTAL</td>
+                <td class="right bold">{{ thermal_amount(venta.total) }}</td>
+            </tr>
+        </table>
+
+        <hr class="sep" />
+
+        <!-- TOTALES PAGADOS -->
+        <table>
+            <tr>
+                <td class="left">{{ cobro_label }}</td>
+                <td class="right">{{ thermal_amount(total_pagado) }}</td>
+            </tr>
+            {% if es_venta_credito and monto_financiado > 0 %}
+            <tr>
+                <td class="left">Saldo financiado</td>
+                <td class="right">{{ thermal_amount(monto_financiado) }}</td>
+            </tr>
+            {% endif %}
+            {% if resumen_credito_plan.total_con_interes > 0 %}
+            <tr>
+                <td class="left">Interes total ({{ "{:,.0f}".format(resumen_credito_plan.tasa_interes_pct).replace(",", ".") }}%)</td>
+                <td class="right">{{ thermal_amount(resumen_credito_plan.interes_total) }}</td>
+            </tr>
+            <tr>
+                <td class="left">Total en cuotas</td>
+                <td class="right">{{ thermal_amount(resumen_credito_plan.total_con_interes) }}</td>
+            </tr>
+            {% if resumen_credito_plan.cantidad_cuotas > 0 %}
+            <tr>
+                <td class="left">Cantidad de cuotas</td>
+                <td class="right">{{ resumen_credito_plan.cantidad_cuotas }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td class="left">Cuota estimada</td>
+                <td class="right">{{ thermal_amount(resumen_credito_plan.cuota_estimada) }}</td>
+            </tr>
+            {% endif %}
+            {% if vuelto and vuelto > 0 %}
+            <tr>
+                <td class="left">Vuelto</td>
+                <td class="right">{{ thermal_amount(vuelto) }}</td>
+            </tr>
+            {% endif %}
+        </table>
+
+        <!-- DETALLE DE PAGOS -->
+        {% if pagos_resumen and pagos_resumen|length > 0 %}
+        <hr class="sep" />
+        <div class="small">{{ detalle_pago_label }}:</div>
+        <table>
+            {% for pago in pagos_resumen %}
+            <tr>
+                <td class="left">{{ pago.nombre|thermal_safe }}</td>
+                <td class="right">{{ thermal_amount(pago.monto) }}</td>
+            </tr>
+            {% if pago.referencias and pago.referencias|length > 0 %}
+            <tr>
+                <td colspan="2" class="small muted">Ref: {{ pago.referencias|join(', ')|thermal_safe }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </table>
+        {% endif %}
+
+        <hr class="sep" />
+
+        <!-- PIE -->
+        <div class="center small">
+            {{ footer_text|default('Gracias por su compra')|thermal_safe }}
+        </div>
+    </div>
+
+    <div class="ticket-thermal-layout">
+        <pre class="thermal-print">{% if empresa.nombre %}{{ thermal_center(empresa.nombre|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.ruc %}{{ thermal_center('RUC: ' ~ empresa.ruc|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.telefono %}{{ thermal_center('Tel: ' ~ empresa.telefono|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.direccion %}{{ thermal_center(empresa.direccion|thermal_safe, thermal_width) }}
+{% endif %}{{ '-' * thermal_width }}
+{{ thermal_pair('Venta:', '#' ~ venta.id_venta, thermal_width) }}
+{{ thermal_pair('Fecha:', venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M'), thermal_width) }}
+Cliente:
+{{ venta.cliente.nombre|thermal_safe }}
+Vendedor:
+{{ vendedor_nombre }}
+{{ '-' * thermal_width }}
+{{ thermal_pair('Producto', 'Cant    Total', thermal_width) }}
+{% for item in detalles %}{{ item.producto.nombre|thermal_safe }}
+{{ thermal_amount(item.precio_unitario) }}
+{{ thermal_pair('', item.cantidad ~ '  ' ~ thermal_amount(item.subtotal), thermal_width) }}
+{% endfor %}{{ '-' * thermal_width }}
+{{ thermal_pair('Subtotal', thermal_amount(subtotal), thermal_width) }}
+{% if descuento_manual and descuento_manual > 0 %}{{ thermal_pair('Desc. manual', '- ' ~ thermal_amount(descuento_manual), thermal_width) }}
+{% endif %}{% if descuento_fidelizacion and descuento_fidelizacion > 0 %}{{ thermal_pair('Desc. fideliz.', '- ' ~ thermal_amount(descuento_fidelizacion), thermal_width) }}
+{% elif descuento and descuento > 0 and not descuento_manual %}{{ thermal_pair('Descuento', '- ' ~ thermal_amount(descuento), thermal_width) }}
+{% endif %}{% if beneficio_aplicado_texto %}Beneficio aplicado:
+{{ beneficio_aplicado_texto|thermal_safe }}
+{% endif %}{{ thermal_pair('TOTAL', thermal_amount(venta.total), thermal_width) }}
+{{ '-' * thermal_width }}
+{{ thermal_pair(cobro_label, thermal_amount(total_pagado), thermal_width) }}
+{% if es_venta_credito and monto_financiado > 0 %}{{ thermal_pair('Saldo financiado', thermal_amount(monto_financiado), thermal_width) }}
+{% endif %}{% if resumen_credito_plan.total_con_interes > 0 %}{{ thermal_pair('Interes total (' ~ "{:,.0f}".format(resumen_credito_plan.tasa_interes_pct).replace(",", ".") ~ '%)', thermal_amount(resumen_credito_plan.interes_total), thermal_width) }}
+{{ thermal_pair('Total en cuotas', thermal_amount(resumen_credito_plan.total_con_interes), thermal_width) }}
+{% if resumen_credito_plan.cantidad_cuotas > 0 %}{{ thermal_pair('Cantidad de cuotas', resumen_credito_plan.cantidad_cuotas, thermal_width) }}
+{% endif %}
+{{ thermal_pair('Cuota estimada', thermal_amount(resumen_credito_plan.cuota_estimada), thermal_width) }}
+{% endif %}{% if vuelto and vuelto > 0 %}{{ thermal_pair('Vuelto', thermal_amount(vuelto), thermal_width) }}
+{% endif %}{% if pagos_resumen and pagos_resumen|length > 0 %}{{ '-' * thermal_width }}
+{{ detalle_pago_label }}:
+{% for pago in pagos_resumen %}{{ thermal_pair(pago.nombre|thermal_safe, thermal_amount(pago.monto), thermal_width) }}
+{% if pago.referencias and pago.referencias|length > 0 %}Ref: {{ pago.referencias|join(', ')|thermal_safe }}
+{% endif %}{% endfor %}{% endif %}{{ '-' * thermal_width }}
+{{ footer_text|default('Gracias por su compra')|thermal_safe }}</pre>
+    </div>
+
+    <!-- ESPACIO EXTRA para que la impresora no corte el texto final -->
+    <!-- Las impresoras térmicas necesitan margen de avance de papel -->
+    <div style="height: 15mm;"></div>
+    <br /><br /><br />
+
+    <!-- SCRIPT DE IMPRESION -->
+    {% if not preview and not embedded %}
+    <script>
+        window.onload = function () {
+            setTimeout(function () {
+                window.print();
+            }, 500);
+        };
+        window.onafterprint = function () {
+            window.close();
+        };
+    </script>
+    {% endif %}
+</body>
+
+</html>

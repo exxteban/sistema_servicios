@@ -1,0 +1,209 @@
+<div x-show="inteligenciaTab === 'resumen'" {% if vista_activa !='resumen' %}style="display: none;"{% endif %}
+    class="app-tab-panel space-y-4 2xl:space-y-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 2xl:gap-4">
+        <div class="rounded-xl bg-white dark:bg-gray-800 shadow-md p-4 border-l-4 border-emerald-500">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ panel.facturacion.titulo }}
+            </p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.facturacion.actual_label }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Total vendido en el período actual.</p>
+            <p
+                class="mt-1 text-xs {% if panel.facturacion.direccion == 'up' %}text-emerald-600 dark:text-emerald-400{% elif panel.facturacion.direccion == 'down' %}text-rose-600 dark:text-rose-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                {{ panel.facturacion.variacion_label }} vs período anterior
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Antes: {{ panel.facturacion.anterior_label }}</p>
+        </div>
+
+        <div class="rounded-xl bg-white dark:bg-gray-800 shadow-md p-4 border-l-4 border-sky-500">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ panel.ticket_promedio.titulo
+                }}</p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.ticket_promedio.actual_label }}
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Promedio de cada venta en este período.</p>
+            <p
+                class="mt-1 text-xs {% if panel.ticket_promedio.direccion == 'up' %}text-emerald-600 dark:text-emerald-400{% elif panel.ticket_promedio.direccion == 'down' %}text-rose-600 dark:text-rose-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                {{ panel.ticket_promedio.variacion_label }} vs período anterior
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Antes: {{ panel.ticket_promedio.anterior_label }}
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 2xl:gap-4">
+        <button type="button" data-inteligencia-kpi-clientes data-kpi-titulo="{{ panel.clientes_activos.titulo }}"
+            data-kpi-actual="{{ panel.clientes_activos.actual }}"
+            data-kpi-anterior="{{ panel.clientes_activos.anterior }}"
+            data-kpi-actual-periodo="{{ panel.periodo_actual_label }}"
+            data-kpi-anterior-periodo="{{ panel.periodo_anterior_label }}"
+            data-kpi-variacion="{{ panel.clientes_activos.variacion_label }}"
+            data-kpi-direccion="{{ panel.clientes_activos.direccion }}"
+            class="flex h-full w-full flex-col rounded-xl bg-white dark:bg-gray-800 shadow-md p-4 border-l-4 border-violet-500 text-left transition hover:ring-2 hover:ring-violet-300/70 dark:hover:ring-violet-500/50">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ panel.clientes_activos.titulo
+                }}</p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.clientes_activos.actual_label }}
+            </p>
+            <div class="mt-3 rounded-xl bg-violet-50/80 dark:bg-violet-500/10 p-3">
+                <div class="h-24 w-full">
+                    <canvas id="inteligenciaClientesSparkline" aria-label="Sparkline de clientes activos"
+                        role="img" class="block h-full w-full"></canvas>
+                </div>
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>
+                        Actual
+                    </span>
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="h-2.5 w-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+                        Anterior
+                    </span>
+                </div>
+            </div>
+            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">Clientes que compraron en este período.</p>
+            <p
+                class="mt-1 text-xs {% if panel.clientes_activos.direccion == 'up' %}text-emerald-600 dark:text-emerald-400{% elif panel.clientes_activos.direccion == 'down' %}text-rose-600 dark:text-rose-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                {{ panel.clientes_activos.variacion_label }} vs período anterior
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Antes: {{ panel.clientes_activos.anterior_label }}
+            </p>
+        </button>
+
+        <button type="button" data-inteligencia-modal-clave="para_activar"
+            data-inteligencia-modal-titulo="Clientes para activar hoy"
+            data-inteligencia-modal-descripcion="Lista priorizada para contactar según inactividad, valor comercial y recurrencia."
+            data-inteligencia-modal-items='{{ panel.clientes.para_activar_detalle|tojson }}'
+            class="flex h-full w-full flex-col rounded-xl bg-white dark:bg-gray-800 shadow-md p-4 border-l-4 border-amber-500 text-left transition hover:ring-2 hover:ring-amber-300/70 dark:hover:ring-amber-500/50">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Clientes para activar hoy</p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.clientes.total_para_activar }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Lista priorizada según inactividad y valor
+                comercial.</p>
+            <div class="mt-3 rounded-xl bg-amber-50/80 dark:bg-amber-500/10 p-3">
+                <div class="flex items-center justify-between gap-2">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Radar de recuperación</p>
+                    <span class="text-[11px] text-amber-700/80 dark:text-amber-200/80">Segmentos clave</span>
+                </div>
+                <div class="mt-2 h-24 w-full">
+                    <canvas id="inteligenciaActivacionChart" aria-label="Gráfico de oportunidades de reactivación"
+                        role="img" class="block h-full w-full"></canvas>
+                </div>
+                <div class="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                    <div class="rounded-lg bg-white/70 px-2 py-2 dark:bg-gray-900/40">
+                        <p class="text-gray-500 dark:text-gray-400">Activables</p>
+                        <p class="mt-1 font-semibold text-gray-900 dark:text-white">{{ panel.clientes.total_para_activar }}</p>
+                    </div>
+                    <div class="rounded-lg bg-white/70 px-2 py-2 dark:bg-gray-900/40">
+                        <p class="text-gray-500 dark:text-gray-400">Alto valor</p>
+                        <p class="mt-1 font-semibold text-gray-900 dark:text-white">{{ panel.clientes.valiosos_dormidos }}</p>
+                    </div>
+                    <div class="rounded-lg bg-white/70 px-2 py-2 dark:bg-gray-900/40">
+                        <p class="text-gray-500 dark:text-gray-400">Frecuentes</p>
+                        <p class="mt-1 font-semibold text-gray-900 dark:text-white">{{ panel.clientes.frecuentes_en_pausa }}</p>
+                    </div>
+                </div>
+            </div>
+            <p class="mt-auto pt-3 text-xs font-medium text-amber-600 dark:text-amber-400">Ver detalle de contacto</p>
+        </button>
+
+        <button type="button" data-inteligencia-modal-stock="riesgo"
+            class="flex h-full w-full flex-col rounded-xl bg-white dark:bg-gray-800 shadow-md p-4 border-l-4 border-rose-500 text-left transition hover:ring-2 hover:ring-rose-300/70 dark:hover:ring-rose-500/50">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock en riesgo</p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.stock.riesgo_count }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Productos con stock igual o por debajo del mínimo.
+            </p>
+            <p class="mt-auto pt-3 text-xs font-medium text-rose-600 dark:text-rose-400">Ver detalle</p>
+        </button>
+
+        <button type="button" data-inteligencia-modal-stock="inmovilizado"
+            class="flex h-full w-full flex-col rounded-xl bg-white dark:bg-gray-800 shadow-md p-4 border-l-4 border-orange-500 text-left transition hover:ring-2 hover:ring-orange-300/70 dark:hover:ring-orange-500/50">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock inmovilizado</p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.stock.inmovilizado_count }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Productos sin salida en los últimos 60 días.</p>
+            <p class="mt-auto pt-3 text-xs font-medium text-orange-600 dark:text-orange-400">Ver detalle</p>
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="xl:col-span-2 rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-[11px] uppercase tracking-wider text-blue-600 dark:text-blue-400 font-semibold">
+                        Prioridades</p>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Qué conviene hacer hoy</h2>
+                </div>
+                <span
+                    class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                    {{ panel.acciones_hoy|length }} acción{% if panel.acciones_hoy|length != 1 %}es{% endif %}
+                </span>
+            </div>
+
+            <div class="mt-4 space-y-3">
+                {% for accion in panel.acciones_hoy %}
+                {% set accion_modal = accion.modal if accion.modal is defined else none %}
+                {% set accion_modal_items = panel.clientes.segmentos_detalle.get(accion_modal.clave, []) if accion_modal
+                else [] %}
+                {% if accion_modal and accion_modal_items %}
+                <button type="button" data-inteligencia-modal-clave="{{ accion_modal.clave }}"
+                    data-inteligencia-modal-titulo="{{ accion_modal.titulo }}"
+                    data-inteligencia-modal-descripcion="{{ accion_modal.descripcion }}"
+                    data-inteligencia-modal-items='{{ accion_modal_items|tojson }}'
+                    class="w-full rounded-xl border border-gray-200 dark:border-gray-700 p-3 2xl:p-4 text-left transition hover:border-blue-300 hover:bg-blue-50/40 dark:hover:border-blue-500/50 dark:hover:bg-blue-500/5">
+                    {% else %}
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-3 2xl:p-4">
+                        {% endif %}
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ accion.titulo }}</p>
+                                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ accion.detalle }}</p>
+                                {% if accion_modal and accion_modal_items %}
+                                <p class="mt-2 text-xs font-medium text-blue-600 dark:text-blue-400">Ver clientes
+                                    sugeridos</p>
+                                {% endif %}
+                            </div>
+                            <span
+                                class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {% if accion.prioridad == 'alta' %}bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300{% elif accion.prioridad == 'media' %}bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                                {{ accion.prioridad|title }}
+                            </span>
+                        </div>
+                        {% if accion_modal and accion_modal_items %}
+                </button>
+                {% else %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5">
+        <p class="text-[11px] uppercase tracking-wider text-violet-600 dark:text-violet-400 font-semibold">Clientes</p>
+        <h2 class="text-lg font-bold text-gray-900 dark:text-white">Segmentos detectados</h2>
+
+        <div class="mt-4 space-y-3">
+            <button type="button" data-inteligencia-modal-clave="dormidos"
+                data-inteligencia-modal-titulo="Clientes dormidos"
+                data-inteligencia-modal-descripcion="Clientes activos que ya superaron el umbral de inactividad y conviene revisar."
+                data-inteligencia-modal-items='{{ panel.clientes.segmentos_detalle.dormidos|tojson }}'
+                class="w-full rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3 text-left transition hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Clientes dormidos</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.clientes.segmentos.dormidos }}
+                </p>
+            </button>
+            <button type="button" data-inteligencia-modal-clave="frecuentes"
+                data-inteligencia-modal-titulo="Clientes frecuentes"
+                data-inteligencia-modal-descripcion="Clientes con recurrencia alta para seguir cuidando la relación comercial."
+                data-inteligencia-modal-items='{{ panel.clientes.segmentos_detalle.frecuentes|tojson }}'
+                class="w-full rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3 text-left transition hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Clientes frecuentes</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.clientes.segmentos.frecuentes
+                    }}</p>
+            </button>
+            <button type="button" data-inteligencia-modal-clave="alto_valor"
+                data-inteligencia-modal-titulo="Clientes de alto valor"
+                data-inteligencia-modal-descripcion="Clientes con mayor gasto acumulado dentro del período analizado."
+                data-inteligencia-modal-items='{{ panel.clientes.segmentos_detalle.alto_valor|tojson }}'
+                class="w-full rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3 text-left transition hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Clientes de alto valor</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.clientes.segmentos.alto_valor
+                    }}</p>
+            </button>
+        </div>
+    </div>
+</div>
+</div>

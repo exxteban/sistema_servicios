@@ -1,0 +1,213 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<div class="p-4 h-full flex flex-col gap-4" x-data="crmBandeja()">
+
+    <!-- Filtros -->
+    <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-1 bg-gray-800/60 rounded-lg p-1">
+            <button @click="filtros.estado = 'todas'; cargar()"
+                :class="filtros.estado === 'todas' ? 'bg-teal-500/30 text-teal-300' : 'text-gray-400 hover:text-white'"
+                class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors">Todas</button>
+            <button @click="filtros.estado = 'bot'; cargar()"
+                :class="filtros.estado === 'bot' ? 'bg-blue-500/30 text-blue-300' : 'text-gray-400 hover:text-white'"
+                class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors">Bot</button>
+            <button @click="filtros.estado = 'derivacion'; cargar()"
+                :class="filtros.estado === 'derivacion' ? 'bg-yellow-500/30 text-yellow-300' : 'text-gray-400 hover:text-white'"
+                class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors">Pendientes</button>
+            <button @click="filtros.estado = 'asesor'; cargar()"
+                :class="filtros.estado === 'asesor' ? 'bg-green-500/30 text-green-300' : 'text-gray-400 hover:text-white'"
+                class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors">Asesor</button>
+        </div>
+
+        <select x-model="filtros.etiqueta" @change="cargar()"
+            class="bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+            <option value="">Todas las etiquetas</option>
+            {% for e in etiquetas %}
+            <option value="{{ e.id }}">{{ e.nombre }}</option>
+            {% endfor %}
+        </select>
+
+        <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+            <input type="checkbox" x-model="filtros.activas" @change="cargar()"
+                class="rounded border-gray-600 bg-gray-700 text-teal-500 focus:ring-teal-500">
+            Solo activas
+        </label>
+
+        <span class="ml-auto text-xs text-gray-500" x-text="total + ' conversaciones'"></span>
+    </div>
+
+    <!-- Lista de conversaciones -->
+    <div class="flex-1 overflow-auto">
+        <div x-show="cargando" class="flex items-center justify-center py-12">
+            <i class="fas fa-spinner fa-spin text-teal-400 text-2xl"></i>
+        </div>
+
+        <div x-show="!cargando && items.length === 0"
+            class="flex flex-col items-center justify-center py-16 text-gray-500">
+            <i class="fas fa-inbox text-4xl mb-3 opacity-40"></i>
+            <p class="text-sm">No hay conversaciones</p>
+        </div>
+
+        <div x-show="!cargando" class="grid gap-2">
+            <template x-for="conv in items" :key="conv.id">
+                <div @click="abrirConversacion(conv)"
+                    class="bg-gray-800/50 hover:bg-gray-700/60 border border-white/5 hover:border-teal-500/30 rounded-xl p-3 cursor-pointer transition-all group">
+                    <div class="flex items-start gap-3">
+                        <!-- Avatar -->
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+                            :class="{
+                                'bg-blue-500/20 text-blue-300': conv.modo === 'bot',
+                                'bg-yellow-500/20 text-yellow-300': conv.modo === 'derivacion',
+                                'bg-green-500/20 text-green-300': conv.modo === 'asesor'
+                            }" x-text="(conv.nombre || conv.telefono).charAt(0).toUpperCase()">
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="font-medium text-sm text-gray-100 truncate"
+                                    x-text="conv.nombre || conv.telefono"></span>
+                                <span class="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0" :class="{
+                                        'bg-blue-500/20 text-blue-300': conv.modo === 'bot',
+                                        'bg-yellow-500/20 text-yellow-300': conv.modo === 'derivacion',
+                                        'bg-green-500/20 text-green-300': conv.modo === 'asesor'
+                                    }" x-text="conv.modo === 'derivacion' ? 'pendiente' : conv.modo">
+                                </span>
+                                <span class="ml-auto text-xs text-gray-500 flex-shrink-0"
+                                    x-text="formatFecha(conv.ultima_actividad)"></span>
+                            </div>
+
+                            <p class="text-xs text-gray-400 truncate" x-text="conv.ultimo_mensaje || '—'"></p>
+                            <p class="text-xs mt-1 flex items-center gap-1"
+                                :class="conv.asesor ? 'text-emerald-300' : 'text-gray-500'">
+                                <i class="fas fa-user-tie text-[10px]"></i>
+                                <span x-text="conv.asesor ? `Asesor: ${conv.asesor}` : 'Asesor: sin asignar'"></span>
+                            </p>
+
+                            <!-- Etiquetas -->
+                            <div x-show="conv.etiquetas && conv.etiquetas.length > 0" class="flex flex-wrap gap-1 mt-1">
+                                <template x-for="et in conv.etiquetas" :key="et.id">
+                                    <span class="text-xs px-1.5 py-0.5 rounded-full"
+                                        :style="`background-color: ${et.color}22; color: ${et.color}`"
+                                        x-text="et.nombre">
+                                    </span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Paginación -->
+        <div x-show="paginas > 1" class="flex items-center justify-center gap-2 mt-4">
+            <button @click="pagina--; cargar(false)" :disabled="pagina <= 1"
+                class="px-3 py-1.5 rounded-lg bg-gray-700/50 text-sm text-gray-300 disabled:opacity-40 hover:bg-gray-600/50 transition-colors">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <span class="text-sm text-gray-400" x-text="`Página ${pagina} de ${paginas}`"></span>
+            <button @click="pagina++; cargar(false)" :disabled="pagina >= paginas"
+                class="px-3 py-1.5 rounded-lg bg-gray-700/50 text-sm text-gray-300 disabled:opacity-40 hover:bg-gray-600/50 transition-colors">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function crmBandeja() {
+        const initialPayload = {{ (initial_payload or { }) | tojson
+    }};
+    return {
+        items: initialPayload.items || [],
+        total: initialPayload.total || 0,
+        pagina: initialPayload.pagina || 1,
+        paginas: initialPayload.paginas || 1,
+        cargando: false,
+        filtros: {
+            estado: 'todas',
+            etiqueta: '',
+            activas: true,
+        },
+
+        async cargar(resetPagina = true) {
+            this.cargando = true;
+            if (resetPagina) this.pagina = 1;
+            await this._fetch();
+        },
+
+        async _fetch() {
+            try {
+                const p = new URLSearchParams({
+                    estado: this.filtros.estado,
+                    etiqueta: this.filtros.etiqueta || '',
+                    activas: this.filtros.activas ? '1' : '0',
+                    pagina: this.pagina,
+                    por_pagina: 30,
+                });
+                const r = await fetch(`/crm/api/bandeja?${p}`);
+                const d = await r.json();
+                this.items = d.items || [];
+                this.total = d.total || 0;
+                this.paginas = d.paginas || 1;
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.cargando = false;
+            }
+        },
+
+        abrirConversacion(conv) {
+            const stateToSave = {
+                filtros: this.filtros,
+                pagina: this.pagina,
+                items: this.items,
+                total: this.total,
+                paginas: this.paginas
+            };
+            sessionStorage.setItem('crmBandejaState', JSON.stringify(stateToSave));
+
+            const url = `/crm/bandeja/${conv.id}?back=/crm/bandeja`;
+            if (window.appNavigateActiveTab) {
+                window.appNavigateActiveTab(url);
+            } else {
+                window.location.href = url;
+            }
+        },
+
+        formatFecha(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            const ahora = new Date();
+            const diff = (ahora - d) / 1000;
+            if (diff < 60) return 'ahora';
+            if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+            return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+        },
+
+        init() {
+            try {
+                const saved = sessionStorage.getItem('crmBandejaState');
+                if (saved) {
+                    const st = JSON.parse(saved);
+                    if (st.filtros) this.filtros = st.filtros;
+                    if (st.pagina) this.pagina = st.pagina;
+                    if (st.items) this.items = st.items;
+                    if (st.total) this.total = st.total;
+                    if (st.paginas) this.paginas = st.paginas;
+                    sessionStorage.removeItem('crmBandejaState');
+                }
+            } catch (e) { }
+
+            if (!this.items || this.items.length === 0) {
+                this.cargar();
+            } else {
+                setTimeout(() => this._fetch(), 100);
+            }
+            setInterval(() => this._fetch(), 30000);
+        }
+    };
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,185 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<div class="p-4 h-full flex flex-col gap-4" x-data="crmPlantillas()">
+
+    <div class="flex items-center gap-3">
+        <h1 class="text-base font-semibold text-gray-200 flex items-center gap-2">
+            <i class="fas fa-bolt text-yellow-400"></i> Plantillas de respuesta rápida
+        </h1>
+        <button @click="mostrarForm = true; editando = null; resetForm()"
+            class="ml-auto px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 text-sm hover:bg-teal-500/30 transition-colors">
+            <i class="fas fa-plus mr-1"></i> Nueva plantilla
+        </button>
+    </div>
+
+    <!-- Formulario crear/editar -->
+    <div x-show="mostrarForm" class="bg-gray-800/60 border border-teal-500/30 rounded-xl p-4 flex flex-col gap-3">
+        <h3 class="text-sm font-semibold text-gray-300" x-text="editando ? 'Editar plantilla' : 'Nueva plantilla'"></h3>
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Título</label>
+                <input type="text" x-model="form.titulo"
+                    class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Categoría</label>
+                <input type="text" x-model="form.categoria" placeholder="general"
+                    class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+            </div>
+        </div>
+        <div>
+            <label class="text-xs text-gray-400 mb-1 block">Contenido</label>
+            <textarea x-model="form.contenido" rows="4"
+                class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50 resize-none"></textarea>
+        </div>
+        <div class="flex gap-2">
+            <button @click="guardar()"
+                :disabled="!form.titulo.trim() || !form.contenido.trim()"
+                class="px-4 py-2 rounded-lg bg-teal-500 text-white text-sm font-medium hover:bg-teal-400 disabled:opacity-40 transition-colors">
+                <span x-text="editando ? 'Guardar cambios' : 'Crear plantilla'"></span>
+            </button>
+            <button @click="mostrarForm = false; editando = null"
+                class="px-3 py-2 rounded-lg bg-gray-700/50 text-sm text-gray-300 hover:bg-gray-600/50 transition-colors">
+                Cancelar
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista de plantillas agrupadas por categoría -->
+    <div class="flex-1 overflow-auto flex flex-col gap-4">
+        <div x-show="cargando" class="flex items-center justify-center py-8">
+            <i class="fas fa-spinner fa-spin text-teal-400"></i>
+        </div>
+
+        <template x-for="[cat, items] in categorias" :key="cat">
+            <div class="bg-gray-800/50 border border-white/5 rounded-xl overflow-hidden">
+                <div class="px-4 py-2 bg-gray-700/30 border-b border-white/5">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider" x-text="cat"></h3>
+                </div>
+                <div class="divide-y divide-white/5">
+                    <template x-for="p in items" :key="p.id">
+                        <div class="px-4 py-3 flex items-start gap-3 hover:bg-white/5 transition-colors">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    <span class="text-sm font-medium text-gray-100" x-text="p.titulo"></span>
+                                    <span x-show="!p.activa" class="text-xs px-1.5 py-0.5 rounded-full bg-gray-600/50 text-gray-400">inactiva</span>
+                                </div>
+                                <p class="text-xs text-gray-400 line-clamp-2" x-text="p.contenido"></p>
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
+                                <button @click="editar(p)"
+                                    class="px-2.5 py-1.5 rounded-lg bg-gray-700/50 text-xs text-gray-300 hover:bg-gray-600/50 transition-colors">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button @click="toggleActiva(p)"
+                                    :class="p.activa ? 'bg-green-500/20 text-green-300' : 'bg-gray-600/50 text-gray-400'"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs hover:opacity-80 transition-colors">
+                                    <i :class="p.activa ? 'fas fa-eye' : 'fas fa-eye-slash'"></i>
+                                </button>
+                                <button @click="eliminar(p.id)"
+                                    class="px-2.5 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs hover:bg-red-500/30 transition-colors">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <div x-show="!cargando && plantillas.length === 0"
+            class="flex flex-col items-center justify-center py-16 text-gray-500">
+            <i class="fas fa-bolt text-4xl mb-3 opacity-30"></i>
+            <p class="text-sm">Sin plantillas configuradas</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function crmPlantillas() {
+    return {
+        plantillas: [],
+        cargando: false,
+        mostrarForm: false,
+        editando: null,
+        form: { titulo: '', contenido: '', categoria: 'general', orden: 0 },
+
+        get categorias() {
+            const map = new Map();
+            for (const p of this.plantillas) {
+                const cat = p.categoria || 'general';
+                if (!map.has(cat)) map.set(cat, []);
+                map.get(cat).push(p);
+            }
+            return [...map.entries()];
+        },
+
+        resetForm() {
+            this.form = { titulo: '', contenido: '', categoria: 'general', orden: 0 };
+        },
+
+        editar(p) {
+            this.editando = p;
+            this.form = { titulo: p.titulo, contenido: p.contenido, categoria: p.categoria, orden: p.orden };
+            this.mostrarForm = true;
+        },
+
+        async cargar() {
+            this.cargando = true;
+            try {
+                const r = await fetch('/crm/api/admin/plantillas');
+                const d = await r.json();
+                this.plantillas = d.plantillas || [];
+            } catch(e) { console.error(e); }
+            finally { this.cargando = false; }
+        },
+
+        async guardar() {
+            try {
+                let r;
+                if (this.editando) {
+                    r = await fetch(`/crm/api/admin/plantillas/${this.editando.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.form),
+                    });
+                } else {
+                    r = await fetch('/crm/api/admin/plantillas', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.form),
+                    });
+                }
+                if (r.ok) {
+                    this.mostrarForm = false;
+                    this.editando = null;
+                    await this.cargar();
+                }
+            } catch(e) { console.error(e); }
+        },
+
+        async toggleActiva(p) {
+            try {
+                await fetch(`/crm/api/admin/plantillas/${p.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ activa: !p.activa }),
+                });
+                p.activa = !p.activa;
+            } catch(e) { console.error(e); }
+        },
+
+        async eliminar(id) {
+            if (!confirm('¿Eliminar esta plantilla?')) return;
+            try {
+                await fetch(`/crm/api/admin/plantillas/${id}`, { method: 'DELETE' });
+                this.plantillas = this.plantillas.filter(p => p.id !== id);
+            } catch(e) { console.error(e); }
+        },
+
+        init() { this.cargar(); }
+    };
+}
+</script>
+{% endblock %}

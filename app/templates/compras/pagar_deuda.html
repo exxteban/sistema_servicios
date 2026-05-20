@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Pagar Compra #{{ compra.id_compra }}{% endblock %}
+
+{% block content %}
+{% set ns = namespace(efectivo_id=1) %}
+{% for metodo in metodos_pago %}
+    {% if metodo.nombre and metodo.nombre|trim|lower == 'efectivo' %}
+        {% set ns.efectivo_id = metodo.id_metodo_pago %}
+    {% endif %}
+{% endfor %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+            <h1 class="text-xl font-bold text-gray-800 dark:text-white flex items-center">
+                <i class="fas fa-money-bill-wave text-green-600 mr-3"></i>
+                Registrar Pago - Compra #{{ compra.id_compra }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Proveedor: <span class="font-semibold">{{ compra.proveedor.nombre }}</span> | 
+                Factura: <span class="font-semibold">{{ compra.numero_factura or 'S/N' }}</span>
+            </p>
+        </div>
+
+        <form method="POST" action="{{ url_for('compras.pagar_deuda', id=compra.id_compra) }}" class="p-6 space-y-6" x-data="{ 
+            monto: {{ cuenta.saldo_pendiente }}, 
+            maxMonto: {{ cuenta.saldo_pendiente }},
+            saldoCaja: {{ saldo_caja }},
+            metodoPago: {{ ns.efectivo_id }},
+            esEfectivo() { return this.metodoPago == {{ ns.efectivo_id }}; } 
+        }">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- Resumen de Saldos -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg text-center border border-red-100 dark:border-red-900/30">
+                    <p class="text-sm text-red-600 dark:text-red-400 font-medium">Saldo Pendiente</p>
+                    <p class="text-2xl font-bold text-red-700 dark:text-red-400">₲ {{ "{:,.0f}".format(cuenta.saldo_pendiente).replace(",", ".") }}</p>
+                </div>
+                <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-center border border-blue-100 dark:border-blue-900/30">
+                    <p class="text-sm text-blue-600 dark:text-blue-400 font-medium">Efectivo en Caja</p>
+                    <p class="text-2xl font-bold text-blue-700 dark:text-blue-400">₲ {{ "{:,.0f}".format(saldo_caja).replace(",", ".") }}</p>
+                </div>
+            </div>
+
+            <!-- Campos del Formulario -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto a Pagar</label>
+                    <div class="relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">₲</span>
+                        </div>
+                        <input type="number" name="monto" x-model="monto" step="any" min="1" :max="maxMonto" required
+                            class="pl-10 w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <p x-show="esEfectivo() && monto > saldoCaja" class="mt-1 text-sm text-red-600 font-medium">
+                        <i class="fas fa-exclamation-circle mr-1"></i>Monto supera el efectivo disponible en caja.
+                    </p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Método de Pago</label>
+                    <select name="id_metodo_pago" x-model.number="metodoPago" required
+                        class="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                        {% for metodo in metodos_pago %}
+                        <option value="{{ metodo.id_metodo_pago }}">{{ metodo.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Referencia (Opcional)</label>
+                    <input type="text" name="referencia" placeholder="Nro de comprobante, transferencia, etc."
+                        class="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observaciones</label>
+                    <textarea name="observaciones" rows="2"
+                        class="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg focus:ring-purple-500 focus:border-purple-500"></textarea>
+                </div>
+            </div>
+
+            <!-- Botones -->
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <a href="{{ url_for('compras.detalle', id=compra.id_compra) }}"
+                    class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit" 
+                    :disabled="esEfectivo() && monto > saldoCaja"
+                    :class="{'opacity-50 cursor-not-allowed': esEfectivo() && monto > saldoCaja}"
+                    class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm transition-colors flex items-center">
+                    <i class="fas fa-check mr-2"></i>Confirmar Pago
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

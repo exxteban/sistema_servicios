@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}Cierres de Caja{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{
+    showCierreModal: false,
+    cierreId: {{ cierre_abierto or 'null' }},
+    _iframeHooksInstalled: false,
+    inspectInfoText: '',
+    debugEnabled() {
+        try {
+            const u = new URL(window.location.href);
+            if (u.searchParams.get('debug') === '1') return true;
+            return localStorage.getItem('debug_logs') === '1';
+        } catch (e) {
+            return false;
+        }
+    },
+    dlog(...args) {
+        if (!this.debugEnabled()) return;
+        try { console.log('[cierre-modal]', ...args); } catch (e) { }
+    },
+    inspectModal() {
+        if (!this.debugEnabled()) return;
+        try {
+            const modalRoot = document.querySelector('[data-cierre-modal-root]');
+            const overlay = document.querySelector('[data-cierre-modal-overlay]');
+            const panel = document.querySelector('[data-cierre-modal-panel]');
+            const iframe = document.querySelector('[data-cierre-modal-iframe]');
+
+            const info = {
+                cierreId: this.cierreId,
+                showCierreModal: this.showCierreModal,
+                modalRoot: null,
+                overlay: null,
+                panel: null,
+                iframe: null
+            };
+
+            if (modalRoot) {
+                const cs = window.getComputedStyle(modalRoot);
+                info.modalRoot = { display: cs.display, visibility: cs.visibility, zIndex: cs.zIndex };
+            }
+            if (overlay) {
+                const cs = window.getComputedStyle(overlay);
+                const r = overlay.getBoundingClientRect();
+                info.overlay = { position: cs.position, display: cs.display, visibility: cs.visibility, zIndex: cs.zIndex, rect: { x: r.x, y: r.y, w: r.width, h: r.height } };
+            }
+            if (panel) {
+                const cs = window.getComputedStyle(panel);
+                const r = panel.getBoundingClientRect();
+                info.panel = { position: cs.position, display: cs.display, visibility: cs.visibility, zIndex: cs.zIndex, rect: { x: r.x, y: r.y, w: r.width, h: r.height } };
+            }
+            if (iframe) {
+                info.iframe = { attrSrc: iframe.getAttribute('src'), src: iframe.src };
+                if (!this._iframeHooksInstalled) {
+                    this._iframeHooksInstalled = true;
+                    iframe.addEventListener('load', () => {
+                        this.dlog('iframe load', { src: iframe.src });
+                    }, { once: false });
+                    iframe.addEventListener('error', () => {
+                        this.dlog('iframe error', { src: iframe.src });
+                    }, { once: false });
+                }
+            }
+
+            try {
+                this.inspectInfoText = JSON.stringify(info, null, 2);
+            } catch (e) {
+                this.inspectInfoText = String(info);
+            }
+            this.dlog('inspect', info);
+        } catch (e) {
+            this.dlog('inspect error', String(e));
+        }
+    },
+    init() {
+        this.dlog('init', { cierreId: this.cierreId });
+        try {
+            this.$watch('showCierreModal', (v) => {
+                this.dlog('showCierreModal change', v);
+                this.$nextTick(() => this.inspectModal());
+            });
+            this.$watch('cierreId', (v) => {
+                this.dlog('cierreId change', v);
+                this.$nextTick(() => this.inspectModal());
+            });
+        } catch (e) {
+            this.dlog('watch error', String(e));
+        }
+        if (this.cierreId) this.showCierreModal = true;
+        this.$nextTick(() => this.inspectModal());
+    }
+}">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-file-invoice-dollar text-purple-600 dark:text-purple-400 mr-2"></i>Cierres de Caja
+        </h1>
+        <a href="{{ url_for('caja.estado') }}" data-permiso="ver_caja" data-tab-url="{{ url_for('caja.estado') }}"
+            data-tab-title="Caja" data-tab-icon="fas fa-wallet"
+            class="app-tab-link bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition">
+            <i class="fas fa-wallet mr-2"></i>Caja Actual
+        </a>
+    </div>
+
+    <form method="GET" action="{{ url_for('caja.cierres_listar') }}"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Desde</label>
+                <input type="date" name="desde" value="{{ desde.isoformat() if desde else '' }}"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Hasta</label>
+                <input type="date" name="hasta" value="{{ hasta.isoformat() if hasta else '' }}"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            </div>
+            <div class="flex gap-2">
+                <button type="submit"
+                    class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-semibold transition">
+                    <i class="fas fa-filter mr-2"></i>Filtrar
+                </button>
+                <a href="{{ url_for('caja.cierres_listar') }}"
+                    class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-lg font-semibold transition">
+                    <i class="fas fa-rotate-left"></i>
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <h2 class="font-semibold text-gray-700 dark:text-gray-200">Historial</h2>
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{ cierres|length }} registros</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Sesión</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Caja</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Apertura</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Cierre</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Abrió</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Cerró</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Sistema</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Declarado</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Diferencia</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for s in cierres %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100 font-semibold">#{{ s.id_sesion }}</td>
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ s.caja.nombre if s.caja else '' }}
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{
+                            s.fecha_apertura|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{
+                            s.fecha_cierre|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ s.usuario.username if s.usuario else
+                            '' }}</td>
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ s.usuario_cierre.username if
+                            s.usuario_cierre else '' }}</td>
+                        {% set sistema_val = s.monto_final_sistema or 0 %}
+                        <td
+                            class="px-4 py-3 text-right {% if sistema_val < 0 %}text-red-700 dark:text-red-300{% else %}text-gray-800 dark:text-gray-100{% endif %}">
+                            ₲ {{ "{:,.0f}".format(s.monto_final_sistema or 0).replace(",", ".") }}
+                        </td>
+                        <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">₲ {{
+                            "{:,.0f}".format(s.monto_final_declarado or 0).replace(",", ".") }}</td>
+                        {% set declarado_val = s.monto_final_declarado or 0 %}
+                        {% if sistema_val < 0 %} {% set diferencia_visible=-sistema_val %} <td
+                            class="px-4 py-3 text-right text-red-700 dark:text-red-300 font-semibold">
+                            ₲ {{ "{:,.0f}".format(diferencia_visible).replace(",", ".") }}
+                            <span class="block text-xs">Faltante para quedar en 0</span>
+                            </td>
+                            {% else %}
+                            {% set diferencia_visible = declarado_val - sistema_val %}
+                            <td
+                                class="px-4 py-3 text-right {% if diferencia_visible == 0 %}text-green-700 dark:text-green-300{% elif diferencia_visible > 0 %}text-yellow-700 dark:text-yellow-300{% else %}text-red-700 dark:text-red-300{% endif %} font-semibold">
+                                ₲ {{ "{:,.0f}".format(diferencia_visible).replace(",", ".") }}
+                            </td>
+                            {% endif %}
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{{ url_for('caja.cierre_detalle', id_sesion=s.id_sesion) }}"
+                                        data-permiso="ver_caja"
+                                        data-tab-url="{{ url_for('caja.cierre_detalle', id_sesion=s.id_sesion) }}"
+                                        data-tab-title="Cierre #{{ s.id_sesion }}" data-tab-icon="fas fa-file-invoice"
+                                        class="app-tab-link inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition">
+                                        <i class="fas fa-eye"></i><span>Ver</span>
+                                    </a>
+                                    {% if current_user.tiene_permiso('editar_cierre_caja') %}
+                                    <a href="{{ url_for('caja.cierre_editar', id_sesion=s.id_sesion) }}"
+                                        data-permiso="editar_cierre_caja"
+                                        data-tab-url="{{ url_for('caja.cierre_editar', id_sesion=s.id_sesion) }}"
+                                        data-tab-title="Editar Cierre #{{ s.id_sesion }}" data-tab-icon="fas fa-edit"
+                                        class="app-tab-link inline-flex items-center gap-1 bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 rounded-lg transition">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                    </tr>
+                    {% endfor %}
+                    {% if cierres|length == 0 %}
+                    <tr>
+                        <td colspan="10" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                            No hay cierres en el rango seleccionado.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <template x-teleport="body">
+        <div x-show="showCierreModal" data-cierre-modal-root
+            style="display: none;"
+            class="fixed inset-0 z-50"
+            aria-modal="true"
+            role="dialog">
+            <div class="fixed inset-0 transition-opacity z-0" style="z-index: 0;" aria-hidden="true" data-cierre-modal-overlay @click="showCierreModal = false">
+                <div class="absolute inset-0 bg-gray-900/70"></div>
+            </div>
+
+            <div class="relative z-10 min-h-full w-full p-2 sm:p-3 overflow-y-auto flex items-center justify-center">
+                <pre x-show="debugEnabled()" x-text="inspectInfoText" style="position: fixed; top: 8px; left: 8px; z-index: 9999; max-width: 45vw; max-height: 45vh; overflow: auto; background: rgba(0,0,0,0.85); color: #fff; font-size: 12px; padding: 8px; border-radius: 8px;"></pre>
+
+                <div data-cierre-modal-panel
+                    class="relative z-10 w-[98vw] max-w-7xl h-[96vh] bg-white dark:bg-gray-900 rounded-lg text-left overflow-hidden shadow-xl flex flex-col" style="z-index: 10;">
+                    <div class="flex justify-between items-center px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-none">
+                        <h3 class="text-sm sm:text-base font-semibold text-gray-900 dark:text-white leading-tight">
+                            Cierre de Caja <span x-text="cierreId ? ('#' + cierreId) : ''"></span>
+                        </h3>
+                        <button @click="showCierreModal = false"
+                            class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <div class="flex-1 min-h-0">
+                        <template x-if="cierreId">
+                            <iframe data-cierre-modal-iframe
+                                class="w-full h-full"
+                                :src="`{{ url_for('caja.cierre_detalle', id_sesion=0, embed=1) }}`.replace('0', cierreId)"
+                                frameborder="0"></iframe>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+{% endblock %}

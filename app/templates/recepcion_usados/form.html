@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}Nuevo formulario de usados{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <div class="text-sm uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400 font-semibold">Logística</div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Recepción de compra de equipos usados</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">El sistema genera el correlativo, crea inventario, registra el vendedor y deja el comprobante listo para imprimir.</p>
+        </div>
+        <div class="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-5 py-3">
+            <div class="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300">Próximo formulario</div>
+            <div class="text-2xl font-bold text-amber-900 dark:text-amber-100">Nº {{ '%06d'|format(numero_preview or 1) }}</div>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('recepcion_usados.nueva') }}" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <section class="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 space-y-6">
+                <div class="flex items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Datos personales del vendedor</h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Se reutilizan por documento para saber cuántas veces ya vendió equipos.</p>
+                    </div>
+                    <div id="sellerMatchBadge" class="hidden text-sm rounded-full px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nombres y apellidos</label>
+                        <input type="text" name="nombres_apellidos" value="{{ request.form.get('nombres_apellidos', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Fecha de nacimiento</label>
+                        <input type="date" name="fecha_nacimiento" value="{{ request.form.get('fecha_nacimiento', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nacionalidad</label>
+                        <input type="text" name="nacionalidad" value="{{ request.form.get('nacionalidad', 'Paraguaya') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Tipo de documento</label>
+                        <select name="tipo_documento" id="tipo_documento" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                            {% set tipo_doc = request.form.get('tipo_documento', 'Cédula') %}
+                            {% for option in ['Cédula', 'Pasaporte', 'RUC', 'Otro'] %}
+                            <option value="{{ option }}" {% if tipo_doc == option %}selected{% endif %}>{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Número de documento</label>
+                        <input type="text" name="numero_documento" id="numero_documento" value="{{ request.form.get('numero_documento', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Estado civil</label>
+                        <input type="text" name="estado_civil" value="{{ request.form.get('estado_civil', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Domicilio</label>
+                        <input type="text" name="domicilio" value="{{ request.form.get('domicilio', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Referencia</label>
+                        <input type="text" name="referencia_domicilio" value="{{ request.form.get('referencia_domicilio', '') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Barrio</label>
+                        <input type="text" name="barrio" value="{{ request.form.get('barrio', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Ciudad</label>
+                        <input type="text" name="ciudad" value="{{ request.form.get('ciudad', 'Ñemby') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Departamento</label>
+                        <input type="text" name="departamento" value="{{ request.form.get('departamento', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Celular</label>
+                        <input type="text" name="telefono" value="{{ request.form.get('telefono', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
+                </div>
+            </section>
+
+            <aside class="space-y-6">
+                <section class="bg-slate-900 text-white rounded-2xl shadow-md p-6 space-y-4">
+                    <div>
+                        <h2 class="text-lg font-semibold">Control y trazabilidad</h2>
+                        <p class="text-sm text-slate-300 mt-1">Cada formulario genera correlativo, producto, compra, movimiento de stock y, si corresponde, egreso de caja.</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div class="rounded-xl bg-white/10 p-4">
+                            <div class="text-slate-300">Caja disponible</div>
+                            <div class="text-xl font-bold">₲ {{ '{:,.0f}'.format(saldo_caja or 0) }}</div>
+                        </div>
+                        <div class="rounded-xl bg-white/10 p-4">
+                            <div class="text-slate-300">Fecha formulario</div>
+                            <input type="date" name="fecha_formulario" value="{{ request.form.get('fecha_formulario', now().strftime('%Y-%m-%d')) }}" required class="mt-2 w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-amber-400">
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-300 leading-5">Sugerencia: verificar documento físico, IMEI/serie y estado antes de guardar. El correlativo final se confirma al registrar.</div>
+                </section>
+            </aside>
+        </div>
+
+        <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 space-y-6">
+            <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Equipo recibido e ingreso a inventario</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Se crea un producto único con código `US-{{ '%06d'|format(numero_preview or 1) }}` y stock inicial 1.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Descripción del producto</label>
+                    <textarea name="descripcion_producto" rows="2" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">{{ request.form.get('descripcion_producto', '') }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Categoría</label>
+                    <select name="id_categoria" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                        <option value="">Seleccionar...</option>
+                        {% set categoria_sel = request.form.get('id_categoria', '') %}
+                        {% for categoria in categorias %}
+                        <option value="{{ categoria.id_categoria }}" {% if categoria_sel == categoria.id_categoria|string %}selected{% endif %}>{{ categoria.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Marca</label>
+                    <input type="text" name="marca" value="{{ request.form.get('marca', '') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Modelo</label>
+                    <input type="text" name="modelo" value="{{ request.form.get('modelo', '') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Color</label>
+                    <input type="text" name="color" value="{{ request.form.get('color', '') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Capacidad</label>
+                    <input type="text" name="capacidad" value="{{ request.form.get('capacidad', '') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">IMEI / Serie</label>
+                    <input type="text" name="imei_serie" value="{{ request.form.get('imei_serie', '') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Accesorios</label>
+                    <textarea name="accesorios" rows="2" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">{{ request.form.get('accesorios', '') }}</textarea>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Estado del equipo / observación técnica</label>
+                    <textarea name="estado_equipo" rows="2" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">{{ request.form.get('estado_equipo', '') }}</textarea>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 space-y-6">
+            <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Pago y datos contractuales</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">El monto queda como costo de compra del producto creado y base del formulario legal.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Monto de compra</label>
+                    <input type="text" name="monto_compra" value="{{ request.form.get('monto_compra', '') }}" required class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="1500000">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Método de pago</label>
+                    <select name="id_metodo_pago" id="id_metodo_pago" required data-metodo-select="1" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                        <option value="">Seleccionar...</option>
+                        {% set metodo_sel = request.form.get('id_metodo_pago', '') %}
+                        {% for metodo in metodos_pago %}
+                        <option value="{{ metodo.id_metodo_pago }}" data-requiere-referencia="{{ 1 if metodo.requiere_referencia else 0 }}" {% if metodo_sel == metodo.id_metodo_pago|string %}selected{% endif %}>{{ metodo.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="xl:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Referencia del pago</label>
+                    <input type="text" name="referencia_pago" id="referencia_pago" value="{{ request.form.get('referencia_pago', '') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="Nº de transferencia, comprobante, banco, etc.">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Domicilio especial del vendedor</label>
+                    <input type="text" name="domicilio_especial_vendedor" value="{{ request.form.get('domicilio_especial_vendedor', '') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="Si se omite, se usará el domicilio principal.">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Ciudad de firma</label>
+                    <input type="text" name="lugar_firma" value="{{ request.form.get('lugar_firma', 'Ñemby') }}" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div class="md:col-span-2 xl:col-span-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Observaciones</label>
+                    <textarea name="observaciones" rows="2" class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none">{{ request.form.get('observaciones', '') }}</textarea>
+                </div>
+            </div>
+        </section>
+
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+            <a href="{{ url_for('recepcion_usados.listar') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-center font-medium">
+                Cancelar
+            </a>
+            <button type="submit" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-amber-500 bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-md shadow-amber-600/30 transition-colors">
+                <i class="fas fa-save mr-2"></i>Guardar y generar formulario
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const docInput = document.getElementById('numero_documento');
+        const typeInput = document.getElementById('tipo_documento');
+        const badge = document.getElementById('sellerMatchBadge');
+        const metodoSelect = document.querySelector('[data-metodo-select="1"]');
+        const referenciaInput = document.getElementById('referencia_pago');
+
+        async function lookupSeller() {
+            const tipo = (typeInput?.value || '').trim();
+            const numero = (docInput?.value || '').trim();
+            if (!tipo || numero.length < 4) {
+                badge.classList.add('hidden');
+                badge.textContent = '';
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams({ tipo_documento: tipo, numero_documento: numero });
+                const resp = await fetch(`{{ url_for('recepcion_usados.api_vendedor') }}?${params.toString()}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!resp.ok) {
+                    badge.classList.add('hidden');
+                    return;
+                }
+
+                const data = await resp.json();
+                if (!data.success || !data.found || !data.vendedor) {
+                    badge.classList.add('hidden');
+                    badge.textContent = '';
+                    return;
+                }
+
+                const vendedor = data.vendedor;
+                const fields = ['nombres_apellidos', 'fecha_nacimiento', 'nacionalidad', 'estado_civil', 'domicilio', 'referencia_domicilio', 'barrio', 'ciudad', 'departamento', 'telefono'];
+                fields.forEach((name) => {
+                    const input = document.querySelector(`[name="${name}"]`);
+                    if (input && !input.value.trim() && vendedor[name]) {
+                        input.value = vendedor[name];
+                    }
+                });
+
+                badge.textContent = `Vendedor registrado: ${vendedor.veces_vendio} compra(s) previa(s)`;
+                badge.classList.remove('hidden');
+            } catch (_err) {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function syncReferenciaRequired() {
+            if (!metodoSelect || !referenciaInput) return;
+            const selected = metodoSelect.options[metodoSelect.selectedIndex];
+            const requiere = selected && selected.dataset.requiereReferencia === '1';
+            referenciaInput.required = !!requiere;
+            referenciaInput.placeholder = requiere ? 'Este método requiere una referencia obligatoria' : 'Nº de transferencia, comprobante, banco, etc.';
+        }
+
+        docInput?.addEventListener('blur', lookupSeller);
+        typeInput?.addEventListener('change', lookupSeller);
+        metodoSelect?.addEventListener('change', syncReferenciaRequired);
+        syncReferenciaRequired();
+    })();
+</script>
+{% endblock %}

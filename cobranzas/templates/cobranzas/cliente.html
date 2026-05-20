@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Cliente {{ detalle.cliente.nombre }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ detalle.cliente.nombre }}</h1>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Ficha minima de cliente en cobranzas con cuentas asociadas y cobros recientes.</p>
+            <div class="mt-2 flex flex-wrap gap-3 text-sm text-gray-500 dark:text-gray-400">
+                <span>Cliente #{{ detalle.cliente.id_cliente }}</span>
+                <span>{{ detalle.cliente.ruc_ci or 'Sin RUC/CI' }}</span>
+                {% if detalle.cliente.telefono %}
+                <span>{{ detalle.cliente.telefono }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('cobranzas_cuentas.listar_cuentas') }}" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left mr-2"></i>Volver a cuentas
+            </a>
+            <a href="{{ url_for('clientes.detalle', id=detalle.cliente.id_cliente) }}" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                <i class="fas fa-address-card mr-2"></i>Ver cliente general
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Saldo pendiente</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">₲ {{ "{:,.0f}".format(detalle.resumen.saldo_total).replace(",", ".") }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Cuentas abiertas</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ detalle.resumen.cuentas_abiertas }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Cuentas vencidas</div>
+            <div class="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">{{ detalle.resumen.cuentas_vencidas }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Credito disponible</div>
+            <div class="mt-2 text-2xl font-bold text-green-600 dark:text-green-400">₲ {{ "{:,.0f}".format(detalle.resumen.credito_disponible).replace(",", ".") }}</div>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Cuentas del cliente</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Resumen de deuda asociada a este cliente.</p>
+        </div>
+
+        {% if detalle.cuentas %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold">Cuenta</th>
+                        <th class="px-4 py-3 text-left font-semibold">Venta</th>
+                        <th class="px-4 py-3 text-left font-semibold">Producto</th>
+                        <th class="px-4 py-3 text-left font-semibold">Plan</th>
+                        <th class="px-4 py-3 text-left font-semibold">Vencimiento</th>
+                        <th class="px-4 py-3 text-right font-semibold">Saldo</th>
+                        <th class="px-4 py-3 text-left font-semibold">Estado</th>
+                        <th class="px-4 py-3 text-right font-semibold">Accion</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for item in detalle.cuentas %}
+                    <tr>
+                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">#{{ item.cuenta.id_cuenta_cobrar }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">#{{ item.cuenta.id_venta }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <div class="max-w-sm truncate" title="{{ item.productos_venta.texto if item.productos_venta else 'Sin detalle de productos' }}">
+                                {{ item.productos_venta.texto if item.productos_venta else 'Sin detalle de productos' }}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            {% if item.plan_credito %}
+                            <div class="font-medium text-gray-900 dark:text-white">{{ item.plan_credito.cantidad_cuotas }} cuota(s)</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                {% if item.plan_credito.proxima_cuota %}
+                                Próxima: #{{ item.plan_credito.proxima_cuota.numero_cuota }}
+                                {% else %}
+                                Plan {{ item.plan_credito.estado.replace('_', ' ') }}
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Cuenta corriente</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            {% if item.cuenta.fecha_vencimiento %}
+                                {{ item.cuenta.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">₲ {{ "{:,.0f}".format(item.saldo_pendiente).replace(",", ".") }}</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ item.estado_classes }}">{{ item.estado_label }}</span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <a href="{{ url_for('cobranzas_cuentas.detalle_cuenta', id_cuenta=item.cuenta.id_cuenta_cobrar) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                Ver ficha
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-10 text-sm text-gray-500 dark:text-gray-400">
+            Este cliente todavia no tiene cuentas por cobrar registradas.
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Cobros recientes</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Ultimos movimientos de cobranza asociados al cliente.</p>
+        </div>
+
+        {% if detalle.pagos %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold">Fecha</th>
+                        <th class="px-4 py-3 text-left font-semibold">Cuenta</th>
+                        <th class="px-4 py-3 text-left font-semibold">Producto</th>
+                        <th class="px-4 py-3 text-left font-semibold">Metodo</th>
+                        <th class="px-4 py-3 text-left font-semibold">Usuario</th>
+                        <th class="px-4 py-3 text-right font-semibold">Monto</th>
+                        <th class="px-4 py-3 text-left font-semibold">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for pago_item in detalle.pagos %}
+                    {% set pago = pago_item.pago %}
+                    <tr>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ pago.fecha_pago|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <a href="{{ url_for('cobranzas_cuentas.detalle_cuenta', id_cuenta=pago.id_cuenta_cobrar) }}" class="font-medium hover:text-indigo-600 dark:hover:text-indigo-400">
+                                #{{ pago.id_cuenta_cobrar }}
+                            </a>
+                            {% if pago.cuenta and pago.cuenta.venta %}
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Venta #{{ pago.cuenta.venta.id_venta }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <div class="max-w-sm truncate" title="{{ pago_item.productos_venta.texto if pago_item.productos_venta else 'Sin detalle de productos' }}">
+                                {{ pago_item.productos_venta.texto if pago_item.productos_venta else 'Sin detalle de productos' }}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ pago.metodo.nombre if pago.metodo else '-' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ pago.usuario.nombre_completo if pago.usuario else ('Usuario #' ~ pago.id_usuario) }}</td>
+                        <td class="px-4 py-3 text-right font-semibold {% if pago_item.estado == 'anulado' %}text-gray-500 dark:text-gray-400{% else %}text-green-700 dark:text-green-400{% endif %}">₲ {{ "{:,.0f}".format(pago.monto).replace(",", ".") }}</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ pago_item.estado_classes }}">{{ pago_item.estado_label }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-10 text-sm text-gray-500 dark:text-gray-400">
+            No hay cobros registrados para este cliente.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

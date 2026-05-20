@@ -1,0 +1,83 @@
+{% if puede_crear_producto_rapido and not bloqueado %}
+<div id="pedido-producto-rapido-modal"
+    class="hidden fixed inset-0 z-50 items-center justify-center bg-black/50 p-4"
+    onclick="cerrarPedidoProductoRapidoDesdeFondo(event)">
+    <div class="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-gray-800">
+        <div class="flex items-center justify-between bg-indigo-600 px-6 py-4 text-white">
+            <h3 class="flex items-center gap-2 text-xl font-bold">
+                <i class="fas fa-cube"></i>
+                Producto rapido
+            </h3>
+            <button type="button" onclick="cerrarPedidoProductoRapido()"
+                class="rounded-lg border border-white/30 px-2 py-1 text-white transition hover:bg-white/10">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+        <div class="space-y-4 p-5">
+            <p class="text-sm text-gray-600 dark:text-gray-300">
+                Crea un producto especifico para este pedido y lo deja listo en el formulario para revisar precio, cantidad u observaciones antes de agregarlo.
+            </p>
+            <p id="pedido-producto-rapido-error" class="hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300"></p>
+
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre *</label>
+                    <input type="text" id="pedido-producto-rapido-nombre"
+                        class="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-gray-800 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        placeholder="Ej: Mueble a medida 2 puertas">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Codigo</label>
+                    <input type="text" id="pedido-producto-rapido-codigo"
+                        class="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-gray-800 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        placeholder="Opcional">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Precio venta *</label>
+                    <input type="number" min="1" step="1000" id="pedido-producto-rapido-precio"
+                        class="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-gray-800 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        placeholder="0">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Categoria *</label>
+                    <select id="pedido-producto-rapido-categoria"
+                        class="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-gray-800 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                        <option value="">Seleccionar...</option>
+                        {% for categoria in categorias_producto_rapido %}
+                        <option value="{{ categoria.id_categoria }}">{{ categoria.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Cantidad</label>
+                    <input type="number" min="1" step="1" id="pedido-producto-rapido-cantidad" value="1"
+                        class="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-gray-800 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Observacion del item</label>
+                    <input type="text" id="pedido-producto-rapido-observaciones"
+                        class="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-gray-800 focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        placeholder="Detalle opcional para el pedido">
+                </div>
+            </div>
+
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input type="checkbox" id="pedido-producto-rapido-sobre-pedido" checked
+                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                Marcar como sobre pedido (prefijo SP- en codigo)
+            </label>
+
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="cerrarPedidoProductoRapido()"
+                    class="flex-1 rounded-lg border border-gray-300 bg-gray-100 py-2.5 font-medium text-gray-700 transition hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
+                    Cancelar
+                </button>
+                <button type="button" id="pedido-producto-rapido-guardar" onclick="guardarPedidoProductoRapido()"
+                    class="flex-1 rounded-lg border border-indigo-700 bg-indigo-600 py-2.5 font-semibold text-white transition hover:bg-indigo-700">
+                    Crear y preparar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

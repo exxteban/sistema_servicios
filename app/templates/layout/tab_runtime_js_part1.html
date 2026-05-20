@@ -1,0 +1,901 @@
+﻿        (function () {
+            const tabBar = document.getElementById('app-tab-bar');
+            const panels = document.getElementById('app-tab-panels');
+            if (!tabBar || !panels) return;
+            const TAB_RUNTIME_OK = typeof Map !== 'undefined'
+                && typeof Set !== 'undefined'
+                && typeof URL !== 'undefined'
+                && typeof DOMParser !== 'undefined'
+                && typeof AbortController !== 'undefined'
+                && typeof fetch === 'function'
+                && typeof Promise !== 'undefined';
+            if (!TAB_RUNTIME_OK) return;
+
+            const DEBUG_LOGS = (() => {
+                try {
+                    const u = new URL(window.location.href);
+                    if (u.searchParams.get('debug') === '1') return true;
+                    return localStorage.getItem('debug_logs') === '1';
+                } catch {
+                    return false;
+                }
+            })();
+
+            window.setDebugLogs = function (enabled) {
+                try {
+                    if (enabled) localStorage.setItem('debug_logs', '1');
+                    else localStorage.removeItem('debug_logs');
+                } catch { }
+                try { window.location.reload(); } catch { }
+            };
+
+            function dlog(...args) {
+                if (!DEBUG_LOGS) return;
+                try { console.log(...args); } catch { }
+            }
+
+            function safeLogFormData(formData) {
+                const out = {};
+                try {
+                    for (const [k, v] of formData.entries()) {
+                        const key = String(k || '');
+                        const lower = key.toLowerCase();
+                        if (lower.includes('password') || lower.includes('token') || lower.includes('csrf') || lower.includes('secret')) {
+                            out[key] = '***';
+                            continue;
+                        }
+                        const val = (v instanceof File) ? `[file:${v.name}]` : v;
+                        out[key] = val;
+                    }
+                } catch { }
+                return out;
+            }
+
+            const onTabBarWheel = (e) => {
+                if (e.ctrlKey) return;
+                if (tabBar.scrollWidth <= tabBar.clientWidth) return;
+                let delta = 0;
+                const absY = Math.abs(e.deltaY || 0);
+                const absX = Math.abs(e.deltaX || 0);
+                if (absX > absY) {
+                    delta = e.deltaX || 0;
+                } else {
+                    delta = e.deltaY || 0;
+                }
+
+                if (delta === 0) return;
+
+                const deltaMode = e.deltaMode || 0;
+                if (deltaMode === 1) delta *= 32;
+                else if (deltaMode === 2) delta *= window.innerHeight || 800;
+
+                const maxScrollLeft = Math.max(0, tabBar.scrollWidth - tabBar.clientWidth);
+                const current = tabBar.scrollLeft;
+                const next = Math.max(0, Math.min(maxScrollLeft, current + delta));
+                if (next === current) return;
+
+                e.preventDefault();
+                tabBar.scrollLeft = next;
+            };
+            try {
+                document.addEventListener('wheel', (e) => {
+                    const target = e.target;
+                    if (!(target instanceof Element)) return;
+                    if (!target.closest('#app-tab-bar')) return;
+                    onTabBarWheel(e);
+                }, { passive: false, capture: true });
+            } catch {
+                document.addEventListener('wheel', (e) => {
+                    const target = e.target;
+                    if (!(target instanceof Element)) return;
+                    if (!target.closest('#app-tab-bar')) return;
+                    onTabBarWheel(e);
+                }, true);
+            }
+
+            const DASHBOARD_URL = {{ url_for('main.dashboard') | tojson }};
+            const LOGIN_URL = {{ url_for('auth.login') | tojson }};
+            const STORAGE_KEY = `app_tabs_v1_u{{ current_user.id_usuario }}`;
+            const LEGACY_STORAGE_KEY = 'app_tabs_v1';
+            const LOGOUT_BROADCAST_KEY = 'app_logout_v1';
+            const principalTabId = 'principal';
+            const tabButtonsById = new Map();
+            const tabPanelsById = new Map();
+            const tabLoadersById = new Map();
+            const tabIdsByKey = new Map();
+            const tabMetaByKey = new Map();
+            const creatingTabs = new Set();
+
+            // Historial de navegaciÃ³n por tab: tabId -> [url, url, ...]
+            const tabHistoryById = new Map();
+            const TAB_HISTORY_MAX = 50;
+
+            const principalBtn = tabBar.querySelector('[data-tab-id="principal"]');
+            const tabBtnBaseClass = principalBtn ? principalBtn.className : '';
+            const closeBtnTemplate = principalBtn ? principalBtn.querySelector('.app-tab-close') : null;
+            const closeBtnBaseClass = closeBtnTemplate ? closeBtnTemplate.className.replace(/\bhidden\b/g, '').trim() : 'ml-2 text-gray-400 hover:text-gray-700';
+
+            tabButtonsById.set(principalTabId, principalBtn);
+            tabPanelsById.set(principalTabId, document.getElementById('app-tab-panel-principal'));
+
+            function getActiveTabId() {
+                for (const [id, btn] of tabButtonsById.entries()) {
+                    if (!btn) continue;
+                    if (btn.getAttribute('aria-selected') === 'true') return id;
+                }
+                return principalTabId;
+            }
+
+            function getKeyByTabId(tabId) {
+                for (const [key, id] of tabIdsByKey.entries()) {
+                    if (id === tabId) return key;
+                }
+                return null;
+            }
+
+            function normalizeKey(url) {
+                try {
+                    const u = new URL(url, window.location.origin);
+                    u.searchParams.delete('embed');
+                    u.searchParams.delete('partial');
+                    u.searchParams.delete('include_css');
+                    u.searchParams.delete('cierre_id');
+                    const qs = u.searchParams.toString();
+                    return qs ? `${u.pathname}?${qs}` : u.pathname;
+                } catch {
+                    return url;
+                }
+            }
+
+            function isRestorableUrl(url) {
+                try {
+                    const u = new URL(url, window.location.origin);
+                    const loginPath = new URL(LOGIN_URL, window.location.origin).pathname;
+                    return u.origin === window.location.origin && u.pathname !== loginPath;
+                } catch {
+                    return false;
+                }
+            }
+
+            function normalizePathname(pathname) {
+                if (!pathname) return '/';
+                if (pathname === '/') return '/';
+                return pathname.replace(/\/+$/, '');
+            }
+
+            function isDashboardUrl(url) {
+                try {
+                    const dashboardPath = normalizePathname(new URL(DASHBOARD_URL, window.location.origin).pathname);
+                    const path = normalizePathname(new URL(url, window.location.origin).pathname);
+                    return path === dashboardPath;
+                } catch {
+                    return false;
+                }
+            }
+
+            function syncTabButtonMeta(tabId, meta) {
+                try {
+                    const btn = tabButtonsById.get(tabId);
+                    if (!btn || !meta) return;
+                    const iconEl = btn.querySelector('i');
+                    if (iconEl && meta.iconClass) iconEl.className = meta.iconClass;
+                    const labelEl = btn.querySelector('span.whitespace-nowrap');
+                    if (labelEl && meta.title) labelEl.textContent = meta.title;
+                } catch { }
+            }
+
+            function buildEmbedUrl(url) {
+                const u = new URL(url, window.location.origin);
+                u.searchParams.set('embed', '1');
+                return u.toString();
+            }
+
+            function clearUiState() {
+                try { localStorage.removeItem(STORAGE_KEY); } catch { }
+                try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch { }
+            }
+
+            function saveState() {
+                try {
+                    const tabs = [];
+                    for (const [key] of tabIdsByKey.entries()) {
+                        const meta = tabMetaByKey.get(key) || {};
+                        tabs.push({
+                            key,
+                            url: normalizeKey(meta.url || key),
+                            title: meta.title || '',
+                            icon: meta.iconClass || ''
+                        });
+                    }
+
+                    const activeId = getActiveTabId();
+                    let activeKey = principalTabId;
+                    if (activeId !== principalTabId) {
+                        for (const [key, id] of tabIdsByKey.entries()) {
+                            if (id === activeId) {
+                                activeKey = key;
+                                break;
+                            }
+                        }
+                    }
+
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, tabs, active: activeKey }));
+                } catch { }
+            }
+
+            function restoreState() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return false;
+                    const payload = JSON.parse(raw);
+                    if (!payload || !Array.isArray(payload.tabs)) return false;
+
+                    const restoredKeyByStoredKey = new Map();
+                    for (const tab of payload.tabs) {
+                        if (!tab || !tab.key) continue;
+                        const storedKey = normalizeKey(tab.key);
+                        const rawUrl = tab.url || tab.key;
+                        if (!isRestorableUrl(rawUrl)) continue;
+
+                        const restoredUrl = normalizeKey(rawUrl);
+                        restoredKeyByStoredKey.set(storedKey, restoredUrl);
+
+                        let title = tab.title || '';
+                        let icon = tab.icon || '';
+                        if (isDashboardUrl(rawUrl) || isDashboardUrl(restoredUrl)) {
+                            title = 'Dashboard';
+                            icon = 'fas fa-tachometer-alt';
+                        }
+
+                        openTab(restoredUrl, title, icon, { activate: false, scroll: false });
+                    }
+
+                    if (payload.active && payload.active !== principalTabId) {
+                        const storedActiveKey = normalizeKey(payload.active);
+                        const restoredActiveKey = restoredKeyByStoredKey.get(storedActiveKey) || storedActiveKey;
+                        const id = tabIdsByKey.get(restoredActiveKey);
+                        if (id) setActiveTab(id);
+                        else setActiveTab(principalTabId);
+                    } else {
+                        setActiveTab(principalTabId);
+                    }
+
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            function setActiveTab(tabId) {
+                // Limpiar entradas huÃ©rfanas (botÃ³n removido del DOM pero no del Map)
+                for (const [id, btn] of tabButtonsById.entries()) {
+                    if (btn && !document.contains(btn)) {
+                        tabButtonsById.set(id, null);
+                    }
+                }
+
+                for (const [id, btn] of tabButtonsById.entries()) {
+                    if (!btn) continue;
+                    const selected = id === tabId;
+                    btn.setAttribute('aria-selected', selected ? 'true' : 'false');
+                    if (selected) {
+                        btn.classList.add('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-200', 'border-gray-200', 'dark:border-gray-700');
+                        btn.classList.remove('bg-gray-100', 'dark:bg-gray-900', 'text-gray-500', 'dark:text-gray-400', 'border-transparent');
+                    } else {
+                        btn.classList.add('bg-gray-100', 'dark:bg-gray-900', 'text-gray-500', 'dark:text-gray-400', 'border-transparent');
+                        btn.classList.remove('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-200', 'border-gray-200', 'dark:border-gray-700');
+                    }
+                }
+
+                for (const [id, panel] of tabPanelsById.entries()) {
+                    if (!panel) continue;
+                    const selected = id === tabId;
+                    panel.hidden = !selected;
+                    panel.setAttribute('aria-hidden', selected ? 'false' : 'true');
+                }
+
+                // Actualizar document.title y URL del browser al cambiar de tab
+                try {
+                    const activePanel = tabPanelsById.get(tabId);
+                    const isPrincipal = tabId === principalTabId;
+                    const hasContent = activePanel && (isPrincipal || activePanel.querySelector('[data-app-tab-content]'));
+                    if (activePanel && hasContent) {
+                        const appTitle = window.__appBaseTitle || 'Sistema de GestiÃ³n Comercial';
+                        const currentKey = getKeyByTabId(tabId);
+                        const meta = currentKey ? tabMetaByKey.get(currentKey) : null;
+                        const savedPageTitle = meta ? (meta.pageTitle || '').trim() : '';
+                        let fullTitle = appTitle;
+
+                        if (savedPageTitle) {
+                            fullTitle = `${savedPageTitle} - ${appTitle}`;
+                        } else {
+                            const btn = tabButtonsById.get(tabId);
+                            const labelEl = btn ? btn.querySelector('span.whitespace-nowrap') : null;
+                            const tabLabel = labelEl ? labelEl.textContent.trim() : '';
+                            if (tabLabel && tabLabel !== 'Dashboard') {
+                                fullTitle = `${tabLabel} - ${appTitle}`;
+                            }
+                        }
+
+                        document.title = fullTitle;
+
+                        // replaceState: reflejar la URL de la tab activa en el browser sin agregar
+                        // una entrada nueva al historial
+                        try {
+                            const tabUrl = meta ? (meta.url || currentKey) : null;
+                            if (tabUrl) {
+                                const absUrl = new URL(tabUrl, window.location.origin).toString();
+                                history.replaceState(
+                                    { tabId, url: normalizeKey(tabUrl), appNav: true },
+                                    fullTitle,
+                                    absUrl
+                                );
+                            } else if (isPrincipal) {
+                                history.replaceState(
+                                    { tabId: principalTabId, url: normalizeKey(DASHBOARD_URL), appNav: true },
+                                    fullTitle,
+                                    DASHBOARD_URL
+                                );
+                            }
+                        } catch { }
+                    }
+                } catch { }
+
+                saveState();
+            }
+
+            function pushTabHistory(tabId, url) {
+                try {
+                    const normalized = normalizeKey(url);
+                    if (!normalized) return;
+                    let stack = tabHistoryById.get(tabId);
+                    if (!stack) {
+                        stack = [];
+                        tabHistoryById.set(tabId, stack);
+                    }
+                    // No duplicar si es la misma URL que la Ãºltima
+                    if (stack.length > 0 && stack[stack.length - 1] === normalized) return;
+                    stack.push(normalized);
+                    if (stack.length > TAB_HISTORY_MAX) stack.shift();
+                } catch { }
+            }
+
+            function popTabHistory(tabId) {
+                try {
+                    const stack = tabHistoryById.get(tabId);
+                    if (!stack || stack.length < 2) return null;
+                    stack.pop(); // quitar la actual
+                    return stack[stack.length - 1]; // retornar la anterior
+                } catch { return null; }
+            }
+
+            function closeTab(tabId) {
+                if (tabId === principalTabId) return;
+                const btn = tabButtonsById.get(tabId);
+                const panel = tabPanelsById.get(tabId);
+                const isActive = btn && btn.getAttribute('aria-selected') === 'true';
+
+                // Antes de eliminar, determinar quÃ© pestaÃ±a activar si esta era la activa.
+                // Se busca la pestaÃ±a inmediatamente anterior en el DOM; si no hay, la siguiente.
+                let fallbackTabId = principalTabId;
+                if (isActive && btn) {
+                    const allBtns = Array.from(tabBar.querySelectorAll('button[data-tab-id]'));
+                    const idx = allBtns.indexOf(btn);
+                    const prevBtn = idx > 0 ? allBtns[idx - 1] : null;
+                    const nextBtn = idx < allBtns.length - 1 ? allBtns[idx + 1] : null;
+                    const candidateBtn = prevBtn || nextBtn;
+                    if (candidateBtn) {
+                        fallbackTabId = candidateBtn.getAttribute('data-tab-id') || principalTabId;
+                    }
+                }
+
+                if (btn) btn.remove();
+                if (panel) panel.remove();
+
+                tabButtonsById.delete(tabId);
+                tabPanelsById.delete(tabId);
+                tabLoadersById.delete(tabId);
+                tabHistoryById.delete(tabId);  // limpiar historial interno
+
+                let removedKey = null;
+                for (const [key, id] of tabIdsByKey.entries()) {
+                    if (id !== tabId) continue;
+                    tabIdsByKey.delete(key);
+                    removedKey = key;
+                    break;
+                }
+                if (removedKey) tabMetaByKey.delete(removedKey);
+
+                if (isActive) {
+                    setActiveTab(fallbackTabId);
+                }
+
+                saveState();
+            }
+
+            function getTabIdFromPointerTarget(target) {
+                const btn = target && target.closest ? target.closest('button[data-tab-id]') : null;
+                if (!btn || !tabBar.contains(btn)) return null;
+                return btn.getAttribute('data-tab-id');
+            }
+
+            tabBar.addEventListener('mousedown', (e) => {
+                if (e.button !== 1) return;
+                const tabId = getTabIdFromPointerTarget(e.target);
+                if (!tabId) return;
+                e.preventDefault();
+            });
+
+            tabBar.addEventListener('auxclick', (e) => {
+                if (e.button !== 1) return;
+                const tabId = getTabIdFromPointerTarget(e.target);
+                if (!tabId) return;
+                e.preventDefault();
+                e.stopPropagation();
+                closeTab(tabId);
+            });
+
+            // Inicializar historial de la tab principal con la URL actual
+            pushTabHistory(principalTabId, window.location.pathname + window.location.search);
+
+            function openTab(url, title, iconClass, options = {}) {
+                const activate = options.activate !== false;
+                const scroll = options.scroll !== false;
+                const preferExistingByTitle = options.preferExistingByTitle === true;
+
+                const key = normalizeKey(url);
+                const targetIsDashboard = isDashboardUrl(url);
+
+                let existingId = tabIdsByKey.get(key);
+                if (!existingId && preferExistingByTitle && title) {
+                    for (const [existingKey] of tabIdsByKey.entries()) {
+                        const meta = tabMetaByKey.get(existingKey);
+                        if (!meta) continue;
+                        if (meta.title !== title) continue;
+                        if (iconClass && meta.iconClass && meta.iconClass !== iconClass) continue;
+                        const existingUrl = meta.url || existingKey;
+                        if (isDashboardUrl(existingUrl) && !targetIsDashboard) continue;
+                        existingId = tabIdsByKey.get(existingKey);
+                        if (existingId) {
+                            if (existingKey !== key && !tabIdsByKey.has(key)) {
+                                tabIdsByKey.delete(existingKey);
+                                tabMetaByKey.delete(existingKey);
+                                tabIdsByKey.set(key, existingId);
+                                tabMetaByKey.set(key, meta);
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (existingId) {
+                    if (activate) setActiveTab(existingId);
+                    const btn = tabButtonsById.get(existingId);
+                    if (btn && scroll) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                    const loader = tabLoadersById.get(existingId);
+                    const meta = tabMetaByKey.get(key);
+                    const normalizedUrl = normalizeKey(url);
+                    if (loader && meta && meta.url !== normalizedUrl) {
+                        meta.url = normalizedUrl;
+                        tabMetaByKey.set(key, meta);
+                        loader(url);
+                        saveState();
+                    }
+                    return;
+                }
+
+                if (creatingTabs.has(key)) {
+                    console.log('Tab already being created:', key);
+                    return;
+                }
+
+                creatingTabs.add(key);
+
+                const tabId = `tab-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                tabIdsByKey.set(key, tabId);
+                tabMetaByKey.set(key, { url: normalizeKey(url), title, iconClass });
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = tabBtnBaseClass;
+                btn.setAttribute('data-tab-id', tabId);
+                btn.setAttribute('aria-selected', 'false');
+                btn.classList.add('bg-gray-100', 'dark:bg-gray-900', 'text-gray-500', 'dark:text-gray-400', 'border-transparent');
+                btn.classList.remove('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-200', 'border-gray-200', 'dark:border-gray-700');
+
+                const icon = document.createElement('i');
+                icon.className = iconClass || 'fas fa-window-maximize';
+                btn.appendChild(icon);
+
+                const label = document.createElement('span');
+                label.className = 'whitespace-nowrap';
+                label.textContent = title || 'PestaÃ±a';
+                btn.appendChild(label);
+
+                const closeBtn = document.createElement('span');
+                closeBtn.className = `${closeBtnBaseClass} app-tab-close select-none`;
+                closeBtn.setAttribute('role', 'button');
+                closeBtn.setAttribute('aria-label', 'Cerrar pestaÃ±a');
+                closeBtn.innerHTML = '&times;';
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    closeTab(tabId);
+                });
+                btn.appendChild(closeBtn);
+
+                btn.addEventListener('click', () => setActiveTab(tabId));
+                tabBar.appendChild(btn);
+                tabButtonsById.set(tabId, btn);
+
+                const panel = document.createElement('section');
+                panel.className = 'app-tab-panel relative flex-1 min-h-0 overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4';
+                panel.setAttribute('data-tab-panel', tabId);
+                panel.setAttribute('aria-hidden', 'true');
+                panel.hidden = true;
+
+                const cover = document.createElement('div');
+                cover.className = 'loading-cover absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10';
+                cover.setAttribute('aria-hidden', 'true');
+
+                const spinner = document.createElement('div');
+                spinner.className = 'w-10 h-10 rounded-full border-4 border-gray-300 dark:border-gray-700 border-t-blue-500 animate-spin';
+                cover.appendChild(spinner);
+                panel.appendChild(cover);
+
+                function extractTabHtml(rawHtml) {
+                    try {
+                        const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
+                        function collectExtraStyles(excludedNodes = []) {
+                            const excluded = excludedNodes.filter(Boolean);
+                            const chunks = [];
+                            doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+                                const isExcluded = excluded.some((parent) => {
+                                    try {
+                                        return parent === node || parent.contains(node);
+                                    } catch {
+                                        return false;
+                                    }
+                                });
+                                if (isExcluded) return;
+                                chunks.push(node.outerHTML || '');
+                            });
+                            return chunks.join('\n');
+                        }
+
+                        function splitNodeHtml(node) {
+                            if (!node) {
+                                return { contentHtml: '', scriptsHtml: '', stylesHtml: '' };
+                            }
+
+                            const clone = node.cloneNode(true);
+                            const scriptChunks = [];
+                            clone.querySelectorAll('script').forEach((scriptNode) => {
+                                scriptChunks.push(scriptNode.outerHTML || '');
+                                scriptNode.remove();
+                            });
+
+                            return {
+                                contentHtml: clone.innerHTML || '',
+                                scriptsHtml: scriptChunks.join('\n'),
+                                stylesHtml: ''
+                            };
+                        }
+
+                        const partialContent = doc.getElementById('partial-content');
+                        if (partialContent) {
+                            const partialScripts = doc.getElementById('partial-scripts');
+                            const extracted = splitNodeHtml(partialContent);
+                            const extraScripts = partialScripts ? (partialScripts.innerHTML || '') : '';
+                            return {
+                                contentHtml: extracted.contentHtml,
+                                scriptsHtml: [extracted.scriptsHtml, extraScripts].filter(Boolean).join('\n'),
+                                stylesHtml: collectExtraStyles([partialContent, partialScripts]),
+                                pageTitle: (partialContent.getAttribute('data-page-title') || '').trim()
+                            };
+                        }
+
+                        const principal = doc.getElementById('app-tab-panel-principal');
+                        if (principal) {
+                            const extracted = splitNodeHtml(principal);
+                            extracted.stylesHtml = collectExtraStyles([principal]);
+                            return extracted;
+                        }
+
+                        if (doc.body) {
+                            const extracted = splitNodeHtml(doc.body);
+                            extracted.stylesHtml = collectExtraStyles([doc.body]);
+                            return extracted;
+                        }
+                    } catch { }
+
+                    return { contentHtml: rawHtml || '', scriptsHtml: '', stylesHtml: '' };
+                }
+
+                const posPerfPaths = new Set(['/ventas/pos', '/ventas/registro-vendedor']);
+
+                function isPosPerfTarget(urlLike) {
+                    try {
+                        const parsed = new URL(urlLike, window.location.origin);
+                        return posPerfPaths.has(parsed.pathname);
+                    } catch {
+                        return false;
+                    }
+                }
+
+                function getPosPerfTiming() {
+                    const timing = window.__posPerfTabLoadTiming;
+                    if (!timing || typeof timing !== 'object') return null;
+                    return timing;
+                }
+
+                function markPosPerf(name) {
+                    const timing = getPosPerfTiming();
+                    if (!timing) return;
+                    timing[name] = performance.now();
+                }
+
+                let currentLoadSeq = 0;
+                let currentAbortController = null;
+
+                function removePanelContent() {
+                    panel.querySelectorAll('[data-app-tab-content]').forEach((el) => {
+                        try {
+                            if (window.Alpine && typeof window.Alpine.destroyTree === 'function') {
+                                window.Alpine.destroyTree(el);
+                            }
+                        } catch { }
+                        el.remove();
+                    });
+                }
+
+                function ensureLoadingCover() {
+                    let loadingCover = panel.querySelector('.loading-cover');
+                    if (loadingCover) return loadingCover;
+                    loadingCover = document.createElement('div');
+                    loadingCover.className = 'loading-cover absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10';
+                    const loadSpinner = document.createElement('div');
+                    loadSpinner.className = 'w-10 h-10 rounded-full border-4 border-gray-300 dark:border-gray-700 border-t-blue-500 animate-spin';
+                    loadingCover.appendChild(loadSpinner);
+                    panel.appendChild(loadingCover);
+                    return loadingCover;
+                }
+
+                function removeLoadingCover() {
+                    const loadingCover = panel.querySelector('.loading-cover');
+                    if (loadingCover) loadingCover.remove();
+                }
+
+                async function applyPayload(payload) {
+                    markPosPerf('apply_payload_start_perf');
+                    removePanelContent();
+
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'app-tab-content h-full w-full';
+                    contentDiv.setAttribute('data-app-tab-content', '1');
+                    contentDiv.innerHTML = [payload.stylesHtml || '', payload.contentHtml || ''].filter(Boolean).join('\n');
+
+                    panel.appendChild(contentDiv);
+                    markPosPerf('content_appended_perf');
+
+                    markPosPerf('script_replace_start_perf');
+                    if (payload.scriptsHtml) {
+                        const scriptsHost = document.createElement('div');
+                        scriptsHost.setAttribute('data-tab-scripts', '1');
+                        scriptsHost.hidden = true;
+                        contentDiv.appendChild(scriptsHost);
+
+                        const scriptsTemplate = document.createElement('template');
+                        scriptsTemplate.innerHTML = payload.scriptsHtml;
+                        const scriptLoads = [];
+
+                        Array.from(scriptsTemplate.content.childNodes).forEach((node) => {
+                            if (node.nodeType !== Node.ELEMENT_NODE) {
+                                return;
+                            }
+
+                            if (node.tagName === 'SCRIPT') {
+                                const newScript = document.createElement('script');
+                                Array.from(node.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                                if (node.src) {
+                                    newScript.async = false;
+                                    scriptLoads.push(new Promise((resolve) => {
+                                        newScript.addEventListener('load', resolve, { once: true });
+                                        newScript.addEventListener('error', resolve, { once: true });
+                                    }));
+                                } else {
+                                    newScript.appendChild(document.createTextNode(node.innerHTML));
+                                }
+                                scriptsHost.appendChild(newScript);
+                                return;
+                            }
+
+                            scriptsHost.appendChild(node.cloneNode(true));
+                        });
+
+                        if (scriptLoads.length > 0) {
+                            await Promise.allSettled(scriptLoads);
+                        }
+                    }
+                    markPosPerf('script_replace_end_perf');
+
+                    if (window.Alpine) {
+                        window.Alpine.initTree(contentDiv);
+                    }
+
+                    markPosPerf('apply_payload_end_perf');
+
+                    setTimeout(() => {
+                        const flashMessages = contentDiv.querySelectorAll('.flash-message');
+                        if (flashMessages.length > 0) {
+                            panel.scrollTop = 0;
+
+                            flashMessages.forEach(msg => {
+                                const category = msg.getAttribute('data-flash-category');
+                                if (category === 'danger' || category === 'warning') {
+                                    msg.style.animation = 'slideDown 0.3s ease-out, flashPulse 0.6s ease-in-out';
+                                }
+                            });
+                        }
+                    }, 50);
+
+                    contentDiv.querySelectorAll('form').forEach(form => {
+                        if (form.hasAttribute('data-no-ajax') || form.hasAttribute('data-custom-submit')) return;
+                        const method = ((form.getAttribute('method') || form.method || 'GET') + '').toUpperCase();
+
+                        if (method === 'GET') {
+                            form.addEventListener('submit', async (e) => {
+                                if (e.defaultPrevented) return;
+                                e.preventDefault();
+                                const submitter = e.submitter;
+                                const formData = submitter ? new FormData(form, submitter) : new FormData(form);
+                                const action = form.action || window.location.href;
+                                const formUrl = new URL(action, window.location.origin);
+
+                                for (const [key, value] of formData.entries()) {
+                                    formUrl.searchParams.set(key, value);
+                                }
+
+                                const currentKey = getKeyByTabId(tabId);
+                                if (currentKey) {
+                                    const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                    meta.url = normalizeKey(formUrl.toString());
+                                    tabMetaByKey.set(currentKey, meta);
+                                }
+
+                                await loadContent(formUrl.toString());
+                                saveState();
+                            });
+                            return;
+                        }
+
+                        form.addEventListener('submit', async (e) => {
+                            if (e.defaultPrevented) return;
+                            e.preventDefault();
+                            ensureLoadingCover();
+
+                            let loadSeq = 0;
+                            try {
+                                loadSeq = ++currentLoadSeq;
+
+                                if (currentAbortController) {
+                                    try { currentAbortController.abort(); } catch { }
+                                }
+                                currentAbortController = new AbortController();
+
+                                const submitter = e.submitter;
+                                const formData = submitter ? new FormData(form, submitter) : new FormData(form);
+                                const action = form.action || window.location.href;
+                                const fetchUrl = new URL(action, window.location.origin);
+                                fetchUrl.searchParams.set('partial', '1');
+
+                                dlog('[FORM SUBMIT]', method, fetchUrl.toString(), safeLogFormData(formData));
+                                const response = await fetch(fetchUrl.toString(), {
+                                    method,
+                                    body: formData,
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                                    redirect: 'follow',
+                                    signal: currentAbortController.signal
+                                });
+
+                                const rawHtml = await response.text();
+                                const payload = extractTabHtml(rawHtml);
+                                dlog('[FORM RESPONSE]', response.status, response.url, { redirected: response.redirected });
+
+                                if (loadSeq !== currentLoadSeq) return;
+
+                                if (!response.ok) {
+                                    await applyPayload(payload);
+                                    return;
+                                }
+
+                                const currentKey = getKeyByTabId(tabId);
+                                if (currentKey) {
+                                    const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                    meta.url = normalizeKey(response.url || new URL(action, window.location.origin).toString());
+                                    tabMetaByKey.set(currentKey, meta);
+
+                                    if (response.redirected && response.url) {
+                                        const redirectedKey = normalizeKey(response.url);
+                                        if (redirectedKey && redirectedKey !== currentKey) {
+                                            const existingId = tabIdsByKey.get(redirectedKey);
+                                            if (existingId && existingId !== tabId) {
+                                                setActiveTab(existingId);
+                                                const existingLoader = tabLoadersById.get(existingId);
+                                                if (existingLoader) await existingLoader(response.url);
+                                                closeTab(tabId);
+                                                saveState();
+                                                return;
+                                            }
+                                            if (!tabIdsByKey.has(redirectedKey)) {
+                                                tabIdsByKey.delete(currentKey);
+                                                tabMetaByKey.delete(currentKey);
+                                                tabIdsByKey.set(redirectedKey, tabId);
+                                                tabMetaByKey.set(redirectedKey, meta);
+                                            }
+                                        }
+                                    }
+
+                                    if (response.url && isDashboardUrl(response.url)) {
+                                        meta.title = 'Dashboard';
+                                        meta.iconClass = 'fas fa-tachometer-alt';
+                                        tabMetaByKey.set(getKeyByTabId(tabId) || currentKey, meta);
+                                        syncTabButtonMeta(tabId, meta);
+                                    }
+                                }
+
+                                if (response.redirected && response.url) {
+                                    await loadContent(response.url);
+                                    saveState();
+                                    return;
+                                }
+
+                                await applyPayload(payload);
+                                saveState();
+                            } catch (error) {
+                                if (error && error.name === 'AbortError') return;
+                                console.error('Error submitting form:', error);
+                            } finally {
+                                if (loadSeq === currentLoadSeq) {
+                                    removeLoadingCover();
+                                }
+                            }
+                        });
+                    });
+
+                    contentDiv.querySelectorAll('a[href]').forEach(link => {
+                        if (link.classList.contains('app-tab-link')) return;
+                        if (link.hasAttribute('download')) return;
+                        if (link.getAttribute('target') === '_blank') return;
+
+                        const href = link.getAttribute('href');
+                        if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+                        try {
+                            const linkUrl = new URL(href, window.location.origin);
+                            if (linkUrl.origin !== window.location.origin) return;
+
+                            // Detectar si es un link "Volver/Regresar" para usar appGoBack()
+                            const linkText = (link.textContent || '').trim().toLowerCase();
+                            const hasBackIcon = link.querySelector('.fa-arrow-left, .fa-chevron-left, .fa-angle-left');
+                            const isBackLink = !link.hasAttribute('data-no-back') && (
+                                hasBackIcon || /^(volver|regresar|back|ir atr[aá]s)/.test(linkText)
+                            );
+
+                            link.addEventListener('click', async (e) => {
+                                e.preventDefault();
+                                if (isBackLink && window.appGoBack) {
+                                    window.appGoBack();
+                                    return;
+                                }
+                                const currentKey = getKeyByTabId(tabId);
+                                if (currentKey) {
+                                    const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                    meta.url = normalizeKey(linkUrl.toString());
+                                    tabMetaByKey.set(currentKey, meta);
+                                }
+                                await loadContent(linkUrl.toString());
+                                saveState();
+                            });
+                        } catch { }
+                    });
+                }
+

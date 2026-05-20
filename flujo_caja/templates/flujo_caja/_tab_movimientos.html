@@ -1,0 +1,54 @@
+{# _tab_movimientos.html — Tab lista de movimientos de la semana #}
+{% from 'flujo_caja/_macros.html' import gs, fila_movimiento %}
+{% set puede_gestionar = current_user.es_admin() or current_user.tiene_permiso('gestionar_flujo_caja') %}
+<div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-700">
+        <div>
+            <h2 class="font-bold text-slate-900 dark:text-white">Movimientos de la semana</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{{ ctx.semana.fecha_inicio.strftime('%d/%m') }} al {{ ctx.semana.fecha_fin.strftime('%d/%m/%Y') }} &middot; {{ ctx.resumen.cantidad_movimientos }} movimiento{% if ctx.resumen.cantidad_movimientos != 1 %}s{% endif %}</p>
+        </div>
+        <div class="flex items-center gap-4 text-sm">
+            <span class="font-bold text-emerald-600 dark:text-emerald-400">+{{ gs(ctx.resumen.total_ingresos) }}</span>
+            <span class="text-slate-300 dark:text-slate-600">|</span>
+            <span class="font-bold text-rose-600 dark:text-rose-400">-{{ gs(ctx.resumen.total_egresos) }}</span>
+        </div>
+    </div>
+    {# FIX #6: separar activos de cancelados para mostrarlos en secciones distintas.
+       Los cancelados se muestran al final con estilo atenuado para que el usuario
+       pueda verlos sin que contaminen los totales ni el conteo del badge. #}
+    {% set ingresos_lista = ctx.movimientos | selectattr('tipo', 'equalto', 'ingreso') | rejectattr('estado', 'equalto', 'cancelado') | list %}
+    {% set egresos_lista = ctx.movimientos | selectattr('tipo', 'equalto', 'egreso') | rejectattr('estado', 'equalto', 'cancelado') | list %}
+    {% set cancelados_lista = ctx.movimientos | selectattr('estado', 'equalto', 'cancelado') | list %}
+    {% if ingresos_lista or egresos_lista or cancelados_lista %}
+    <div class="divide-y divide-slate-50 dark:divide-slate-800">
+        {% if ingresos_lista %}
+        <div class="px-5 py-2 bg-emerald-50/50 dark:bg-slate-800/40">
+            <p class="text-xs font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400"><i class="fas fa-arrow-down-to-line mr-1"></i>Ingresos</p>
+        </div>
+        {% for mov in ingresos_lista %}{{ fila_movimiento(mov, ctx, puede_gestionar, 'movimientos') }}{% endfor %}
+        {% endif %}
+        {% if egresos_lista %}
+        <div class="px-5 py-2 bg-rose-50/50 dark:bg-slate-800/40">
+            <p class="text-xs font-black uppercase tracking-wide text-rose-600 dark:text-rose-400"><i class="fas fa-arrow-up-from-line mr-1"></i>Egresos</p>
+        </div>
+        {% for mov in egresos_lista %}{{ fila_movimiento(mov, ctx, puede_gestionar, 'movimientos') }}{% endfor %}
+        {% endif %}
+        {% if cancelados_lista %}
+        <div class="px-5 py-2 bg-slate-50 dark:bg-slate-800/20">
+            <p class="text-xs font-black uppercase tracking-wide text-slate-400 dark:text-slate-500"><i class="fas fa-ban mr-1"></i>Cancelados (no afectan totales)</p>
+        </div>
+        {% for mov in cancelados_lista %}{{ fila_movimiento(mov, ctx, puede_gestionar, 'movimientos') }}{% endfor %}
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="px-5 py-12 text-center">
+        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800">
+            <i class="fas fa-inbox text-slate-400 dark:text-slate-500"></i>
+        </div>
+        <p class="font-semibold text-slate-600 dark:text-slate-300">Sin movimientos esta semana</p>
+        <p class="mt-1 text-sm text-slate-400 dark:text-slate-500">
+            Andá a <a href="{{ url_for('flujo_caja.index', semana=ctx.semana.fecha_inicio.isoformat(), tab='semana') }}" class="font-bold text-cyan-600 hover:underline dark:text-cyan-400">Esta semana</a> para cargar ingresos y egresos.
+        </p>
+    </div>
+    {% endif %}
+</div>

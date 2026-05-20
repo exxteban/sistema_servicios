@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Recibo de Pago - {{ pago.periodo }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 1.5cm;
+      @frame footer_frame {
+        -pdf-frame-content: footer_content;
+        bottom: 1cm;
+        margin-left: 1.5cm;
+        margin-right: 1.5cm;
+        height: 1cm;
+      }
+    }
+
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 10pt;
+      color: #111827;
+      line-height: 1.5;
+    }
+
+    .header {
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+
+    .company-name {
+      font-size: 18pt;
+      font-weight: bold;
+      color: #1f2937;
+      margin: 0;
+    }
+
+    .company-details {
+      font-size: 9pt;
+      color: #4b5563;
+      margin-top: 5px;
+    }
+
+    .receipt-title {
+      font-size: 16pt;
+      font-weight: bold;
+      text-align: center;
+      margin: 20px 0;
+      color: #1f2937;
+    }
+
+    .info-grid {
+      width: 100%;
+      margin-bottom: 25px;
+    }
+
+    .info-grid td {
+      padding: 5px;
+      vertical-align: top;
+    }
+
+    .info-label {
+      font-weight: bold;
+      color: #4b5563;
+      width: 120px;
+    }
+
+    .table-details {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+
+    .table-details th {
+      background-color: #f3f4f6;
+      border-top: 1px solid #d1d5db;
+      border-bottom: 2px solid #d1d5db;
+      padding: 10px;
+      text-align: left;
+      font-weight: bold;
+      color: #374151;
+    }
+
+    .table-details td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 10px;
+    }
+
+    .text-right {
+      text-align: right;
+    }
+
+    .amount {
+      font-family: monospace;
+      font-size: 11pt;
+    }
+
+    .total-row td {
+      background-color: #f9fafb;
+      border-top: 2px solid #1f2937;
+      font-weight: bold;
+      font-size: 12pt;
+    }
+
+    .signatures {
+      width: 100%;
+      margin-top: 60px;
+      text-align: center;
+    }
+
+    .signature-line {
+      border-top: 1px solid #1f2937;
+      width: 250px;
+      margin: 0 auto;
+      padding-top: 5px;
+      font-size: 9pt;
+    }
+
+    .notes {
+      margin-top: 30px;
+      font-size: 9pt;
+      color: #4b5563;
+      background-color: #f9fafb;
+      padding: 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <table width="100%">
+      <tr>
+        <td width="60%">
+          <div class="company-name">{{ empresa_nombre }}</div>
+          <div class="company-details">
+            RUC: {{ empresa_ruc }}<br>
+            Dirección: {{ empresa_direccion }}
+          </div>
+        </td>
+        <td width="40%" class="text-right">
+          <div style="font-size: 12pt; font-weight: bold; color: #4b5563;">Recibo N° {{ "%06d" | format(pago.id_pago) }}</div>
+          <div style="font-size: 9pt; color: #6b7280; margin-top: 5px;">Fecha de emisión: {{ fecha_impresion.strftime('%d/%m/%Y') }}</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="receipt-title">RECIBO DE SALARIO</div>
+
+  <!-- EMPLEADO INFO -->
+  <table class="info-grid">
+    <tr>
+      <td class="info-label">Empleado:</td>
+      <td><strong>{{ empleado.nombre_completo }}</strong></td>
+      <td class="info-label">Periodo:</td>
+      <td><strong>{{ pago.periodo }}</strong></td>
+    </tr>
+    <tr>
+      <td class="info-label">Documento:</td>
+      <td>{{ empleado.documento or '—' }}</td>
+      <td class="info-label">Fecha de Pago:</td>
+      <td>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</td>
+    </tr>
+    <tr>
+      <td class="info-label">Cargo:</td>
+      <td>{{ empleado.cargo or '—' }}</td>
+      <td class="info-label">Método:</td>
+      <td>{{ pago.metodo_pago or 'Efectivo' }}</td>
+    </tr>
+  </table>
+
+  <!-- DETALLES -->
+  <table class="table-details">
+    <thead>
+      <tr>
+        <th width="70%">Concepto</th>
+        <th width="30%" class="text-right">Monto (Gs.)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Salario Base -->
+      <tr>
+        <td>Salario Base del Periodo</td>
+        <td class="text-right amount">{{ '{:,.0f}'.format(pago.salario_base).replace(',', '.') }}</td>
+      </tr>
+      
+      <!-- Extras -->
+      {% if pago.total_extras > 0 %}
+      <tr>
+        <td>Bonificaciones y Extras</td>
+        <td class="text-right amount" style="color: #059669;">+ {{ '{:,.0f}'.format(pago.total_extras).replace(',', '.') }}</td>
+      </tr>
+      {% endif %}
+
+      <!-- Descuentos -->
+      {% if pago.total_descuentos > 0 %}
+      <tr>
+        <td>Adelantos y Descuentos</td>
+        <td class="text-right amount" style="color: #dc2626;">- {{ '{:,.0f}'.format(pago.total_descuentos).replace(',', '.') }}</td>
+      </tr>
+      {% endif %}
+    </tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td class="text-right">TOTAL NETO A COBRAR</td>
+        <td class="text-right amount">Gs. {{ '{:,.0f}'.format(pago.total_pagado).replace(',', '.') }}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  {% if pago.notas %}
+  <div class="notes">
+    <strong>Observaciones:</strong> {{ pago.notas }}
+  </div>
+  {% endif %}
+
+  <!-- FIRMAS -->
+  <table class="signatures">
+    <tr>
+      <td width="50%">
+        <div style="height: 50px;"></div>
+        <div class="signature-line">
+          Firma del Empleador<br>
+          {{ empresa_nombre }}
+        </div>
+      </td>
+      <td width="50%">
+        <div style="height: 50px;"></div>
+        <div class="signature-line">
+          Recibí Conforme<br>
+          {{ empleado.nombre_completo }}<br>
+          C.I.: {{ empleado.documento or '____________________' }}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <div id="footer_content" style="text-align: center; font-size: 8pt; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 5px;">
+    Documento generado por Sistema de Gestión - Página <pdf:pagenumber /> de <pdf:pagecount />
+  </div>
+
+</body>
+</html>

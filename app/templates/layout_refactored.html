@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    {% set browser_title %}{% block title %}{% endblock %}{% endset %}
+    {% set username_actual = ((current_user.username if current_user.is_authenticated else '') or '') | trim | lower %}
+    {% set usuario_demo = (current_user.is_authenticated and (current_user.modo_demo or username_actual in ['demo', 'demostracion', 'demostración'])) %}
+    {% set app_title_default = 'Sistema de Gestión Comercial' %}
+    {% if usuario_demo %}
+    {% set app_title_default = app_title_default ~ ' | Te interesa este sistema, contacta al 0961862624 Esteban Lezcano' %}
+    {% endif %}
+    <title>{% set browser_title = browser_title | striptags | trim %}{% if browser_title %}{{ browser_title }} - {% endif %}{{ app_title_default }}</title>
+    {% include 'layout/head_assets.html' %}
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body data-endpoint="{{ request.endpoint or '' }}"
+    class="app-shell-body bg-gray-100 dark:bg-gray-900 dark:text-gray-100 overflow-hidden flex flex-col transition-colors duration-300"
+    x-data="{ 
+          sidebarOpen: false, 
+          darkMode: localStorage.getItem('darkMode') === 'true'
+      }" x-init="$watch('darkMode', val => localStorage.setItem('darkMode', val)); 
+              if(darkMode) document.documentElement.classList.add('dark'); 
+              $watch('darkMode', val => val ? document.documentElement.classList.add('dark') : document.documentElement.classList.remove('dark'));
+              window.addEventListener('storage', (e) => {
+                  if (e.key === 'darkMode') {
+                      darkMode = e.newValue === 'true';
+                  }
+              });">
+    {% set embed_mode = (request.args.get('embed') == '1') %}
+    <span id="app-server-time-anchor" class="hidden"
+        data-app-server-epoch-ms="{{ ((now().timestamp() * 1000) | int) if now is defined else '' }}"
+        data-app-timezone="{{ app_timezone_name() if app_timezone_name is defined else '' }}"></span>
+
+    {% set layout_shell_section = 'before' %}
+    {% include 'layout/app_shell.html' %}
+    {% block content %}{% endblock %}
+    {% set layout_shell_section = 'after' %}
+    {% include 'layout/app_shell.html' %}
+    {% include 'layout/post_content_scripts.html' %}
+    {% include 'layout/pos_perf_navigation_script.html' %}
+    {% if current_user.is_authenticated and not embed_mode and (current_user.tiene_permiso('usar_asistente_ia') or current_user.es_admin()) %}
+    {% include 'layout/daily_insights_widget.html' %}
+    {% endif %}
+
+    {% block extra_js %}{% endblock %}
+
+    {% if current_user.is_authenticated and not embed_mode %}
+    <script>
+        // Título base de la aplicación para document.title dinámico
+        // Se extrae del <title> del documento, tomando la parte después del primer " - "
+        (function() {
+            try {
+                const fullTitle = document.title || '';
+                const sepIdx = fullTitle.indexOf(' - ');
+                window.__appBaseTitle = sepIdx > 0 ? fullTitle.slice(sepIdx + 3) : fullTitle || 'Sistema de Gestión Comercial';
+            } catch { window.__appBaseTitle = 'Sistema de Gestión Comercial'; }
+        })();
+{% include 'layout/tab_runtime_js_part1.html' %}
+{% include 'layout/tab_runtime_js_part2.html' %}
+    </script>
+    {% endif %}
+
+    {% include 'layout/server_clock_script.html' %}
+</body>
+</html>

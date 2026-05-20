@@ -1,0 +1,90 @@
+<script>
+    (function () {
+        if (window.dashboardNewView) return;
+
+        window.dashboardNewView = function (config) {
+            const safeConfig = config || {};
+            return {
+                availableActions: Array.isArray(safeConfig.availableActions) ? safeConfig.availableActions : [],
+                selectedActions: Array.isArray(safeConfig.selectedActions) ? safeConfig.selectedActions : [],
+                saveUrl: safeConfig.saveUrl || '',
+                customizerOpen: false,
+                saving: false,
+                slots: [1, 2, 3, 4],
+                draftIds: [],
+
+                init() {
+                    this.selectedActions = this.normalizeSelection(this.selectedActions.map((action) => action.id));
+                    this.resetDraftIds();
+                },
+
+                normalizeSelection(ids) {
+                    const byId = {};
+                    this.availableActions.forEach((action) => {
+                        if (action && action.id) byId[action.id] = action;
+                    });
+
+                    const selected = [];
+                    const seen = {};
+                    (Array.isArray(ids) ? ids : []).forEach((id) => {
+                        const key = String(id || '').trim();
+                        if (key && byId[key] && !seen[key]) {
+                            selected.push(byId[key]);
+                            seen[key] = true;
+                        }
+                    });
+
+                    this.availableActions.forEach((action) => {
+                        if (selected.length >= this.slots.length) return;
+                        if (action && action.id && !seen[action.id]) {
+                            selected.push(action);
+                            seen[action.id] = true;
+                        }
+                    });
+                    return selected.slice(0, this.slots.length);
+                },
+
+                resetDraftIds() {
+                    const ids = this.selectedActions.map((action) => action.id);
+                    this.availableActions.forEach((action) => {
+                        if (ids.length >= this.slots.length) return;
+                        if (action && action.id && !ids.includes(action.id)) ids.push(action.id);
+                    });
+                    this.draftIds = ids.slice(0, this.slots.length);
+                },
+
+                openCustomizer() {
+                    this.resetDraftIds();
+                    this.customizerOpen = true;
+                },
+
+                async saveActions() {
+                    if (!this.saveUrl || this.saving) return;
+                    this.saving = true;
+                    try {
+                        const res = await fetch(this.saveUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                            body: JSON.stringify({ quick_actions: this.draftIds })
+                        });
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        if (Array.isArray(data.quick_actions_available)) {
+                            this.availableActions = data.quick_actions_available;
+                        }
+                        if (Array.isArray(data.quick_actions_selected)) {
+                            this.selectedActions = data.quick_actions_selected;
+                        } else {
+                            this.selectedActions = this.normalizeSelection(this.draftIds);
+                        }
+                        this.resetDraftIds();
+                        this.customizerOpen = false;
+                    } catch (e) {
+                    } finally {
+                        this.saving = false;
+                    }
+                }
+            };
+        };
+    })();
+</script>

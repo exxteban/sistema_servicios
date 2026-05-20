@@ -1,0 +1,219 @@
+<div id="pedido-cliente-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+    <div class="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-gray-800">
+        <div class="flex items-center justify-between bg-blue-600 px-6 py-4 text-white">
+            <h3 class="text-xl font-bold">Nuevo Cliente</h3>
+            <button type="button" id="pedido-cliente-modal-close-top" class="text-white hover:text-blue-200" aria-label="Cerrar modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="space-y-4 p-6">
+            <div>
+                <label for="pedido-cliente-nombre" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Nombre Completo *</label>
+                <input type="text" id="pedido-cliente-nombre"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-400">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="pedido-cliente-ruc-ci" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">RUC / CI</label>
+                    <input type="text" id="pedido-cliente-ruc-ci"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 transition-colors dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                </div>
+                <div>
+                    <label for="pedido-cliente-telefono" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Telefono</label>
+                    <input type="text" id="pedido-cliente-telefono"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 transition-colors dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                </div>
+            </div>
+
+            <div>
+                <label for="pedido-cliente-email" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Email</label>
+                <input type="email" id="pedido-cliente-email"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 transition-colors dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="pedido-cliente-tipo" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Tipo</label>
+                    <select id="pedido-cliente-tipo"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 transition-colors dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="minorista">Minorista</option>
+                        <option value="mayorista">Mayorista</option>
+                        <option value="empresa">Empresa</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="pedido-cliente-limite" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Limite de Credito</label>
+                    <input type="number" id="pedido-cliente-limite" min="0" value="0"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 transition-colors dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                </div>
+            </div>
+
+            <div>
+                <label for="pedido-cliente-direccion" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Direccion</label>
+                <textarea id="pedido-cliente-direccion" rows="2"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 transition-colors dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
+            </div>
+
+            <div id="pedido-cliente-modal-error" class="hidden text-sm text-red-600 dark:text-red-400"></div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="button" id="pedido-cliente-modal-cancel"
+                    class="flex-1 rounded-lg bg-gray-200 py-2 text-gray-700 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                    Cancelar
+                </button>
+                <button type="button" id="pedido-cliente-modal-save"
+                    class="flex-1 rounded-lg bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50">
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const openButton = document.getElementById('pedido-nuevo-cliente-btn');
+    const selectCliente = document.getElementById('pedido-id-cliente');
+    const modal = document.getElementById('pedido-cliente-modal');
+    const closeTopButton = document.getElementById('pedido-cliente-modal-close-top');
+    const cancelButton = document.getElementById('pedido-cliente-modal-cancel');
+    const saveButton = document.getElementById('pedido-cliente-modal-save');
+    const errorBox = document.getElementById('pedido-cliente-modal-error');
+    const fields = {
+        nombre: document.getElementById('pedido-cliente-nombre'),
+        ruc_ci: document.getElementById('pedido-cliente-ruc-ci'),
+        telefono: document.getElementById('pedido-cliente-telefono'),
+        email: document.getElementById('pedido-cliente-email'),
+        tipo: document.getElementById('pedido-cliente-tipo'),
+        limite_credito: document.getElementById('pedido-cliente-limite'),
+        direccion: document.getElementById('pedido-cliente-direccion')
+    };
+
+    if (!openButton || !selectCliente || !modal || !saveButton) {
+        return;
+    }
+
+    let guardando = false;
+
+    function setError(message) {
+        if (!message) {
+            errorBox.textContent = '';
+            errorBox.classList.add('hidden');
+            return;
+        }
+        errorBox.textContent = message;
+        errorBox.classList.remove('hidden');
+    }
+
+    function syncSaveState() {
+        saveButton.disabled = guardando || !fields.nombre.value.trim();
+        saveButton.textContent = guardando ? 'Guardando...' : 'Guardar';
+    }
+
+    function resetForm() {
+        fields.nombre.value = '';
+        fields.ruc_ci.value = '';
+        fields.telefono.value = '';
+        fields.email.value = '';
+        fields.tipo.value = 'minorista';
+        fields.limite_credito.value = '0';
+        fields.direccion.value = '';
+        setError('');
+        guardando = false;
+        syncSaveState();
+    }
+
+    function openModal() {
+        resetForm();
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        window.setTimeout(function () {
+            fields.nombre.focus();
+        }, 0);
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function clienteOptionLabel(cliente) {
+        return cliente.telefono ? `${cliente.nombre} · ${cliente.telefono}` : cliente.nombre;
+    }
+
+    function upsertCliente(cliente) {
+        let option = Array.from(selectCliente.options).find(function (item) {
+            return String(item.value) === String(cliente.id_cliente);
+        });
+        if (!option) {
+            option = document.createElement('option');
+            selectCliente.appendChild(option);
+        }
+        option.value = String(cliente.id_cliente);
+        option.textContent = clienteOptionLabel(cliente);
+        selectCliente.value = String(cliente.id_cliente);
+        selectCliente.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    async function guardarCliente() {
+        if (guardando || !fields.nombre.value.trim()) {
+            syncSaveState();
+            return;
+        }
+
+        guardando = true;
+        setError('');
+        syncSaveState();
+
+        try {
+            const response = await fetch('/clientes/crear_json', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    nombre: fields.nombre.value.trim(),
+                    ruc_ci: fields.ruc_ci.value.trim(),
+                    telefono: fields.telefono.value.trim(),
+                    email: fields.email.value.trim(),
+                    tipo: fields.tipo.value,
+                    limite_credito: fields.limite_credito.value || 0,
+                    direccion: fields.direccion.value.trim()
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data || !data.success || !data.cliente) {
+                throw new Error((data && data.error) || 'No se pudo crear el cliente');
+            }
+            upsertCliente(data.cliente);
+            closeModal();
+        } catch (error) {
+            setError(error.message || 'Error de conexion al crear el cliente');
+        } finally {
+            guardando = false;
+            syncSaveState();
+        }
+    }
+
+    openButton.addEventListener('click', openModal);
+    closeTopButton.addEventListener('click', closeModal);
+    cancelButton.addEventListener('click', closeModal);
+    saveButton.addEventListener('click', guardarCliente);
+    fields.nombre.addEventListener('input', syncSaveState);
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('flex')) {
+            closeModal();
+        }
+    });
+
+    syncSaveState();
+})();
+</script>

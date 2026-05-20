@@ -1,0 +1,145 @@
+{% set mostrar_busqueda = not ocultar_busqueda and request.headers.get('X-Requested-With') != 'XMLHttpRequest' %}
+
+{% if mostrar_busqueda %}
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+    <form id="tienda-admin-search-form" method="GET" action="{{ url_for('tienda_admin.panel') }}" class="flex gap-3 flex-wrap">
+        <div class="relative flex-1 min-w-64">
+            <input
+                id="tienda-admin-search-input"
+                type="text"
+                name="q"
+                value="{{ q }}"
+                placeholder="Buscar productos..."
+                oninput="window.tiendaAdminProgramarAutoBusqueda && window.tiendaAdminProgramarAutoBusqueda()"
+                autocomplete="off"
+                class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 pl-3 pr-10 focus:border-blue-500 focus:outline-none">
+            <button
+                id="tienda-admin-search-clear"
+                type="button"
+                onclick="if (window.tiendaAdminLimpiarBusqueda) { window.tiendaAdminLimpiarBusqueda(); } else { const input = document.getElementById('tienda-admin-search-input'); if (input) input.value = ''; this.classList.add('hidden'); }"
+                class="absolute inset-y-0 right-0 {% if q %}flex{% else %}hidden{% endif %} items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                aria-label="Limpiar búsqueda">
+                <i class="fas fa-times-circle"></i>
+            </button>
+        </div>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-900 text-white transition">Buscar</button>
+    </form>
+</div>
+{% endif %}
+
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Código</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Producto</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Precio</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Vistas</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Publicado</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Destacado</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Oferta</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for p in productos.items %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <td class="px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-200">{{ p.codigo }}</td>
+                    <td class="px-4 py-3">
+                        <div class="font-medium text-gray-800 dark:text-white">{{ p.nombre }}</div>
+                        {% if p.marca or p.modelo %}
+                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ p.marca or '' }} {{ p.modelo or '' }}</div>
+                        {% endif %}
+                        {% if p.descripcion_tienda or p.descripcion %}
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs" title="{{ p.descripcion_tienda or p.descripcion }}">{{ p.descripcion_tienda or p.descripcion }}</div>
+                        {% else %}
+                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Sin descripción</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-200">₲ {{ "{:,.0f}".format(p.precio_venta).replace(",", ".") }}</td>
+                    <td class="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-300">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-full text-xs font-medium transition"
+                            onclick='abrirModalEstadisticasProducto({{ p.id_producto }}, {{ p.nombre|tojson }})'>
+                            <i class="fas fa-eye"></i> {{ p.vistas_tienda or 0 }}
+                        </button>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition {{ 'bg-green-600 hover:bg-green-700 text-white' if p.publicado_tienda else 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200' }}"
+                            onclick="togglePublicar({{ p.id_producto }}, {{ 'true' if p.publicado_tienda else 'false' }})">
+                            <span>{{ 'Sí' if p.publicado_tienda else 'No' }}</span>
+                        </button>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition {{ 'bg-yellow-500 hover:bg-yellow-600 text-white' if p.es_destacado_tienda else 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200' }}"
+                            onclick="toggleDestacado({{ p.id_producto }}, {{ 'true' if p.es_destacado_tienda else 'false' }})">
+                            <i class="fas fa-star"></i>
+                        </button>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition {{ 'bg-red-500 hover:bg-red-600 text-white' if p.es_oferta_tienda else 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200' }}"
+                            onclick="toggleOferta({{ p.id_producto }}, {{ 'true' if p.es_oferta_tienda else 'false' }})">
+                            <i class="fas fa-tags"></i>
+                        </button>
+                    </td>
+                    <td class="px-4 py-3 text-center space-x-1">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 dark:text-blue-300 transition"
+                            onclick="editarDescripcion({{ p.id_producto }}, `{{ (p.descripcion_tienda or p.descripcion or '') | replace('`', '\\`') }}`)">
+                            <i class="fas fa-edit"></i> <span class="hidden sm:inline">Desc.</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-900/30 dark:hover:bg-purple-800/40 dark:text-purple-300 transition"
+                            onclick="abrirModalImagenes({{ p.id_producto }})">
+                            <i class="fas fa-images"></i> <span class="hidden sm:inline">Imágenes</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-rose-100 hover:bg-rose-200 text-rose-700 dark:bg-rose-900/30 dark:hover:bg-rose-800/40 dark:text-rose-300 transition"
+                            onclick='abrirModalPromocionParaProducto({{ p.id_producto }}, {{ p.nombre|tojson }})'>
+                            <i class="fas fa-badge-percent"></i> <span class="hidden sm:inline">Promo</span>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No hay productos para mostrar</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if productos.pages > 1 %}
+<div class="flex flex-wrap items-center justify-center gap-2">
+    {% if productos.has_prev %}
+    <a href="{{ url_for('tienda_admin.panel', page=productos.prev_num, q=q or none) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">Anterior</a>
+    {% endif %}
+    {% for p in productos.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
+    {% if p %}
+    {% if p == productos.page %}
+    <span class="px-3 py-2 rounded-lg bg-blue-600 text-white font-semibold min-w-[2.25rem] text-center">{{ p }}</span>
+    {% else %}
+    <a href="{{ url_for('tienda_admin.panel', page=p, q=q or none) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 min-w-[2.25rem] text-center">{{ p }}</a>
+    {% endif %}
+    {% else %}
+    <span class="px-2 text-gray-400 dark:text-gray-500">…</span>
+    {% endif %}
+    {% endfor %}
+    <span class="px-3 py-2 rounded-lg bg-blue-600 text-white">{{ productos.page }} / {{ productos.pages }}</span>
+    {% if productos.has_next %}
+    <a href="{{ url_for('tienda_admin.panel', page=productos.next_num, q=q or none) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">Siguiente</a>
+    {% endif %}
+</div>
+{% endif %}

@@ -1,0 +1,102 @@
+<div class="grid grid-cols-2 auto-rows-fr md:grid-cols-4 gap-3">
+    {% if can_crear_venta and sidebar_mostrar_pos %}
+    {{ quick_action_card(
+    url_for('ventas.pos'), url_for('ventas.pos'), 'POS', 'fas fa-cash-register',
+    'bg-gradient-to-br from-green-500 via-emerald-500 to-green-600 dark:from-slate-900 dark:via-emerald-900/75
+    dark:to-slate-900', 'shadow-lg shadow-green-500/20 dark:shadow-black/30',
+    'bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.18),transparent_42%)]
+    dark:bg-[radial-gradient(circle_at_top_right,rgba(167,243,208,0.08),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.14),transparent_44%)]',
+    'fas fa-cash-register',
+    'Ventas', 'Nueva Venta', 'POS', 'Cobrar en pocos pasos', 'Punto de venta listo', 'text-green-50/80
+    dark:text-emerald-100/70', 'text-green-50 dark:text-slate-100', 'text-green-100/80 dark:text-emerald-100/60') }}
+    {% elif can_crear_venta and sidebar_mostrar_registro_vendedor %}
+    {{ quick_action_card(
+    url_for('ventas.registro_vendedor'), url_for('ventas.registro_vendedor'), 'Registro vendedor', 'fas
+    fa-clipboard-list',
+    'bg-gradient-to-br from-amber-500 via-orange-400 to-amber-600 dark:from-slate-900 dark:via-amber-900/75
+    dark:to-slate-900', 'shadow-lg shadow-amber-500/20 dark:shadow-black/30',
+    'bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(251,191,36,0.16),transparent_42%)]
+    dark:bg-[radial-gradient(circle_at_top_right,rgba(253,230,138,0.08),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.14),transparent_44%)]',
+    'fas fa-clipboard-list',
+    'Ventas', 'Registro vendedor', 'Manual', 'Registrar ventas manuales', 'Ideal para atención asistida',
+    'text-amber-50/80 dark:text-amber-100/70', 'text-amber-50 dark:text-slate-100', 'text-amber-100/80
+    dark:text-amber-100/60') }}
+    {% endif %}
+
+    {% if current_user.tiene_permiso('crear_producto') %}
+    {{ quick_action_card(
+    url_for('productos.nuevo'), url_for('productos.nuevo'), 'Nuevo Producto', 'fas fa-plus-circle',
+    'bg-gradient-to-br from-blue-500 via-sky-500 to-blue-600 dark:from-slate-900 dark:via-blue-900/75
+    dark:to-slate-900', 'shadow-lg shadow-blue-500/20 dark:shadow-black/30',
+    'bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.18),transparent_42%)]
+    dark:bg-[radial-gradient(circle_at_top_right,rgba(191,219,254,0.08),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.14),transparent_44%)]',
+    'fas fa-plus-circle',
+    'Catálogo', 'Nuevo Producto', 'Alta', 'Agregar al inventario', 'Precio y stock inicial', 'text-blue-50/80
+    dark:text-blue-100/70', 'text-blue-50 dark:text-slate-100', 'text-blue-100/80 dark:text-blue-100/60') }}
+    {% endif %}
+
+    {% if current_user.tiene_permiso('crear_compra') %}
+    {{ quick_action_card(
+    url_for('compras.nueva'), url_for('compras.nueva'), 'Nueva Compra', 'fas fa-truck',
+    'bg-gradient-to-br from-purple-500 via-fuchsia-500 to-purple-600 dark:from-slate-900 dark:via-purple-900/75
+    dark:to-slate-900', 'shadow-lg shadow-purple-500/20 dark:shadow-black/30',
+    'bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.18),transparent_42%)]
+    dark:bg-[radial-gradient(circle_at_top_right,rgba(221,214,254,0.08),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.14),transparent_44%)]',
+    'fas fa-truck',
+    'Compras', 'Nueva Compra', 'Stock', 'Cargar mercadería y costos', 'Proveedor y reposición', 'text-purple-50/80
+    dark:text-purple-100/70', 'text-purple-50 dark:text-slate-100', 'text-purple-100/80 dark:text-purple-100/60') }}
+    {% endif %}
+
+    {% if can_ver_reportes %}
+    {{ quick_action_card(
+    url_for('reportes.index'), url_for('reportes.index'), 'Reportes', 'fas fa-chart-line',
+    'bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 dark:from-slate-900 dark:via-orange-900/75
+    dark:to-slate-900', 'shadow-lg shadow-orange-500/20 dark:shadow-black/30',
+    'bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(249,115,22,0.16),transparent_42%)]
+    dark:bg-[radial-gradient(circle_at_top_right,rgba(254,215,170,0.08),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(249,115,22,0.14),transparent_44%)]',
+    'fas fa-chart-line',
+    'Análisis', 'Reportes', 'Datos', 'Ver métricas del negocio', 'Panel central de indicadores', 'text-orange-50/80
+    dark:text-orange-100/70', 'text-orange-50 dark:text-slate-100', 'text-orange-100/80 dark:text-orange-100/60') }}
+    {% endif %}
+
+    {% if can_ver_gastos_corrientes and gastos_corrientes_resumen %}
+    {% set gastos_badge = (gastos_corrientes_resumen.total_alertas ~ ' alerta' ~ ('' if
+    gastos_corrientes_resumen.total_alertas == 1 else 's')) if gastos_corrientes_resumen.total_alertas > 0 else 'En
+    orden' %}
+    {% set gastos_descripcion = '<span class="font-semibold text-white dark:text-slate-100">' ~
+        gastos_corrientes_resumen.vencidos ~ '</span> vencido' ~ ('' if gastos_corrientes_resumen.vencidos == 1 else
+    's') ~ ' del período' %}
+    {% set gastos_helper = '<span class="font-semibold text-white dark:text-white/90">' ~
+        gastos_corrientes_resumen.por_vencer ~ '</span> por vencer · <span
+        class="font-semibold text-white/90 dark:text-white/80">₲ ' ~
+        '{:,.0f}'.format(gastos_corrientes_resumen.total_pendiente).replace(',', '.') ~ '</span> pendiente' %}
+    {{ quick_action_card(
+    url_for('gastos_corrientes.index', periodo=gastos_corrientes_resumen.periodo, estado='vencido' if
+    gastos_corrientes_resumen.vencidos > 0 else ''), url_for('gastos_corrientes.index',
+    periodo=gastos_corrientes_resumen.periodo), 'Gastos corrientes', 'fas fa-file-invoice-dollar',
+    'bg-gradient-to-br from-yellow-500 via-amber-500 to-yellow-600 dark:from-slate-900 dark:via-yellow-900/75
+    dark:to-slate-900', 'shadow-lg shadow-yellow-500/20 dark:shadow-black/30',
+    'bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(234,179,8,0.18),transparent_42%)]
+    dark:bg-[radial-gradient(circle_at_top_right,rgba(254,249,195,0.08),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(234,179,8,0.14),transparent_44%)]',
+    'fas fa-file-invoice-dollar',
+    'Control', 'Gastos Corrientes', gastos_badge, gastos_descripcion, gastos_helper, 'text-yellow-50/80
+    dark:text-yellow-100/70', 'text-yellow-50 dark:text-slate-100', 'text-yellow-100/80 dark:text-yellow-100/60') }}
+    {% endif %}
+
+    {% if can_ver_inteligencia and inteligencia_resumen %}
+    {{ quick_action_card(
+    url_for('inteligencia.dashboard'), url_for('inteligencia.dashboard'), 'Inteligencia', 'fas fa-brain',
+    'bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 dark:from-slate-900 dark:via-slate-800/95
+    dark:to-indigo-950/70', 'shadow-lg shadow-blue-900/30 dark:shadow-black/35',
+    'bg-[radial-gradient(circle_at_top_right,rgba(103,232,249,0.18),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.16),transparent_38%)]
+    dark:bg-[radial-gradient(circle_at_top_right,rgba(165,243,252,0.08),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_40%)]',
+    'fas fa-brain',
+    'Acciones', 'Inteligencia', inteligencia_resumen.acciones_label, '<span
+        class="font-semibold text-white dark:text-slate-100">' ~ inteligencia_resumen.clientes_para_activar ~ '</span>
+    clientes por activar', '<span class="font-semibold text-cyan-200 dark:text-cyan-100/80">' ~
+        inteligencia_resumen.riesgo_stock ~ '</span> alertas de stock', 'text-cyan-200/75 dark:text-cyan-100/70',
+    'text-slate-100', 'text-blue-100/80 dark:text-slate-300/75', 'bg-cyan-400/15 dark:bg-cyan-300/10 ring-1
+    ring-white/10 dark:ring-white/5', 'text-cyan-300 dark:text-cyan-100/80', 'bg-white/10 dark:bg-white/6',
+    'text-cyan-100 dark:text-cyan-50/80') }}
+    {% endif %}
+</div>

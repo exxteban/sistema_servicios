@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoría{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-clipboard-list text-slate-600 dark:text-slate-300 mr-2"></i>Auditoría
+        </h1>
+    </div>
+
+    <form method="GET" action="{{ url_for('auditoria.listar') }}" autocomplete="off"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Desde</label>
+                <input type="date" name="desde" value="{{ filtros.desde }}"
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Hasta</label>
+                <input type="date" name="hasta" value="{{ filtros.hasta }}"
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Usuario</label>
+                <select name="id_usuario" autocomplete="off"
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+                    <option value="">Todos</option>
+                    {% for u in usuarios %}
+                    <option value="{{ u.id_usuario }}" {% if filtros.id_usuario==(u.id_usuario|string) %}selected{%
+                        endif %}>
+                        {{ u.username }}{% if u.nombre_completo %} — {{ u.nombre_completo }}{% endif %}{% if not
+                        u.activo %} (inactivo){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Módulo</label>
+                <select name="modulo"
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+                    <option value="">Todos</option>
+                    {% if filtros.modulo and filtros.modulo not in modulos_auditables %}
+                    <option value="{{ filtros.modulo }}" selected>{{ filtros.modulo }}</option>
+                    {% endif %}
+                    {% for m in modulos_auditables %}
+                    <option value="{{ m }}" {% if filtros.modulo==m %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Acción</label>
+                <input type="text" name="accion" value="{{ filtros.accion }}" placeholder="crear_venta..."
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Texto</label>
+                <input type="text" name="q" value="{{ filtros.q }}" placeholder="buscar en descripción"
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3 mt-3">
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Referencia tipo</label>
+                <input type="text" name="referencia_tipo" value="{{ filtros.referencia_tipo }}"
+                    placeholder="venta, producto..."
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Referencia id</label>
+                <input type="number" name="referencia_id" value="{{ filtros.referencia_id }}"
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Por página</label>
+                <select name="per_page"
+                    class="w-full px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+                    {% for n in [10,20,50,100] %}
+                    <option value="{{ n }}" {% if filtros.per_page==n %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="md:col-span-3 flex items-end gap-2">
+                <button type="submit"
+                    class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg transition text-sm">
+                    <i class="fas fa-filter mr-2"></i>Filtrar
+                </button>
+                <a href="{{ url_for('auditoria.listar') }}"
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition text-sm dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100">
+                    <i class="fas fa-eraser mr-2"></i>Limpiar
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Usuario</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Módulo</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Acción</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Descripción
+                    </th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Referencia
+                    </th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Detalle
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for a in auditorias.items %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40">
+                    <td class="px-4 py-3 text-sm font-mono text-gray-800 dark:text-gray-100">{{
+                        a.fecha_accion|local_strftime('%d/%m/%Y %H:%M') if a.fecha_accion else '' }}</td>
+                    <td class="px-4 py-3 text-sm">
+                        <div class="font-semibold text-gray-800 dark:text-gray-100">{{ a.usuario.nombre_completo if
+                            a.usuario else '-' }}</div>
+                        <div class="text-gray-500 dark:text-gray-400 font-mono">{{ a.usuario.username if a.usuario else
+                            '' }}</div>
+                    </td>
+                    <td class="px-4 py-3 text-sm font-mono text-gray-800 dark:text-gray-100">{{ a.modulo }}</td>
+                    <td class="px-4 py-3 text-sm font-mono text-gray-800 dark:text-gray-100">{{ a.accion }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">{{ a.descripcion }}</td>
+                    <td class="px-4 py-3 text-sm font-mono text-gray-800 dark:text-gray-100">
+                        {% if a.referencia_tipo %}
+                        {{ a.referencia_tipo }}{% if a.referencia_id is not none %} #{{ a.referencia_id }}{% endif %}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <a href="{{ url_for('auditoria.detalle', id_auditoria=a.id_auditoria) }}"
+                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                        No se encontraron registros
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if auditorias.pages > 1 %}
+    <div class="flex justify-center space-x-2">
+        {% if auditorias.has_prev %}
+        <a href="{{ url_for('auditoria.listar',
+            page=auditorias.prev_num,
+            desde=filtros.desde,
+            hasta=filtros.hasta,
+            id_usuario=filtros.id_usuario,
+            modulo=filtros.modulo,
+            accion=filtros.accion,
+            referencia_tipo=filtros.referencia_tipo,
+            referencia_id=filtros.referencia_id,
+            q=filtros.q,
+            per_page=filtros.per_page
+        ) }}"
+            class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        {% endif %}
+
+        <span class="px-4 py-2 bg-slate-700 text-white rounded-lg">
+            {{ auditorias.page }} / {{ auditorias.pages }}
+        </span>
+
+        {% if auditorias.has_next %}
+        <a href="{{ url_for('auditoria.listar',
+            page=auditorias.next_num,
+            desde=filtros.desde,
+            hasta=filtros.hasta,
+            id_usuario=filtros.id_usuario,
+            modulo=filtros.modulo,
+            accion=filtros.accion,
+            referencia_tipo=filtros.referencia_tipo,
+            referencia_id=filtros.referencia_id,
+            q=filtros.q,
+            per_page=filtros.per_page
+        ) }}"
+            class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

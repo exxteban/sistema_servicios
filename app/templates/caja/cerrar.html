@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Cerrar Caja{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-6 text-center">
+            <i class="fas fa-lock text-red-600 dark:text-red-400 mr-2"></i>Cerrar Caja
+        </h1>
+
+        <!-- Resumen -->
+        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-6 space-y-2">
+            <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-300">Caja:</span>
+                <span class="font-semibold text-gray-800 dark:text-white">{{ sesion.caja.nombre }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-300">Monto Inicial:</span>
+                <span class="text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(sesion.monto_inicial).replace(",",
+                    ".") }}</span>
+            </div>
+            <hr class="border-gray-200 dark:border-gray-700">
+            <div class="flex justify-between text-lg">
+                <span class="text-gray-700 dark:text-gray-200 font-medium">Total Sistema:</span>
+                <span class="font-bold text-green-600 dark:text-green-300">₲ {{
+                    "{:,.0f}".format(total_sistema).replace(",", ".") }}</span>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('caja.cerrar') }}" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Monto Contado
+                    (Declarado)</label>
+                <input type="number" name="monto_declarado" required min="0" value="{{ total_sistema|int }}"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-3 px-4 text-lg text-right bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Ingrese el efectivo que contó en caja</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Observaciones</label>
+                <textarea name="observaciones" rows="3"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                    placeholder="Novedades del turno..."></textarea>
+            </div>
+
+            <div class="flex space-x-4">
+                <a href="{{ url_for('caja.estado') }}"
+                    class="flex-1 text-center bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-3 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                    class="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition">
+                    <i class="fas fa-lock mr-2"></i>Cerrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

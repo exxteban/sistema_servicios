@@ -1,0 +1,44 @@
+{% from 'reparaciones/_brand_logo.html' import render_brand_logo %}
+{% set brand_logo = resolve_electronics_brand_logo(rep.marca_modelo) %}
+<a href="{{ url_for('reparaciones.detalle', id=rep.id_reparacion) }}" class="block bg-white dark:bg-gray-900/40 p-4 rounded shadow-sm hover:shadow-md transition-shadow border border-gray-100 dark:border-gray-700/70 border-l-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+    {% if rep.estado == 'pendiente' %}border-gray-400
+    {% elif rep.estado == 'diagnostico' %}border-blue-400
+    {% elif rep.estado == 'espera_presupuesto' %}border-orange-400
+    {% elif rep.estado == 'en_proceso' %}border-indigo-400
+    {% elif rep.estado == 'listo' %}border-green-400
+    {% elif rep.estado == 'no_se_pudo' %}border-rose-400
+    {% elif rep.estado == 'entregado' %}border-purple-400
+    {% elif rep.estado == 'cancelado' %}border-red-400
+    {% elif rep.estado == 'antiguos' %}border-slate-400
+    {% else %}border-yellow-400{% endif %}">
+
+    <div class="flex justify-between items-start mb-2">
+        <span class="text-xs font-bold text-gray-500 dark:text-gray-400">#{{ rep.id_reparacion }}</span>
+        <span class="text-xs text-gray-400 dark:text-gray-500">{{ rep.fecha_ingreso|local_strftime('%d/%m %H:%M')
+            }}</span>
+    </div>
+
+    <div class="flex items-center gap-2 min-w-0">
+        {{ render_brand_logo(brand_logo) }}
+        <h4 class="min-w-0 flex-1 font-bold text-gray-800 dark:text-gray-100 truncate" title="{{ rep.marca_modelo }}">{{ rep.marca_modelo
+            }}</h4>
+    </div>
+    <p class="text-sm text-gray-600 dark:text-gray-300 truncate" title="{{ rep.cliente.nombre }}">{{ rep.cliente.nombre
+        }}</p>
+
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">Falla: {{ rep.falla_reportada }}</p>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+        Técnico: {{ rep.tecnico.nombre_completo if rep.tecnico else 'Sin asignar' }}
+    </p>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+        Toma: {{ rep.fecha_toma_tecnico|local_strftime('%d/%m %H:%M') if rep.fecha_toma_tecnico else 'Pendiente' }}
+    </p>
+
+    <div class="mt-3 flex justify-between items-center">
+        <span class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-600 dark:text-gray-200">{{
+            rep.tipo_equipo }}</span>
+        <span class="text-blue-600 dark:text-blue-300 text-sm font-semibold">
+            <i class="fas fa-eye"></i>
+        </span>
+    </div>
+</a>

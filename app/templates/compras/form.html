@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Compra{% endblock %}
+
+{% block content %}
+{% set observaciones_form = request.form.get('observaciones', '') %}
+<div x-data="compraApp()" class="max-w-5xl mx-auto space-y-6">
+    <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+        <i class="fas fa-truck text-purple-600 dark:text-purple-400 mr-2"></i>Nueva Compra
+    </h1>
+
+    <form method="POST" action="{{ url_for('compras.nueva') }}" enctype="multipart/form-data" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Tipo Compra</label>
+                    <select name="tipo_compra" x-model="tipoCompra"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                        <option value="contado">Contado</option>
+                        <option value="credito">Crédito</option>
+                    </select>
+                    <div x-show="tipoCompra == 'contado'" class="text-xs mt-1 font-semibold inline-flex items-center gap-1 whitespace-nowrap">
+                        Saldo Disp: <span :class="saldoCaja < total ? 'text-red-500' : 'text-green-600'" 
+                            x-text="'₲ ' + formatNumber(saldoCaja)"></span>
+                    </div>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Proveedor
+                        (opcional)</label>
+                    <div class="flex items-center gap-2">
+                        <select name="id_proveedor" x-model="idProveedorSeleccionado" x-ref="proveedorSelect"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            <option value="">Sin proveedor específico</option>
+                            {% for prov in proveedores %}
+                            {% if prov.id_proveedor != 1 %}
+                            <option value="{{ prov.id_proveedor }}">{{ prov.nombre }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button type="button" data-permiso="crear_proveedor" @click="abrirModalProveedor()"
+                            class="shrink-0 w-7 h-6 p-0 border-2 border-purple-600 bg-purple-600 text-white rounded-md hover:bg-purple-700 hover:border-purple-700 transition-colors flex items-center justify-center"
+                            title="Agregar proveedor">
+                            <i class="fas fa-plus text-[0.65rem] leading-none"></i>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"># Factura</label>
+                    <input type="text" name="numero_factura"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Fecha</label>
+                    <input type="date" name="fecha_compra"
+                        value="{{ now().strftime('%Y-%m-%d') if now is defined else '' }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Hora</label>
+                    <input type="time" name="hora_compra"
+                        value="{{ now().strftime('%H:%M') if now is defined else '' }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Foto de factura</label>
+                <input type="file" name="factura_imagen" accept=".png,.jpg,.jpeg,.webp,.gif,image/*"
+                    class="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-white file:mr-4 file:rounded-md file:border-0 file:bg-purple-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-purple-700">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Se guarda optimizada dentro de la carpeta de facturas de compras.
+                </p>
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Descripción opcional de la compra
+                </label>
+                <textarea name="observaciones" rows="3"
+                    placeholder="Ej: Materiales para carpintería. Detalle general: clavos, bisagras, electrodos, discos de corte y lijas."
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-3 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">{{ observaciones_form }}</textarea>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Use este campo si quiere dejar un resumen claro de la factura o algún detalle útil para futuras consultas.
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-semibold text-gray-700 dark:text-gray-200">Productos</h2>
+                <button type="button" @click="abrirModalProducto()"
+                    class="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-md">
+                    <i class="fas fa-plus mr-1"></i> Nuevo Producto
+                </button>
+            </div>
+
+            <div class="grid grid-cols-12 gap-2 mb-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                <div class="col-span-5 px-1">Producto</div>
+                <div class="col-span-2 text-center">Cantidad inicial</div>
+                <div class="col-span-3 text-right pr-2">Precio compra</div>
+                <div class="col-span-1 text-right">Subtotal</div>
+                <div class="col-span-1"></div>
+            </div>
+
+            <template x-for="(item, index) in items" :key="index">
+                <div class="grid grid-cols-12 gap-2 mb-2 items-center">
+                    <div class="col-span-5 relative" x-data="{ 
+                        searchTerm: '', 
+                        showDropdown: false, 
+                        selectedIndex: 0,
+                        get filteredProducts() {
+                            if (!this.searchTerm) return productosData;
+                            const term = this.searchTerm.toLowerCase();
+                            return productosData.filter(p => 
+                                p.codigo.toLowerCase().includes(term) || 
+                                p.nombre.toLowerCase().includes(term)
+                            );
+                        },
+                        selectProduct(product, itemRef) {
+                            itemRef.id = product.id_producto;
+                            itemRef.precio = product.precio_compra || 0;
+                            itemRef.nombreProducto = product.codigo + ' - ' + product.nombre;
+                            this.searchTerm = '';
+                            this.showDropdown = false;
+                            this.selectedIndex = 0;
+                        },
+                        moveDown() {
+                            if (this.selectedIndex < this.filteredProducts.length - 1) {
+                                this.selectedIndex++;
+                                this.scrollToSelected();
+                            }
+                        },
+                        moveUp() {
+                            if (this.selectedIndex > 0) {
+                                this.selectedIndex--;
+                                this.scrollToSelected();
+                            }
+                        },
+                        selectCurrentItem(itemRef) {
+                            if (this.filteredProducts[this.selectedIndex]) {
+                                this.selectProduct(this.filteredProducts[this.selectedIndex], itemRef);
+                            }
+                        },
+                        scrollToSelected() {
+                            this.$nextTick(() => {
+                                const dropdown = this.$refs.dropdown;
+                                const selected = dropdown?.querySelector('[data-selected=true]');
+                                if (selected) {
+                                    selected.scrollIntoView({ block: 'nearest' });
+                                }
+                            });
+                        }
+                    }">
+                        <!-- Input de búsqueda visible o texto del producto seleccionado -->
+                        <div class="relative">
+                            <input type="text" x-show="!item.nombreProducto || showDropdown" x-model="searchTerm"
+                                @input="item.id=''; item.nombreProducto=''; showDropdown = true; selectedIndex = 0"
+                                @focus="showDropdown = true"
+                                @blur="setTimeout(() => showDropdown = false, 200)"
+                                @keydown.arrow-down.prevent="moveDown()" @keydown.arrow-up.prevent="moveUp()"
+                                @keydown.enter.prevent="selectCurrentItem(item)"
+                                @keydown.escape="showDropdown = false; searchTerm = ''" placeholder="Buscar producto..."
+                                autocomplete="off"
+                                class="w-full border border-gray-300 dark:border-gray-700 rounded-lg py-2 pl-3 pr-10 text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none">
+
+                            <!-- Botón X para limpiar -->
+                            <button type="button" x-show="(!item.nombreProducto || showDropdown) && searchTerm"
+                                @mousedown.prevent="searchTerm = ''"
+                                class="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                                tabindex="-1">
+                                <i class="fas fa-times-circle text-sm"></i>
+                            </button>
+
+                            <!-- Mostrar producto seleccionado -->
+                            <div x-show="item.nombreProducto && !showDropdown" @click="showDropdown = true"
+                                class="w-full border border-gray-300 dark:border-gray-700 rounded-lg py-2 px-3 text-sm bg-white dark:bg-gray-900 text-gray-800 dark:text-white cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 flex justify-between items-center">
+                                <span x-text="item.nombreProducto"></span>
+                                <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+                            </div>
+                        </div>
+
+                        <!-- Hidden input con el ID -->
+                        <input type="hidden" :name="'producto_id[]'" x-model="item.id">
+                        <input type="hidden" :name="'producto_texto[]'" x-model="searchTerm">
+
+                        <!-- Dropdown de resultados -->
+                        <div x-show="showDropdown && filteredProducts.length > 0" x-ref="dropdown"
+                            class="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-xl">
+                            <template x-for="(product, idx) in filteredProducts" :key="product.id_producto">
+                                <div @mousedown.prevent="selectProduct(product, item)"
+                                    :data-selected="idx === selectedIndex"
+                                    :class="idx === selectedIndex ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
+                                    class="px-3 py-2 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+                                    <span class="font-mono text-xs text-blue-600 dark:text-blue-400"
+                                        x-text="product.codigo"></span>
+                                    <span class="text-sm text-gray-800 dark:text-gray-200 ml-2"
+                                        x-text="product.nombre"></span>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Mensaje cuando no hay resultados -->
+                        <div x-show="showDropdown && searchTerm && filteredProducts.length === 0"
+                            class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-xl px-3 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                            <i class="fas fa-search mb-2"></i>
+                            <div>No se encontraron productos</div>
+                        </div>
+                    </div>
+                    <div class="col-span-2">
+                        <input type="number" :name="'cantidad[]'" x-model.number="item.cantidad" min="1"
+                            placeholder="Cant. inicial" title="Cantidad inicial" aria-label="Cantidad inicial"
+                            class="w-full border border-gray-300 dark:border-gray-700 rounded-lg py-2 px-3 text-sm text-center bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    </div>
+                    <div class="col-span-3">
+                        <input type="number" :name="'precio[]'" x-model.number="item.precio" step="0.01"
+                            placeholder="Precio"
+                            class="w-full border border-gray-300 dark:border-gray-700 rounded-lg py-2 px-3 text-sm text-right bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    </div>
+                    <div class="col-span-1 text-right font-semibold text-sm text-gray-800 dark:text-gray-100"
+                        x-text="'₲ ' + formatNumber(item.cantidad * item.precio)"></div>
+                    <div class="col-span-1">
+                        <button type="button" @click="removeItem(index)" class="text-red-500 hover:text-red-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <button type="button" @click="addItem()"
+                class="mt-4 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
+                <i class="fas fa-plus mr-1"></i>Agregar Producto
+            </button>
+
+            <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 text-right">
+                <span class="text-lg font-bold text-gray-800 dark:text-white">Total: ₲ <span
+                        x-text="formatNumber(total)"></span></span>
+            </div>
+        </div>
+
+        <div class="flex justify-end space-x-4">
+            <a href="{{ url_for('compras.listar') }}"
+                class="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">Cancelar</a>
+            <button type="submit" class="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
+                <i class="fas fa-save mr-2"></i>Guardar Compra
+            </button>
+        </div>
+
+        <!-- Modal Crear Proveedor Rápido -->
+        <div x-show="modalProveedor.visible" x-cloak @click.self="cerrarModalProveedor()"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+                @click.stop>
+                <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">
+                    <i class="fas fa-truck text-purple-600 dark:text-purple-400 mr-2"></i>Crear Proveedor Rápido
+                </h3>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Nombre *</label>
+                    <input type="text" x-model="modalProveedor.nombre"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none transition-colors"
+                        placeholder="Nombre del proveedor">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">RUC</label>
+                        <input type="text" x-model="modalProveedor.ruc"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none transition-colors"
+                            placeholder="00000000-0">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Teléfono</label>
+                        <input type="text" x-model="modalProveedor.telefono"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none transition-colors"
+                            placeholder="Ej: 0981 000 000">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Email</label>
+                    <input type="email" x-model="modalProveedor.email"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none transition-colors"
+                        placeholder="correo@ejemplo.com">
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Dirección</label>
+                    <input type="text" x-model="modalProveedor.direccion"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-purple-500 dark:focus:border-purple-400 focus:outline-none transition-colors"
+                        placeholder="Dirección (opcional)">
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="cerrarModalProveedor()"
+                        class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" @click="guardarProveedorRapido()" :disabled="guardandoProveedor"
+                        :class="guardandoProveedor ? 'opacity-50 cursor-not-allowed' : ''"
+                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                        <i class="fas fa-save mr-1"></i>
+                        <span x-text="guardandoProveedor ? 'Guardando...' : 'Guardar'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Crear Producto Rápido -->
+        <div x-show="modalProducto.visible" x-cloak @click.self="cerrarModalProducto()"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+                @click.stop>
+                <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">
+                    <i class="fas fa-box text-green-500 mr-2"></i>Crear Producto Rápido
+                </h3>
+
+                <!-- Código -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Código *</label>
+                    <input type="text" x-model="modalProducto.codigo"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors"
+                        placeholder="Ej: PROD001">
+                </div>
+
+                <!-- Nombre -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Nombre *</label>
+                    <input type="text" x-model="modalProducto.nombre"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors"
+                        placeholder="Ej: Termo Stanley 1L">
+                </div>
+
+                <!-- Categoría -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Categoría *</label>
+                    <select x-model="modalProducto.id_categoria"
+                        @change="modalProducto.mostrarNuevaCategoria = (modalProducto.id_categoria === 'nueva')"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors">
+                        <option value="">Seleccione...</option>
+                        {% for cat in categorias %}
+                        <option value="{{ cat.id_categoria }}">{{ cat.nombre }}</option>
+                        {% endfor %}
+                        <option value="nueva">+ Crear nueva categoría</option>
+                    </select>
+                </div>
+
+                <!-- Nueva Categoría (condicional) -->
+                <div x-show="modalProducto.mostrarNuevaCategoria" class="mb-4" style="display: none;">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Nueva
+                        Categoría</label>
+                    <input type="text" x-model="modalProducto.nueva_categoria"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors"
+                        placeholder="Nombre de la categoría">
+                </div>
+
+                <!-- Precios -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Precio
+                            Compra</label>
+                        <input type="number" x-model.number="modalProducto.precio_compra" step="0.01" min="0"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Precio Venta
+                            *</label>
+                        <input type="number" x-model.number="modalProducto.precio_venta" step="0.01" min="0"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Precio Mayorista</label>
+                        <input type="number" x-model.number="modalProducto.precio_mayorista" step="0.01" min="0"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors">
+                    </div>
+                </div>
+
+                <!-- Stock / IVA -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Stock mínimo</label>
+                        <input type="number" x-model.number="modalProducto.stock_minimo" step="1" min="0"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">IVA</label>
+                        <select x-model.number="modalProducto.porcentaje_iva"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors">
+                            <option value="0">Exento</option>
+                            <option value="5">5%</option>
+                            <option value="10">10%</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Precios opcionales -->
+                <div class="mb-6">
+                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                        <input type="checkbox" x-model="modalProducto.usa_precios_opciones"
+                            class="rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500">
+                        Precio con desplegable en POS
+                    </label>
+                    <div x-show="modalProducto.usa_precios_opciones" class="mt-3" style="display: none;">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Precios</label>
+                        <textarea x-model="modalProducto.precios_opciones" rows="3"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-green-500 dark:focus:border-green-400 focus:outline-none transition-colors"
+                            placeholder="Ej:\n10000\n12000\n15000"></textarea>
+                    </div>
+                </div>
+
+                <!-- Botones -->
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="cerrarModalProducto()"
+                        class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" @click="guardarProductoRapido()" :disabled="guardandoProducto"
+                        :class="guardandoProducto ? 'opacity-50 cursor-not-allowed' : ''"
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                        <i class="fas fa-save mr-1"></i>
+                        <span x-text="guardandoProducto ? 'Creando...' : 'Crear y Agregar'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'compras/_form_scripts.html' %}
+{% endblock %}

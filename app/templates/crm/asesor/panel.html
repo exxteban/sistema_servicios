@@ -1,0 +1,306 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<div class="h-full flex" x-data="crmAsesor()">
+
+    <!-- Panel izquierdo: cola de conversaciones -->
+    <div class="crm-panel-left w-80 flex-shrink-0 border-r border-white/10 flex flex-col bg-gray-900/60">
+        <!-- Header con toggle online -->
+        <div class="p-3 border-b border-white/10 flex items-center justify-between gap-2">
+            <div class="flex items-center min-w-0" x-show="puedeOperar">
+                <button @click="toggleOnline()"
+                    :class="online ? 'bg-green-500 hover:bg-green-400' : 'bg-gray-600 hover:bg-gray-500'"
+                    class="relative w-10 h-5 rounded-full overflow-hidden transition-colors flex-shrink-0"
+                    style="box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);">
+                    <span :class="online ? 'translate-x-5' : 'translate-x-0'"
+                        class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"></span>
+                </button>
+                <span class="ml-3 text-sm font-medium truncate min-w-0" :class="online ? 'text-green-300' : 'text-gray-400'"
+                    x-text="online ? 'En línea' : 'Desconectado'"></span>
+            </div>
+            <div x-show="!puedeOperar" class="min-w-0">
+                <p class="text-sm font-medium text-gray-200">Modo solo lectura</p>
+                <p class="text-xs text-gray-500 truncate">Usá esta vista para revisar la cola sin operar como asesor.</p>
+            </div>
+            <span class="text-xs text-gray-500 flex-shrink-0"
+                x-text="panelModo === 'control' ? (pendientes.length + ' por revisar') : (pendientes.length + ' pendientes')"></span>
+        </div>
+
+        <!-- Tabs: Pendientes / Mis conversaciones -->
+        <div class="flex border-b border-white/10">
+            <button @click="setTab('pendientes')"
+                :class="tab === 'pendientes' ? 'border-b-2 border-teal-400 text-teal-300' : 'text-gray-400 hover:text-white'"
+                class="flex-1 py-2 text-xs font-medium transition-colors">
+                Pendientes
+                <span x-show="pendientes.length > 0" x-text="'(' + pendientes.length + ')'" class="text-yellow-400 ml-1"></span>
+            </button>
+            <button @click="setTab('mias')"
+                :class="tab === 'mias' ? 'border-b-2 border-teal-400 text-teal-300' : 'text-gray-400 hover:text-white'"
+                class="flex-1 py-2 text-xs font-medium transition-colors">
+                <span x-text="panelModo === 'control' ? 'Asignadas' : 'Mis chats'"></span>
+                <span x-show="misConversaciones.length > 0" x-text="'(' + misConversaciones.length + ')'" class="text-teal-400 ml-1"></span>
+            </button>
+            <button x-show="panelModo === 'control'" @click="setTab('historiales')"
+                :class="tab === 'historiales' ? 'border-b-2 border-teal-400 text-teal-300' : 'text-gray-400 hover:text-white'"
+                class="flex-1 py-2 text-xs font-medium transition-colors">
+                Historial web
+                <span x-show="historialCount > 0" x-text="'(' + historialCount + ')'" class="text-indigo-300 ml-1"></span>
+            </button>
+        </div>
+
+        <div x-show="tab === 'historiales' && panelModo === 'control'" class="p-2.5 border-b border-white/10 space-y-2">
+            <input type="text" x-model="historialBusqueda" @input="programarBusquedaHistoriales()"
+                placeholder="Buscar por teléfono o nombre..."
+                class="w-full rounded-lg bg-gray-800/70 border border-white/10 px-3 py-2 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-teal-500/40 transition-colors">
+            <div class="grid grid-cols-2 gap-2">
+                <label class="flex flex-col gap-1 text-[11px] text-gray-500">
+                    Estado
+                    <select x-model="historialEstado" @change="cargarHistorialesWeb({ resetPage: true })"
+                        class="rounded-lg bg-gray-800/70 border border-white/10 px-2 py-2 text-xs text-gray-200 focus:outline-none focus:border-teal-500/40 transition-colors">
+                        <option value="activas">Activas</option>
+                        <option value="cerradas">Cerradas</option>
+                        <option value="todas">Todas</option>
+                    </select>
+                </label>
+                <label class="flex flex-col gap-1 text-[11px] text-gray-500">
+                    Período
+                    <select x-model="historialPeriodo" @change="cargarHistorialesWeb({ resetPage: true })"
+                        class="rounded-lg bg-gray-800/70 border border-white/10 px-2 py-2 text-xs text-gray-200 focus:outline-none focus:border-teal-500/40 transition-colors">
+                        <option value="7">7 días</option>
+                        <option value="30">30 días</option>
+                        <option value="90">90 días</option>
+                        <option value="all">Todo</option>
+                    </select>
+                </label>
+            </div>
+            <p class="text-[11px] text-gray-500" x-text="historialResumen"></p>
+        </div>
+
+        <!-- Lista -->
+        <div class="flex-1 overflow-auto p-2 flex flex-col gap-1">
+            <template x-for="conv in getTabItems()" :key="conv.id">
+                <div @click="seleccionar(conv)"
+                    :class="convActiva && convActiva.id === conv.id ? 'bg-teal-500/20 border-teal-500/40' : 'bg-gray-800/40 border-white/5 hover:bg-gray-700/50'"
+                    class="border rounded-xl p-2.5 cursor-pointer transition-all">
+                    <div class="flex items-center gap-2 mb-1">
+                        <div class="w-8 h-8 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            x-text="(conv.nombre || conv.telefono).charAt(0).toUpperCase()">
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-medium text-gray-100 truncate" x-text="conv.nombre || conv.telefono"></p>
+                            <p class="text-xs text-gray-500 truncate" x-text="conv.ultimo_mensaje || '—'"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 mt-1">
+                        <span x-show="conv.estado_asignacion === 'pendiente'"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300">pendiente</span>
+                        <span x-show="conv.estado_asignacion === 'activa'"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-300">activa</span>
+                        <span x-show="conv.estado_asignacion === 'cerrada'"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-gray-600/40 text-gray-300">cerrada</span>
+                        <span x-show="conv.estado_asignacion === 'devuelta'"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300">devuelta</span>
+                        <span x-show="tab === 'historiales'"
+                            class="text-xs px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200">solo lectura</span>
+                        <template x-for="et in (conv.etiquetas || [])" :key="et.id">
+                            <span class="text-xs px-1.5 py-0.5 rounded-full"
+                                :style="`background-color: ${et.color}22; color: ${et.color}`"
+                                x-text="et.nombre">
+                            </span>
+                        </template>
+                    </div>
+                </div>
+            </template>
+            <div x-show="getTabItems().length === 0"
+                class="text-center text-gray-500 text-xs py-8">
+                <i class="fas fa-inbox text-2xl mb-2 block opacity-30"></i>
+                <span x-show="tab === 'pendientes' && puedeOperar && !online">Ponete online para ver pendientes</span>
+                <span x-show="tab === 'pendientes' && (!puedeOperar || online)">Sin conversaciones pendientes</span>
+                <span x-show="tab === 'mias' && panelModo === 'control'">Sin conversaciones asignadas para monitorear</span>
+                <span x-show="tab === 'mias' && panelModo !== 'control'">Sin conversaciones asignadas</span>
+                <span x-show="tab === 'historiales'">Sin historiales web para revisar</span>
+            </div>
+        </div>
+
+        <div x-show="tab === 'historiales' && panelModo === 'control' && historialPages > 1"
+            class="px-2 py-2 border-t border-white/10 flex items-center justify-between gap-2 text-xs">
+            <button @click="irPaginaHistorial(historialPage - 1)" :disabled="historialPage <= 1"
+                class="px-2.5 py-1.5 rounded-lg bg-gray-800/70 text-gray-300 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-700/70 transition-colors">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <span class="text-gray-500">
+                Pág. <span x-text="historialPage"></span> / <span x-text="historialPages"></span>
+            </span>
+            <button @click="irPaginaHistorial(historialPage + 1)" :disabled="historialPage >= historialPages"
+                class="px-2.5 py-1.5 rounded-lg bg-gray-800/70 text-gray-300 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-700/70 transition-colors">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Panel central: chat -->
+    <div class="flex-1 flex flex-col min-w-0 bg-gray-950/30">
+        <!-- Sin conversación seleccionada -->
+        <div x-show="!convActiva" class="flex-1 flex flex-col items-center justify-center text-gray-500">
+            <i class="fas fa-comments text-4xl mb-3 opacity-30"></i>
+            <p class="text-sm">Seleccioná una conversación</p>
+        </div>
+
+        <!-- Conversación activa -->
+        <template x-if="convActiva">
+            <div class="flex-1 flex flex-col min-h-0">
+                <!-- Header del chat -->
+                <div class="p-3 border-b border-white/10 flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center text-sm font-bold flex-shrink-0"
+                        x-text="(convActiva.nombre || convActiva.telefono).charAt(0).toUpperCase()">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-100" x-text="convActiva.nombre || convActiva.telefono"></p>
+                        <p class="text-xs text-gray-500" x-text="convActiva.telefono"></p>
+                    </div>
+                    <!-- Acciones -->
+                    <div class="flex items-center gap-1.5">
+                        {% if puede_operar_panel %}
+                        <button x-show="convActiva.estado_asignacion !== 'activa'"
+                            @click="tomar()"
+                            class="px-2.5 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 text-xs hover:bg-teal-500/30 transition-colors">
+                            <i class="fas fa-hand-paper mr-1"></i> Tomar
+                        </button>
+                        <button x-show="convActiva.estado_asignacion === 'activa'"
+                            @click="devolver()"
+                            class="px-2.5 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-300 text-xs hover:bg-yellow-500/30 transition-colors">
+                            <i class="fas fa-undo mr-1"></i> Devolver
+                        </button>
+                        <button @click="cerrar()"
+                            class="px-2.5 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs hover:bg-red-500/30 transition-colors">
+                            <i class="fas fa-times mr-1"></i> Cerrar
+                        </button>
+                        {% endif %}
+                        <a x-show="convActiva.id_contacto" :href="`/crm/contactos/${convActiva.id_contacto}`"
+                            class="px-2.5 py-1.5 rounded-lg bg-gray-700/50 text-gray-300 text-xs hover:bg-gray-600/50 transition-colors">
+                            <i class="fas fa-user"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mensajes -->
+                <div class="flex-1 overflow-auto p-3 flex flex-col gap-2 bg-gray-950/20" id="chat-messages" x-ref="chatMessages">
+                    <div x-show="timelineHasMore" class="flex justify-center pb-1">
+                        <button @click="cargarMensajesAnteriores()" :disabled="cargandoMensajes || timelineLoadingMore"
+                            class="px-3 py-1.5 rounded-full bg-gray-800/80 border border-white/10 text-xs text-gray-300 hover:bg-gray-700/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <i class="fas fa-history mr-1" x-show="!timelineLoadingMore"></i>
+                            <i class="fas fa-spinner fa-spin mr-1" x-show="timelineLoadingMore"></i>
+                            Cargar anteriores
+                        </button>
+                    </div>
+                    <div x-show="cargandoMensajes" class="flex items-center justify-center py-4">
+                        <i class="fas fa-spinner fa-spin text-teal-400"></i>
+                    </div>
+                    <template x-for="msg in mensajes" :key="msg.id">
+                        <div :class="msg.es_evento ? 'items-center' : (msg.direccion === 'saliente' ? 'items-end' : 'items-start')" class="flex flex-col">
+                            <template x-if="msg.es_evento">
+                                <div class="max-w-xl px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[11px] text-gray-400">
+                                    <span x-text="msg.contenido"></span>
+                                    <span class="ml-2 opacity-60" x-text="formatHora(msg.created_at)"></span>
+                                </div>
+                            </template>
+                            <template x-if="msg.es_nota">
+                                <div class="max-w-sm bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2">
+                                    <div class="flex items-center gap-1.5 mb-1">
+                                        <i class="fas fa-sticky-note text-yellow-400 text-xs"></i>
+                                        <span class="text-xs text-yellow-400 font-medium">Nota interna</span>
+                                        <span class="text-xs text-gray-500 ml-auto" x-text="formatHora(msg.created_at)"></span>
+                                    </div>
+                                    <p class="text-sm text-gray-200 whitespace-pre-wrap break-words" x-text="msg.contenido"></p>
+                                    <p class="text-xs text-gray-500 mt-1" x-text="msg.autor || ''"></p>
+                                </div>
+                            </template>
+                            <template x-if="!msg.es_evento && !msg.es_nota">
+                                <div :class="{
+                                        'bg-teal-500/20 text-teal-50 rounded-br-sm border border-teal-500/10': msg.direccion === 'saliente' && msg.remitente === 'asesor',
+                                        'bg-blue-500/15 text-blue-100 rounded-br-sm border border-blue-500/10': msg.direccion === 'saliente' && msg.remitente === 'bot',
+                                        'bg-white/6 text-gray-200 rounded-bl-sm border border-white/5': msg.direccion === 'entrante'
+                                    }"
+                                    class="max-w-xs lg:max-w-md px-3 py-2 rounded-xl text-sm">
+                                    <p class="whitespace-pre-wrap break-words" x-text="msg.contenido"></p>
+                                    <div class="flex items-center gap-1 mt-1">
+                                        <span class="text-xs opacity-50" x-text="formatHora(msg.created_at)"></span>
+                                        <span x-show="msg.remitente === 'bot'" class="text-xs opacity-50">· bot</span>
+                                        <span x-show="msg.asesor" class="text-xs opacity-50" x-text="'· ' + msg.asesor"></span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Nota interna -->
+                {% if puede_operar_panel %}
+                <div x-show="mostrandoNota" class="px-3 py-2 border-t border-yellow-500/20 bg-yellow-500/5">
+                    <div class="flex gap-2">
+                        <textarea x-model="textNota" rows="2" placeholder="Nota interna (solo visible para asesores)..."
+                            class="flex-1 bg-gray-700/50 border border-yellow-500/30 rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none resize-none"></textarea>
+                        <div class="flex flex-col gap-1">
+                            <button @click="enviarNota()"
+                                class="px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-300 text-xs hover:bg-yellow-500/30 transition-colors">
+                                <i class="fas fa-sticky-note"></i>
+                            </button>
+                            <button @click="mostrandoNota = false"
+                                class="px-3 py-1.5 rounded-lg bg-gray-700/50 text-gray-400 text-xs hover:bg-gray-600/50 transition-colors">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Input de respuesta -->
+                <div class="p-3 border-t border-white/8 bg-gray-900/40">
+                    <!-- Plantillas rápidas -->
+                    {% if puede_operar_panel %}
+                    <div x-show="mostrandoPlantillas" class="mb-2 max-h-40 overflow-auto bg-gray-900/90 rounded-xl p-2 flex flex-col gap-1">
+                        <template x-for="p in plantillas" :key="p.id">
+                            <button @click="usarPlantilla(p)"
+                                class="text-left px-2 py-1.5 rounded-lg hover:bg-white/10 text-sm text-gray-200 transition-colors">
+                                <span class="font-medium text-teal-300" x-text="p.titulo"></span>
+                                <span class="text-gray-400 ml-2 text-xs truncate" x-text="p.contenido.substring(0, 60)"></span>
+                            </button>
+                        </template>
+                    </div>
+                    {% endif %}
+
+                    <div class="flex gap-2 items-end">
+                        {% if puede_operar_panel %}
+                        <textarea x-model="textMensaje" @keydown.enter.prevent="if(!$event.shiftKey) enviar()"
+                            rows="2" placeholder="Escribir respuesta... (Enter para enviar, Shift+Enter para nueva línea)"
+                            class="flex-1 bg-white/5 rounded-xl px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none resize-none transition-colors"></textarea>
+                        <div class="flex flex-col gap-1">
+                            {% if puede_operar_panel %}
+                            <button @click="mostrandoPlantillas = !mostrandoPlantillas"
+                                :class="mostrandoPlantillas ? 'bg-teal-500/25 text-teal-300' : 'bg-white/5 text-gray-500 hover:text-gray-300'"
+                                class="px-3 py-2 rounded-xl text-sm transition-colors" title="Plantillas">
+                                <i class="fas fa-bolt"></i>
+                            </button>
+                            <button @click="mostrandoNota = !mostrandoNota"
+                                :class="mostrandoNota ? 'bg-yellow-500/25 text-yellow-300' : 'bg-white/5 text-gray-500 hover:text-gray-300'"
+                                class="px-3 py-2 rounded-xl text-sm transition-colors" title="Nota interna">
+                                <i class="fas fa-sticky-note"></i>
+                            </button>
+                            <button @click="enviar()" :disabled="!textMensaje.trim() || enviando"
+                                class="px-3 py-2 rounded-xl bg-teal-500/90 text-white text-sm hover:bg-teal-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-lg shadow-teal-500/20">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-gray-500">Vista de solo lectura para perfiles de control.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
+{% include "crm/asesor/_panel_js.html" %}
+{% endblock %}

@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+
+{% block title %}Gastos corrientes{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    {# ── Encabezado ───────────────────────────────────────────────── #}
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gastos corrientes</h1>
+            <p class="text-sm text-gray-500 dark:text-slate-400 mt-1">Controla gastos fijos del negocio, pagos y alertas de vencimiento.</p>
+        </div>
+        {% if current_user.es_admin() or current_user.tiene_permiso('crear_gastos_corrientes') %}
+        <a href="{{ url_for('gastos_corrientes.nuevo') }}"
+            class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors">
+            <i class="fas fa-plus"></i>
+            Nuevo gasto
+        </a>
+        {% endif %}
+    </div>
+
+    {# ── Filtros ───────────────────────────────────────────────────── #}
+    <form method="get" action="{{ url_for('gastos_corrientes.index') }}"
+        class="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 shadow-sm">
+        <div>
+            <label for="periodo" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400 mb-1">Mes</label>
+            <input id="periodo" name="periodo" type="month" value="{{ panel.periodo }}"
+                class="rounded-xl border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="categoria" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400 mb-1">Categoría</label>
+            <select id="categoria" name="categoria"
+                class="rounded-xl border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="">Todas</option>
+                {% for categoria in categorias %}
+                <option value="{{ categoria.valor }}" {% if panel.categoria == categoria.valor %}selected{% endif %}>{{ categoria.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="estado" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400 mb-1">Estado</label>
+            <select id="estado" name="estado"
+                class="rounded-xl border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="">Todos</option>
+                <option value="pendiente" {% if panel.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="vencido" {% if panel.estado == 'vencido' %}selected{% endif %}>Vencido</option>
+                <option value="pagado" {% if panel.estado == 'pagado' %}selected{% endif %}>Pagado</option>
+                <option value="inactivo" {% if panel.estado == 'inactivo' %}selected{% endif %}>Inactivo</option>
+            </select>
+        </div>
+        <div class="self-end flex gap-2 flex-wrap">
+            <button type="submit"
+                class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-gray-900 dark:bg-slate-600 text-white text-sm font-semibold hover:bg-gray-800 transition-colors">
+                Filtrar
+            </button>
+            <a href="{{ url_for('gastos_corrientes.index', periodo=panel.periodo) }}"
+                class="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-gray-300 dark:border-slate-600 text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                Limpiar
+            </a>
+            {% if current_user.es_admin() or current_user.tiene_permiso('ver_reportes_gastos_corrientes') %}
+            <a href="{{ url_for('gastos_corrientes.exportar_csv', periodo=panel.periodo, categoria=panel.categoria, estado=panel.estado) }}"
+                download="gastos_corrientes_{{ panel.periodo }}.csv"
+                class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-emerald-200 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors">
+                <i class="fas fa-file-csv"></i>
+                CSV
+            </a>
+            <a href="{{ url_for('gastos_corrientes.exportar_pdf', periodo=panel.periodo, categoria=panel.categoria, estado=panel.estado) }}"
+                download="gastos_corrientes_{{ panel.periodo }}.pdf"
+                class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-rose-200 text-sm font-semibold text-rose-700 hover:bg-rose-50 transition-colors">
+                <i class="fas fa-file-pdf"></i>
+                PDF
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if current_user.es_admin() or current_user.tiene_permiso('editar_gastos_corrientes') %}
+    <form method="post" action="{{ url_for('gastos_corrientes.sincronizar_periodo') }}" class="flex justify-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="periodo" value="{{ panel.periodo }}">
+        <input type="hidden" name="categoria" value="{{ panel.categoria }}">
+        <input type="hidden" name="estado" value="{{ panel.estado }}">
+        <button type="submit"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-indigo-200 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors">
+            <i class="fas fa-arrows-rotate"></i>
+            Sincronizar período
+        </button>
+    </form>
+    {% endif %}
+
+    {# ── KPIs globales ─────────────────────────────────────────────── #}
+    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Estimado del mes</p>
+            <p class="mt-2 text-xl font-black text-gray-900 dark:text-white">Gs. {{ '{:,.0f}'.format(panel.total_estimado).replace(',', '.') }}</p>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Pagado</p>
+            <p class="mt-2 text-xl font-black text-sky-700 dark:text-sky-400">Gs. {{ '{:,.0f}'.format(panel.total_pagado).replace(',', '.') }}</p>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Pendiente</p>
+            <p class="mt-2 text-xl font-black text-amber-600 dark:text-amber-400">Gs. {{ '{:,.0f}'.format(panel.total_pendiente).replace(',', '.') }}</p>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Vencidos</p>
+            <p class="mt-2 text-xl font-black text-rose-600 dark:text-rose-400">{{ panel.vencidos }}</p>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Alertas activas</p>
+            <p class="mt-2 text-xl font-black text-emerald-600 dark:text-emerald-400">{{ panel.alertas_activas }}</p>
+        </div>
+    </div>
+
+    {# ── Navegación de Tabs ────────────────────────────────────────── #}
+    <div class="border-b border-gray-200 dark:border-slate-700">
+        <nav id="gc-tabs-nav" class="-mb-px flex gap-1" aria-label="Secciones de gastos corrientes">
+            <button type="button" data-tab="listado" id="gc-tab-listado"
+                class="gc-tab-btn inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors
+                       border-amber-500 text-amber-700 dark:text-amber-400">
+                <i class="fas fa-list text-xs"></i>
+                Listado mensual
+                <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-bold text-gray-600 dark:text-slate-300">
+                    {{ panel['items']|length }}
+                </span>
+            </button>
+            <button type="button" data-tab="resumen" id="gc-tab-resumen"
+                class="gc-tab-btn inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors
+                       border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 hover:border-gray-300">
+                <i class="fas fa-chart-pie text-xs"></i>
+                Resumen
+            </button>
+        </nav>
+    </div>
+
+    {# ── TAB: Resumen ──────────────────────────────────────────────── #}
+    <div id="gc-panel-resumen" class="gc-tab-panel hidden space-y-4">
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            {# Comparativo #}
+            <div class="xl:col-span-1 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Comparativo del período</h2>
+                        <p class="text-sm text-gray-500 dark:text-slate-400">Cruza estimado, pagado y pendiente del mes seleccionado.</p>
+                    </div>
+                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold
+                        {% if panel.comparativo.estado_desviacion == 'sobre' %}bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300
+                        {% elif panel.comparativo.estado_desviacion == 'bajo' %}bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300
+                        {% else %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300{% endif %}">
+                        {% if panel.comparativo.estado_desviacion == 'sobre' %}Sobre estimado
+                        {% elif panel.comparativo.estado_desviacion == 'bajo' %}Bajo estimado
+                        {% else %}En línea{% endif %}
+                    </span>
+                </div>
+                <div class="mt-5 grid grid-cols-2 gap-4">
+                    <div class="rounded-2xl bg-sky-50 dark:bg-sky-900/25 p-4">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">Ejecución pagada</p>
+                        <p class="mt-2 text-3xl font-black text-sky-800 dark:text-sky-200">{{ '{:,.2f}'.format(panel.comparativo.porcentaje_pagado).replace(',', 'X').replace('.', ',').replace('X', '.') }}%</p>
+                        <p class="mt-1 text-xs text-sky-700 dark:text-sky-300">{{ panel.comparativo.cantidad_pagados }} de {{ panel.comparativo.cantidad_items }} gasto(s) pagados</p>
+                    </div>
+                    <div class="rounded-2xl bg-amber-50 dark:bg-amber-900/25 p-4">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Pendiente</p>
+                        <p class="mt-2 text-3xl font-black text-amber-800 dark:text-amber-200">{{ '{:,.2f}'.format(panel.comparativo.porcentaje_pendiente).replace(',', 'X').replace('.', ',').replace('X', '.') }}%</p>
+                        <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">{{ panel.comparativo.cantidad_pendientes }} gasto(s) sin cerrar</p>
+                    </div>
+                </div>
+                <div class="mt-4 rounded-2xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/50 p-4">
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Desvío vs estimado</p>
+                    <p class="mt-2 text-2xl font-black
+                        {% if panel.comparativo.desviacion > 0 %}text-rose-700 dark:text-rose-400
+                        {% elif panel.comparativo.desviacion < 0 %}text-amber-700 dark:text-amber-400
+                        {% else %}text-emerald-700 dark:text-emerald-400{% endif %}">
+                        Gs. {{ '{:,.0f}'.format(panel.comparativo.desviacion|abs).replace(',', '.') }}
+                    </p>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-slate-300">
+                        {% if panel.comparativo.desviacion > 0 %}El total pagado supera el estimado del período.
+                        {% elif panel.comparativo.desviacion < 0 %}El total pagado aún está por debajo del estimado del período.
+                        {% else %}El total pagado coincide con el estimado del período.{% endif %}
+                    </p>
+                </div>
+            </div>
+
+            {# Top categorías #}
+            <div class="xl:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Top categorías</h2>
+                        <p class="text-sm text-gray-500 dark:text-slate-400">Ranking del período según monto pagado y peso estimado.</p>
+                    </div>
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ panel.categorias_resumen|length }} categorías</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700 text-xs">
+                        <thead class="bg-gray-50 dark:bg-slate-700/50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Categoría</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Gastos</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Estimado</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Pagado</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Pendiente</th>
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">% Pagado</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
+                            {% for categoria in panel.categorias_resumen %}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/40">
+                                <td class="px-4 py-3 align-top">
+                                    <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ categoria.label }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-slate-400">{{ categoria.pagados }} pagado(s) · {{ categoria.pendientes }} pendiente(s)</div>
+                                </td>
+                                <td class="px-4 py-3 align-top text-sm text-gray-700 dark:text-slate-300">{{ categoria.cantidad }}</td>
+                                <td class="px-4 py-3 align-top text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Gs. {{ '{:,.0f}'.format(categoria.total_estimado).replace(',', '.') }}</td>
+                                <td class="px-4 py-3 align-top text-sm font-semibold text-sky-700 dark:text-sky-400 whitespace-nowrap">Gs. {{ '{:,.0f}'.format(categoria.total_pagado).replace(',', '.') }}</td>
+                                <td class="px-4 py-3 align-top text-sm font-semibold text-amber-700 dark:text-amber-400 whitespace-nowrap">Gs. {{ '{:,.0f}'.format(categoria.total_pendiente).replace(',', '.') }}</td>
+                                <td class="px-4 py-3 align-top text-sm text-gray-700 dark:text-slate-300">{{ '{:,.2f}'.format(categoria.porcentaje_pagado).replace(',', 'X').replace('.', ',').replace('X', '.') }}%</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-slate-400">
+                                    No hay categorías para mostrar en este período.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── TAB: Listado mensual ──────────────────────────────────────── #}
+    <div id="gc-panel-listado" class="gc-tab-panel">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Listado mensual</h2>
+                    <p class="text-sm text-gray-500 dark:text-slate-400">Estado operativo del período {{ panel.periodo }}.</p>
+                </div>
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ panel['items']|length }} registros</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700 text-xs">
+                    <thead class="bg-gray-50 dark:bg-slate-700/50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Concepto</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Categoría</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Vencimiento</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Estimado</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Pagado</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Estado</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Alerta</th>
+                            <th class="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
+                        {% for item in panel['items'] %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/40">
+                            <td class="px-4 py-3 align-top">
+                                <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ item.gasto.nombre }}</div>
+                                <div class="text-xs text-gray-500 dark:text-slate-400">{{ item.gasto.descripcion or 'Sin descripción' }}</div>
+                            </td>
+                            <td class="px-4 py-3 align-top text-sm text-gray-700 dark:text-slate-300">{{ item.gasto.categoria.replace('_', ' ').title() }}</td>
+                            <td class="px-4 py-3 align-top text-sm text-gray-700 dark:text-slate-300">{{ item.fecha_vencimiento.strftime('%d/%m/%Y') }}</td>
+                            <td class="px-4 py-3 align-top text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">Gs. {{ '{:,.0f}'.format(item.monto_estimado).replace(',', '.') }}</td>
+                            <td class="px-4 py-3 align-top text-sm font-semibold text-sky-700 dark:text-sky-400 whitespace-nowrap">
+                                {% if item.monto_pagado > 0 %}
+                                Gs. {{ '{:,.0f}'.format(item.monto_pagado).replace(',', '.') }}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="px-4 py-3 align-top">
+                                {% if item.estado_panel == 'pagado' %}
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">Pagado</span>
+                                {% elif item.estado_panel == 'vencido' %}
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">Vencido</span>
+                                {% elif item.estado_panel == 'inactivo' %}
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300">Inactivo</span>
+                                {% else %}
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Pendiente</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 align-top">
+                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ item.alerta.clase }}">
+                                    {{ item.alerta.texto }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 align-top">
+                                <div class="flex items-center justify-end gap-2">
+                                    {% if item.estado_panel == 'pagado' and item.pago and (current_user.es_admin() or current_user.tiene_permiso('ver_gastos_corrientes')) %}
+                                    <a href="{{ url_for('gastos_corrientes.detalle_pago', id_pago=item.pago.id_pago_gasto_corriente) }}"
+                                        class="px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors border-sky-200 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-400 dark:hover:bg-sky-900/30">
+                                        Ver pago
+                                    </a>
+                                    {% elif current_user.es_admin() or current_user.tiene_permiso('registrar_pago_gasto_corriente') %}
+                                    <a href="{{ url_for('gastos_corrientes.nuevo_pago', id_gasto_corriente=item.gasto.id_gasto_corriente, periodo=panel.periodo) }}"
+                                        class="px-2 py-1.5 rounded-lg border border-emerald-200 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30">
+                                        Registrar pago
+                                    </a>
+                                    {% endif %}
+                                    {% if current_user.es_admin() or current_user.tiene_permiso('editar_gastos_corrientes') %}
+                                    <a href="{{ url_for('gastos_corrientes.editar', id_gasto_corriente=item.gasto.id_gasto_corriente) }}"
+                                        class="px-2 py-1.5 rounded-lg border border-blue-200 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 transition-colors dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30">
+                                        Editar
+                                    </a>
+                                    <form method="post"
+                                        action="{{ url_for('gastos_corrientes.eliminar', id_gasto_corriente=item.gasto.id_gasto_corriente) }}"
+                                        onsubmit="return confirm('¿Eliminar este gasto? Si ya tuvo pagos reales el sistema lo bloqueará para proteger el historial.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="periodo" value="{{ panel.periodo }}">
+                                        <input type="hidden" name="categoria" value="{{ panel.categoria }}">
+                                        <input type="hidden" name="estado" value="{{ panel.estado }}">
+                                        <input type="hidden" name="tab" value="listado">
+                                        <button type="submit"
+                                            class="px-2 py-1.5 rounded-lg border border-rose-200 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 transition-colors dark:border-rose-700 dark:text-rose-400 dark:hover:bg-rose-900/30">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="px-4 py-12 text-center">
+                                <div class="mx-auto max-w-md">
+                                    <div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-gray-400 text-xl">
+                                        <i class="fas fa-file-invoice-dollar"></i>
+                                    </div>
+                                    <h3 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">No hay gastos para este filtro</h3>
+                                    <p class="mt-2 text-sm text-gray-500 dark:text-slate-400">Crea un gasto corriente o cambia el mes / estado seleccionado.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    const STORAGE_KEY = 'gc-active-tab';
+    const ACTIVE_CLASSES   = ['border-amber-500', 'text-amber-700', 'dark:text-amber-400'];
+    const INACTIVE_CLASSES = ['border-transparent', 'text-gray-500', 'dark:text-slate-400',
+                              'hover:text-gray-700', 'dark:hover:text-slate-200', 'hover:border-gray-300'];
+
+    function activateTab(tabName) {
+        document.querySelectorAll('.gc-tab-panel').forEach(panel => {
+            panel.classList.toggle('hidden', panel.id !== 'gc-panel-' + tabName);
+        });
+        document.querySelectorAll('.gc-tab-btn').forEach(btn => {
+            const isActive = btn.dataset.tab === tabName;
+            ACTIVE_CLASSES.forEach(c   => btn.classList.toggle(c, isActive));
+            INACTIVE_CLASSES.forEach(c => btn.classList.toggle(c, !isActive));
+        });
+        try { sessionStorage.setItem(STORAGE_KEY, tabName); } catch (_) {}
+    }
+
+    document.querySelectorAll('.gc-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+    });
+
+    // Restaurar tab: prioridad → param URL ?tab=  → sessionStorage → 'listado'
+    const params         = new URLSearchParams(window.location.search);
+    const initialTab     = params.get('tab') ||
+                           (function(){ try { return sessionStorage.getItem(STORAGE_KEY); } catch(_){ return null; } })() ||
+                           'listado';
+    activateTab(initialTab);
+})();
+</script>
+{% endblock %}

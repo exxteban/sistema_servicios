@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Imprimir Cierre #{{ sesion.id_sesion }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="flex items-center justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-bold text-gray-800 dark:text-white">Resumen de caja</h1>
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                <span class="font-semibold text-gray-700 dark:text-gray-200">Sesión #{{ sesion.id_sesion }}</span>
+                <span class="mx-2">·</span>
+                <span>{{ sesion.caja.nombre if sesion.caja else '' }}</span>
+                <span class="mx-2">·</span>
+                <span>{{ sesion.fecha_cierre|local_strftime('%d/%m/%Y %H:%M') }}</span>
+            </div>
+        </div>
+        <button type="button" onclick="window.print()"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+            <i class="fas fa-print mr-2"></i>Imprimir
+        </button>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <p class="text-gray-500 dark:text-gray-400 text-xs">Ingresos</p>
+            <p class="text-lg font-bold text-gray-800 dark:text-white mt-1">₲ {{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <p class="text-gray-500 dark:text-gray-400 text-xs">Egresos</p>
+            <p class="text-lg font-bold text-gray-800 dark:text-white mt-1">₲ {{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <p class="text-gray-500 dark:text-gray-400 text-xs">Neto</p>
+            <p class="text-lg font-bold text-gray-800 dark:text-white mt-1">₲ {{ "{:,.0f}".format(neto).replace(",", ".") }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <p class="text-gray-500 dark:text-gray-400 text-xs">Ingreso Real (Efectivo)</p>
+            <p class="text-lg font-bold text-gray-800 dark:text-white mt-1">₲ {{ "{:,.0f}".format(ingreso_real_efectivo).replace(",", ".") }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Efectivo del turno sin caja inicial</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <p class="text-gray-500 dark:text-gray-400 text-xs">Declarado (Efectivo)</p>
+            <p class="text-lg font-bold text-gray-800 dark:text-white mt-1">₲ {{ "{:,.0f}".format(declarado).replace(",", ".") }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="font-semibold text-gray-700 dark:text-gray-200">Detalle por Concepto</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Entrada</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Salida</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for row in conceptos %}
+                    <tr>
+                        <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ row.concepto }}</td>
+                        <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(row.entrada or 0).replace(",", ".") }}</td>
+                        <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(row.salida or 0).replace(",", ".") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <td class="px-4 py-3 text-right font-bold text-gray-800 dark:text-gray-100">Totales</td>
+                        <td class="px-4 py-3 text-right font-bold text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</td>
+                        <td class="px-4 py-3 text-right font-bold text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="font-semibold text-gray-700 dark:text-gray-200">Detalle</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Tipo</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Referencia</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Detalle</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Forma de Pago</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Entrada</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Salida</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for d in detalles %}
+                    <tr>
+                        <td class="px-4 py-2 text-gray-600 dark:text-gray-300">{{ d.fecha|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ d.concepto }}</td>
+                        <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ d.referencia }}</td>
+                        <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ d.detalle }}</td>
+                        <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ d.forma_pago }}</td>
+                        <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(d.entrada or 0).replace(",", ".") }}</td>
+                        <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(d.salida or 0).replace(",", ".") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,251 @@
+{% set clientes_para_activar = (inteligencia_resumen.clientes_para_activar if inteligencia_resumen else 0) %}
+{% set gastos_pendientes = (gastos_corrientes_resumen.vencidos if gastos_corrientes_resumen else 0) %}
+<div class="space-y-4"
+    x-data='dashboardNewView({
+        availableActions: {{ dashboard_quick_actions_available|tojson }},
+        selectedActions: {{ dashboard_quick_actions_selected|tojson }},
+        saveUrl: "{{ url_for('main.api_dashboard_preferencias') }}"
+    })'>
+    {% if can_crear_venta or can_ver_caja or can_abrir_caja %}
+    <div class="flex justify-end">
+        {% if sesion_caja %}
+        <span class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-900 ring-1 ring-emerald-200/80 dark:border-emerald-800/50 dark:bg-emerald-900/30 dark:text-emerald-100 dark:ring-emerald-800/50">
+            <i class="fas fa-check-circle"></i>
+            Caja {{ sesion_caja.caja.nombre }} activa desde {{ sesion_caja.fecha_apertura|local_strftime('%H:%M') }}
+        </span>
+        {% elif mostrar_alerta_sin_caja %}
+        <a href="{{ url_for('caja.abrir') if can_abrir_caja else '#' }}"
+            {% if can_abrir_caja %}data-tab-url="{{ url_for('caja.abrir') }}" data-tab-title="Abrir Caja" data-tab-icon="fas fa-wallet"{% endif %}
+            class="{% if can_abrir_caja %}app-tab-link{% endif %} inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 ring-1 ring-amber-200/80 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-100 dark:ring-amber-800/50">
+            <i class="fas fa-exclamation-triangle"></i>
+            Caja sin abrir
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <section class="space-y-3">
+        <h2 class="text-base font-bold text-slate-900 dark:text-white">Resumen general</h2>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {% if can_ver_reporte_ventas %}
+            <a href="{{ url_for('reportes.ventas_diarias') }}" data-tab-url="{{ url_for('reportes.ventas_diarias') }}"
+                data-tab-title="Ventas Hoy" data-tab-icon="fas fa-shopping-cart"
+                class="app-tab-link group rounded-lg border border-slate-200 border-l-4 border-l-blue-600 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:border-l-blue-400 dark:bg-slate-900">
+                <div class="flex items-center gap-4">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-400/15 dark:text-blue-200">
+                        <i class="fas fa-shopping-cart text-lg"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">Ventas hoy</p>
+                        <p id="dashboard-new-ventas-hoy" class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{{ ventas_hoy }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Operaciones registradas</p>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-semibold text-blue-600 dark:border-white/10 dark:text-blue-300">
+                    Ver detalle <i class="fas fa-arrow-right"></i>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if can_ver_ventas %}
+            <a href="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
+                data-tab-url="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
+                data-tab-title="Detalle de Ventas" data-tab-icon="fas fa-money-bill-wave"
+                class="app-tab-link group rounded-lg border border-slate-200 border-l-4 border-l-emerald-600 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:border-l-emerald-400 dark:bg-slate-900">
+                <div class="flex items-center gap-4">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800/50">
+                        <i class="fas fa-dollar-sign text-lg"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">Cobrado hoy</p>
+                        <p id="dashboard-new-total-cobrado" class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Gs. {{ "{:,.0f}".format(total_cobrado_display).replace(",", ".") }}</p>
+                        <p id="dashboard-new-total-cobrado-meta" class="truncate text-xs text-slate-500 dark:text-slate-400">Ventas cobradas: Gs. {{ "{:,.0f}".format(cobrado_en_ventas_display).replace(",", ".") }}</p>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-semibold text-emerald-600 dark:border-white/10 dark:text-emerald-300">
+                    Ver detalle <i class="fas fa-arrow-right"></i>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if can_ver_inventario or can_ver_reporte_inventario %}
+            <a href="{{ url_for('reportes.stock_bajo') if can_ver_reporte_inventario else url_for('productos.listar') }}"
+                data-tab-url="{{ url_for('reportes.stock_bajo') if can_ver_reporte_inventario else url_for('productos.listar') }}"
+                data-tab-title="Stock Bajo" data-tab-icon="fas fa-exclamation-triangle"
+                class="app-tab-link group rounded-lg border border-slate-200 border-l-4 border-l-red-600 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:border-l-red-400 dark:bg-slate-900">
+                <div class="flex items-center gap-4">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-lg bg-red-100 text-red-600 dark:bg-red-400/15 dark:text-red-200">
+                        <i class="fas fa-exclamation-triangle text-lg"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">Stock bajo</p>
+                        <p class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{{ productos_stock_bajo }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Productos con stock bajo</p>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-semibold text-red-600 dark:border-white/10 dark:text-red-300">
+                    Ver alertas <i class="fas fa-arrow-right"></i>
+                </div>
+            </a>
+
+            <a href="{{ url_for('productos.listar') }}" data-tab-url="{{ url_for('productos.listar') }}"
+                data-tab-title="Productos" data-tab-icon="fas fa-box"
+                class="app-tab-link group rounded-lg border border-slate-200 border-l-4 border-l-purple-600 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:border-l-purple-400 dark:bg-slate-900">
+                <div class="flex items-center gap-4">
+                    <span class="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-400/15 dark:text-purple-200">
+                        <i class="fas fa-cube text-lg"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">Inventario</p>
+                        <p class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{{ total_productos }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Productos activos en catalogo</p>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-semibold text-purple-600 dark:border-white/10 dark:text-purple-300">
+                    Ver productos <i class="fas fa-arrow-right"></i>
+                </div>
+            </a>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="space-y-3">
+        <div class="flex items-center justify-between gap-3">
+            <h2 class="text-base font-bold text-slate-900 dark:text-white">Acciones rapidas</h2>
+            <button type="button" @click="openCustomizer()"
+                class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+                <i class="fas fa-sliders-h"></i>
+                Modificar
+            </button>
+        </div>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <template x-for="action in selectedActions" :key="action.id">
+                <a :href="action.href" :data-tab-url="action.tab_url" :data-tab-title="action.tab_title"
+                    :data-tab-icon="action.tab_icon"
+                    class="app-tab-link group flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900">
+                    <div class="flex min-w-0 items-center gap-4">
+                        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-white" :class="action.color_class">
+                            <i :class="action.icon"></i>
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block truncate text-sm font-bold text-slate-900 dark:text-white" x-text="action.title"></span>
+                            <span class="block truncate text-xs text-slate-500 dark:text-slate-400" x-text="action.subtitle"></span>
+                        </span>
+                    </div>
+                    <i class="fas fa-chevron-right shrink-0 text-slate-500 transition group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white"></i>
+                </a>
+            </template>
+        </div>
+    </section>
+
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
+            <h2 class="border-b border-slate-100 px-4 py-3 text-base font-bold text-slate-900 dark:border-white/10 dark:text-white">Requiere atencion</h2>
+            <div class="divide-y divide-slate-100 dark:divide-white/10">
+                <a href="{{ url_for('inteligencia.dashboard') if can_ver_inteligencia else url_for('clientes.listar') }}"
+                    data-tab-url="{{ url_for('inteligencia.dashboard') if can_ver_inteligencia else url_for('clientes.listar') }}"
+                    data-tab-title="{{ 'Inteligencia' if can_ver_inteligencia else 'Clientes' }}"
+                    data-tab-icon="{{ 'fas fa-brain' if can_ver_inteligencia else 'fas fa-users' }}"
+                    class="app-tab-link flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-white/5">
+                    <span class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-400/15 dark:text-blue-200"><i class="fas fa-users"></i></span>
+                        <span class="min-w-0">
+                            <span class="block text-sm font-bold text-slate-900 dark:text-white">Clientes por activar</span>
+                            <span class="block text-xs text-slate-500 dark:text-slate-400">Clientes pendientes de activacion</span>
+                        </span>
+                    </span>
+                    <span class="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-700 ring-1 ring-blue-200/80 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-800/50">{{ clientes_para_activar }}</span>
+                </a>
+                <a href="{{ url_for('reportes.stock_bajo') if can_ver_reporte_inventario else url_for('productos.listar') }}"
+                    data-tab-url="{{ url_for('reportes.stock_bajo') if can_ver_reporte_inventario else url_for('productos.listar') }}"
+                    data-tab-title="Stock Bajo" data-tab-icon="fas fa-exclamation-triangle"
+                    class="app-tab-link flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-white/5">
+                    <span class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-400/15 dark:text-red-200"><i class="fas fa-exclamation-triangle"></i></span>
+                        <span class="min-w-0">
+                            <span class="block text-sm font-bold text-slate-900 dark:text-white">Alertas de stock</span>
+                            <span class="block text-xs text-slate-500 dark:text-slate-400">Productos con stock bajo</span>
+                        </span>
+                    </span>
+                    <span class="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-700 ring-1 ring-red-200/80 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/50">{{ productos_stock_bajo }}</span>
+                </a>
+                {% if can_ver_gastos_corrientes %}
+                <a href="{{ url_for('gastos_corrientes.index', estado='vencido') }}"
+                    data-tab-url="{{ url_for('gastos_corrientes.index') }}" data-tab-title="Gastos Corrientes"
+                    data-tab-icon="fas fa-file-invoice-dollar"
+                    class="app-tab-link flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-white/5">
+                    <span class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-1 ring-amber-200/80 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800/50"><i class="fas fa-dollar-sign"></i></span>
+                        <span class="min-w-0">
+                            <span class="block text-sm font-bold text-slate-900 dark:text-white">Gastos pendientes</span>
+                            <span class="block text-xs text-slate-500 dark:text-slate-400">Vencidos del periodo</span>
+                        </span>
+                    </span>
+                    <span class="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-700 ring-1 ring-amber-200/80 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800/50">{{ gastos_pendientes }}</span>
+                </a>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('inteligencia.dashboard') if can_ver_inteligencia else url_for('productos.listar') }}"
+                data-tab-url="{{ url_for('inteligencia.dashboard') if can_ver_inteligencia else url_for('productos.listar') }}"
+                data-tab-title="{{ 'Inteligencia' if can_ver_inteligencia else 'Productos' }}"
+                data-tab-icon="{{ 'fas fa-brain' if can_ver_inteligencia else 'fas fa-box' }}"
+                class="app-tab-link flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs font-bold text-blue-600 dark:border-white/10 dark:text-blue-300">
+                Ver todas las alertas <i class="fas fa-arrow-right"></i>
+            </a>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
+            <h2 class="border-b border-slate-100 px-4 py-3 text-base font-bold text-slate-900 dark:border-white/10 dark:text-white">Agenda del dia</h2>
+            <div class="flex min-h-[14rem] flex-col items-center justify-center px-4 py-8 text-center">
+                <span class="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-200 dark:bg-blue-400/10 dark:text-blue-200/60">
+                    <i class="fas fa-calendar-check"></i>
+                </span>
+                <p id="dashboard-new-agenda-pendientes" class="mt-4 text-xl font-bold text-slate-900 dark:text-white">{{ agenda_pendientes_hoy }} pendiente{% if agenda_pendientes_hoy != 1 %}s{% endif %}</p>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">No hay actividades pendientes para hoy.</p>
+            </div>
+            {% if can_ver_agenda %}
+            <a href="{{ url_for('agenda.dashboard') }}" data-tab-url="{{ url_for('agenda.dashboard') }}"
+                data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
+                class="app-tab-link flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs font-bold text-blue-600 dark:border-white/10 dark:text-blue-300">
+                Ver agenda completa <i class="fas fa-arrow-right"></i>
+            </a>
+            {% endif %}
+        </section>
+    </div>
+
+    <template x-teleport="body">
+        <div x-show="customizerOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+            <div class="absolute inset-0 bg-slate-950/60" @click="customizerOpen = false"></div>
+            <div class="relative w-full max-w-xl rounded-lg bg-white shadow-xl dark:bg-slate-900">
+                <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white">Configurar acciones rapidas</h3>
+                    <button type="button" @click="customizerOpen = false" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="space-y-3 p-4">
+                    <template x-for="slot in slots" :key="slot">
+                        <label class="block">
+                            <span class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400" x-text="`Accion ${slot}`"></span>
+                            <select x-model="draftIds[slot - 1]"
+                                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+                                <template x-for="action in availableActions" :key="`${slot}-${action.id}`">
+                                    <option :value="action.id" x-text="action.title"></option>
+                                </template>
+                            </select>
+                        </label>
+                    </template>
+                </div>
+                <div class="flex justify-end gap-2 border-t border-slate-100 px-4 py-3 dark:border-white/10">
+                    <button type="button" @click="customizerOpen = false"
+                        class="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10">Cancelar</button>
+                    <button type="button" @click="saveActions()" :disabled="saving"
+                        class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60">
+                        <i class="fas fa-save"></i>
+                        Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>

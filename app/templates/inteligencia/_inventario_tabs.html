@@ -1,0 +1,246 @@
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-4" x-data="{ inventarioTab: 'rotacion' }">
+    <div class="xl:col-span-2 rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5">
+        <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider text-orange-600 dark:text-orange-400 font-semibold">Inventario</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Rotación e inteligencia de stock</h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Lectura del período {{ panel.inventario.periodo_label }} cruzada con stock real{% if panel.inventario.hay_senales_tienda %} y señales de tienda{% endif %}.</p>
+            </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Riesgo de quiebre</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.inventario.resumen.riesgo_quiebre }}</p>
+            </div>
+            <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Rotación rápida</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.inventario.resumen.rotacion_rapida }}</p>
+            </div>
+            <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Stock inmovilizado</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.inventario.resumen.stock_inmovilizado }}</p>
+            </div>
+            <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Mucha mirada, poca rotación</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.inventario.resumen.atencion_sin_rotacion }}</p>
+            </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Vistas de inteligencia de inventario">
+            <button type="button" role="tab" @click="inventarioTab = 'rotacion'" :aria-selected="inventarioTab === 'rotacion'" class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition" :class="inventarioTab === 'rotacion' ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/40 dark:bg-orange-500/10 dark:text-orange-300' : 'border-gray-200 text-gray-600 hover:border-orange-200 hover:text-orange-700 dark:border-gray-700 dark:text-gray-300 dark:hover:border-orange-500/40 dark:hover:text-orange-300'">
+                <span>Rotación</span>
+                <span class="inline-flex items-center rounded-full bg-white/80 px-2 py-0.5 text-[11px] dark:bg-gray-800/70">{{ panel.inventario.resumen.rotacion_rapida + panel.inventario.resumen.riesgo_quiebre }}</span>
+            </button>
+            <button type="button" role="tab" @click="inventarioTab = 'inmovilizado'" :aria-selected="inventarioTab === 'inmovilizado'" class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition" :class="inventarioTab === 'inmovilizado' ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/40 dark:bg-orange-500/10 dark:text-orange-300' : 'border-gray-200 text-gray-600 hover:border-orange-200 hover:text-orange-700 dark:border-gray-700 dark:text-gray-300 dark:hover:border-orange-500/40 dark:hover:text-orange-300'">
+                <span>Inmovilizado</span>
+                <span class="inline-flex items-center rounded-full bg-white/80 px-2 py-0.5 text-[11px] dark:bg-gray-800/70">{{ panel.inventario.resumen.stock_inmovilizado }}</span>
+            </button>
+            <button type="button" role="tab" @click="inventarioTab = 'atencion'" :aria-selected="inventarioTab === 'atencion'" class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition" :class="inventarioTab === 'atencion' ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/40 dark:bg-orange-500/10 dark:text-orange-300' : 'border-gray-200 text-gray-600 hover:border-orange-200 hover:text-orange-700 dark:border-gray-700 dark:text-gray-300 dark:hover:border-orange-500/40 dark:hover:text-orange-300'">
+                <span>Atención</span>
+                <span class="inline-flex items-center rounded-full bg-white/80 px-2 py-0.5 text-[11px] dark:bg-gray-800/70">{{ panel.inventario.resumen.atencion_sin_rotacion }}</span>
+            </button>
+        </div>
+
+        <div x-bind:hidden="inventarioTab !== 'rotacion'" class="mt-4 grid grid-cols-1 2xl:grid-cols-2 gap-4">
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Rotación rápida</h3>
+                <div class="mt-3 space-y-3">
+                    {% for producto in panel.inventario.rotacion_rapida %}
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</p>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ producto.categoria }}</p>
+                                <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ producto.unidades_actual }} unidad{% if producto.unidades_actual != 1 %}es{% endif %} vendida{% if producto.unidades_actual != 1 %}s{% endif %} y cobertura estimada de {{ producto.cobertura_dias_label|lower }}.</p>
+                                <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ producto.accion }}</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {% if producto.variacion_direccion == 'up' %}bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300{% elif producto.variacion_direccion == 'down' %}bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                                {{ producto.variacion_label }}
+                            </span>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Todavía no aparecen productos con rotación rápida suficiente para destacar.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Riesgo de quiebre</h3>
+                <div class="mt-3 space-y-3">
+                    {% for producto in panel.inventario.riesgo_quiebre %}
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                {% if producto.producto_url %}
+                                <a href="{{ producto.producto_url }}" data-tab-url="{{ producto.producto_url }}" data-tab-title="Producto" data-tab-icon="fas fa-box-open" class="app-tab-link text-sm font-semibold text-gray-900 underline-offset-2 hover:text-orange-600 hover:underline dark:text-white dark:hover:text-orange-300">{{ producto.nombre }}</a>
+                                {% else %}
+                                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</p>
+                                {% endif %}
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ producto.categoria }}</p>
+                                <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">Stock actual {{ producto.stock_actual }}, mínimo {{ producto.stock_minimo }}, cobertura {{ producto.cobertura_dias_label|lower }}.</p>
+                                <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ producto.accion }}</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 px-2.5 py-1 text-[11px] font-semibold">
+                                Alta
+                            </span>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-500 dark:text-gray-400">No hay productos con señal clara de quiebre en este corte.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div x-bind:hidden="inventarioTab !== 'inmovilizado'" hidden class="mt-4 space-y-3">
+            {% for producto in panel.inventario.stock_inmovilizado %}
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        {% if producto.producto_url %}
+                        <a href="{{ producto.producto_url }}" data-tab-url="{{ producto.producto_url }}" data-tab-title="Producto" data-tab-icon="fas fa-box-open" class="app-tab-link text-sm font-semibold text-gray-900 underline-offset-2 hover:text-orange-600 hover:underline dark:text-white dark:hover:text-orange-300">{{ producto.nombre }}</a>
+                        {% else %}
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ producto.categoria }}</p>
+                        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">Tiene {{ producto.stock_actual }} unidad{% if producto.stock_actual != 1 %}es{% endif %} en stock y no muestra salida reciente dentro del radar ampliado.</p>
+                        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ producto.accion }}</p>
+                    </div>
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                        <p>Stock mínimo {{ producto.stock_minimo }}</p>
+                        <p class="mt-1">Cobertura {{ producto.cobertura_dias_label|lower }}</p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-4">
+                <p class="text-sm text-gray-600 dark:text-gray-300">No aparecen productos inmovilizados dentro del radar actual.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div x-bind:hidden="inventarioTab !== 'atencion'" hidden class="mt-4 space-y-3">
+            {% for producto in panel.inventario.atencion_sin_rotacion %}
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ producto.categoria }}</p>
+                        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ producto.total_visitas }} visita{% if producto.total_visitas != 1 %}s{% endif %}, {{ producto.leads_generados }} consulta{% if producto.leads_generados != 1 %}s{% endif %} y conversión {{ producto.conversion_leads_label }} con stock actual de {{ producto.stock_actual }}.</p>
+                        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ producto.accion }}</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300 px-2.5 py-1 text-[11px] font-semibold">
+                        Atención alta
+                    </span>
+                </div>
+            </div>
+            {% else %}
+            <div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-4">
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                    {% if panel.inventario.hay_senales_tienda %}
+                    No aparecen productos con atención fuerte y rotación baja en este período.
+                    {% else %}
+                    Este radar se activa cuando hay contexto del tenant de tienda para cruzar visitas con ventas.
+                    {% endif %}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5">
+        <div x-bind:hidden="inventarioTab !== 'rotacion'" class="space-y-4">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider text-orange-600 dark:text-orange-400 font-semibold">Radar de stock</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Señales accionables</h2>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Quiebre</p>
+                    <p class="mt-1 text-lg font-bold text-gray-900 dark:text-white">{{ panel.inventario.resumen.riesgo_quiebre }}</p>
+                </div>
+                <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Rotación</p>
+                    <p class="mt-1 text-lg font-bold text-gray-900 dark:text-white">{{ panel.inventario.resumen.rotacion_rapida }}</p>
+                </div>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-gray-900 dark:text-white">Insights</p>
+                <div class="mt-3 space-y-2">
+                    {% for insight in panel.inventario.insights %}
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ insight.titulo }}</p>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ insight.detalle }}</p>
+                                <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ insight.accion }}</p>
+                            </div>
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {% if insight.prioridad == 'alta' %}bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300{% elif insight.prioridad == 'media' %}bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                                {{ insight.prioridad|title }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div x-bind:hidden="inventarioTab !== 'inmovilizado'" hidden class="space-y-4">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider text-orange-600 dark:text-orange-400 font-semibold">Capital inmovilizado</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Dónde se frena el stock</h2>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">Muestra productos que siguen ocupando lugar y caja sin salida reciente.</p>
+            </div>
+            <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Productos detectados</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.inventario.resumen.stock_inmovilizado }}</p>
+            </div>
+            <div class="space-y-2">
+                {% for producto in panel.inventario.stock_inmovilizado %}
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                    {% if producto.producto_url %}
+                    <a href="{{ producto.producto_url }}" data-tab-url="{{ producto.producto_url }}" data-tab-title="Producto" data-tab-icon="fas fa-box-open" class="app-tab-link text-sm font-medium text-gray-900 underline-offset-2 hover:text-orange-600 hover:underline dark:text-white dark:hover:text-orange-300">{{ producto.nombre }}</a>
+                    {% else %}
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">{{ producto.nombre }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ producto.stock_actual }} unidad{% if producto.stock_actual != 1 %}es{% endif %} sin salida reciente.</p>
+                    <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ producto.accion }}</p>
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500 dark:text-gray-400">No aparecen productos inmovilizados dentro del radar actual.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div x-bind:hidden="inventarioTab !== 'atencion'" hidden class="space-y-4">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider text-orange-600 dark:text-orange-400 font-semibold">Interés sin salida</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Productos que llaman la atención</h2>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">Cruza visitas, consultas y stock para encontrar oportunidades que hoy no se convierten.</p>
+            </div>
+            <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Casos detectados</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ panel.inventario.resumen.atencion_sin_rotacion }}</p>
+            </div>
+            <div class="space-y-2">
+                {% for producto in panel.inventario.atencion_sin_rotacion %}
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">{{ producto.nombre }}</p>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ producto.total_visitas }} visita{% if producto.total_visitas != 1 %}s{% endif %}, {{ producto.leads_generados }} consulta{% if producto.leads_generados != 1 %}s{% endif %}, conversión {{ producto.conversion_leads_label }}.</p>
+                    <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ producto.accion }}</p>
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {% if panel.inventario.hay_senales_tienda %}
+                    No aparecen productos con atención fuerte y rotación baja en este período.
+                    {% else %}
+                    Este radar se activa cuando hay contexto del tenant de tienda para cruzar visitas con ventas.
+                    {% endif %}
+                </p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>

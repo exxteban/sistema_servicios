@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Formulario Nº {{ recepcion.numero_formulario_display }}{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <div class="text-sm uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400 font-semibold">Formulario legal</div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Recepción de compra Nº {{ recepcion.numero_formulario_display }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Registrado el {{ recepcion.fecha_formulario.strftime('%d/%m/%Y') if recepcion.fecha_formulario else '-' }} por {{ recepcion.usuario.nombre_completo if recepcion.usuario else '-' }}.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ url_for('recepcion_usados.listar') }}" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Volver</a>
+            <a href="{{ url_for('recepcion_usados.nueva') }}" class="px-4 py-2 rounded-lg bg-gray-800 dark:bg-gray-700 text-white hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">Nuevo formulario</a>
+            <a href="{{ url_for('recepcion_usados.imprimir', id_recepcion=recepcion.id_recepcion_compra_usado) }}" target="_blank" class="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors">Imprimir para firma</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <section class="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Vendedor</h2>
+                    <dl class="space-y-3 text-sm">
+                        <div><dt class="text-gray-500 dark:text-gray-400">Nombre</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_nombres_apellidos }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Documento</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_tipo_documento }} {{ recepcion.vendedor_numero_documento }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Nacimiento / nacionalidad</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_fecha_nacimiento.strftime('%d/%m/%Y') if recepcion.vendedor_fecha_nacimiento else '-' }} / {{ recepcion.vendedor_nacionalidad }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Estado civil</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_estado_civil or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Domicilio</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_domicilio }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Referencia</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_referencia_domicilio or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Barrio / ciudad / departamento</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_barrio }} / {{ recepcion.vendedor_ciudad }} / {{ recepcion.vendedor_departamento }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Celular</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.vendedor_telefono }}</dd></div>
+                    </dl>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Equipo e integración</h2>
+                    <dl class="space-y-3 text-sm">
+                        <div><dt class="text-gray-500 dark:text-gray-400">Descripción</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.descripcion_producto }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Marca / modelo</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.marca or '-' }} / {{ recepcion.modelo or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Color / capacidad</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.color or '-' }} / {{ recepcion.capacidad or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">IMEI / serie</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.imei_serie or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Accesorios</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.accesorios or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Estado reportado</dt><dd class="font-medium text-gray-800 dark:text-gray-100 whitespace-pre-line">{{ recepcion.estado_equipo or '-' }}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Producto creado</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{{ recepcion.producto.codigo if recepcion.producto else '-' }}{% if recepcion.producto %} - <a href="{{ url_for('productos.editar', id=recepcion.producto.id_producto) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ recepcion.producto.nombre }}</a>{% endif %}</dd></div>
+                        <div><dt class="text-gray-500 dark:text-gray-400">Compra relacionada</dt><dd class="font-medium text-gray-800 dark:text-gray-100">{% if recepcion.compra %}<a href="{{ url_for('compras.detalle', id=recepcion.compra.id_compra) }}" class="text-blue-600 dark:text-blue-400 hover:underline">Compra #{{ recepcion.compra.id_compra }}</a>{% else %}-{% endif %}</dd></div>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Condiciones registradas</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4">
+                        <div class="text-gray-500 dark:text-gray-400">Monto de compra</div>
+                        <div class="text-xl font-bold text-gray-800 dark:text-gray-100">₲ {{ '{:,.0f}'.format(recepcion.monto_compra or 0) }}</div>
+                    </div>
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4">
+                        <div class="text-gray-500 dark:text-gray-400">Método de pago</div>
+                        <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ recepcion.metodo_pago }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ recepcion.referencia_pago or 'Sin referencia' }}</div>
+                    </div>
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4">
+                        <div class="text-gray-500 dark:text-gray-400">Veces que vendió</div>
+                        <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ recepcion.vendedor.total_ventas_usados }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Impresiones: {{ recepcion.cantidad_impresiones or 0 }}</div>
+                    </div>
+                </div>
+                <div class="mt-4 rounded-xl bg-gray-50 dark:bg-gray-900/40 p-4 text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                    <div><span class="font-semibold">Domicilio especial:</span> {{ recepcion.domicilio_especial_vendedor or '-' }}</div>
+                    <div><span class="font-semibold">Ciudad de firma:</span> {{ recepcion.lugar_firma or '-' }}</div>
+                    <div><span class="font-semibold">Observaciones:</span> {{ recepcion.observaciones or '-' }}</div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="space-y-6">
+            <section class="bg-slate-900 text-white rounded-2xl shadow-md p-6 space-y-4">
+                <h2 class="text-lg font-semibold">Integridad de datos</h2>
+                <ul class="space-y-3 text-sm text-slate-200">
+                    <li>Correlativo único: Nº {{ recepcion.numero_formulario_display }}</li>
+                    <li>Documento vinculado al vendedor: {{ recepcion.vendedor_tipo_documento }} {{ recepcion.vendedor_numero_documento }}</li>
+                    <li>Producto único generado: {{ recepcion.producto.codigo if recepcion.producto else '-' }}</li>
+                    <li>Compra asociada: #{{ recepcion.compra.id_compra if recepcion.compra else '-' }}</li>
+                    <li>Movimiento de caja: {% if recepcion.movimiento_caja %}#{{ recepcion.movimiento_caja.id_movimiento_caja }}{% else %}No aplica{% endif %}</li>
+                </ul>
+            </section>
+        </aside>
+    </div>
+</div>
+{% endblock %}

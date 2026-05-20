@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración de Ticket{% endblock %}
+
+{% block content %}
+{% set venta_initial_template_html = venta_data['ticket_template_html'] if venta_data['ticket_template_html'] else default_template_html %}
+{% set reparacion_initial_template_html = reparacion_data['ticket_template_html'] if reparacion_data['ticket_template_html'] else default_repair_template_html %}
+<div class="max-w-7xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <div class="flex flex-col gap-4 mb-6">
+            <div class="flex items-center justify-between gap-4">
+                <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                    <i class="fas fa-receipt text-blue-600 dark:text-blue-400 mr-2"></i>
+                    Configuración de Ticket
+                </h1>
+            </div>
+            <div class="inline-flex w-full sm:w-auto rounded-xl border border-gray-200 dark:border-gray-700 p-1 bg-gray-100 dark:bg-gray-900">
+                <button type="button" data-ticket-tab="venta"
+                    class="ticket-tab-button flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition">
+                    Ventas / POS
+                </button>
+                <button type="button" data-ticket-tab="reparacion"
+                    class="ticket-tab-button flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition">
+                    Reparaciones
+                </button>
+            </div>
+        </div>
+
+        <div id="ticket-panel-venta" data-ticket-panel="venta" class="space-y-6">
+            <form id="ticket-form-venta" method="POST" action="{{ url_for('ventas.config_ticket') }}" class="space-y-6">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="ticket_scope" value="venta">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del negocio</label>
+                        <input id="venta_nombre_empresa" name="nombre_empresa" type="text" value="{{ venta_data['nombre_empresa'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">RUC</label>
+                        <input id="venta_ruc_empresa" name="ruc_empresa" type="text" value="{{ venta_data['ruc_empresa'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dirección</label>
+                        <input id="venta_direccion_empresa" name="direccion_empresa" type="text" value="{{ venta_data['direccion_empresa'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>
+                        <input id="venta_telefono_empresa" name="telefono_empresa" type="text" value="{{ venta_data['telefono_empresa'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pie del ticket</label>
+                        <input id="venta_ticket_footer_text" name="ticket_footer_text" type="text" value="{{ venta_data['ticket_footer_text'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ID de venta para vista previa (opcional)</label>
+                        <input id="venta_preview_id" type="number" value="{{ id_venta_preview }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div class="flex items-end justify-end gap-2">
+                        <button id="venta_btn_preview" type="button"
+                            class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                            Vista previa
+                        </button>
+                        <button id="venta_btn_toggle_html" type="button"
+                            class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm">
+                            Mostrar HTML
+                        </button>
+                    </div>
+                </div>
+
+                <div id="venta_html_editor_container" class="hidden">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Plantilla HTML completa</label>
+                        <button id="venta_btn_reset_template" type="button"
+                            class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm">
+                            Restablecer
+                        </button>
+                    </div>
+                    <textarea id="venta_ticket_template_html" name="ticket_template_html" rows="18"
+                        class="w-full font-mono text-xs border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-3 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">{{ venta_initial_template_html }}</textarea>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <a href="{{ url_for('main.dashboard') }}"
+                        class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                        Volver
+                    </a>
+                    <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-save mr-2"></i>Guardar ventas
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="ticket-panel-reparacion" data-ticket-panel="reparacion" class="hidden space-y-6">
+            <form id="ticket-form-reparacion" method="POST" action="{{ url_for('ventas.config_ticket') }}" class="space-y-6">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="ticket_scope" value="reparacion">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del negocio</label>
+                        <input id="reparacion_nombre_empresa" name="nombre_empresa" type="text" value="{{ reparacion_data['nombre_empresa'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">RUC</label>
+                        <input id="reparacion_ruc_empresa" name="ruc_empresa" type="text" value="{{ reparacion_data['ruc_empresa'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dirección</label>
+                        <input id="reparacion_direccion_empresa" name="direccion_empresa" type="text" value="{{ reparacion_data['direccion_empresa'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>
+                        <input id="reparacion_telefono_empresa" name="telefono_empresa" type="text" value="{{ reparacion_data['telefono_empresa'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pie del ticket</label>
+                        <input id="reparacion_ticket_footer_text" name="ticket_footer_text" type="text" value="{{ reparacion_data['ticket_footer_text'] }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ID de reparación para vista previa (opcional)</label>
+                        <input id="reparacion_preview_id" type="number" value="{{ id_reparacion_preview }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div class="flex items-end justify-end gap-2">
+                        <button id="reparacion_btn_preview" type="button"
+                            class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                            Vista previa
+                        </button>
+                        <button id="reparacion_btn_toggle_html" type="button"
+                            class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm">
+                            Mostrar HTML
+                        </button>
+                    </div>
+                </div>
+
+                <div id="reparacion_html_editor_container" class="hidden">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Plantilla HTML completa</label>
+                        <button id="reparacion_btn_reset_template" type="button"
+                            class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm">
+                            Restablecer
+                        </button>
+                    </div>
+                    <textarea id="reparacion_ticket_template_html" name="ticket_template_html" rows="18"
+                        class="w-full font-mono text-xs border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-3 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">{{ reparacion_initial_template_html }}</textarea>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <a href="{{ url_for('main.dashboard') }}"
+                        class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                        Volver
+                    </a>
+                    <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-save mr-2"></i>Guardar reparación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script id="default-template-venta-json" type="application/json">{{ default_template_html|tojson }}</script>
+<script id="default-template-reparacion-json" type="application/json">{{ default_repair_template_html|tojson }}</script>
+
+<div id="ticket-preview-modal" class="hidden fixed inset-0 z-50">
+    <div id="ticket-preview-overlay" class="absolute inset-0 bg-gray-900/70"></div>
+    <div class="relative min-h-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <div id="preview-title" class="text-sm font-semibold text-gray-700 dark:text-gray-200">Vista previa</div>
+                <div class="flex items-center gap-3">
+                    <a id="open-preview-window" href="#" target="_blank"
+                        class="text-sm text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                        Abrir en ventana
+                    </a>
+                    <button id="btn-close-preview" type="button"
+                        class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+            <div class="p-4 space-y-3">
+                <div id="preview-error" class="hidden p-3 rounded-lg bg-red-100 text-red-800 border border-red-200 text-sm"></div>
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900">
+                    <iframe id="ticket-preview-iframe" class="w-full" style="height: 720px;"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const els = {
+            previewTitle: document.getElementById('preview-title'),
+            iframe: document.getElementById('ticket-preview-iframe'),
+            error: document.getElementById('preview-error'),
+            openPreviewWindow: document.getElementById('open-preview-window'),
+            modal: document.getElementById('ticket-preview-modal'),
+            overlay: document.getElementById('ticket-preview-overlay'),
+            btnClose: document.getElementById('btn-close-preview'),
+        };
+        const tabButtons = Array.from(document.querySelectorAll('[data-ticket-tab]'));
+        const panels = Array.from(document.querySelectorAll('[data-ticket-panel]'));
+        const configUrl = "{{ url_for('ventas.config_ticket') }}";
+        const scopeConfigs = {
+            venta: {
+                form: document.getElementById('ticket-form-venta'),
+                panel: document.getElementById('ticket-panel-venta'),
+                previewButton: document.getElementById('venta_btn_preview'),
+                toggleButton: document.getElementById('venta_btn_toggle_html'),
+                resetButton: document.getElementById('venta_btn_reset_template'),
+                htmlEditor: document.getElementById('venta_html_editor_container'),
+                templateField: document.getElementById('venta_ticket_template_html'),
+                previewIdField: document.getElementById('venta_preview_id'),
+                previewUrl: "{{ url_for('ventas.config_ticket_preview') }}",
+                previewIdKey: 'id_venta',
+                previewTitle: 'Vista previa ticket de venta',
+                defaultTemplateId: 'default-template-venta-json',
+            },
+            reparacion: {
+                form: document.getElementById('ticket-form-reparacion'),
+                panel: document.getElementById('ticket-panel-reparacion'),
+                previewButton: document.getElementById('reparacion_btn_preview'),
+                toggleButton: document.getElementById('reparacion_btn_toggle_html'),
+                resetButton: document.getElementById('reparacion_btn_reset_template'),
+                htmlEditor: document.getElementById('reparacion_html_editor_container'),
+                templateField: document.getElementById('reparacion_ticket_template_html'),
+                previewIdField: document.getElementById('reparacion_preview_id'),
+                previewUrl: "{{ url_for('reparaciones.config_ticket_preview') }}",
+                previewIdKey: 'id_reparacion',
+                previewTitle: 'Vista previa ticket de reparación',
+                defaultTemplateId: 'default-template-reparacion-json',
+            }
+        };
+
+        let currentBlobUrl = null;
+        let activeScope = "{{ selected_tab }}";
+
+        function showError(msg) {
+            els.error.textContent = msg || 'Error al renderizar';
+            els.error.classList.remove('hidden');
+        }
+
+        function clearError() {
+            els.error.textContent = '';
+            els.error.classList.add('hidden');
+        }
+
+        function openModal() {
+            els.modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeModal() {
+            els.modal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        function setActiveTab(scope) {
+            activeScope = scope in scopeConfigs ? scope : 'venta';
+            panels.forEach((panel) => {
+                panel.classList.toggle('hidden', panel.dataset.ticketPanel !== activeScope);
+            });
+            tabButtons.forEach((button) => {
+                const isActive = button.dataset.ticketTab === activeScope;
+                button.classList.toggle('bg-white', isActive);
+                button.classList.toggle('dark:bg-gray-800', isActive);
+                button.classList.toggle('text-blue-700', isActive);
+                button.classList.toggle('dark:text-blue-300', isActive);
+                button.classList.toggle('shadow-sm', isActive);
+                button.classList.toggle('text-gray-600', !isActive);
+                button.classList.toggle('dark:text-gray-300', !isActive);
+            });
+            if (window.history && window.history.replaceState) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', activeScope);
+                window.history.replaceState({}, '', url.toString());
+            }
+        }
+
+        function buildPayload(scope) {
+            const config = scopeConfigs[scope];
+            const formData = new FormData(config.form);
+            const payload = {
+                nombre_empresa: String(formData.get('nombre_empresa') || ''),
+                ruc_empresa: String(formData.get('ruc_empresa') || ''),
+                direccion_empresa: String(formData.get('direccion_empresa') || ''),
+                telefono_empresa: String(formData.get('telefono_empresa') || ''),
+                ticket_footer_text: String(formData.get('ticket_footer_text') || ''),
+                ticket_template_html: String(formData.get('ticket_template_html') || '')
+            };
+            payload[config.previewIdKey] = config.previewIdField.value ? Number(config.previewIdField.value) : null;
+            return payload;
+        }
+
+        async function renderPreview(scope) {
+            clearError();
+            const config = scopeConfigs[scope];
+            const payload = buildPayload(scope);
+            els.previewTitle.textContent = config.previewTitle;
+
+            try {
+                const res = await fetch(config.previewUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    showError(data && data.error ? data.error : 'Error al renderizar');
+                    return;
+                }
+                els.iframe.srcdoc = data.html;
+                if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+                const blob = new Blob([data.html], { type: 'text/html' });
+                currentBlobUrl = URL.createObjectURL(blob);
+                els.openPreviewWindow.href = currentBlobUrl;
+            } catch (e) {
+                showError(String(e));
+            }
+        }
+
+        function resetTemplate(scope) {
+            const config = scopeConfigs[scope];
+            try {
+                const raw = document.getElementById(config.defaultTemplateId).textContent || '""';
+                const tpl = JSON.parse(raw);
+                if (config.templateField) config.templateField.value = tpl || '';
+            } catch (e) {
+                showError(String(e));
+            }
+        }
+
+        tabButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                setActiveTab(button.dataset.ticketTab);
+            });
+        });
+
+        Object.entries(scopeConfigs).forEach(([scope, config]) => {
+            config.previewButton.addEventListener('click', async () => {
+                openModal();
+                els.iframe.srcdoc = '';
+                await renderPreview(scope);
+            });
+            config.resetButton.addEventListener('click', () => {
+                resetTemplate(scope);
+            });
+            config.toggleButton.addEventListener('click', () => {
+                const isHidden = config.htmlEditor.classList.contains('hidden');
+                config.htmlEditor.classList.toggle('hidden', !isHidden);
+                config.toggleButton.textContent = isHidden ? 'Ocultar HTML' : 'Mostrar HTML';
+            });
+            config.form.addEventListener('submit', () => {
+                const submitUrl = new URL(configUrl, window.location.origin);
+                submitUrl.searchParams.set('tab', scope);
+                config.form.action = submitUrl.toString();
+            });
+        });
+
+        els.btnClose.addEventListener('click', closeModal);
+        els.overlay.addEventListener('click', closeModal);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !els.modal.classList.contains('hidden')) closeModal();
+        });
+        setActiveTab(activeScope);
+    })();
+</script>
+{% endblock %}

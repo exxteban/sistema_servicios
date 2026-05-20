@@ -1,0 +1,180 @@
+<section class="bg-white dark:bg-gray-800 rounded-2xl shadow border border-gray-100 dark:border-gray-700">
+    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-xs uppercase tracking-wide font-semibold text-rose-600 dark:text-rose-400">Promociones</p>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Bot y tienda sincronizados con promos activas</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Cuando una promo vence deja de verse en la tienda y también sale del contexto del asistente.</p>
+        </div>
+        <button
+            type="button"
+            onclick="abrirModalPromocion()"
+            class="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700">
+            <i class="fas fa-badge-percent"></i> Nueva promoción
+        </button>
+    </div>
+
+    <div class="p-5">
+        {% if promociones %}
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {% for promo in promociones %}
+            <article class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ promo.nombre }}</h3>
+                            {% set estado_colores = {
+                                'activa': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+                                'programada': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+                                'finalizada': 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200',
+                                'inactiva': 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                            } %}
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold {{ estado_colores.get(promo.estado, estado_colores['inactiva']) }}">
+                                {{ promo.estado|capitalize }}
+                            </span>
+                        </div>
+                        {% if promo.descripcion_corta %}
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ promo.descripcion_corta }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ promo.tipo_label }}</p>
+                        <p class="text-base font-semibold text-rose-600 dark:text-rose-400">
+                            {% if promo.tipo == 'porcentaje' %}
+                            {{ promo.valor|round(0)|int }}%
+                            {% else %}
+                            ₲ {{ "{:,.0f}".format(promo.valor).replace(",", ".") }}
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2">
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Vigencia</p>
+                        <p class="mt-1 font-medium text-gray-800 dark:text-gray-100">{{ promo.fecha_inicio[:16].replace('T', ' ') }}</p>
+                        <p class="text-gray-500 dark:text-gray-400">{{ promo.fecha_fin[:16].replace('T', ' ') }}</p>
+                    </div>
+                    <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2">
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Productos</p>
+                        <p class="mt-1 font-medium text-gray-800 dark:text-gray-100">{{ promo.productos|length }} producto(s)</p>
+                        <p class="text-gray-500 dark:text-gray-400 truncate" title="{{ promo.productos | map(attribute='nombre') | join(', ') }}">
+                            {{ promo.productos | map(attribute='nombre') | join(', ') }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex items-center justify-end gap-2">
+                    <button
+                        type="button"
+                        data-promo='{{ promo|tojson|forceescape }}'
+                        onclick="abrirModalPromocionDesdeJSON(this.dataset.promo)"
+                        class="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <i class="fas fa-pen"></i> Editar
+                    </button>
+                    <button
+                        type="button"
+                        onclick="eliminarPromocion({{ promo.id_promocion }})"
+                        class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-700">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30 px-6 py-10 text-center">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300">
+                <i class="fas fa-tags text-xl"></i>
+            </div>
+            <h3 class="mt-4 text-base font-semibold text-gray-900 dark:text-white">Todavía no hay promociones cargadas</h3>
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Creá una promo con fecha de inicio y fin para que aparezca sola mientras esté vigente.</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<div id="modalPromocion" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-promocion-title" role="dialog" aria-modal="true">
+    <div id="modalPromocionBackdrop" class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 opacity-0 transition-opacity backdrop-blur-sm"></div>
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div id="modalPromocionPanel" class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95 sm:my-8 sm:w-full sm:max-w-3xl border border-gray-200 dark:border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+                    <div>
+                        <h3 id="modal-promocion-title" class="text-lg font-semibold text-gray-900 dark:text-white">Nueva promoción</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Definí vigencia, tipo de descuento y productos incluidos.</p>
+                    </div>
+                    <button type="button" onclick="cerrarModalPromocion()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <span class="sr-only">Cerrar</span>
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <form id="formPromocion" class="px-6 py-6 space-y-6">
+                    <input type="hidden" name="promotion_id" value="">
+                    <input type="hidden" name="slug_actual" value="{{ tienda_config.slug if tienda_config else '' }}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la promo</label>
+                            <input name="nombre" type="text" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm" placeholder="Ej: Accesorios con descuento esta semana" required>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción breve para tienda/bot</label>
+                            <textarea name="descripcion_corta" rows="2" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm" placeholder="Ej: Promo válida hasta agotar stock en productos seleccionados."></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo</label>
+                            <select name="tipo" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm">
+                                <option value="porcentaje">Descuento %</option>
+                                <option value="monto_fijo">Monto fijo</option>
+                                <option value="precio_promocional">Precio promocional</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Valor</label>
+                            <input name="valor" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm" placeholder="Ej: 10 o 25000" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Inicio</label>
+                            <input name="fecha_inicio" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fin</label>
+                            <input name="fecha_fin" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm" required>
+                        </div>
+                    </div>
+
+                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="activa" checked class="rounded border-gray-300 dark:border-gray-600 text-rose-600 focus:ring-rose-500">
+                        Promo habilitada
+                    </label>
+
+                    <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 p-4">
+                        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Productos incluidos</h4>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Buscá productos por nombre, código, marca o modelo.</p>
+                            </div>
+                            <div class="w-full md:max-w-md">
+                                <input id="promocionProductoSearch" type="text" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm" placeholder="Buscar producto para agregar">
+                            </div>
+                        </div>
+                        <div id="promocionProductoResultados" class="mt-4 grid grid-cols-1 gap-2"></div>
+                        <div class="mt-4">
+                            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Seleccionados</p>
+                            <div id="promocionProductosSeleccionados" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end rounded-b-2xl border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" onclick="cerrarModalPromocion()" class="inline-flex justify-center rounded-lg bg-white dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-gray-200 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="guardarPromocion()" class="inline-flex justify-center rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 transition-colors">
+                        Guardar promoción
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

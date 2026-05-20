@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    {% set browser_title %}{% block title %}{% endblock %}{% endset %}
+    <title>{% set browser_title = browser_title | striptags | trim %}{% if browser_title %}{{ browser_title }} - {% endif %}Sistema de Gestión Comercial</title>
+    {% include 'layout/head_assets.html' %}
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body data-endpoint="{{ request.endpoint or '' }}"
+    class="app-shell-body bg-gray-100 dark:bg-gray-900 dark:text-gray-100 overflow-hidden flex flex-col transition-colors duration-300"
+    x-data="{ 
+          sidebarOpen: false, 
+          darkMode: localStorage.getItem('darkMode') === 'true'
+      }" x-init="$watch('darkMode', val => localStorage.setItem('darkMode', val)); 
+              if(darkMode) document.documentElement.classList.add('dark'); 
+              $watch('darkMode', val => val ? document.documentElement.classList.add('dark') : document.documentElement.classList.remove('dark'));
+              window.addEventListener('storage', (e) => {
+                  if (e.key === 'darkMode') {
+                      darkMode = e.newValue === 'true';
+                  }
+              });">
+    {% set embed_mode = (request.args.get('embed') == '1') %}
+    <span id="app-server-time-anchor" class="hidden"
+        data-app-server-epoch-ms="{{ ((now().timestamp() * 1000) | int) if now is defined else '' }}"
+        data-app-timezone="{{ app_timezone_name() if app_timezone_name is defined else '' }}"></span>
+
+    {% include 'layout/app_shell.html' %}
+    {% include 'layout/post_content_scripts.html' %}
+    {% if current_user.is_authenticated and not embed_mode and (current_user.tiene_permiso('usar_asistente_ia') or current_user.es_admin()) %}
+    {% include 'layout/daily_insights_widget.html' %}
+    {% endif %}
+
+    {% block extra_js %}{% endblock %}
+
+    {% if current_user.is_authenticated and not embed_mode %}
+    <script>
+{% include 'layout/tab_runtime_js_part1.html' %}
+{% include 'layout/tab_runtime_js_part2.html' %}
+    </script>
+    {% endif %}
+
+    {% include 'layout/server_clock_script.html' %}
+
+</html>

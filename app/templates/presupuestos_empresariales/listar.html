@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Presupuestos empresariales{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-file-contract text-emerald-600 dark:text-emerald-400 mr-2"></i>Presupuestos empresariales
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Presupuestos listos para PDF, impresión y envío rápido por WhatsApp.</p>
+        </div>
+        <a href="{{ url_for('presupuestos_empresariales.nuevo') }}" data-permiso="crear_presupuestos_empresariales"
+            class="inline-flex items-center justify-center gap-2 border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md shadow-emerald-600/30 transition-colors">
+            <i class="fas fa-plus"></i>
+            <span>Nuevo presupuesto</span>
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+        <form method="GET" class="flex flex-col gap-3 md:flex-row">
+            <input type="text" name="q" value="{{ q }}" placeholder="Buscar por número, empresa, RUC o asunto..."
+                class="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <div class="flex gap-2">
+                <button type="submit" class="inline-flex items-center justify-center gap-2 border border-gray-700 dark:border-gray-500 bg-gray-800 dark:bg-gray-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
+                    <i class="fas fa-search mr-1"></i> Buscar
+                </button>
+                {% if q %}
+                <a href="{{ url_for('presupuestos_empresariales.listar') }}" class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Limpiar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[980px]">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Presupuesto</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Empresa</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Asunto</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Validez</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Total</th>
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">PDF</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for presupuesto in presupuestos.items %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-gray-800 dark:text-gray-100">Nº {{ presupuesto.numero_presupuesto_display }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ presupuesto.destinatario_ruc or 'Sin RUC' }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                            <div>{{ presupuesto.fecha_emision.strftime('%d/%m/%Y') if presupuesto.fecha_emision else '-' }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Hasta {{ presupuesto.valido_hasta.strftime('%d/%m/%Y') if presupuesto.valido_hasta else '-' }}</div>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-800 dark:text-gray-100">{{ presupuesto.destinatario_nombre }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ presupuesto.destinatario_contacto or presupuesto.destinatario_telefono or '-' }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300 max-w-sm">
+                            <div class="truncate">{{ presupuesto.asunto }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ presupuesto.validez_dias }} día(s)</td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100">₲ {{ '{:,.0f}'.format(presupuesto.total or 0) }}</td>
+                        <td class="px-4 py-3 text-center text-gray-600 dark:text-gray-300">{{ presupuesto.cantidad_impresiones or 0 }}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex justify-end gap-3 text-sm">
+                                <a href="{{ url_for('presupuestos_empresariales.detalle', id_presupuesto=presupuesto.id_presupuesto_empresarial) }}" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                                    Ver
+                                </a>
+                                <a href="{{ url_for('presupuestos_empresariales.pdf', id_presupuesto=presupuesto.id_presupuesto_empresarial) }}" target="_blank" class="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300">
+                                    PDF
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-10 text-center text-gray-400 dark:text-gray-500">
+                            {% if q %}
+                            No se encontraron presupuestos con "{{ q }}".
+                            {% else %}
+                            Aún no hay presupuestos empresariales registrados.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if presupuestos.pages > 1 %}
+    <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+        <span>Página {{ presupuestos.page }} de {{ presupuestos.pages }}</span>
+        <div class="flex gap-2">
+            {% if presupuestos.has_prev %}
+            <a href="{{ url_for('presupuestos_empresariales.listar', page=presupuestos.prev_num, q=q) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100">Anterior</a>
+            {% endif %}
+            {% if presupuestos.has_next %}
+            <a href="{{ url_for('presupuestos_empresariales.listar', page=presupuestos.next_num, q=q) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100">Siguiente</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

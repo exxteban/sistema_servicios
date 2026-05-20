@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Usuarios{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-user-cog text-blue-600 dark:text-blue-400 mr-2"></i>Usuarios
+        </h1>
+        <a href="{{ url_for('usuarios.nuevo') }}" data-permiso="gestionar_usuarios"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+            <i class="fas fa-plus mr-2"></i>Nuevo Usuario
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-2 transition-colors duration-300">
+        <div class="flex gap-2">
+            <a href="{{ url_for('usuarios.listar') }}"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition {% if active_tab != 'configuracion' %}bg-blue-600 text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                Usuarios
+            </a>
+            <a href="{{ url_for('usuarios.configuracion') }}"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition {% if active_tab == 'configuracion' %}bg-blue-600 text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                Configuración
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <a href="{{ url_for('usuarios.listar', buscar=buscar, rol=rol_id, estado='activos') }}"
+                    class="px-4 py-2 text-sm font-medium transition {% if estado == 'activos' %}bg-blue-600 text-white{% else %}bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700{% endif %}">
+                    Activos
+                </a>
+                <a href="{{ url_for('usuarios.listar', buscar=buscar, rol=rol_id, estado='inactivos') }}"
+                    class="px-4 py-2 text-sm font-medium transition {% if estado == 'inactivos' %}bg-blue-600 text-white{% else %}bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700{% endif %}">
+                    Desactivados
+                </a>
+            </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando usuarios {{ 'activos' if estado == 'activos' else 'desactivados' }}.
+            </p>
+        </div>
+        <form method="GET" action="{{ url_for('usuarios.listar') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <input type="hidden" name="estado" value="{{ estado }}">
+            <input type="text" name="buscar" value="{{ buscar }}" placeholder="Buscar por username o nombre..."
+                class="border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            <select name="rol"
+                class="border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                <option value="0">Todos los roles</option>
+                {% for rol in roles %}
+                <option value="{{ rol.id_rol }}" {% if rol_id==rol.id_rol %}selected{% endif %}>
+                    {{ rol.nombre }}
+                </option>
+                {% endfor %}
+            </select>
+            <button type="submit"
+                class="md:col-span-2 bg-gray-800 dark:bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition">
+                <i class="fas fa-search mr-2"></i>Filtrar
+            </button>
+        </form>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Usuario</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Nombre</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Rol</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Estado</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for u in usuarios.items %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                    <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">
+                        {{ u.username }}
+                        {% if u.id_usuario == current_user.id_usuario %}
+                        <span
+                            class="ml-2 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-1 rounded-full">Tú</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{{ u.nombre_completo }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span>{{ u.rol.nombre if u.rol else '-' }}</span>
+                            {% if u.rol and current_user.tiene_permiso('gestionar_roles') %}
+                            <a href="{{ url_for('roles.editar', id_rol=u.rol.id_rol) }}"
+                                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs transition-colors">
+                                Editar permisos
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        {% if u.activo %}
+                        <span
+                            class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">Activo</span>
+                        {% else %}
+                        <span
+                            class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <a href="{{ url_for('usuarios.editar', id=u.id_usuario) }}"
+                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mx-1 transition-colors">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        {% if u.id_usuario != current_user.id_usuario %}
+                        <form method="POST" action="{{ url_for('usuarios.toggle_activo', id=u.id_usuario) }}"
+                            class="inline-block mx-1"
+                            onsubmit="return confirm('{{ '¿Activar' if not u.activo else '¿Desactivar' }} este usuario?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="next"
+                                value="{{ url_for('usuarios.listar', page=usuarios.page, buscar=buscar, rol=rol_id, estado=estado) }}">
+                            <button type="submit"
+                                class="{% if u.activo %}text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300{% else %}text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300{% endif %} transition-colors"
+                                title="{{ 'Activar usuario' if not u.activo else 'Desactivar usuario' }}">
+                                <i class="fas {{ 'fa-user-check' if not u.activo else 'fa-user-slash' }}"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if not usuarios.items %}
+        <div class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            No hay usuarios {{ 'activos' if estado == 'activos' else 'desactivados' }} con los filtros actuales.
+        </div>
+        {% endif %}
+    </div>
+
+    {% if usuarios.pages > 1 %}
+    <div class="flex justify-center items-center gap-2">
+        {% if usuarios.has_prev %}
+        <a class="px-3 py-2 rounded-lg bg-white dark:bg-gray-800 shadow hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            href="{{ url_for('usuarios.listar', page=usuarios.prev_num, buscar=buscar, rol=rol_id, estado=estado) }}">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        {% endif %}
+        <span class="text-sm text-gray-600 dark:text-gray-300">Página {{ usuarios.page }} de {{ usuarios.pages }}</span>
+        {% if usuarios.has_next %}
+        <a class="px-3 py-2 rounded-lg bg-white dark:bg-gray-800 shadow hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            href="{{ url_for('usuarios.listar', page=usuarios.next_num, buscar=buscar, rol=rol_id, estado=estado) }}">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

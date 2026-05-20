@@ -1,0 +1,34 @@
+<script>
+    (function () {
+        if (window.__posPerfNavTrackerInstalled) return;
+        window.__posPerfNavTrackerInstalled = true;
+
+        const POS_PATHS = new Set(['/ventas/pos', '/ventas/registro-vendedor']);
+        const STORAGE_KEY = 'pos_perf_nav_start_v1';
+
+        function guardarInicio(url, source) {
+            try {
+                sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    href: url.href,
+                    path: url.pathname,
+                    source_path: window.location.pathname,
+                    source: source || 'unknown',
+                    started_at_ms: Date.now()
+                }));
+            } catch (e) {
+            }
+        }
+
+        document.addEventListener('click', function (event) {
+            const anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+            if (!anchor) return;
+
+            try {
+                const url = new URL(anchor.href, window.location.origin);
+                if (!POS_PATHS.has(url.pathname)) return;
+                guardarInicio(url, 'anchor');
+            } catch (e) {
+            }
+        }, true);
+    })();
+</script>

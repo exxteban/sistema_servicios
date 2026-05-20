@@ -1,0 +1,57 @@
+{% if can_ver_gastos_corrientes and gastos_corrientes_dashboard %}
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+    <div class="xl:col-span-12 relative overflow-hidden rounded-2xl border border-slate-800/70 bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 shadow-lg p-5">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(103,232,249,0.18),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.16),transparent_38%)] opacity-90"></div>
+        <div class="relative space-y-5">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200/75">Radar financiero</p>
+                    <h2 class="mt-2 text-xl font-black text-white">Gastos corrientes</h2>
+                    <p class="mt-1 text-sm text-slate-300">Pulso operativo del período {{ gastos_corrientes_dashboard.periodo }}.</p>
+                </div>
+                <a href="{{ url_for('gastos_corrientes.index', periodo=gastos_corrientes_dashboard.periodo) }}"
+                    data-tab-url="{{ url_for('gastos_corrientes.index', periodo=gastos_corrientes_dashboard.periodo) }}"
+                    data-tab-title="Gastos corrientes" data-tab-icon="fas fa-file-invoice-dollar"
+                    class="app-tab-link inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white ring-1 ring-white/10 backdrop-blur-sm hover:bg-white/15 transition">
+                    <i class="fas fa-arrow-up-right-from-square"></i>
+                    Abrir módulo
+                </a>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-2xl bg-white/6 p-4 ring-1 ring-white/8 backdrop-blur-sm">
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-slate-300/75">Pendiente</p>
+                    <p class="mt-2 text-2xl font-black text-cyan-100">₲ {{ '{:,.0f}'.format(gastos_corrientes_dashboard.total_pendiente).replace(',', '.') }}</p>
+                    <p class="mt-1 text-xs text-slate-300/80">{{ gastos_corrientes_dashboard.cantidad_pendientes }} gasto(s) abiertos</p>
+                </div>
+                <div class="rounded-2xl bg-white/6 p-4 ring-1 ring-white/8 backdrop-blur-sm">
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-slate-300/75">Pagado</p>
+                    <p class="mt-2 text-2xl font-black text-cyan-100">{{ '{:,.2f}'.format(gastos_corrientes_dashboard.porcentaje_pagado).replace(',', 'X').replace('.', ',').replace('X', '.') }}%</p>
+                    <p class="mt-1 text-xs text-slate-300/80">{{ gastos_corrientes_dashboard.cantidad_pagados }} de {{ gastos_corrientes_dashboard.cantidad_items }} cerrados</p>
+                </div>
+                <div class="rounded-2xl bg-white/6 p-4 ring-1 ring-white/8 backdrop-blur-sm">
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-slate-300/75">Vencidos</p>
+                    <p class="mt-2 text-2xl font-black text-cyan-100">{{ gastos_corrientes_dashboard.vencidos }}</p>
+                    <p class="mt-1 text-xs text-slate-300/80">{{ gastos_corrientes_dashboard.por_vencer }} por vencer</p>
+                </div>
+                <div class="rounded-2xl bg-white/6 p-4 ring-1 ring-white/8 backdrop-blur-sm">
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-slate-300/75">Desvío</p>
+                    <p class="mt-2 text-2xl font-black text-cyan-100">
+                        ₲ {{ '{:,.0f}'.format(gastos_corrientes_dashboard.desviacion|abs).replace(',', '.') }}
+                    </p>
+                    <p class="mt-1 text-xs text-slate-300/80">
+                        {% if gastos_corrientes_dashboard.estado_desviacion == 'sobre' %}
+                        Pagado por encima del estimado.
+                        {% elif gastos_corrientes_dashboard.estado_desviacion == 'bajo' %}
+                        Pagado todavía por debajo del estimado.
+                        {% else %}
+                        En línea con el plan del mes.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endif %}

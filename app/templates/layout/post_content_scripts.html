@@ -1,0 +1,742 @@
+    <script>
+        window.__appNotificationQueue = Array.isArray(window.__appNotificationQueue) ? window.__appNotificationQueue : [];
+        window.__appNotificationReady = window.__appNotificationReady === true;
+        window.__appNotificationRecent = window.__appNotificationRecent || {};
+        window.__appNotificationHost = window.__appNotificationHost || null;
+
+        window.__ensureAppNotificationHost = function () {
+            if (!document.body) {
+                return null;
+            }
+
+            const existingHost = window.__appNotificationHost;
+            if (existingHost && document.body.contains(existingHost)) {
+                return existingHost;
+            }
+
+            const staleHost = document.getElementById('app-toast-host');
+            if (staleHost) {
+                window.__appNotificationHost = staleHost;
+                return staleHost;
+            }
+
+            const host = document.createElement('div');
+            host.id = 'app-toast-host';
+            host.className = 'app-toast-host';
+            document.body.appendChild(host);
+            window.__appNotificationHost = host;
+            return host;
+        };
+
+        window.__removeAppNotification = function (id) {
+            const host = window.__ensureAppNotificationHost();
+            if (!host || !id) {
+                return;
+            }
+
+            const toast = Array.from(host.querySelectorAll('[data-toast-id]'))
+                .find((item) => item.dataset.toastId === String(id));
+            if (!toast || toast.dataset.leaving === '1') {
+                return;
+            }
+
+            toast.dataset.leaving = '1';
+            toast.classList.remove('is-visible');
+            toast.classList.add('is-leaving');
+
+            window.setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 220);
+        };
+
+        window.__renderAppNotification = function (detail) {
+            const host = window.__ensureAppNotificationHost();
+            if (!host) {
+                window.__appNotificationQueue.push(detail);
+                return;
+            }
+
+            const message = String((detail && detail.message) ?? '').trim();
+            if (!message) {
+                return;
+            }
+
+            const type = ['success', 'error', 'info', 'warning'].includes(detail && detail.type)
+                ? detail.type
+                : 'info';
+            const dedupeKey = `${type}:${message}`;
+            const nowMs = Date.now();
+            const recentTs = Number(window.__appNotificationRecent[dedupeKey] || 0);
+            if (nowMs - recentTs < 1200) {
+                return;
+            }
+            window.__appNotificationRecent[dedupeKey] = nowMs;
+            window.setTimeout(() => {
+                if (window.__appNotificationRecent[dedupeKey] === nowMs) {
+                    delete window.__appNotificationRecent[dedupeKey];
+                }
+            }, 1500);
+
+            const toast = document.createElement('div');
+            toast.className = `app-toast app-toast--${type}`;
+            toast.dataset.toastId = String(detail.id || `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`);
+            toast.setAttribute('role', type === 'error' || type === 'warning' ? 'alert' : 'status');
+            toast.setAttribute('aria-live', type === 'error' || type === 'warning' ? 'assertive' : 'polite');
+
+            const icon = document.createElement('i');
+            icon.className = ({
+                success: 'fas fa-check-circle',
+                error: 'fas fa-times-circle',
+                info: 'fas fa-info-circle',
+                warning: 'fas fa-exclamation-triangle'
+            })[type] || 'fas fa-info-circle';
+            icon.classList.add('app-toast__icon');
+
+            const body = document.createElement('div');
+            body.className = 'app-toast__body';
+
+            const text = document.createElement('p');
+            text.className = 'app-toast__message';
+            text.textContent = message;
+            body.appendChild(text);
+
+            const closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'app-toast__close';
+            closeButton.setAttribute('aria-label', 'Cerrar notificación');
+            closeButton.innerHTML = '&times;';
+            closeButton.addEventListener('click', () => window.__removeAppNotification(toast.dataset.toastId));
+
+            toast.appendChild(icon);
+            toast.appendChild(body);
+            toast.appendChild(closeButton);
+            host.appendChild(toast);
+
+            window.requestAnimationFrame(() => {
+                toast.classList.add('is-visible');
+            });
+
+            const durationMs = Number(detail && detail.duration) > 0 ? Number(detail.duration) : 4200;
+            window.setTimeout(() => {
+                window.__removeAppNotification(toast.dataset.toastId);
+            }, durationMs);
+        };
+
+        window.__emitAppNotification = function (detail) {
+            if (!document.body) {
+                window.__appNotificationQueue.push(detail);
+                return;
+            }
+            window.__renderAppNotification(detail);
+        };
+        window.mostrarNotificacion = function (message, type = 'success') {
+            const detail = {
+                id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+                message: String(message ?? ''),
+                type
+            };
+            if (window.__appNotificationReady) {
+                window.__emitAppNotification(detail);
+                return;
+            }
+            window.__appNotificationQueue.push(detail);
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                const host = window.__ensureAppNotificationHost();
+                if (!host) {
+                    return;
+                }
+                window.__appNotificationReady = true;
+                const pending = Array.isArray(window.__appNotificationQueue) ? window.__appNotificationQueue.splice(0) : [];
+                pending.forEach((detail) => window.__renderAppNotification(detail));
+            }, { once: true });
+        } else {
+            const host = window.__ensureAppNotificationHost();
+            if (host) {
+                window.__appNotificationReady = true;
+                const pending = Array.isArray(window.__appNotificationQueue) ? window.__appNotificationQueue.splice(0) : [];
+                pending.forEach((detail) => window.__renderAppNotification(detail));
+            }
+        }
+    </script>
+
+    {% if current_user.is_authenticated and current_user.tiene_permiso('agenda_acceso') %}
+    <script>
+        (function () {
+            if (window.__agendaSummaryInitialized) {
+                return;
+            }
+            window.__agendaSummaryInitialized = true;
+
+            const agendaUrl = {{ url_for('agenda.dashboard') | tojson }};
+            const agendaTitle = 'Agenda';
+            const agendaIcon = 'fas fa-calendar-check';
+
+            window.__ensureAgendaSummaryHost = function () {
+                if (!document.body) {
+                    return null;
+                }
+
+                let host = document.getElementById('app-agenda-summary-host');
+                if (!host) {
+                    host = document.createElement('div');
+                    host.id = 'app-agenda-summary-host';
+                    host.className = 'app-agenda-summary-host';
+                    host.hidden = true;
+
+                    const link = document.createElement('a');
+                    link.href = agendaUrl;
+                    link.setAttribute('data-tab-url', agendaUrl);
+                    link.setAttribute('data-tab-title', agendaTitle);
+                    link.setAttribute('data-tab-icon', agendaIcon);
+                    link.className = 'app-tab-link app-agenda-summary';
+
+                    const icon = document.createElement('i');
+                    icon.className = 'fas fa-bell app-agenda-summary__icon';
+
+                    const text = document.createElement('span');
+                    text.className = 'app-agenda-summary__text';
+                    text.dataset.role = 'summary-text';
+
+                    const meta = document.createElement('div');
+                    meta.className = 'app-agenda-summary__meta';
+
+                    const overdue = document.createElement('span');
+                    overdue.className = 'app-agenda-summary__badge app-agenda-summary__badge--overdue';
+                    overdue.dataset.role = 'overdue-badge';
+                    overdue.hidden = true;
+
+                    const alert = document.createElement('span');
+                    alert.className = 'app-agenda-summary__badge app-agenda-summary__badge--alert';
+                    alert.dataset.role = 'alert-badge';
+                    alert.hidden = true;
+
+                    meta.appendChild(overdue);
+                    meta.appendChild(alert);
+                    link.appendChild(icon);
+                    link.appendChild(text);
+                    link.appendChild(meta);
+                    host.appendChild(link);
+                    document.body.appendChild(host);
+                }
+
+                return host;
+            };
+
+            window.__updateAgendaSummary = function (detail) {
+                const host = window.__ensureAgendaSummaryHost();
+                if (!host) {
+                    return;
+                }
+
+                const count = Number(detail && detail.count || 0);
+                const overdueCount = Number(detail && detail.overdue_count || 0);
+                const alertCount = Number(detail && detail.alert_count || 0);
+                const hasOverdueAlerts = overdueCount > 0;
+
+                const link = host.querySelector('.app-agenda-summary');
+                const text = host.querySelector('[data-role="summary-text"]');
+                const overdueBadge = host.querySelector('[data-role="overdue-badge"]');
+                const alertBadge = host.querySelector('[data-role="alert-badge"]');
+                if (!link || !text || !overdueBadge || !alertBadge) {
+                    return;
+                }
+
+                if (!hasOverdueAlerts) {
+                    host.classList.remove('is-visible');
+                    window.setTimeout(() => {
+                        if (!host.classList.contains('is-visible')) {
+                            host.hidden = true;
+                        }
+                    }, 180);
+                    return;
+                }
+
+                text.textContent = `Agenda: ${overdueCount} alerta${overdueCount === 1 ? '' : 's'}`;
+                link.title = `Vencidas: ${overdueCount} | En alerta: ${alertCount} | Total: ${count}`;
+
+                overdueBadge.hidden = overdueCount <= 0;
+                overdueBadge.textContent = `${overdueCount} vencida${overdueCount === 1 ? '' : 's'}`;
+
+                alertBadge.hidden = alertCount <= 0;
+                alertBadge.textContent = `${alertCount} en alerta`;
+
+                host.hidden = false;
+                window.requestAnimationFrame(() => {
+                    host.classList.add('is-visible');
+                });
+            };
+
+            const bindAgendaSummary = () => {
+                window.__ensureAgendaSummaryHost();
+                window.addEventListener('agenda:alertas-actualizadas', (event) => {
+                    window.__updateAgendaSummary(event && event.detail ? event.detail : {});
+                });
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', bindAgendaSummary, { once: true });
+            } else {
+                bindAgendaSummary();
+            }
+        })();
+    </script>
+
+    <script>
+        (function () {
+            if (window.__agendaLiveAlertsInitialized) {
+                return;
+            }
+            window.__agendaLiveAlertsInitialized = true;
+
+            const agendaUrl = {{ url_for('agenda.dashboard') | tojson }};
+            const agendaTitle = 'Agenda';
+            const agendaIcon = 'fas fa-calendar-check';
+            const maxVisibleCards = 3;
+            const pinnedAlertId = '__agenda-live-alert-pinned__';
+            const agendaActivitySyncStorageKey = 'agenda-activity-sync';
+
+            window.__agendaLiveAlertQueue = Array.isArray(window.__agendaLiveAlertQueue) ? window.__agendaLiveAlertQueue : [];
+            window.__agendaLiveAlertHost = window.__agendaLiveAlertHost || null;
+            window.__agendaLiveAlertActiveKeys = window.__agendaLiveAlertActiveKeys || {};
+            window.__agendaLiveAlertDismissedKeys = window.__agendaLiveAlertDismissedKeys || {};
+
+            function buildAgendaLiveAlertId(item) {
+                if (!item) {
+                    return '';
+                }
+                return String(item.alert_key || `${item.id || '0'}:${item.estado_alerta || 'alert'}:${item.trigger_at_utc || ''}`);
+            }
+
+            function severityClass(item) {
+                return item && item.estado_alerta === 'overdue'
+                    ? 'app-agenda-live-alert--overdue'
+                    : 'app-agenda-live-alert--warning';
+            }
+
+            function isAgendaLiveAlertDismissed(alertId) {
+                return Boolean(alertId && window.__agendaLiveAlertDismissedKeys[String(alertId)]);
+            }
+
+            function dismissAgendaLiveAlert(alertId) {
+                if (!alertId) {
+                    return;
+                }
+                window.__agendaLiveAlertDismissedKeys[String(alertId)] = Date.now();
+                removeAgendaLiveAlertCard(String(alertId));
+            }
+
+            function createAgendaLiveAlertCard(item, alertId) {
+                const sourceAlertId = buildAgendaLiveAlertId(item);
+                const card = document.createElement('a');
+                card.href = agendaUrl;
+                card.setAttribute('data-tab-url', agendaUrl);
+                card.setAttribute('data-tab-title', agendaTitle);
+                card.setAttribute('data-tab-icon', agendaIcon);
+                card.setAttribute('data-agenda-live-alert-id', alertId);
+                card.setAttribute('data-agenda-live-alert-source-id', sourceAlertId);
+                card.setAttribute('data-agenda-live-alert-activity-id', String((item && item.id) || ''));
+                card.className = `app-tab-link app-agenda-live-alert ${severityClass(item)}`;
+
+                const header = document.createElement('div');
+                header.className = 'app-agenda-live-alert__header';
+
+                const title = document.createElement('div');
+                title.className = 'app-agenda-live-alert__title';
+                title.textContent = String((item && item.titulo) || 'Actividad');
+
+                const badge = document.createElement('span');
+                badge.className = 'app-agenda-live-alert__badge';
+                badge.textContent = String((item && item.badge_label) || 'Alerta');
+
+                const meta = document.createElement('div');
+                meta.className = 'app-agenda-live-alert__meta';
+
+                const closeButton = document.createElement('button');
+                closeButton.type = 'button';
+                closeButton.className = 'app-agenda-live-alert__close';
+                closeButton.setAttribute('aria-label', 'Cerrar alerta');
+                closeButton.setAttribute('data-tab-ignore-click', '1');
+                closeButton.innerHTML = '&times;';
+                closeButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (sourceAlertId && sourceAlertId !== alertId) {
+                        dismissAgendaLiveAlert(sourceAlertId);
+                    }
+                    dismissAgendaLiveAlert(alertId);
+                });
+
+                meta.appendChild(badge);
+                meta.appendChild(closeButton);
+                header.appendChild(title);
+                header.appendChild(meta);
+
+                const subtitle = document.createElement('div');
+                subtitle.className = 'app-agenda-live-alert__subtitle';
+                subtitle.textContent = String((item && item.tipo_label) || 'Actividad');
+
+                const detail = document.createElement('div');
+                detail.className = 'app-agenda-live-alert__detail';
+                detail.textContent = String((item && item.detail_label) || '');
+
+                card.appendChild(header);
+                card.appendChild(subtitle);
+                if (detail.textContent) {
+                    card.appendChild(detail);
+                }
+
+                return card;
+            }
+
+            function ensureAgendaLiveAlertHost() {
+                if (!document.body) {
+                    return null;
+                }
+
+                const existingHost = window.__agendaLiveAlertHost;
+                if (existingHost && document.body.contains(existingHost)) {
+                    return existingHost;
+                }
+
+                let host = document.getElementById('app-agenda-live-alert-host');
+                if (!host) {
+                    host = document.createElement('div');
+                    host.id = 'app-agenda-live-alert-host';
+                    host.className = 'app-agenda-live-alert-host';
+                    document.body.appendChild(host);
+                }
+
+                window.__agendaLiveAlertHost = host;
+                return host;
+            }
+
+            function trimAgendaLiveAlertCards() {
+                const host = ensureAgendaLiveAlertHost();
+                if (!host) {
+                    return;
+                }
+                const cards = Array.from(host.querySelectorAll('[data-agenda-live-alert-id]'))
+                    .filter((card) => String(card.dataset.agendaLiveAlertId || '') !== pinnedAlertId);
+                cards.slice(maxVisibleCards).forEach((card) => {
+                    const alertId = String(card.dataset.agendaLiveAlertId || '');
+                    if (alertId) {
+                        delete window.__agendaLiveAlertActiveKeys[alertId];
+                    }
+                    card.remove();
+                });
+            }
+
+            function removeAgendaLiveAlertCard(alertId) {
+                const host = ensureAgendaLiveAlertHost();
+                if (!host || !alertId) {
+                    return;
+                }
+                delete window.__agendaLiveAlertActiveKeys[String(alertId)];
+                Array.from(host.querySelectorAll('[data-agenda-live-alert-id]'))
+                    .filter((item) => {
+                        const currentId = String(item.dataset.agendaLiveAlertId || '');
+                        const currentSourceId = String(item.dataset.agendaLiveAlertSourceId || '');
+                        return currentId === String(alertId) || currentSourceId === String(alertId);
+                    })
+                    .forEach((card) => {
+                        if (card.dataset.leaving === '1') {
+                            return;
+                        }
+                        card.dataset.leaving = '1';
+                        card.classList.remove('is-visible');
+                        card.classList.add('is-leaving');
+                        window.setTimeout(() => {
+                            if (card.parentNode) {
+                                card.parentNode.removeChild(card);
+                            }
+                        }, 220);
+                    });
+            }
+
+            function removeAgendaLiveAlertCardsByActivity(activityId) {
+                const normalizedActivityId = String(activityId || '').trim();
+                const host = ensureAgendaLiveAlertHost();
+                if (!host || !normalizedActivityId) {
+                    return;
+                }
+
+                Array.from(host.querySelectorAll('[data-agenda-live-alert-activity-id]'))
+                    .filter((card) => String(card.dataset.agendaLiveAlertActivityId || '') === normalizedActivityId)
+                    .forEach((card) => {
+                        const alertId = String(card.dataset.agendaLiveAlertId || '');
+                        const sourceAlertId = String(card.dataset.agendaLiveAlertSourceId || '');
+                        if (alertId) {
+                            delete window.__agendaLiveAlertActiveKeys[alertId];
+                        }
+                        if (sourceAlertId) {
+                            delete window.__agendaLiveAlertActiveKeys[sourceAlertId];
+                        }
+                        if (card.dataset.leaving === '1') {
+                            return;
+                        }
+                        card.dataset.leaving = '1';
+                        card.classList.remove('is-visible');
+                        card.classList.add('is-leaving');
+                        window.setTimeout(() => {
+                            if (card.parentNode) {
+                                card.parentNode.removeChild(card);
+                            }
+                        }, 220);
+                    });
+            }
+
+            function renderAgendaLiveAlertItem(item) {
+                const host = ensureAgendaLiveAlertHost();
+                const alertId = buildAgendaLiveAlertId(item);
+                if (!host || !alertId || isAgendaLiveAlertDismissed(alertId) || window.__agendaLiveAlertActiveKeys[alertId]) {
+                    return;
+                }
+
+                const card = createAgendaLiveAlertCard(item, alertId);
+                host.prepend(card);
+                trimAgendaLiveAlertCards();
+
+                window.requestAnimationFrame(() => {
+                    card.classList.add('is-visible');
+                });
+
+                window.__agendaLiveAlertActiveKeys[alertId] = true;
+                const durationMs = item && item.estado_alerta === 'overdue' ? 14000 : 11000;
+                window.setTimeout(() => {
+                    removeAgendaLiveAlertCard(alertId);
+                }, durationMs);
+            }
+
+            function syncPinnedAgendaLiveAlert(detail) {
+                const host = ensureAgendaLiveAlertHost();
+                if (!host) {
+                    return;
+                }
+
+                const items = Array.isArray(detail && detail.items) ? detail.items : [];
+                const pinnedItem = items.find((item) => {
+                    const candidateAlertId = buildAgendaLiveAlertId(item);
+                    return item && item.estado_alerta === 'alert' && !isAgendaLiveAlertDismissed(candidateAlertId);
+                }) || null;
+                const existingPinned = Array.from(host.querySelectorAll('[data-agenda-live-alert-id]'))
+                    .find((item) => item.dataset.agendaLiveAlertId === pinnedAlertId);
+
+                if (!pinnedItem) {
+                    if (existingPinned) {
+                        existingPinned.remove();
+                    }
+                    return;
+                }
+
+                const nextCard = createAgendaLiveAlertCard(pinnedItem, pinnedAlertId);
+                nextCard.classList.add('is-visible', 'app-agenda-live-alert--pinned');
+                if (existingPinned) {
+                    existingPinned.replaceWith(nextCard);
+                } else {
+                    host.prepend(nextCard);
+                }
+            }
+
+            window.__emitAgendaLiveAlerts = function (detail) {
+                if (!document.body) {
+                    window.__agendaLiveAlertQueue.push(detail);
+                    return;
+                }
+
+                const items = Array.isArray(detail && detail.items) ? detail.items : [];
+                items
+                    .filter((item) => !isAgendaLiveAlertDismissed(buildAgendaLiveAlertId(item)))
+                    .slice(0, maxVisibleCards)
+                    .forEach((item) => renderAgendaLiveAlertItem(item));
+            };
+
+            const bindAgendaLiveAlerts = () => {
+                ensureAgendaLiveAlertHost();
+
+                window.addEventListener('agenda:alertas-disparadas', (event) => {
+                    window.__emitAgendaLiveAlerts(event && event.detail ? event.detail : {});
+                });
+                window.addEventListener('agenda:alertas-actualizadas', (event) => {
+                    syncPinnedAgendaLiveAlert(event && event.detail ? event.detail : {});
+                });
+                window.addEventListener('agenda:resolver-actividad', (event) => {
+                    const detail = event && event.detail ? event.detail : {};
+                    removeAgendaLiveAlertCardsByActivity(detail && detail.id ? detail.id : '');
+                });
+                window.addEventListener('storage', (event) => {
+                    if (!event || event.key !== agendaActivitySyncStorageKey || !event.newValue) {
+                        return;
+                    }
+                    try {
+                        const detail = JSON.parse(event.newValue);
+                        removeAgendaLiveAlertCardsByActivity(detail && detail.id ? detail.id : '');
+                    } catch (e) {
+                    }
+                });
+
+                const pending = Array.isArray(window.__agendaLiveAlertQueue)
+                    ? window.__agendaLiveAlertQueue.splice(0)
+                    : [];
+                pending.forEach((detail) => window.__emitAgendaLiveAlerts(detail));
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', bindAgendaLiveAlerts, { once: true });
+            } else {
+                bindAgendaLiveAlerts();
+            }
+        })();
+    </script>
+    {% endif %}
+
+    {% include 'layout/gastos_corrientes_reminders.html' %}
+
+    {% include 'components/modal_autorizacion.html' %}
+
+    <script>
+        (function () {
+            const originalAlert = window.alert ? window.alert.bind(window) : null;
+            const isCrmConfigActive = () => !!document.querySelector('[x-data="crmConfig()"]');
+            const syncCrmConfigState = () => {
+                if (!document.body) return;
+                document.body.classList.toggle('crm-config-active', isCrmConfigActive());
+            };
+
+            syncCrmConfigState();
+            try {
+                const observer = new MutationObserver(() => syncCrmConfigState());
+                observer.observe(document.documentElement, { childList: true, subtree: true });
+            } catch { }
+            window.addEventListener('popstate', syncCrmConfigState);
+
+            window.alert = function (message) {
+                syncCrmConfigState();
+                if (!document.body || !document.body.classList.contains('crm-config-active')) {
+                    if (originalAlert) originalAlert(message);
+                    return;
+                }
+                if (!document.body) {
+                    if (originalAlert) originalAlert(message);
+                    return;
+                }
+
+                const existing = document.querySelector('.app-alert-overlay');
+                if (existing) existing.remove();
+
+                const overlay = document.createElement('div');
+                overlay.className = 'app-alert-overlay';
+                const modal = document.createElement('div');
+                modal.className = 'app-alert-modal';
+
+                const header = document.createElement('div');
+                header.className = 'app-alert-head';
+                header.textContent = 'Sistema';
+
+                const body = document.createElement('div');
+                body.className = 'app-alert-body';
+                body.textContent = String(message ?? '');
+
+                const actions = document.createElement('div');
+                actions.className = 'app-alert-actions';
+
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'app-alert-btn';
+                button.textContent = 'Aceptar';
+
+                const close = () => {
+                    overlay.remove();
+                    document.removeEventListener('keydown', onKeyDown);
+                };
+
+                const onKeyDown = (ev) => {
+                    if (ev.key === 'Enter' || ev.key === 'Escape') {
+                        ev.preventDefault();
+                        close();
+                    }
+                };
+
+                button.addEventListener('click', close);
+                overlay.addEventListener('click', (ev) => {
+                    if (ev.target === overlay) close();
+                });
+                document.addEventListener('keydown', onKeyDown);
+
+                actions.appendChild(button);
+                modal.appendChild(header);
+                modal.appendChild(body);
+                modal.appendChild(actions);
+                overlay.appendChild(modal);
+                document.body.appendChild(overlay);
+                button.focus();
+            };
+        })();
+    </script>
+
+    <script>
+            (function () {
+                try {
+                    if (window.self !== window.top) {
+                        const u = new URL(window.location.href);
+                        if (u.searchParams.get('embed') !== '1') {
+                            u.searchParams.set('embed', '1');
+                            window.location.replace(u.toString());
+                        }
+                    }
+                } catch { }
+            })();
+    </script>
+
+    {% if embed_mode %}
+    <script>
+        (function () {
+            function toEmbedUrl(href) {
+                try {
+                    const u = new URL(href, window.location.origin);
+                    if (u.origin !== window.location.origin) return null;
+                    u.searchParams.set('embed', '1');
+                    return u.toString();
+                } catch {
+                    return null;
+                }
+            }
+
+            document.addEventListener('click', (e) => {
+                const a = e.target.closest('a[href]');
+                if (!a) return;
+                if (a.hasAttribute('download')) return;
+                const href = a.getAttribute('href');
+                if (!href) return;
+                if (href.startsWith('#')) return;
+                if (href.startsWith('javascript:')) return;
+                if (href.startsWith('mailto:')) return;
+                if (href.startsWith('tel:')) return;
+                const target = a.getAttribute('target');
+                if (target === '_blank') return;
+
+                const embedUrl = toEmbedUrl(href);
+                if (!embedUrl) return;
+                e.preventDefault();
+                window.location.href = embedUrl;
+            }, true);
+
+            document.addEventListener('submit', (e) => {
+                const form = e.target;
+                if (!(form instanceof HTMLFormElement)) return;
+                const submitter = e.submitter;
+                const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
+                    ? (submitter.getAttribute('formaction') || submitter.formAction || '')
+                    : '';
+                const action = submitterAction || form.getAttribute('action') || window.location.href;
+                const embedUrl = toEmbedUrl(action);
+                if (!embedUrl) return;
+                form.setAttribute('action', embedUrl);
+            }, true);
+        })();
+    </script>
+    {% endif %}

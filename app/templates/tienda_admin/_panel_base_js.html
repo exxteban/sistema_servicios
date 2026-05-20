@@ -1,0 +1,420 @@
+let tiendaAdminAutoBusquedaTimer = null;
+let tiendaAdminUltimaBusqueda = {{ q|tojson }};
+let tiendaAdminBusquedaController = null;
+
+function tiendaAdminObtenerElementosBusqueda() {
+    return {
+        form: document.getElementById('tienda-admin-search-form'),
+        input: document.getElementById('tienda-admin-search-input'),
+        clearButton: document.getElementById('tienda-admin-search-clear'),
+        results: document.getElementById('tienda-admin-results')
+    };
+}
+
+function tiendaAdminActualizarBotonLimpiar() {
+    const { input, clearButton } = tiendaAdminObtenerElementosBusqueda();
+    if (!input || !clearButton) return;
+    const mostrar = Boolean((input.value || '').length);
+    clearButton.classList.toggle('hidden', !mostrar);
+    clearButton.classList.toggle('flex', mostrar);
+}
+
+function tiendaAdminEnviarBusqueda() {
+    const { form, input } = tiendaAdminObtenerElementosBusqueda();
+    if (!form || !input) return;
+    const url = new URL(form.action, window.location.origin);
+    const termino = (input.value || '').trim();
+    if (termino) {
+        url.searchParams.set('q', termino);
+    } else {
+        url.searchParams.delete('q');
+    }
+    url.searchParams.delete('page');
+    tiendaAdminCargarResultados(url, { restaurarFoco: true });
+}
+
+function tiendaAdminRestaurarFoco(selectionStart, selectionEnd) {
+    const { input } = tiendaAdminObtenerElementosBusqueda();
+    if (!input) return;
+    input.focus({ preventScroll: true });
+    if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+        input.setSelectionRange(selectionStart, selectionEnd);
+        return;
+    }
+    const posicion = (input.value || '').length;
+    input.setSelectionRange(posicion, posicion);
+}
+
+async function tiendaAdminCargarResultados(url, { restaurarFoco = false } = {}) {
+    const { input, results } = tiendaAdminObtenerElementosBusqueda();
+    if (!input || !results) {
+        window.location.assign(url.toString());
+        return;
+    }
+
+    const selectionStart = input.selectionStart;
+    const selectionEnd = input.selectionEnd;
+
+    if (tiendaAdminBusquedaController) {
+        tiendaAdminBusquedaController.abort();
+    }
+    tiendaAdminBusquedaController = new AbortController();
+
+    const partialUrl = new URL(url.toString());
+    partialUrl.searchParams.set('partial', '1');
+    partialUrl.searchParams.set('fragment', 'productos');
+
+    results.classList.add('opacity-60', 'pointer-events-none');
+
+    try {
+        const response = await fetch(partialUrl.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            signal: tiendaAdminBusquedaController.signal
+        });
+        if (!response.ok) {
+            throw new Error('No se pudo actualizar la búsqueda');
+        }
+        const html = await response.text();
+        results.innerHTML = html;
+        tiendaAdminUltimaBusqueda = (input.value || '').trim();
+        window.history.replaceState({}, '', url.toString());
+        if (restaurarFoco) {
+            window.requestAnimationFrame(() => tiendaAdminRestaurarFoco(selectionStart, selectionEnd));
+        }
+    } catch (error) {
+        if (error.name === 'AbortError') return;
+        window.location.assign(url.toString());
+    } finally {
+        results.classList.remove('opacity-60', 'pointer-events-none');
+        tiendaAdminBusquedaController = null;
+    }
+}
+
+function tiendaAdminProgramarAutoBusqueda() {
+    const { input } = tiendaAdminObtenerElementosBusqueda();
+    if (!input) return;
+
+    tiendaAdminActualizarBotonLimpiar();
+
+    const termino = (input.value || '').trim();
+    window.clearTimeout(tiendaAdminAutoBusquedaTimer);
+
+    if (termino === tiendaAdminUltimaBusqueda) {
+        return;
+    }
+
+    if (termino && termino.length < 2) {
+        return;
+    }
+
+    tiendaAdminAutoBusquedaTimer = window.setTimeout(() => {
+        tiendaAdminUltimaBusqueda = termino;
+        tiendaAdminEnviarBusqueda();
+    }, 350);
+}
+
+function tiendaAdminLimpiarBusqueda() {
+    const { input } = tiendaAdminObtenerElementosBusqueda();
+    if (!input) return;
+    window.clearTimeout(tiendaAdminAutoBusquedaTimer);
+    input.value = '';
+    tiendaAdminUltimaBusqueda = '';
+    tiendaAdminActualizarBotonLimpiar();
+    tiendaAdminEnviarBusqueda();
+}
+
+function tiendaAdminInicializarBusqueda() {
+    const { form, input, results } = tiendaAdminObtenerElementosBusqueda();
+    tiendaAdminActualizarBotonLimpiar();
+    if (!form || !input || !results) return;
+    if (form.dataset.searchBound === '1') return;
+    form.dataset.searchBound = '1';
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        tiendaAdminEnviarBusqueda();
+    });
+
+    results.addEventListener('click', (event) => {
+        const link = event.target.closest('a[href]');
+        if (!link) return;
+        const url = new URL(link.href, window.location.origin);
+        if (url.pathname !== form.getAttribute('action')) return;
+        event.preventDefault();
+        tiendaAdminCargarResultados(url);
+    });
+}
+
+document.getElementById('color_primario')?.addEventListener('input', function(e) {
+    document.getElementById('color_hex').textContent = e.target.value;
+});
+
+function actualizarNombreArchivo(input) {
+    const targetId = input.dataset.target || 'nombre_archivo_portada';
+    const p = document.getElementById(targetId);
+    if (!p) return;
+    if (input.files && input.files[0]) {
+        p.textContent = 'Archivo seleccionado: ' + input.files[0].name;
+        p.classList.remove('hidden');
+    } else {
+        p.classList.add('hidden');
+    }
+}
+
+function limpiarTextoNoneEnFormulario() {
+    const form = document.getElementById('formConfiguracion');
+    if (!form) return;
+    const campos = form.querySelectorAll('input[type="text"], input[type="email"], input[type="url"], textarea');
+    campos.forEach((campo) => {
+        if (typeof campo.value === 'string' && campo.value.trim().toLowerCase() === 'none') {
+            campo.value = '';
+        }
+    });
+}
+
+function vincularToggleContacto(checkboxId, wrapId) {
+    const check = document.getElementById(checkboxId);
+    const wrap = document.getElementById(wrapId);
+    if (!check || !wrap) return;
+    const sync = () => wrap.classList.toggle('hidden', !check.checked);
+    check.removeEventListener('change', sync);
+    check.addEventListener('change', sync);
+    sync();
+}
+
+function inicializarTogglesContacto() {
+    vincularToggleContacto('mostrar_email_contacto', 'email_contacto_wrap');
+    vincularToggleContacto('mostrar_sitio_web', 'sitio_web_wrap');
+    vincularToggleContacto('mostrar_instagram', 'instagram_url_wrap');
+    vincularToggleContacto('mostrar_facebook', 'facebook_url_wrap');
+    vincularToggleContacto('mostrar_youtube', 'youtube_url_wrap');
+}
+
+function abrirConfiguracion() {
+    const modal = document.getElementById('modalConfiguracion');
+    limpiarTextoNoneEnFormulario();
+    inicializarTogglesContacto();
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.querySelector('.fixed.inset-0.bg-gray-500\\/75').classList.add('opacity-100');
+        modal.querySelector('.transform').classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
+    }, 10);
+}
+
+function inicializarBotonesCabeceraTienda() {
+    const btnEstadisticas = document.getElementById('btnAbrirEstadisticasTienda');
+    const btnConfiguracion = document.getElementById('btnAbrirConfiguracionTienda');
+
+    if (btnEstadisticas && btnEstadisticas.dataset.bound !== '1') {
+        btnEstadisticas.dataset.bound = '1';
+        btnEstadisticas.addEventListener('click', abrirModalEstadisticasTienda);
+    }
+    if (btnConfiguracion && btnConfiguracion.dataset.bound !== '1') {
+        btnConfiguracion.dataset.bound = '1';
+        btnConfiguracion.addEventListener('click', abrirConfiguracion);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    tiendaAdminInicializarBusqueda();
+    inicializarTogglesContacto();
+    inicializarBotonesCabeceraTienda();
+});
+
+tiendaAdminInicializarBusqueda();
+inicializarBotonesCabeceraTienda();
+
+function cerrarConfiguracion() {
+    const modal = document.getElementById('modalConfiguracion');
+    modal.querySelector('.fixed.inset-0.bg-gray-500\\/75').classList.remove('opacity-100');
+    modal.querySelector('.transform').classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300);
+}
+
+async function copiarLinkTienda(inputId, trigger) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const previousLabel = trigger ? trigger.innerHTML : '';
+    try {
+        await navigator.clipboard.writeText(input.value);
+    } catch (_error) {
+        input.focus();
+        input.select();
+        document.execCommand('copy');
+    }
+    if (trigger) {
+        trigger.innerHTML = '<i class="fas fa-check mr-2"></i>Copiado';
+        setTimeout(() => {
+            trigger.innerHTML = previousLabel;
+        }, 1400);
+    }
+}
+
+async function guardarConfiguracion(e) {
+    e.preventDefault();
+    const form = e.target;
+    const checkboxNames = [
+        'mostrar_hero_tienda',
+        'mostrar_bloque_beneficios_home',
+        'mostrar_destacados',
+        'mostrar_ofertas',
+        'mostrar_titulo_footer',
+        'mostrar_footer_enlaces',
+        'mostrar_politicas_envio',
+        'mostrar_politicas_cambios',
+        'mostrar_email_contacto',
+        'mostrar_sitio_web',
+        'mostrar_instagram',
+        'mostrar_facebook',
+        'mostrar_youtube',
+        'mostrar_whatsapp_confianza',
+        'mostrar_envios',
+        'mostrar_retiro_local',
+        'mostrar_garantia',
+        'mostrar_horarios',
+        'mostrar_cobertura',
+        'mostrar_texto_apoyo_whatsapp',
+        'mostrar_recordatorio_whatsapp',
+        'mostrar_beneficios_producto',
+        'mostrar_bloque_confianza_producto',
+        'mostrar_relacionados',
+        'mostrar_descuento_porcentaje'
+    ];
+    const checkboxValue = (name, fallback = false) => Boolean(form.elements.namedItem(name)?.checked ?? fallback);
+    const portadaFileInput = form.querySelector('#imagen_portada_file');
+    const logoFileInput = form.querySelector('#logo_file');
+    const hasFile = Boolean(
+        (portadaFileInput && portadaFileInput.files.length > 0) ||
+        (logoFileInput && logoFileInput.files.length > 0)
+    );
+    let fetchOptions = {
+        method: 'POST'
+    };
+    if (hasFile) {
+        const formData = new FormData(form);
+        checkboxNames.forEach((name) => {
+            formData.set(name, checkboxValue(name) ? '1' : '0');
+        });
+        fetchOptions.body = formData;
+    } else {
+        const data = {
+            id_config: form.id_config.value,
+            slug_actual: form.slug_actual.value,
+            slug: form.slug.value,
+            nombre_tienda: form.nombre_tienda.value,
+            logo_url: form.logo_url.value,
+            texto_portada: form.texto_portada.value,
+            titulo_hero_tienda: form.titulo_hero_tienda.value,
+            subtitulo_hero_tienda: form.subtitulo_hero_tienda.value,
+            texto_boton_hero: form.texto_boton_hero.value,
+            beneficio_home_1_texto: form.beneficio_home_1_texto.value,
+            beneficio_home_2_texto: form.beneficio_home_2_texto.value,
+            beneficio_home_3_texto: form.beneficio_home_3_texto.value,
+            titulo_destacados: form.titulo_destacados.value,
+            titulo_ofertas: form.titulo_ofertas.value,
+            titulo_footer: form.titulo_footer.value,
+            texto_footer_descripcion: form.texto_footer_descripcion.value,
+            texto_politicas_envio: form.texto_politicas_envio.value,
+            link_politicas_envio: form.link_politicas_envio.value,
+            texto_politicas_cambios: form.texto_politicas_cambios.value,
+            link_politicas_cambios: form.link_politicas_cambios.value,
+            imagen_portada: form.imagen_portada.value,
+            color_primario: form.color_primario.value,
+            estilo_tienda: form.estilo_tienda.value,
+            telefono_whatsapp: form.telefono_whatsapp.value,
+            mensaje_whatsapp: form.mensaje_whatsapp.value,
+            mensaje_whatsapp_producto: form.mensaje_whatsapp_producto.value,
+            email_contacto: form.email_contacto.value,
+            sitio_web: form.sitio_web.value,
+            instagram_url: form.instagram_url.value,
+            facebook_url: form.facebook_url.value,
+            meta_pixel_id: form.meta_pixel_id.value,
+            youtube_url: form.youtube_url.value,
+            texto_cta_catalogo: form.texto_cta_catalogo.value,
+            texto_cta_producto: form.texto_cta_producto.value,
+            texto_whatsapp_confianza: form.texto_whatsapp_confianza.value,
+            texto_envios: form.texto_envios.value,
+            texto_retiro_local: form.texto_retiro_local.value,
+            texto_garantia: form.texto_garantia.value,
+            texto_horarios: form.texto_horarios.value,
+            texto_cobertura: form.texto_cobertura.value,
+            texto_apoyo_whatsapp: form.texto_apoyo_whatsapp.value,
+            texto_recordatorio_whatsapp: form.texto_recordatorio_whatsapp.value,
+            beneficio_producto_1: form.beneficio_producto_1.value,
+            beneficio_producto_2: form.beneficio_producto_2.value,
+            beneficio_producto_3: form.beneficio_producto_3.value,
+            titulo_relacionados: form.titulo_relacionados.value,
+            mostrar_hero_tienda: checkboxValue('mostrar_hero_tienda', true),
+            mostrar_bloque_beneficios_home: checkboxValue('mostrar_bloque_beneficios_home'),
+            mostrar_destacados: checkboxValue('mostrar_destacados', true),
+            mostrar_ofertas: checkboxValue('mostrar_ofertas', true),
+            mostrar_titulo_footer: checkboxValue('mostrar_titulo_footer'),
+            mostrar_footer_enlaces: checkboxValue('mostrar_footer_enlaces', true),
+            mostrar_politicas_envio: checkboxValue('mostrar_politicas_envio'),
+            mostrar_politicas_cambios: checkboxValue('mostrar_politicas_cambios'),
+            mostrar_email_contacto: checkboxValue('mostrar_email_contacto'),
+            mostrar_sitio_web: checkboxValue('mostrar_sitio_web'),
+            mostrar_instagram: checkboxValue('mostrar_instagram'),
+            mostrar_facebook: checkboxValue('mostrar_facebook'),
+            mostrar_youtube: checkboxValue('mostrar_youtube'),
+            mostrar_whatsapp_confianza: checkboxValue('mostrar_whatsapp_confianza'),
+            mostrar_envios: checkboxValue('mostrar_envios'),
+            mostrar_retiro_local: checkboxValue('mostrar_retiro_local'),
+            mostrar_garantia: checkboxValue('mostrar_garantia'),
+            mostrar_horarios: checkboxValue('mostrar_horarios'),
+            mostrar_cobertura: checkboxValue('mostrar_cobertura'),
+            mostrar_texto_apoyo_whatsapp: checkboxValue('mostrar_texto_apoyo_whatsapp'),
+            mostrar_recordatorio_whatsapp: checkboxValue('mostrar_recordatorio_whatsapp'),
+            mostrar_beneficios_producto: checkboxValue('mostrar_beneficios_producto'),
+            mostrar_bloque_confianza_producto: checkboxValue('mostrar_bloque_confianza_producto'),
+            mostrar_relacionados: checkboxValue('mostrar_relacionados', true),
+            mostrar_descuento_porcentaje: checkboxValue('mostrar_descuento_porcentaje', true)
+        };
+        fetchOptions.headers = {
+            'Content-Type': 'application/json'
+        };
+        fetchOptions.body = JSON.stringify(data);
+    }
+
+    try {
+        const res = await fetch('/api/tienda/admin/config', fetchOptions);
+        const result = await res.json();
+
+        if (res.ok) {
+            alert('Configuración guardada exitosamente');
+            location.reload();
+        } else {
+            alert('Error: ' + (result.error || 'No se pudo guardar la configuración'));
+        }
+    } catch (_error) {
+        alert('Error de conexión al guardar');
+    }
+}
+
+async function togglePublicar(idProducto, publicadoActual) {
+    const res = await fetch(`/api/tienda/admin/producto/${idProducto}/publicar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicar: !publicadoActual }),
+    });
+    if (!res.ok) {
+        alert('No se pudo actualizar el estado de publicación');
+    } else {
+        location.reload();
+    }
+}
+
+async function toggleDestacado(idProducto, destacadoActual) {
+    const res = await fetch(`/api/tienda/admin/producto/${idProducto}/publicar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destacado: !destacadoActual }),
+    });
+    if (!res.ok) {
+        alert('No se pudo actualizar el estado de destacado');
+    } else {
+        location.reload();
+    }
+}

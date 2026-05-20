@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Panel IA{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto flex flex-col gap-4">
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-shield-alt text-blue-600 dark:text-blue-400 mr-2"></i>Panel IA
+            </h1>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                Vista root para administrar consumo, presupuesto y uso del asistente interno.
+            </p>
+        </div>
+        <a href="{{ url_for('asistente_ia.chat') }}"
+           class="inline-flex h-10 items-center gap-2 rounded-lg bg-gray-700 px-3 text-sm font-semibold text-white hover:bg-gray-800 transition">
+            <i class="fas fa-comments" aria-hidden="true"></i>
+            Chat
+        </a>
+    </div>
+
+    <section id="ia-consumo-panel"
+             class="grid gap-3 md:grid-cols-3"
+             data-enabled="1"
+             aria-label="Consumo IA">
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Consumo hoy</h2>
+                <i class="fas fa-bolt text-amber-500" aria-hidden="true"></i>
+            </div>
+            <p id="ia-consumo-dia" class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">-</p>
+            <p id="ia-consumo-dia-limite" class="text-xs text-gray-500 dark:text-gray-400">-</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Consumo mes</h2>
+                <i class="fas fa-chart-line text-blue-500" aria-hidden="true"></i>
+            </div>
+            <p id="ia-consumo-mes" class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">-</p>
+            <p id="ia-consumo-mes-limite" class="text-xs text-gray-500 dark:text-gray-400">-</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Usuarios</h2>
+                <i class="fas fa-users text-emerald-500" aria-hidden="true"></i>
+            </div>
+            <div id="ia-consumo-usuarios" class="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-200">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Cargando...</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+        <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Estado</h2>
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {% if cfg.enabled %}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200{% else %}bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                {% if cfg.enabled %}IA activa{% else %}IA apagada{% endif %}
+            </span>
+        </div>
+        <div class="mt-3 grid gap-2 text-sm text-gray-700 dark:text-gray-200 md:grid-cols-3">
+            <p>Proveedor: <span class="font-semibold">{{ cfg.provider }}</span></p>
+            <p>Modelo: <span class="font-semibold">{{ cfg.model }}</span></p>
+            <p>Max tokens: <span class="font-semibold">{{ cfg.max_tokens }}</span></p>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('js/asistente_ia/admin.js') }}"></script>
+{% endblock %}

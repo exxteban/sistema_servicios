@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración de Usuarios{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    {% include 'usuarios/_config_switch_styles.html' %}
+
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-user-cog text-blue-600 dark:text-blue-400 mr-2"></i>Usuarios
+        </h1>
+        <a href="{{ url_for('usuarios.nuevo') }}" data-permiso="gestionar_usuarios"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+            <i class="fas fa-plus mr-2"></i>Nuevo Usuario
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-2 transition-colors duration-300">
+        <div class="flex gap-2">
+            <a href="{{ url_for('usuarios.listar') }}"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition {% if active_tab != 'configuracion' %}bg-blue-600 text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                Usuarios
+            </a>
+            <a href="{{ url_for('usuarios.configuracion') }}"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition {% if active_tab == 'configuracion' %}bg-blue-600 text-white{% else %}text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                Configuración
+            </a>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('usuarios.configuracion') }}" enctype="multipart/form-data"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-6 transition-colors duration-300">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Punto de Venta</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Activa para mostrar en POS el selector de Vendedor / Cajero.
+                Si está desactivado, la venta se procesa con el usuario actual.
+            </p>
+
+            <div class="mt-4 flex items-center justify-between gap-4">
+                <div>
+                    <div class="text-sm font-medium text-gray-800 dark:text-gray-100">
+                        Mostrar selector de Vendedor / Cajero en POS
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Estado actual:
+                        <span class="font-semibold {% if mostrar_selector_vendedor_pos %}text-green-600 dark:text-green-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                            {% if mostrar_selector_vendedor_pos %}Activado{% else %}Desactivado{% endif %}
+                        </span>.
+                        Desactivado: no se muestra el selector y se usa automáticamente el usuario de la sesión.
+                    </div>
+                </div>
+                <div class="relative inline-flex items-center">
+                    <input type="hidden" name="mostrar_selector_vendedor_pos" value="0">
+                    <input id="mostrar_selector_vendedor_pos"
+                           type="checkbox"
+                           name="mostrar_selector_vendedor_pos"
+                           value="1"
+                           class="config-switch-input"
+                           onchange="this.form.submit()"
+                           {% if mostrar_selector_vendedor_pos %}checked{% endif %}>
+                    <label for="mostrar_selector_vendedor_pos" class="config-switch-track cursor-pointer" aria-label="Mostrar selector de vendedor/cajero en POS">
+                        <span class="config-switch-thumb"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+            <div>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Caja</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Define el modo de trabajo entre vendedor y cajero.
+                </p>
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <div class="text-sm font-medium text-gray-800 dark:text-gray-100">
+                        Modo caja exclusiva (vendedor no cobra)
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Activado: el vendedor registra y envía a caja, y el cobro final lo hace un cajero habilitado.
+                        Desactivado: el usuario del POS puede cobrar de forma directa.
+                    </div>
+                </div>
+                <div class="relative inline-flex items-center">
+                    <input type="hidden" name="modo_cobro_exclusivo_cajero" value="0">
+                    <input id="modo_cobro_exclusivo_cajero"
+                           type="checkbox"
+                           name="modo_cobro_exclusivo_cajero"
+                           value="1"
+                           class="config-switch-input"
+                           onchange="this.form.submit()"
+                           {% if modo_cobro_exclusivo_cajero %}checked{% endif %}>
+                    <label for="modo_cobro_exclusivo_cajero" class="config-switch-track cursor-pointer" aria-label="Activar modo caja exclusiva">
+                        <span class="config-switch-thumb"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <div class="text-sm font-medium text-gray-800 dark:text-gray-100">
+                        Alerta de pendientes en caja
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Muestra badge y notificaciones en caja cuando llegan pendientes.
+                    </div>
+                </div>
+                <div class="relative inline-flex items-center">
+                    <input type="hidden" name="caja_alerta_pendientes_activa" value="0">
+                    <input id="caja_alerta_pendientes_activa"
+                           type="checkbox"
+                           name="caja_alerta_pendientes_activa"
+                           value="1"
+                           class="config-switch-input"
+                           onchange="this.form.submit()"
+                           {% if caja_alerta_pendientes_activa %}checked{% endif %}>
+                    <label for="caja_alerta_pendientes_activa" class="config-switch-track cursor-pointer" aria-label="Habilitar alerta de pendientes en caja">
+                        <span class="config-switch-thumb"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+            <div>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Marca del encabezado</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Configura el nombre y el logo que se muestran junto a Sistema de Gestión Comercial.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                    <label for="nombre_empresa_ui" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Nombre de empresa
+                    </label>
+                    <input id="nombre_empresa_ui"
+                           name="nombre_empresa_ui"
+                           type="text"
+                           value="{{ nombre_empresa_ui }}"
+                           placeholder="Ej: Celulares Silvio"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+
+                <div>
+                    <label for="logo_empresa_ui" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Logo de empresa
+                    </label>
+                    <input id="logo_empresa_ui"
+                           name="logo_empresa_ui"
+                           type="file"
+                           accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-3 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Recomendado: {{ logo_tamano_recomendado }}. Máximo: {{ logo_tamano_maximo_mb }} MB.
+                    </p>
+                </div>
+                <div class="lg:col-span-2">
+                    <label for="mensaje_whatsapp_seguimiento" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Mensaje WhatsApp para link de seguimiento
+                    </label>
+                    <textarea id="mensaje_whatsapp_seguimiento"
+                              name="mensaje_whatsapp_seguimiento"
+                              rows="3"
+                              class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">{{ mensaje_whatsapp_seguimiento }}</textarea>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Puedes usar los marcadores <span class="font-semibold">{empresa}</span> y <span class="font-semibold">{link}</span>.
+                    </p>
+                </div>
+            </div>
+
+            {% if logo_empresa_ui_path %}
+            <div class="pt-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Logo actual</p>
+                <div class="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2">
+                    <img src="{{ static_url(logo_empresa_ui_path) }}" alt="Logo de empresa" class="h-10 w-auto object-contain">
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                Guardar configuración
+            </button>
+        </div>
+
+    </form>
+
+    {% include 'usuarios/_config_ia_backoffice.html' %}
+
+    <form method="POST" action="{{ url_for('usuarios.configuracion_ia') }}"
+          class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-6 transition-colors duration-300">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+            <div>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Integración IA</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Configura proveedor, modelo y API keys desde el sistema sin depender de archivo .env.
+                </p>
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <div class="text-sm font-medium text-gray-800 dark:text-gray-100">
+                        IA habilitada
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Cuando está desactivado no se hacen llamadas a OpenAI ni DeepSeek.
+                    </div>
+                </div>
+                <div class="relative inline-flex items-center">
+                    <input type="hidden" name="ia_enabled" value="0">
+                    <input id="ia_enabled"
+                           type="checkbox"
+                           name="ia_enabled"
+                           value="1"
+                           class="config-switch-input"
+                           {% if ia_enabled_ui %}checked{% endif %}>
+                    <label for="ia_enabled" class="config-switch-track cursor-pointer" aria-label="Activar IA">
+                        <span class="config-switch-thumb"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                    <label for="ia_provider" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Proveedor principal
+                    </label>
+                    <select id="ia_provider"
+                            name="ia_provider"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-3 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                        <option value="deepseek" {% if ia_provider_ui == 'deepseek' %}selected{% endif %}>DeepSeek</option>
+                        <option value="openai" {% if ia_provider_ui == 'openai' %}selected{% endif %}>OpenAI</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="ia_model" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Modelo
+                    </label>
+                    <input id="ia_model"
+                           name="ia_model"
+                           type="text"
+                           value="{{ ia_model_ui }}"
+                           placeholder="Ej: deepseek-chat / gpt-4o-mini"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div>
+                    <label for="ia_max_tokens" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Máx. tokens
+                    </label>
+                    <input id="ia_max_tokens"
+                           name="ia_max_tokens"
+                           type="number"
+                           min="1"
+                           value="{{ ia_max_tokens_ui }}"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div>
+                    <label for="ia_temperature" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Temperatura
+                    </label>
+                    <input id="ia_temperature"
+                           name="ia_temperature"
+                           type="number"
+                           step="0.1"
+                           min="0"
+                           max="2"
+                           value="{{ ia_temperature_ui }}"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div>
+                    <label for="ia_base_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Base URL genérica (opcional)
+                    </label>
+                    <input id="ia_base_url"
+                           name="ia_base_url"
+                           type="text"
+                           value="{{ ia_base_url_ui }}"
+                           placeholder="https://api.openai.com/v1"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div>
+                    <label for="ia_deepseek_base_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Base URL DeepSeek (opcional)
+                    </label>
+                    <input id="ia_deepseek_base_url"
+                           name="ia_deepseek_base_url"
+                           type="text"
+                           value="{{ ia_deepseek_base_url_ui }}"
+                           placeholder="https://api.deepseek.com/v1"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div>
+                    <label for="ia_deepseek_api_key" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        API key DeepSeek
+                    </label>
+                    <input id="ia_deepseek_api_key"
+                           name="ia_deepseek_api_key"
+                           type="password"
+                           autocomplete="new-password"
+                           placeholder="{% if ia_deepseek_key_configurada_ui %}Ya configurada (deja vacío para conservar){% else %}sk-...{% endif %}"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <input type="checkbox" name="ia_clear_deepseek_api_key" value="1">
+                        Limpiar key DeepSeek guardada
+                    </label>
+                </div>
+                <div>
+                    <label for="ia_openai_api_key" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        API key OpenAI
+                    </label>
+                    <input id="ia_openai_api_key"
+                           name="ia_openai_api_key"
+                           type="password"
+                           autocomplete="new-password"
+                           placeholder="{% if ia_openai_key_configurada_ui %}Ya configurada (deja vacío para conservar){% else %}sk-...{% endif %}"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <input type="checkbox" name="ia_clear_openai_api_key" value="1">
+                        Limpiar key OpenAI guardada
+                    </label>
+                </div>
+                <div class="lg:col-span-2">
+                    <label for="ia_api_key" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        API key genérica (fallback)
+                    </label>
+                    <input id="ia_api_key"
+                           name="ia_api_key"
+                           type="password"
+                           autocomplete="new-password"
+                           placeholder="{% if ia_generic_key_configurada_ui %}Ya configurada (deja vacío para conservar){% else %}API key alternativa{% endif %}"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <input type="checkbox" name="ia_clear_api_key" value="1">
+                        Limpiar key genérica guardada
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-2">
+            <button type="submit"
+                    formaction="{{ url_for('usuarios.configuracion_ia_test') }}"
+                    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+                Probar conexión IA
+            </button>
+            <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                Guardar configuración IA
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

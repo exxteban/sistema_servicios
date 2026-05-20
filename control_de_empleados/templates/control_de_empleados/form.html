@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ 'Editar empleado' if empleado else 'Nuevo empleado' }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200">
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">{{ 'Editar empleado' if empleado else 'Nuevo empleado' }}</h1>
+                    <p class="text-sm text-gray-500">Llena solo lo importante. Después podrás cargar extras, descuentos o adelantos.</p>
+                </div>
+                <a href="{{ url_for('control_empleados.index') }}"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
+                </a>
+            </div>
+        </div>
+
+        <form method="post"
+            action="{{ url_for('control_empleados.editar', id_empleado=empleado.id_empleado) if empleado else url_for('control_empleados.nuevo') }}"
+            class="p-6 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label for="nombre_completo" class="block text-sm font-semibold text-gray-700 mb-2">Nombre completo</label>
+                    <input id="nombre_completo" name="nombre_completo" type="text" required
+                        value="{{ empleado.nombre_completo if empleado else '' }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="documento" class="block text-sm font-semibold text-gray-700 mb-2">Documento</label>
+                    <input id="documento" name="documento" type="text"
+                        value="{{ empleado.documento if empleado else '' }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="cargo" class="block text-sm font-semibold text-gray-700 mb-2">Cargo</label>
+                    <input id="cargo" name="cargo" type="text"
+                        value="{{ empleado.cargo if empleado else '' }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="area" class="block text-sm font-semibold text-gray-700 mb-2">Área</label>
+                    <input id="area" name="area" type="text"
+                        value="{{ empleado.area if empleado else '' }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="telefono" class="block text-sm font-semibold text-gray-700 mb-2">Teléfono</label>
+                    <input id="telefono" name="telefono" type="text"
+                        value="{{ empleado.telefono if empleado else '' }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="fecha_ingreso" class="block text-sm font-semibold text-gray-700 mb-2">Fecha de ingreso</label>
+                    <input id="fecha_ingreso" name="fecha_ingreso" type="date"
+                        value="{{ empleado.fecha_ingreso.isoformat() if empleado and empleado.fecha_ingreso else '' }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="fecha_egreso" class="block text-sm font-semibold text-gray-700 mb-2">Fecha de egreso</label>
+                    <input id="fecha_egreso" name="fecha_egreso" type="date"
+                        value="{{ empleado.fecha_egreso.isoformat() if empleado and empleado.fecha_egreso else '' }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    <p class="mt-2 text-xs text-gray-500">Déjalo vacío mientras siga activo. Sirve para cortar el aguinaldo en la fecha exacta.</p>
+                </div>
+                <div>
+                    <label for="salario_base" class="block text-sm font-semibold text-gray-700 mb-2">Sueldo base</label>
+                    <input id="salario_base" name="salario_base" type="number" min="0" step="1" required
+                        value="{{ '{:.0f}'.format(empleado.salario_base) if empleado else '' }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    <p id="ipsDetalle" class="mt-2 text-xs text-blue-700 {% if not empleado or not empleado.salario_incluye_ips %}hidden{% endif %}">
+                        {% if empleado and empleado.salario_incluye_ips %}
+                        Sueldo cargado: Gs. {{ '{:,.0f}'.format(empleado.salario_base_decimal()).replace(',', '.') }} ·
+                        IPS obrero estimado (9%): Gs. {{ '{:,.0f}'.format(empleado.ips_obrero_estimado_decimal()).replace(',', '.') }} ·
+                        Neto estimado: Gs. {{ '{:,.0f}'.format(empleado.salario_neto_estimado_decimal()).replace(',', '.') }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <label for="tipo_pago" class="block text-sm font-semibold text-gray-700 mb-2">Forma de pago</label>
+                    <select id="tipo_pago" name="tipo_pago"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                        {% for tipo in tipos_pago %}
+                        <option value="{{ tipo.valor }}" {% if (empleado and empleado.tipo_pago == tipo.valor) or (not empleado and tipo.valor == 'mensual') %}selected{% endif %}>
+                            {{ tipo.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="dias_vacaciones_anuales" class="block text-sm font-semibold text-gray-700 mb-2">Cupo anual de vacaciones</label>
+                    <input id="dias_vacaciones_anuales" name="dias_vacaciones_anuales" type="number" min="0" step="1"
+                        value="{{ empleado.dias_vacaciones_anuales_int() if empleado else 12 }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    <p class="mt-2 text-xs text-gray-500">Se usa para calcular el saldo disponible en el tab de vacaciones.</p>
+                </div>
+            </div>
+
+            <label class="flex items-start gap-3 rounded-2xl border border-blue-100 p-4 bg-blue-50">
+                <input id="salario_incluye_ips" type="checkbox" name="salario_incluye_ips" value="1"
+                    class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    {% if empleado and empleado.salario_incluye_ips %}checked{% endif %}>
+                <div>
+                    <div class="text-sm font-semibold text-blue-900">El sueldo cargado incluye IPS obrero</div>
+                    <div class="text-sm text-blue-700">Se mostrará cuánto corresponde al 9% estimado y cuánto quedaría como neto referencial. El aguinaldo no descuenta IPS.</div>
+                </div>
+            </label>
+
+            <div>
+                <label for="notas" class="block text-sm font-semibold text-gray-700 mb-2">Notas</label>
+                <textarea id="notas" name="notas" rows="4"
+                    class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">{{ empleado.notas if empleado else '' }}</textarea>
+            </div>
+
+            <label class="flex items-center gap-3 rounded-2xl border border-gray-200 p-4 bg-gray-50">
+                <input type="checkbox" name="activo" value="1"
+                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    {% if empleado is none or empleado.activo %}checked{% endif %}>
+                <div>
+                    <div class="text-sm font-semibold text-gray-900">Empleado activo</div>
+                    <div class="text-sm text-gray-500">Si lo desmarcas, se conserva el historial pero ya no aparece como activo.</div>
+                </div>
+            </label>
+
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <a href="{{ url_for('control_empleados.index') }}"
+                    class="inline-flex items-center justify-center px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-save"></i>
+                    Guardar empleado
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(() => {
+    const salarioInput = document.getElementById('salario_base');
+    const incluyeIpsInput = document.getElementById('salario_incluye_ips');
+    const detalle = document.getElementById('ipsDetalle');
+    if (!salarioInput || !incluyeIpsInput || !detalle) {
+        return;
+    }
+
+    const formatGs = (value) => {
+        const entero = Math.round(Number.isFinite(value) ? value : 0);
+        return `Gs. ${entero.toLocaleString('es-PY')}`;
+    };
+
+    const renderDetalle = () => {
+        const salario = Number(salarioInput.value || 0);
+        if (!incluyeIpsInput.checked || salario <= 0) {
+            detalle.classList.add('hidden');
+            detalle.textContent = '';
+            return;
+        }
+        const ips = salario * 0.09;
+        const neto = salario - ips;
+        detalle.textContent = `Sueldo cargado: ${formatGs(salario)} · IPS obrero estimado (9%): ${formatGs(ips)} · Neto estimado: ${formatGs(neto)}`;
+        detalle.classList.remove('hidden');
+    };
+
+    salarioInput.addEventListener('input', renderDetalle);
+    incluyeIpsInput.addEventListener('change', renderDetalle);
+    renderDetalle();
+})();
+</script>
+{% endblock %}

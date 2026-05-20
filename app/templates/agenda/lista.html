@@ -1,0 +1,922 @@
+{% extends "base.html" %}
+
+{% block title %}Agenda | Lista{% endblock %}
+
+{% block content %}
+<div class="space-y-6" data-agenda-list-root="1">
+    <div class="flex items-center justify-between gap-3">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-list-check text-indigo-500 mr-2"></i>Actividades
+        </h1>
+        <div class="flex items-center gap-2">
+            <a href="{{ url_for('agenda.dashboard') }}"
+                class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                <i class="fas fa-arrow-left mr-1"></i> Volver
+            </a>
+            {% if current_user.tiene_permiso('agenda_crear') %}
+            <a href="{{ url_for('agenda.nueva_actividad') }}"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition">
+                <i class="fas fa-plus mr-1"></i> Nueva actividad
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="GET" action="{{ url_for('agenda.lista_actividades') }}" data-agenda-filter-form="1"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="dir" value="{{ dir }}">
+        <select name="estado" data-auto-submit-filter="1" onchange="this.form && this.form.requestSubmit && this.form.requestSubmit()"
+            class="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            <option value="">Estado</option>
+            {% for e in estados_actividad %}
+            <option value="{{ e }}" {% if estado == e %}selected{% endif %}>{{ e|capitalize }}</option>
+            {% endfor %}
+        </select>
+        <select name="tipo" data-auto-submit-filter="1" onchange="this.form && this.form.requestSubmit && this.form.requestSubmit()"
+            class="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            <option value="">Tipo</option>
+            {% for t in tipos_actividad %}
+            <option value="{{ t }}" {% if tipo == t %}selected{% endif %}>{{ t|replace('_', ' ')|title }}</option>
+            {% endfor %}
+        </select>
+        <select name="prioridad" data-auto-submit-filter="1" onchange="this.form && this.form.requestSubmit && this.form.requestSubmit()"
+            class="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            <option value="">Prioridad</option>
+            {% for p in prioridades_actividad %}
+            <option value="{{ p }}" {% if prioridad == p %}selected{% endif %}>
+                {% if p == 'baja' %}🟢{% elif p == 'media' %}🔵{% elif p == 'alta' %}🟠{% elif p == 'critica' %}🔴{% endif %}
+                {{ p|capitalize }}
+            </option>
+            {% endfor %}
+        </select>
+        <input type="date" name="desde" value="{{ desde }}" data-auto-submit-filter="1" onchange="this.form && this.form.requestSubmit && this.form.requestSubmit()"
+            class="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+        <input type="date" name="hasta" value="{{ hasta }}" data-auto-submit-filter="1" onchange="this.form && this.form.requestSubmit && this.form.requestSubmit()"
+            class="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+        <select name="responsable_id" data-auto-submit-filter="1" onchange="this.form && this.form.requestSubmit && this.form.requestSubmit()"
+            class="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+            {% if not puede_ver_todo %}disabled{% endif %}>
+            <option value="">Responsable</option>
+            {% for r in responsables %}
+            <option value="{{ r.id_usuario }}" {% if responsable_id == r.id_usuario %}selected{% endif %}>
+                {{ r.nombre_completo or r.username }}
+            </option>
+            {% endfor %}
+        </select>
+        <div class="md:col-span-6 flex items-center gap-2">
+            <button type="submit" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition">
+                <i class="fas fa-filter mr-1"></i> Filtrar
+            </button>
+            <a href="{{ url_for('agenda.lista_actividades') }}"
+                class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                Limpiar
+            </a>
+        </div>
+    </form>
+
+    <div id="agenda-list-results" data-agenda-list-results="1" data-current-page="{{ actividades.page }}">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full agenda-list-table">
+                    <thead class="bg-gray-50 dark:bg-gray-700/60">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                                {% set dir_actividad = 'desc' if sort == 'actividad' and dir == 'asc' else 'asc' %}
+                                <a href="{{ url_for('agenda.lista_actividades', page=1, estado=estado, tipo=tipo, prioridad=prioridad, responsable_id=responsable_id, desde=desde, hasta=hasta, sort='actividad', dir=dir_actividad) }}"
+                                    class="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
+                                    <span>Actividad</span>
+                                    {% if sort == 'actividad' %}
+                                    <i class="fas {{ 'fa-sort-up' if dir == 'asc' else 'fa-sort-down' }} text-xs"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-xs opacity-50"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                                {% set dir_fecha_inicio = 'desc' if sort == 'fecha_inicio' and dir == 'asc' else 'asc' %}
+                                <a href="{{ url_for('agenda.lista_actividades', page=1, estado=estado, tipo=tipo, prioridad=prioridad, responsable_id=responsable_id, desde=desde, hasta=hasta, sort='fecha_inicio', dir=dir_fecha_inicio) }}"
+                                    class="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
+                                    <span>Fecha inicio</span>
+                                    {% if sort == 'fecha_inicio' %}
+                                    <i class="fas {{ 'fa-sort-up' if dir == 'asc' else 'fa-sort-down' }} text-xs"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-xs opacity-50"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                                {% set dir_responsable = 'desc' if sort == 'responsable' and dir == 'asc' else 'asc' %}
+                                <a href="{{ url_for('agenda.lista_actividades', page=1, estado=estado, tipo=tipo, prioridad=prioridad, responsable_id=responsable_id, desde=desde, hasta=hasta, sort='responsable', dir=dir_responsable) }}"
+                                    class="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
+                                    <span>Responsable</span>
+                                    {% if sort == 'responsable' %}
+                                    <i class="fas {{ 'fa-sort-up' if dir == 'asc' else 'fa-sort-down' }} text-xs"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-xs opacity-50"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                                {% set dir_estado = 'desc' if sort == 'estado' and dir == 'asc' else 'asc' %}
+                                <a href="{{ url_for('agenda.lista_actividades', page=1, estado=estado, tipo=tipo, prioridad=prioridad, responsable_id=responsable_id, desde=desde, hasta=hasta, sort='estado', dir=dir_estado) }}"
+                                    class="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
+                                    <span>Estado</span>
+                                    {% if sort == 'estado' %}
+                                    <i class="fas {{ 'fa-sort-up' if dir == 'asc' else 'fa-sort-down' }} text-xs"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-xs opacity-50"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                                {% set dir_prioridad = 'desc' if sort == 'prioridad' and dir == 'asc' else 'asc' %}
+                                <a href="{{ url_for('agenda.lista_actividades', page=1, estado=estado, tipo=tipo, prioridad=prioridad, responsable_id=responsable_id, desde=desde, hasta=hasta, sort='prioridad', dir=dir_prioridad) }}"
+                                    class="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
+                                    <span>Prioridad</span>
+                                    {% if sort == 'prioridad' %}
+                                    <i class="fas {{ 'fa-sort-up' if dir == 'asc' else 'fa-sort-down' }} text-xs"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-xs opacity-50"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for a in actividades.items %}
+                        {% set alert_state = alert_states.get(a.id) %}
+                        <tr
+                            class="agenda-activity-row hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors {% if alert_state == 'alert' %}agenda-alert-row--warning{% elif alert_state == 'overdue' %}agenda-alert-row--overdue{% endif %}"
+                            data-actividad-id="{{ a.id }}"
+                            data-estado="{{ a.estado }}"
+                            data-alerta-inicial="{{ alert_state or '' }}"
+                            data-titulo="{{ a.titulo }}"
+                            data-fecha-inicio-utc="{{ a.fecha_inicio.strftime('%Y-%m-%dT%H:%M:%S') }}Z"
+                            data-fecha-fin-utc="{{ a.fecha_fin.strftime('%Y-%m-%dT%H:%M:%S') ~ 'Z' if a.fecha_fin else '' }}"
+                            data-recordatorio-minutos="{{ a.recordatorio_minutos if a.recordatorio_minutos is not none else '' }}">
+                            <td class="px-4 py-3">
+                                <div class="font-semibold text-gray-800 dark:text-gray-100">{{ a.titulo }}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ a.tipo|replace('_', ' ')|title }}</div>
+                                <div class="mt-1 flex items-center gap-2 text-[11px]">
+                                    {% if a.recordatorio_minutos is not none %}
+                                    <span class="text-gray-500 dark:text-gray-400">Aviso {{ a.recordatorio_minutos }} min antes</span>
+                                    {% endif %}
+                                    <span class="agenda-reminder-badge {% if not alert_state %}hidden{% endif %} px-2 py-0.5 rounded-full font-semibold
+                                        {% if alert_state == 'overdue' %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300{% elif alert_state == 'alert' %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300{% endif %}">
+                                        {% if alert_state == 'overdue' %}Vencida{% elif alert_state == 'alert' %}En alerta{% endif %}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ a.fecha_inicio|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ a.usuario.nombre_completo if a.usuario else '-' }}</td>
+                            <td class="px-4 py-3">
+                                <span data-estado-badge="1" class="agenda-estado-badge px-2 py-1 rounded text-xs font-semibold
+                                    {% if a.estado == 'pendiente' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300{% elif a.estado == 'hecha' %}bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300{% else %}bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300{% endif %}">
+                                    {{ a.estado|capitalize }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold
+                                    {% if a.prioridad == 'baja' %}bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300{% elif a.prioridad == 'media' %}bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300{% elif a.prioridad == 'alta' %}bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300{% elif a.prioridad == 'critica' %}bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300{% endif %}">
+                                    <span class="w-2 h-2 rounded-full
+                                        {% if a.prioridad == 'baja' %}bg-emerald-500{% elif a.prioridad == 'media' %}bg-sky-500{% elif a.prioridad == 'alta' %}bg-orange-500{% elif a.prioridad == 'critica' %}bg-rose-500{% else %}bg-gray-500{% endif %}"></span>
+                                    {{ a.prioridad|capitalize }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="agenda-row-actions flex justify-end items-center gap-2">
+                                    {% if current_user.tiene_permiso('agenda_editar') %}
+                                    <a href="{{ url_for('agenda.editar_actividad', id_actividad=a.id) }}"
+                                        class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if current_user.tiene_permiso('agenda_completar') and a.estado == 'pendiente' %}
+                                    <form method="POST" action="{{ url_for('agenda.completar_actividad', id_actividad=a.id) }}"
+                                        class="agenda-resolve-form" data-custom-submit="1" data-actividad-id="{{ a.id }}" data-resolve-action="hecha" data-remove-row="0" data-pending-action="1">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300" title="Completar">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if current_user.tiene_permiso('agenda_cancelar') and a.estado == 'pendiente' %}
+                                    <form method="POST" action="{{ url_for('agenda.cancelar_actividad', id_actividad=a.id) }}"
+                                        class="agenda-resolve-form" data-custom-submit="1" data-actividad-id="{{ a.id }}" data-resolve-action="cancelada" data-remove-row="0" data-pending-action="1">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title="Cancelar">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if current_user.tiene_permiso('agenda_cancelar') %}
+                                    <form method="POST" action="{{ url_for('agenda.eliminar_actividad', id_actividad=a.id) }}"
+                                        class="agenda-resolve-form" data-custom-submit="1" data-actividad-id="{{ a.id }}" data-resolve-action="eliminada" data-remove-row="1"
+                                        onsubmit="return confirm('¿Eliminar esta actividad de la agenda? Esta acción no se puede deshacer.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="text-red-700 hover:text-red-900 dark:text-red-300 dark:hover:text-red-100" title="Eliminar">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr data-empty-agenda-row="1">
+                            <td colspan="6" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+                                No hay actividades para los filtros seleccionados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if actividades.pages > 1 %}
+        <div class="flex items-center justify-between text-sm mt-6">
+            <a href="{{ url_for('agenda.lista_actividades', page=actividades.prev_num, estado=estado, tipo=tipo, prioridad=prioridad, responsable_id=responsable_id, desde=desde, hasta=hasta, sort=sort, dir=dir) if actividades.has_prev else '#' }}"
+                class="px-3 py-2 rounded-lg {{ 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100' if actividades.has_prev else 'bg-gray-100 dark:bg-gray-800 text-gray-400 pointer-events-none' }}">
+                Anterior
+            </a>
+            <span class="text-gray-600 dark:text-gray-300">Página {{ actividades.page }} de {{ actividades.pages }}</span>
+            <a href="{{ url_for('agenda.lista_actividades', page=actividades.next_num, estado=estado, tipo=tipo, prioridad=prioridad, responsable_id=responsable_id, desde=desde, hasta=hasta, sort=sort, dir=dir) if actividades.has_next else '#' }}"
+                class="px-3 py-2 rounded-lg {{ 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100' if actividades.has_next else 'bg-gray-100 dark:bg-gray-800 text-gray-400 pointer-events-none' }}">
+                Siguiente
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const currentScript = document.currentScript;
+        const agendaTabContent = currentScript ? currentScript.closest('[data-app-tab-content]') : null;
+        const agendaListRoot = (agendaTabContent && agendaTabContent.querySelector('[data-agenda-list-root="1"]'))
+            || document.querySelector('[data-agenda-list-root="1"]');
+        if (!agendaListRoot) {
+            return;
+        }
+        const agendaActivitySyncStorageKey = 'agenda-activity-sync';
+        const agendaListSyncUrl = {{ url_for('agenda.estado_actividades_lista') | tojson }};
+        const agendaListSyncPollMs = 4000;
+        let agendaReminderTimeoutId = null;
+        let agendaListSyncIntervalId = null;
+        let agendaListSyncRequestInFlight = false;
+        let agendaListRefreshInFlight = false;
+
+        function parseUtcDate(value) {
+            if (!value) return null;
+            const parsed = new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        function updateBadge(row, state) {
+            const badge = row.querySelector('.agenda-reminder-badge');
+            if (!badge) return;
+
+            badge.className = 'agenda-reminder-badge px-2 py-0.5 rounded-full font-semibold';
+            if (state === 'overdue') {
+                badge.classList.add('bg-red-100', 'text-red-700', 'dark:bg-red-900/30', 'dark:text-red-300');
+                badge.textContent = 'Vencida';
+                return;
+            }
+
+            if (state === 'alert') {
+                badge.classList.add('bg-amber-100', 'text-amber-700', 'dark:bg-amber-900/30', 'dark:text-amber-300');
+                badge.textContent = 'En alerta';
+                return;
+            }
+
+            badge.classList.add('hidden');
+            badge.textContent = '';
+        }
+
+        function setRowState(row, state) {
+            row.classList.remove('agenda-alert-row--warning', 'agenda-alert-row--overdue');
+            if (state === 'overdue') {
+                row.classList.add('agenda-alert-row--overdue');
+            } else if (state === 'alert') {
+                row.classList.add('agenda-alert-row--warning');
+            }
+            updateBadge(row, state);
+        }
+
+        function evaluateRowFromSchedule(row) {
+            const nowMs = Date.now();
+            if ((row.dataset.estado || '').toLowerCase() !== 'pendiente') {
+                return 'idle';
+            }
+            const serverState = String(row.dataset.alertaInicial || '').trim();
+
+            const startDate = parseUtcDate(row.dataset.fechaInicioUtc);
+            const endDate = parseUtcDate(row.dataset.fechaFinUtc);
+            const reminderMinutes = Number.parseInt(row.dataset.recordatorioMinutos || '', 10);
+            if (!startDate) {
+                return serverState || 'idle';
+            }
+
+            const startMs = startDate.getTime();
+            const endMs = endDate ? endDate.getTime() : NaN;
+            const dueMs = Number.isFinite(endMs) && endMs >= startMs ? endMs : startMs;
+            if (nowMs >= dueMs) {
+                return 'overdue';
+            }
+
+            if (Number.isFinite(reminderMinutes) && reminderMinutes >= 0) {
+                const reminderAtMs = dueMs - (reminderMinutes * 60 * 1000);
+                if (nowMs >= reminderAtMs && nowMs < dueMs) {
+                    return 'alert';
+                }
+            }
+
+            return serverState || 'idle';
+        }
+
+        function refreshAgendaAlerts() {
+            agendaListRoot.querySelectorAll('.agenda-activity-row').forEach((row) => {
+                setRowState(row, evaluateRowFromSchedule(row));
+            });
+        }
+
+        function getNextRowRefreshAt(row, nowMs = Date.now()) {
+            if ((row.dataset.estado || '').toLowerCase() !== 'pendiente') {
+                return null;
+            }
+
+            const startDate = parseUtcDate(row.dataset.fechaInicioUtc);
+            if (!startDate) {
+                return null;
+            }
+
+            const endDate = parseUtcDate(row.dataset.fechaFinUtc);
+            const reminderMinutes = Number.parseInt(row.dataset.recordatorioMinutos || '', 10);
+            const startMs = startDate.getTime();
+            const endMs = endDate ? endDate.getTime() : NaN;
+            const dueMs = Number.isFinite(endMs) && endMs >= startMs ? endMs : startMs;
+            if (nowMs >= dueMs) {
+                return null;
+            }
+
+            if (Number.isFinite(reminderMinutes) && reminderMinutes >= 0) {
+                const reminderAtMs = dueMs - (reminderMinutes * 60 * 1000);
+                if (nowMs < reminderAtMs) {
+                    return reminderAtMs;
+                }
+            }
+
+            return dueMs > nowMs ? dueMs : null;
+        }
+
+        function scheduleAgendaAlertsRefresh() {
+            if (agendaReminderTimeoutId) {
+                window.clearTimeout(agendaReminderTimeoutId);
+                agendaReminderTimeoutId = null;
+            }
+
+            refreshAgendaAlerts();
+
+            const nowMs = Date.now();
+            let nextRefreshAt = null;
+            agendaListRoot.querySelectorAll('.agenda-activity-row').forEach((row) => {
+                const candidateAt = getNextRowRefreshAt(row, nowMs);
+                if (!Number.isFinite(candidateAt)) {
+                    return;
+                }
+                if (!Number.isFinite(nextRefreshAt) || candidateAt < nextRefreshAt) {
+                    nextRefreshAt = candidateAt;
+                }
+            });
+
+            if (!Number.isFinite(nextRefreshAt)) {
+                return;
+            }
+
+            const delayMs = Math.max(0, nextRefreshAt - nowMs + 250);
+            agendaReminderTimeoutId = window.setTimeout(scheduleAgendaAlertsRefresh, delayMs);
+        }
+
+        function normalizeResolvedActivityDetail(detail) {
+            const activityId = Number((detail && (detail.id || detail.activityId)) || 0);
+            const estado = String((detail && detail.estado) || '').trim().toLowerCase();
+            const estadoAlerta = String((detail && detail.estado_alerta) || '').trim().toLowerCase();
+            return {
+                id: activityId,
+                estado: estado || null,
+                estado_alerta: estadoAlerta && estadoAlerta !== 'idle' ? estadoAlerta : null,
+                eliminada: Boolean(detail && detail.eliminada),
+                synced_at: Number((detail && detail.synced_at) || Date.now())
+            };
+        }
+
+        function broadcastResolvedActivity(detail) {
+            const normalized = normalizeResolvedActivityDetail(detail);
+            if (!normalized.id || !window.localStorage) {
+                return;
+            }
+            try {
+                const payload = JSON.stringify(normalized);
+                window.localStorage.setItem(agendaActivitySyncStorageKey, payload);
+                window.localStorage.removeItem(agendaActivitySyncStorageKey);
+            } catch (e) {
+            }
+        }
+
+        function dispatchResolvedActivity(activityId, detail) {
+            const normalized = normalizeResolvedActivityDetail({
+                ...(detail || {}),
+                id: Number(activityId || (detail && detail.id) || 0)
+            });
+            if (!normalized.id) return;
+            window.dispatchEvent(new CustomEvent('agenda:resolver-actividad', {
+                detail: normalized
+            }));
+            broadcastResolvedActivity(normalized);
+        }
+
+        function ensureEmptyStateRow() {
+            const tbody = agendaListRoot.querySelector('.agenda-list-table tbody');
+            if (!tbody) return;
+            const hasRows = tbody.querySelector('.agenda-activity-row');
+            if (hasRows) return;
+            if (tbody.querySelector('[data-empty-agenda-row="1"]')) return;
+            const row = document.createElement('tr');
+            row.setAttribute('data-empty-agenda-row', '1');
+            row.innerHTML = '<td colspan="6" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No hay actividades para los filtros seleccionados.</td>';
+            tbody.appendChild(row);
+        }
+
+        function removeEmptyStateRowIfNeeded() {
+            const tbody = agendaListRoot.querySelector('.agenda-list-table tbody');
+            if (!tbody) return;
+            const hasRows = Boolean(tbody.querySelector('.agenda-activity-row'));
+            if (!hasRows) return;
+            const emptyRow = tbody.querySelector('[data-empty-agenda-row="1"]');
+            if (emptyRow) {
+                emptyRow.remove();
+            }
+        }
+
+        function currentActivityIds() {
+            return Array.from(agendaListRoot.querySelectorAll('.agenda-activity-row'))
+                .map((row) => Number(row.dataset.actividadId || 0))
+                .filter((id) => Number.isFinite(id) && id > 0);
+        }
+
+        function arraysEqual(left, right) {
+            if (!Array.isArray(left) || !Array.isArray(right)) {
+                return false;
+            }
+            if (left.length !== right.length) {
+                return false;
+            }
+            for (let index = 0; index < left.length; index += 1) {
+                if (Number(left[index]) !== Number(right[index])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function getAgendaListResultsContainer() {
+            return agendaListRoot.querySelector('[data-agenda-list-results="1"]');
+        }
+
+        function getAgendaListFilterForm() {
+            return agendaListRoot.querySelector('[data-agenda-filter-form="1"]');
+        }
+
+        function buildAgendaListStateUrl(extraParams = []) {
+            const form = getAgendaListFilterForm();
+            const baseUrl = form && form.getAttribute('action')
+                ? new URL(form.getAttribute('action'), window.location.origin)
+                : new URL(window.location.href, window.location.origin);
+
+            if (form) {
+                const formData = new FormData(form);
+                for (const [key, value] of formData.entries()) {
+                    if (value === null || value === undefined || value === '') {
+                        continue;
+                    }
+                    baseUrl.searchParams.set(key, String(value));
+                }
+            }
+
+            const results = getAgendaListResultsContainer();
+            const currentPage = Number(results && results.dataset.currentPage || 1);
+            if (Number.isFinite(currentPage) && currentPage > 1) {
+                baseUrl.searchParams.set('page', String(currentPage));
+            } else {
+                baseUrl.searchParams.delete('page');
+            }
+
+            extraParams.forEach(([key, value]) => {
+                if (value === null || value === undefined || value === '') {
+                    return;
+                }
+                baseUrl.searchParams.append(key, String(value));
+            });
+
+            return baseUrl;
+        }
+
+        function estadoClasses(estado) {
+            if (estado === 'hecha') {
+                return ['bg-green-100', 'text-green-800', 'dark:bg-green-900/30', 'dark:text-green-300'];
+            }
+            if (estado === 'cancelada') {
+                return ['bg-red-100', 'text-red-800', 'dark:bg-red-900/30', 'dark:text-red-300'];
+            }
+            return ['bg-yellow-100', 'text-yellow-800', 'dark:bg-yellow-900/30', 'dark:text-yellow-300'];
+        }
+
+        function estadoLabel(estado) {
+            if (!estado) return 'Pendiente';
+            return estado.charAt(0).toUpperCase() + estado.slice(1);
+        }
+
+        function shouldRemoveByCurrentFilter(nextEstado) {
+            const url = new URL(window.location.href);
+            const estadoFiltro = String(url.searchParams.get('estado') || '').trim().toLowerCase();
+            return Boolean(estadoFiltro) && estadoFiltro !== nextEstado;
+        }
+
+        function updateRowAfterResolve(row, nextEstado) {
+            row.dataset.estado = nextEstado;
+            row.dataset.alertaInicial = '';
+            setRowState(row, 'idle');
+
+            const badge = row.querySelector('[data-estado-badge="1"]');
+            if (badge) {
+                badge.className = 'agenda-estado-badge px-2 py-1 rounded text-xs font-semibold';
+                badge.classList.add(...estadoClasses(nextEstado));
+                badge.textContent = estadoLabel(nextEstado);
+            }
+
+            if (nextEstado !== 'pendiente') {
+                row.querySelectorAll('.agenda-resolve-form[data-pending-action="1"]').forEach((form) => form.remove());
+            }
+        }
+
+        function handleResolvedActivityUpdate(detail) {
+            const normalized = normalizeResolvedActivityDetail(detail);
+            if (!normalized.id) {
+                return;
+            }
+
+            const row = agendaListRoot.querySelector(`.agenda-activity-row[data-actividad-id="${normalized.id}"]`);
+            if (!row) {
+                scheduleAgendaAlertsRefresh();
+                return;
+            }
+
+            const nextEstado = String(normalized.estado || row.dataset.estado || 'pendiente').trim().toLowerCase();
+            if (normalized.eliminada || shouldRemoveByCurrentFilter(nextEstado)) {
+                row.remove();
+                ensureEmptyStateRow();
+            } else {
+                removeEmptyStateRowIfNeeded();
+                updateRowAfterResolve(row, nextEstado);
+            }
+
+            scheduleAgendaAlertsRefresh();
+        }
+
+        function buildAgendaListSyncRequestUrl(activityIds) {
+            const sourceUrl = buildAgendaListStateUrl(activityIds.map((id) => ['ids', id]));
+            const url = new URL(agendaListSyncUrl, window.location.origin);
+            ['page', 'estado', 'tipo', 'prioridad', 'responsable_id', 'desde', 'hasta', 'sort', 'dir'].forEach((key) => {
+                const value = sourceUrl.searchParams.get(key);
+                if (value !== null && value !== '') {
+                    url.searchParams.set(key, value);
+                }
+            });
+            sourceUrl.searchParams.getAll('ids').forEach((id) => url.searchParams.append('ids', id));
+            return url.toString();
+        }
+
+        function buildAgendaListPartialUrl() {
+            const url = buildAgendaListStateUrl();
+            url.searchParams.set('partial', '1');
+            return url.toString();
+        }
+
+        async function refreshAgendaListResultsFromServer() {
+            if (agendaListRefreshInFlight) {
+                return;
+            }
+            const results = getAgendaListResultsContainer();
+            if (!results) {
+                return;
+            }
+
+            agendaListRefreshInFlight = true;
+            try {
+                const response = await fetch(buildAgendaListPartialUrl(), {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/html',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) {
+                    return;
+                }
+
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const nextResults = doc.getElementById('agenda-list-results');
+                if (!nextResults) {
+                    return;
+                }
+
+                results.replaceWith(nextResults);
+                bindResolveForms();
+                scheduleAgendaAlertsRefresh();
+            } catch (e) {
+            } finally {
+                agendaListRefreshInFlight = false;
+            }
+        }
+
+        async function syncAgendaRowsWithServer() {
+            if (document.hidden) {
+                return;
+            }
+            if (agendaListSyncRequestInFlight) {
+                return;
+            }
+            const activityIds = currentActivityIds();
+
+            agendaListSyncRequestInFlight = true;
+            try {
+                const response = await fetch(buildAgendaListSyncRequestUrl(activityIds), {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = await response.json();
+                const items = Array.isArray(payload && payload.items) ? payload.items : [];
+                const missingIds = Array.isArray(payload && payload.missing_ids) ? payload.missing_ids : [];
+                const pageIds = Array.isArray(payload && payload.page_ids) ? payload.page_ids : [];
+                const itemsById = new Map(items.map((item) => [Number(item && item.id), item]));
+                const currentIds = currentActivityIds();
+
+                if (!arraysEqual(currentIds, pageIds)) {
+                    await refreshAgendaListResultsFromServer();
+                    return;
+                }
+
+                missingIds.forEach((activityId) => {
+                    const row = agendaListRoot.querySelector(`.agenda-activity-row[data-actividad-id="${activityId}"]`);
+                    if (!row) {
+                        return;
+                    }
+                    row.remove();
+                    ensureEmptyStateRow();
+                    dispatchResolvedActivity(activityId, {
+                        estado: 'eliminada',
+                        eliminada: true,
+                        synced_at: Date.now()
+                    });
+                });
+
+                items.forEach((item) => {
+                    const activityId = Number(item && item.id);
+                    if (!activityId) {
+                        return;
+                    }
+                    const row = agendaListRoot.querySelector(`.agenda-activity-row[data-actividad-id="${activityId}"]`);
+                    if (!row) {
+                        return;
+                    }
+                    const nextEstado = String(item && item.estado || row.dataset.estado || 'pendiente').trim().toLowerCase();
+                    row.dataset.alertaInicial = String(item && item.estado_alerta || '').trim().toLowerCase();
+                    if (shouldRemoveByCurrentFilter(nextEstado)) {
+                        row.remove();
+                        ensureEmptyStateRow();
+                        dispatchResolvedActivity(activityId, {
+                            estado: nextEstado,
+                            eliminada: true,
+                            estado_alerta: item && item.estado_alerta ? item.estado_alerta : null,
+                            synced_at: Date.now()
+                        });
+                        return;
+                    }
+                    removeEmptyStateRowIfNeeded();
+                    updateRowAfterResolve(row, nextEstado);
+                    const serverState = itemsById.get(activityId);
+                    setRowState(row, (serverState && serverState.estado_alerta) || evaluateRowFromSchedule(row));
+                });
+
+                scheduleAgendaAlertsRefresh();
+            } catch (e) {
+            } finally {
+                agendaListSyncRequestInFlight = false;
+            }
+        }
+
+        function stopAgendaListServerSyncPolling() {
+            if (agendaListSyncIntervalId) {
+                window.clearInterval(agendaListSyncIntervalId);
+                agendaListSyncIntervalId = null;
+            }
+        }
+
+        function startAgendaListServerSyncPolling() {
+            stopAgendaListServerSyncPolling();
+            if (document.hidden) {
+                return;
+            }
+            syncAgendaRowsWithServer();
+            agendaListSyncIntervalId = window.setInterval(syncAgendaRowsWithServer, agendaListSyncPollMs);
+        }
+
+        async function submitResolveForm(form) {
+            const activityId = String(form.dataset.actividadId || '');
+            const row = activityId
+                ? agendaListRoot.querySelector(`.agenda-activity-row[data-actividad-id="${activityId}"]`)
+                : null;
+            if (!row) {
+                form.submit();
+                return;
+            }
+
+            const previousState = row.classList.contains('agenda-alert-row--overdue')
+                ? 'overdue'
+                : row.classList.contains('agenda-alert-row--warning')
+                    ? 'alert'
+                    : evaluateRowFromSchedule(row);
+
+            const formData = new FormData(form);
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData,
+                credentials: 'same-origin'
+            });
+
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch (e) {
+                payload = null;
+            }
+
+            if (!response.ok || !payload || payload.ok !== true) {
+                if (payload && payload.mensaje && typeof window.mostrarNotificacion === 'function') {
+                    window.mostrarNotificacion(payload.mensaje, 'warning');
+                }
+                throw new Error((payload && payload.mensaje) || 'No se pudo actualizar la actividad');
+            }
+
+            const nextEstado = String((payload && payload.estado) || form.dataset.resolveAction || 'pendiente').trim().toLowerCase();
+            const removeRow = String(form.dataset.removeRow || '0') === '1' || Boolean(payload && payload.eliminada);
+            if (removeRow || shouldRemoveByCurrentFilter(nextEstado)) {
+                row.remove();
+                ensureEmptyStateRow();
+            } else {
+                removeEmptyStateRowIfNeeded();
+                updateRowAfterResolve(row, nextEstado);
+            }
+
+            scheduleAgendaAlertsRefresh();
+            dispatchResolvedActivity(activityId, {
+                estado: nextEstado,
+                estado_alerta: (payload && payload.estado_alerta) || previousState,
+                eliminada: removeRow
+            });
+            if (payload && payload.mensaje && typeof window.mostrarNotificacion === 'function') {
+                window.mostrarNotificacion(payload.mensaje, 'success');
+            }
+        }
+
+        function bindResolveForms() {
+            agendaListRoot.querySelectorAll('.agenda-resolve-form').forEach((form) => {
+                if (form.dataset.agendaBound === '1') return;
+                form.dataset.agendaBound = '1';
+                form.addEventListener('submit', async (event) => {
+                    if (event.defaultPrevented) {
+                        return;
+                    }
+                    event.preventDefault();
+                    if (form.dataset.agendaSubmitting === '1') {
+                        return;
+                    }
+                    form.dataset.agendaSubmitting = '1';
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                        submitButton.classList.add('opacity-60', 'cursor-not-allowed');
+                    }
+                    try {
+                        await submitResolveForm(form);
+                    } catch (e) {
+                        if (typeof window.mostrarNotificacion === 'function') {
+                            window.mostrarNotificacion(e && e.message ? e.message : 'No se pudo procesar la actividad', 'warning');
+                        }
+                    } finally {
+                        form.dataset.agendaSubmitting = '0';
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                            submitButton.classList.remove('opacity-60', 'cursor-not-allowed');
+                        }
+                    }
+                });
+            });
+        }
+
+        function applyServerAlertState(detail) {
+            const items = Array.isArray(detail && detail.items) ? detail.items : [];
+            const itemsById = new Map(items.map((item) => [String(item.id), item.estado_alerta]));
+
+            agendaListRoot.querySelectorAll('.agenda-activity-row').forEach((row) => {
+                const activityId = String(row.dataset.actividadId || '');
+                const serverState = itemsById.get(activityId);
+                row.dataset.alertaInicial = serverState || '';
+                setRowState(row, serverState || evaluateRowFromSchedule(row));
+            });
+        }
+
+        function initAgendaAlerts() {
+            scheduleAgendaAlertsRefresh();
+            bindResolveForms();
+            startAgendaListServerSyncPolling();
+            const onResolvedActivity = (event) => {
+                if (!agendaListRoot.isConnected) {
+                    return;
+                }
+                handleResolvedActivityUpdate(event && event.detail ? event.detail : {});
+            };
+            window.addEventListener('agenda:resolver-actividad', onResolvedActivity);
+
+            const onResolvedActivityStorage = (event) => {
+                if (!agendaListRoot.isConnected) {
+                    return;
+                }
+                if (!event || event.key !== agendaActivitySyncStorageKey || !event.newValue) {
+                    return;
+                }
+                try {
+                    handleResolvedActivityUpdate(JSON.parse(event.newValue));
+                } catch (e) {
+                }
+            };
+            window.addEventListener('storage', onResolvedActivityStorage);
+
+            const onAgendaAlertsUpdated = (event) => {
+                if (!agendaListRoot.isConnected) {
+                    return;
+                }
+                applyServerAlertState(event.detail || {});
+                scheduleAgendaAlertsRefresh();
+            };
+            window.addEventListener('agenda:alertas-actualizadas', onAgendaAlertsUpdated);
+
+            const onAgendaVisibilityChange = () => {
+                if (!agendaListRoot.isConnected) {
+                    stopAgendaListServerSyncPolling();
+                    return;
+                }
+                if (document.hidden) {
+                    stopAgendaListServerSyncPolling();
+                    return;
+                }
+                startAgendaListServerSyncPolling();
+                scheduleAgendaAlertsRefresh();
+            };
+            document.addEventListener('visibilitychange', onAgendaVisibilityChange);
+
+            const onAgendaFocus = () => {
+                if (!agendaListRoot.isConnected) {
+                    return;
+                }
+                startAgendaListServerSyncPolling();
+                syncAgendaRowsWithServer();
+                scheduleAgendaAlertsRefresh();
+            };
+            window.addEventListener('focus', onAgendaFocus);
+            window.addEventListener('pageshow', onAgendaFocus);
+        }
+
+        initAgendaAlerts();
+    })();
+</script>
+{% endblock %}

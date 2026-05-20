@@ -1,0 +1,805 @@
+{% extends "base.html" %}
+
+{% block title %}Agenda | {{ 'Editar' if modo == 'editar' else 'Nueva' }} actividad{% endblock %}
+
+{% block content %}
+{% set v_titulo = data.get('titulo') if data else (actividad.titulo if actividad else '') %}
+{% set v_tipo = data.get('tipo') if data else (actividad.tipo if actividad else 'tarea_interna') %}
+{% set v_descripcion = data.get('descripcion') if data else (actividad.descripcion if actividad else '') %}
+{% set v_prioridad = data.get('prioridad') if data else (actividad.prioridad if actividad else 'media') %}
+{% set v_usuario_id = data.get('usuario_id') if data else (actividad.usuario_id if actividad else current_user.id_usuario) %}
+{% set v_cliente_id = data.get('cliente_id') if data else (actividad.cliente_id if actividad else '') %}
+{% set v_reparacion_id = data.get('reparacion_id') if data else (actividad.reparacion_id if actividad else '') %}
+{% set v_venta_id = data.get('venta_id') if data else (actividad.venta_id if actividad else '') %}
+{% set v_crm_contacto_id = data.get('crm_contacto_id') if data else (actividad.crm_contacto_id if actividad else '') %}
+{% set v_recordatorio = data.get('recordatorio_minutos') if data else (actividad.recordatorio_minutos if actividad else '') %}
+{% set v_observaciones = data.get('observaciones') if data else (actividad.observaciones if actividad else '') %}
+{% set v_mostrar_agenda_en = mostrar_agenda_en if mostrar_agenda_en is defined else 'solo_responsable' %}
+{% set v_recordatorio_a = recordatorio_a if recordatorio_a is defined else 'solo_responsable' %}
+{% if data and data.get('fecha_inicio') %}
+    {% set v_fecha_inicio = data.get('fecha_inicio') %}
+{% elif actividad and to_datetime_local_input is defined %}
+    {% set v_fecha_inicio = to_datetime_local_input(actividad.fecha_inicio) %}
+{% else %}
+    {% set v_fecha_inicio = '' %}
+{% endif %}
+{% if data and data.get('fecha_fin') %}
+    {% set v_fecha_fin = data.get('fecha_fin') %}
+{% elif actividad and to_datetime_local_input is defined %}
+    {% set v_fecha_fin = to_datetime_local_input(actividad.fecha_fin) %}
+{% else %}
+    {% set v_fecha_fin = '' %}
+{% endif %}
+{% set v_todo_el_dia = (data and data.get('es_todo_el_dia')) or (actividad and actividad.es_todo_el_dia) %}
+{% set form_action = url_for('agenda.editar_actividad', id_actividad=actividad.id) if modo == 'editar' and actividad else url_for('agenda.nueva_actividad') %}
+
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-calendar-plus text-indigo-500 mr-2"></i>{{ 'Editar actividad' if modo == 'editar' else 'Nueva actividad' }}
+        </h1>
+        <a href="{{ url_for('agenda.lista_actividades') }}"
+            class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+            Volver
+        </a>
+    </div>
+
+    <form method="POST" action="{{ form_action }}"
+        x-data="agendaRelacionForm()"
+        data-cliente-inicial="{{ (cliente_inicial or none)|tojson|forceescape }}"
+        data-reparacion-inicial="{{ (reparacion_inicial or none)|tojson|forceescape }}"
+        data-venta-inicial="{{ (venta_inicial or none)|tojson|forceescape }}"
+        data-clientes-url="{{ url_for('agenda.buscar_clientes_relacion') }}"
+        data-reparaciones-url="{{ url_for('agenda.buscar_reparaciones_relacion') }}"
+        data-ventas-url="{{ url_for('agenda.buscar_ventas_relacion') }}"
+        data-mostrar-agenda-en="{{ v_mostrar_agenda_en }}"
+        data-recordatorio-a="{{ v_recordatorio_a }}"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Título</label>
+            <input type="text" name="titulo" required value="{{ v_titulo }}"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Tipo</label>
+            <select name="tipo"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                {% for t in tipos_actividad %}
+                <option value="{{ t }}" {% if v_tipo == t %}selected{% endif %}>{{ t|replace('_', ' ')|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Prioridad</label>
+            <select name="prioridad" x-model="prioridadSeleccionada"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                {% for p in prioridades_actividad %}
+                <option value="{{ p }}" {% if v_prioridad == p %}selected{% endif %}>
+                    {% if p == 'baja' %}🟢{% elif p == 'media' %}🔵{% elif p == 'alta' %}🟠{% elif p == 'critica' %}🔴{% endif %}
+                    {{ p|capitalize }}
+                </option>
+                {% endfor %}
+            </select>
+            <div class="mt-2">
+                <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold transition-colors"
+                    :class="prioridadBadgeClass(prioridadSeleccionada)">
+                    <span class="w-2 h-2 rounded-full" :class="prioridadPuntoClass(prioridadSeleccionada)"></span>
+                    <span x-text="prioridadTexto(prioridadSeleccionada)"></span>
+                </span>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Fecha inicio</label>
+            <input type="datetime-local" name="fecha_inicio" x-ref="fechaInicioInput" required value="{{ v_fecha_inicio }}"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Fecha fin</label>
+            <input type="datetime-local" name="fecha_fin" x-ref="fechaFinInput" value="{{ v_fecha_fin }}"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Responsable</label>
+            <select name="usuario_id"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                {% if not (current_user.es_admin() or current_user.tiene_permiso('agenda_ver_todas')) %}disabled{% endif %}>
+                {% for u in usuarios %}
+                <option value="{{ u.id_usuario }}" {% if v_usuario_id|string == u.id_usuario|string %}selected{% endif %}>
+                    {{ u.nombre_completo or u.username }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Mostrar en agenda de</label>
+            <select name="mostrar_agenda_en" x-model="mostrarAgendaEnSeleccionado"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                {% for alcance in alcances_destinatarios %}
+                <option value="{{ alcance }}" {% if v_mostrar_agenda_en == alcance %}selected{% endif %}>
+                    {% if alcance == 'solo_responsable' %}Solo responsable{% elif alcance == 'todos' %}Todos{% else %}Usuarios específicos{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div x-show="mostrarAgendaEnSeleccionado === 'usuarios_especificos'" x-cloak class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Usuarios visibles</label>
+            <select name="visible_usuario_ids" multiple size="5"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                {% for u in usuarios %}
+                <option value="{{ u.id_usuario }}" {% if u.id_usuario in usuarios_agenda_ids %}selected{% endif %}>
+                    {{ u.nombre_completo or u.username }}
+                </option>
+                {% endfor %}
+            </select>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Mantené presionado Ctrl para seleccionar varios usuarios.
+            </p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Recordatorio (min)</label>
+            <input type="number" name="recordatorio_minutos" x-ref="recordatorioInput" min="0" value="{{ v_recordatorio }}"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            <p x-ref="recordatorioHelp" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Si definís fecha fin, el recordatorio debe ser menor al tiempo entre inicio y fin.
+            </p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Enviar recordatorio a</label>
+            <select name="recordatorio_a" x-model="recordatorioParaSeleccionado"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                {% for alcance in alcances_destinatarios %}
+                <option value="{{ alcance }}" {% if v_recordatorio_a == alcance %}selected{% endif %}>
+                    {% if alcance == 'solo_responsable' %}Solo responsable{% elif alcance == 'todos' %}Todos{% else %}Usuarios específicos{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div x-show="recordatorioParaSeleccionado === 'usuarios_especificos'" x-cloak class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Usuarios a notificar</label>
+            <select name="recordatorio_usuario_ids" multiple size="5"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                {% for u in usuarios %}
+                <option value="{{ u.id_usuario }}" {% if u.id_usuario in usuarios_recordatorio_ids %}selected{% endif %}>
+                    {{ u.nombre_completo or u.username }}
+                </option>
+                {% endfor %}
+            </select>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Si no querés avisos, dejá vacío el campo Recordatorio (min).
+            </p>
+        </div>
+
+        <div class="relative" @click.outside="mostrarResultadosClientes = false">
+            <input type="hidden" name="cliente_id" :value="clienteId || ''">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Cliente</label>
+            <div class="relative">
+                <input type="text"
+                    x-model="clienteBusqueda"
+                    @focus="buscarClientes(clienteBusqueda, true)"
+                    @input.debounce.250ms="manejarBusquedaCliente()"
+                    placeholder="Buscar por nombre, teléfono o RUC..."
+                    autocomplete="off"
+                    :class="clienteSeleccionado ? 'pr-36' : 'pr-14'"
+                    class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                <div class="absolute inset-y-0 right-4 flex items-center gap-3">
+                    <button type="button"
+                        x-show="clienteSeleccionado"
+                        @click="limpiarCliente()"
+                        class="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+                        Sin vínculo
+                    </button>
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+            </div>
+
+            <div x-show="mostrarResultadosClientes" x-cloak
+                class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl overflow-hidden">
+                <div x-show="cargandoClientes" class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                    Buscando clientes...
+                </div>
+                <template x-for="cliente in clientesEncontrados" :key="cliente.id_cliente">
+                    <button type="button"
+                        @click="seleccionarCliente(cliente)"
+                        class="block w-full text-left px-3 py-2 border-b border-gray-100 dark:border-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition">
+                        <div class="font-medium text-gray-800 dark:text-white" x-text="cliente.nombre"></div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400" x-text="detalleCliente(cliente)"></div>
+                    </button>
+                </template>
+                <div x-show="!cargandoClientes && clientesEncontrados.length === 0"
+                    class="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    No se encontraron clientes.
+                </div>
+            </div>
+
+            <template x-if="clienteSeleccionado">
+                <div class="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/70 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-indigo-900/20">
+                    <div class="font-semibold text-indigo-700 dark:text-indigo-300" x-text="clienteSeleccionado.nombre"></div>
+                    <div class="text-xs text-indigo-600/90 dark:text-indigo-200/80" x-text="detalleCliente(clienteSeleccionado)"></div>
+                </div>
+            </template>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Escribí para filtrar sin cargar una lista completa.
+            </p>
+        </div>
+
+        <div class="relative" @click.outside="mostrarResultadosReparaciones = false">
+            <input type="hidden" name="reparacion_id" :value="reparacionId || ''">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Reparación</label>
+            <div class="relative">
+                <input type="text"
+                    x-model="reparacionBusqueda"
+                    @focus="buscarReparaciones(reparacionBusqueda, true)"
+                    @input.debounce.250ms="manejarBusquedaReparacion()"
+                    :placeholder="clienteId ? 'Buscar reparación de este cliente...' : 'Buscar por nro de reparación, equipo o cliente...'"
+                    autocomplete="off"
+                    :class="reparacionSeleccionada ? 'pr-36' : 'pr-14'"
+                    class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                <div class="absolute inset-y-0 right-4 flex items-center gap-3">
+                    <button type="button"
+                        x-show="reparacionSeleccionada"
+                        @click="limpiarReparacion()"
+                        class="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+                        Sin vínculo
+                    </button>
+                    <i class="fas fa-tools text-gray-400"></i>
+                </div>
+            </div>
+
+            <div x-show="mostrarResultadosReparaciones" x-cloak
+                class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl overflow-hidden">
+                <div x-show="cargandoReparaciones" class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                    Buscando reparaciones...
+                </div>
+                <template x-for="reparacion in reparacionesEncontradas" :key="reparacion.id_reparacion">
+                    <button type="button"
+                        @click="seleccionarReparacion(reparacion)"
+                        class="block w-full text-left px-3 py-2 border-b border-gray-100 dark:border-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition">
+                        <div class="font-medium text-gray-800 dark:text-white" x-text="etiquetaReparacion(reparacion)"></div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400" x-text="detalleReparacion(reparacion)"></div>
+                    </button>
+                </template>
+                <div x-show="!cargandoReparaciones && reparacionesEncontradas.length === 0"
+                    class="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    No se encontraron reparaciones.
+                </div>
+            </div>
+
+            <template x-if="reparacionSeleccionada">
+                <div class="mt-2 rounded-lg border border-amber-100 bg-amber-50/70 px-3 py-2 text-sm dark:border-amber-900/40 dark:bg-amber-900/20">
+                    <div class="font-semibold text-amber-700 dark:text-amber-300" x-text="etiquetaReparacion(reparacionSeleccionada)"></div>
+                    <div class="text-xs text-amber-700/90 dark:text-amber-200/80" x-text="detalleReparacion(reparacionSeleccionada)"></div>
+                </div>
+            </template>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Al hacer click ves reparaciones recientes; si elegís primero un cliente, se priorizan sus últimas reparaciones.
+            </p>
+        </div>
+
+        <div class="relative" @click.outside="mostrarResultadosVentas = false">
+            <input type="hidden" name="venta_id" :value="ventaId || ''">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Venta</label>
+            <div class="relative">
+                <input type="text"
+                    x-model="ventaBusqueda"
+                    @focus="buscarVentas(ventaBusqueda, true)"
+                    @input.debounce.250ms="manejarBusquedaVenta()"
+                    :placeholder="clienteId ? 'Buscar venta de este cliente...' : 'Buscar por nro de venta o cliente...'"
+                    autocomplete="off"
+                    :class="ventaSeleccionada ? 'pr-36' : 'pr-14'"
+                    class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                <div class="absolute inset-y-0 right-4 flex items-center gap-3">
+                    <button type="button"
+                        x-show="ventaSeleccionada"
+                        @click="limpiarVenta()"
+                        class="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+                        Sin vínculo
+                    </button>
+                    <i class="fas fa-receipt text-gray-400"></i>
+                </div>
+            </div>
+
+            <div x-show="mostrarResultadosVentas" x-cloak
+                class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl overflow-hidden">
+                <div x-show="cargandoVentas" class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                    Buscando ventas...
+                </div>
+                <template x-for="venta in ventasEncontradas" :key="venta.id_venta">
+                    <button type="button"
+                        @click="seleccionarVenta(venta)"
+                        class="block w-full text-left px-3 py-2 border-b border-gray-100 dark:border-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="font-medium text-gray-800 dark:text-white" x-text="etiquetaVenta(venta)"></div>
+                            <div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400" x-text="formatearMonto(venta.total)"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400" x-text="detalleVenta(venta)"></div>
+                    </button>
+                </template>
+                <div x-show="!cargandoVentas && ventasEncontradas.length === 0"
+                    class="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    No se encontraron ventas.
+                </div>
+            </div>
+
+            <template x-if="ventaSeleccionada">
+                <div class="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-sm dark:border-emerald-900/40 dark:bg-emerald-900/20">
+                    <div class="font-semibold text-emerald-700 dark:text-emerald-300" x-text="etiquetaVenta(ventaSeleccionada)"></div>
+                    <div class="text-xs text-emerald-700/90 dark:text-emerald-200/80" x-text="detalleVenta(ventaSeleccionada)"></div>
+                </div>
+            </template>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Al hacer click ves ventas recientes; si elegís primero un cliente, se priorizan sus últimas ventas.
+            </p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Contacto CRM</label>
+            <select name="crm_contacto_id"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                <option value="">Sin vínculo</option>
+                {% for c in contactos %}
+                <option value="{{ c.id }}" {% if v_crm_contacto_id|string == c.id|string %}selected{% endif %}>
+                    {{ c.nombre or 'Sin nombre' }} - {{ c.telefono }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Descripción</label>
+            <textarea name="descripcion" rows="3"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">{{ v_descripcion }}</textarea>
+        </div>
+
+        <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Observaciones</label>
+            <textarea name="observaciones" rows="2"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">{{ v_observaciones }}</textarea>
+        </div>
+
+        <div class="md:col-span-2 flex items-center gap-2">
+            <input type="checkbox" id="es_todo_el_dia" name="es_todo_el_dia" {% if v_todo_el_dia %}checked{% endif %}>
+            <label for="es_todo_el_dia" class="text-sm text-gray-700 dark:text-gray-200">Actividad de todo el día</label>
+        </div>
+
+        <div class="md:col-span-2 flex justify-end gap-2">
+            <a href="{{ url_for('agenda.lista_actividades') }}"
+                class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                Cancelar
+            </a>
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition">
+                {{ 'Guardar cambios' if modo == 'editar' else 'Crear actividad' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function agendaRelacionForm() {
+        return {
+            clientesUrl: '',
+            reparacionesUrl: '',
+            ventasUrl: '',
+            clienteSeleccionado: null,
+            clienteId: '',
+            clienteBusqueda: '',
+            clientesEncontrados: [],
+            mostrarResultadosClientes: false,
+            cargandoClientes: false,
+            clienteFetchId: 0,
+
+            reparacionSeleccionada: null,
+            reparacionId: '',
+            reparacionBusqueda: '',
+            reparacionesEncontradas: [],
+            mostrarResultadosReparaciones: false,
+            cargandoReparaciones: false,
+            reparacionFetchId: 0,
+
+            ventaSeleccionada: null,
+            ventaId: '',
+            ventaBusqueda: '',
+            ventasEncontradas: [],
+            mostrarResultadosVentas: false,
+            cargandoVentas: false,
+            ventaFetchId: 0,
+            prioridadSeleccionada: 'media',
+            mostrarAgendaEnSeleccionado: 'solo_responsable',
+            recordatorioParaSeleccionado: 'solo_responsable',
+            fechaInicioInput: null,
+            fechaFinInput: null,
+            recordatorioInput: null,
+            recordatorioHelp: null,
+
+            init() {
+                const el = this.$el;
+                if (!el || !el.dataset) {
+                    return;
+                }
+                this.clientesUrl = el.dataset.clientesUrl || '';
+                this.reparacionesUrl = el.dataset.reparacionesUrl || '';
+                this.ventasUrl = el.dataset.ventasUrl || '';
+                try {
+                    this.clienteSeleccionado = JSON.parse(el.dataset.clienteInicial || 'null');
+                } catch (_error) {
+                    this.clienteSeleccionado = null;
+                }
+                try {
+                    this.reparacionSeleccionada = JSON.parse(el.dataset.reparacionInicial || 'null');
+                } catch (_error) {
+                    this.reparacionSeleccionada = null;
+                }
+                try {
+                    this.ventaSeleccionada = JSON.parse(el.dataset.ventaInicial || 'null');
+                } catch (_error) {
+                    this.ventaSeleccionada = null;
+                }
+                this.clienteId = this.clienteSeleccionado ? this.clienteSeleccionado.id_cliente : '';
+                this.clienteBusqueda = '';
+                this.reparacionId = this.reparacionSeleccionada ? this.reparacionSeleccionada.id_reparacion : '';
+                this.reparacionBusqueda = '';
+                this.ventaId = this.ventaSeleccionada ? this.ventaSeleccionada.id_venta : '';
+                this.ventaBusqueda = '';
+                const prioridadInput = el.querySelector('select[name="prioridad"]');
+                this.prioridadSeleccionada = prioridadInput ? String(prioridadInput.value || 'media') : 'media';
+                this.mostrarAgendaEnSeleccionado = String(el.dataset.mostrarAgendaEn || 'solo_responsable');
+                this.recordatorioParaSeleccionado = String(el.dataset.recordatorioA || 'solo_responsable');
+                this.fechaInicioInput = this.$refs.fechaInicioInput || el.querySelector('input[name="fecha_inicio"]');
+                this.fechaFinInput = this.$refs.fechaFinInput || el.querySelector('input[name="fecha_fin"]');
+                this.recordatorioInput = this.$refs.recordatorioInput || el.querySelector('input[name="recordatorio_minutos"]');
+                this.recordatorioHelp = this.$refs.recordatorioHelp || null;
+                this.bindTemporalFields();
+                this.sincronizarValidacionRecordatorio();
+            },
+
+            bindTemporalFields() {
+                [this.fechaInicioInput, this.fechaFinInput, this.recordatorioInput].forEach((input) => {
+                    if (!input || input.dataset.agendaBound === '1') {
+                        return;
+                    }
+                    input.dataset.agendaBound = '1';
+                    input.addEventListener('input', () => this.sincronizarValidacionRecordatorio());
+                    input.addEventListener('change', () => this.sincronizarValidacionRecordatorio());
+                });
+            },
+
+            parseDatetimeLocalValue(value) {
+                if (!value) return null;
+                const parsed = new Date(value);
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
+            },
+
+            sincronizarValidacionRecordatorio() {
+                const startInput = this.fechaInicioInput;
+                const endInput = this.fechaFinInput;
+                const reminderInput = this.recordatorioInput;
+                const help = this.recordatorioHelp;
+                if (!startInput || !endInput || !reminderInput) {
+                    return;
+                }
+
+                const startDate = this.parseDatetimeLocalValue(startInput.value);
+                const endDate = this.parseDatetimeLocalValue(endInput.value);
+                const reminderValue = reminderInput.value;
+                const reminderMinutes = reminderValue === '' ? null : Number.parseInt(reminderValue, 10);
+
+                endInput.setCustomValidity('');
+                reminderInput.setCustomValidity('');
+                reminderInput.removeAttribute('max');
+
+                if (help) {
+                    help.textContent = 'Si definís fecha fin, el recordatorio debe ser menor al tiempo entre inicio y fin.';
+                }
+
+                if (startDate && endDate) {
+                    const diffMs = endDate.getTime() - startDate.getTime();
+                    if (diffMs <= 0) {
+                        endInput.setCustomValidity('La fecha fin debe ser posterior a la fecha de inicio.');
+                        return;
+                    }
+
+                    const diffMinutes = Math.floor(diffMs / 60000);
+                    const maxReminder = Math.max(0, diffMinutes - 1);
+                    reminderInput.setAttribute('max', String(maxReminder));
+
+                    if (help) {
+                        help.textContent = maxReminder > 0
+                            ? `Máximo permitido con esta duración: ${maxReminder} min.`
+                            : 'Con esta duración solo se permite 0 min como recordatorio.';
+                    }
+
+                    if (reminderMinutes !== null && Number.isFinite(reminderMinutes) && reminderMinutes >= diffMinutes) {
+                        reminderInput.setCustomValidity('El recordatorio debe ser menor al tiempo entre la fecha de inicio y la fecha fin.');
+                    }
+                }
+            },
+
+            prioridadTexto(valor) {
+                const prioridad = String(valor || '').toLowerCase();
+                if (prioridad === 'baja') return 'Baja';
+                if (prioridad === 'media') return 'Media';
+                if (prioridad === 'alta') return 'Alta';
+                if (prioridad === 'critica') return 'Crítica';
+                return 'Sin prioridad';
+            },
+
+            prioridadBadgeClass(valor) {
+                const prioridad = String(valor || '').toLowerCase();
+                if (prioridad === 'baja') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
+                if (prioridad === 'media') return 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300';
+                if (prioridad === 'alta') return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+                if (prioridad === 'critica') return 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300';
+                return 'bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300';
+            },
+
+            prioridadPuntoClass(valor) {
+                const prioridad = String(valor || '').toLowerCase();
+                if (prioridad === 'baja') return 'bg-emerald-500';
+                if (prioridad === 'media') return 'bg-sky-500';
+                if (prioridad === 'alta') return 'bg-orange-500';
+                if (prioridad === 'critica') return 'bg-rose-500';
+                return 'bg-gray-500';
+            },
+
+            detalleCliente(cliente) {
+                if (!cliente) return 'Sin vínculo';
+                const partes = [];
+                if (cliente.ruc_ci) partes.push(cliente.ruc_ci);
+                if (cliente.telefono) partes.push(cliente.telefono);
+                if (cliente.email) partes.push(cliente.email);
+                return partes.length ? partes.join(' · ') : 'Sin datos extra';
+            },
+
+            etiquetaReparacion(reparacion) {
+                if (!reparacion) return '';
+                const equipo = [reparacion.tipo_equipo, reparacion.marca_modelo].filter(Boolean).join(' - ');
+                return `#${reparacion.id_reparacion} · ${equipo || 'Sin equipo'}`;
+            },
+
+            detalleReparacion(reparacion) {
+                if (!reparacion) return 'Sin vínculo';
+                const partes = [];
+                if (reparacion.cliente && reparacion.cliente.nombre) partes.push(reparacion.cliente.nombre);
+                if (reparacion.estado) partes.push(this.capitalizar(String(reparacion.estado).replace(/_/g, ' ')));
+                if (reparacion.fecha_ingreso) partes.push(reparacion.fecha_ingreso);
+                return partes.join(' · ');
+            },
+
+            etiquetaVenta(venta) {
+                if (!venta) return '';
+                return `#${venta.id_venta} · ${venta.fecha_venta || 'Sin fecha'}`;
+            },
+
+            detalleVenta(venta) {
+                if (!venta) return 'Sin vínculo';
+                const partes = [];
+                if (venta.cliente && venta.cliente.nombre) partes.push(venta.cliente.nombre);
+                if (venta.estado) partes.push(this.capitalizar(String(venta.estado).replace(/_/g, ' ')));
+                return partes.join(' · ');
+            },
+
+            capitalizar(texto) {
+                if (!texto) return '';
+                return texto.charAt(0).toUpperCase() + texto.slice(1);
+            },
+
+            formatearMonto(valor) {
+                const numero = Number(valor || 0);
+                return `₲ ${new Intl.NumberFormat('es-PY').format(numero)}`;
+            },
+
+            limpiarCliente() {
+                this.clienteSeleccionado = null;
+                this.clienteId = '';
+                this.clienteBusqueda = '';
+                this.clientesEncontrados = [];
+                this.mostrarResultadosClientes = false;
+                this.limpiarReparacion();
+                this.limpiarVenta();
+            },
+
+            limpiarReparacion() {
+                this.reparacionSeleccionada = null;
+                this.reparacionId = '';
+                this.reparacionBusqueda = '';
+                this.reparacionesEncontradas = [];
+                this.mostrarResultadosReparaciones = false;
+            },
+
+            limpiarVenta() {
+                this.ventaSeleccionada = null;
+                this.ventaId = '';
+                this.ventaBusqueda = '';
+                this.ventasEncontradas = [];
+                this.mostrarResultadosVentas = false;
+            },
+
+            async manejarBusquedaCliente() {
+                const termino = this.clienteBusqueda.trim();
+                const etiquetaActual = this.clienteSeleccionado ? this.clienteSeleccionado.nombre : '';
+                if (this.clienteSeleccionado && termino !== etiquetaActual) {
+                    this.clienteSeleccionado = null;
+                    this.clienteId = '';
+                    this.limpiarReparacion();
+                    this.limpiarVenta();
+                }
+                this.mostrarResultadosClientes = true;
+                await this.buscarClientes(termino, true);
+            },
+
+            async buscarClientes(query = '', abrir = false) {
+                if (abrir) this.mostrarResultadosClientes = true;
+                const fetchId = ++this.clienteFetchId;
+                this.cargandoClientes = true;
+                try {
+                    const url = new URL(this.clientesUrl, window.location.origin);
+                    if ((query || '').trim()) {
+                        url.searchParams.set('q', query.trim());
+                    }
+                    const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                    const data = await response.json();
+                    if (fetchId !== this.clienteFetchId) return;
+                    this.clientesEncontrados = Array.isArray(data.items) ? data.items : [];
+                } catch (_error) {
+                    if (fetchId === this.clienteFetchId) {
+                        this.clientesEncontrados = [];
+                    }
+                } finally {
+                    if (fetchId === this.clienteFetchId) {
+                        this.cargandoClientes = false;
+                    }
+                }
+            },
+
+            seleccionarCliente(cliente, opciones = {}) {
+                this.clienteSeleccionado = cliente;
+                this.clienteId = cliente ? cliente.id_cliente : '';
+                this.clienteBusqueda = '';
+                this.clientesEncontrados = [];
+                this.mostrarResultadosClientes = false;
+
+                if (!opciones.conservarVenta) {
+                    if (this.ventaSeleccionada && this.ventaSeleccionada.id_cliente !== this.clienteId) {
+                        this.limpiarVenta();
+                    } else if (!this.ventaSeleccionada) {
+                        this.buscarVentas('', false);
+                    }
+                }
+
+                if (!opciones.conservarReparacion) {
+                    if (this.reparacionSeleccionada && this.reparacionSeleccionada.cliente_id !== this.clienteId) {
+                        this.limpiarReparacion();
+                    } else if (!this.reparacionSeleccionada) {
+                        this.buscarReparaciones('', false);
+                    }
+                }
+            },
+
+            async manejarBusquedaReparacion() {
+                const termino = this.reparacionBusqueda.trim();
+                const etiquetaActual = this.reparacionSeleccionada ? this.etiquetaReparacion(this.reparacionSeleccionada) : '';
+                if (this.reparacionSeleccionada && termino !== etiquetaActual) {
+                    this.reparacionSeleccionada = null;
+                    this.reparacionId = '';
+                }
+                this.mostrarResultadosReparaciones = true;
+                await this.buscarReparaciones(termino, true);
+            },
+
+            async buscarReparaciones(query = '', abrir = false) {
+                const termino = (query || '').trim();
+                if (abrir) this.mostrarResultadosReparaciones = true;
+
+                const fetchId = ++this.reparacionFetchId;
+                this.cargandoReparaciones = true;
+                try {
+                    const url = new URL(this.reparacionesUrl, window.location.origin);
+                    if (this.clienteId) {
+                        url.searchParams.set('cliente_id', this.clienteId);
+                    }
+                    if (termino) {
+                        url.searchParams.set('q', termino);
+                    }
+                    const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                    const data = await response.json();
+                    if (fetchId !== this.reparacionFetchId) return;
+                    this.reparacionesEncontradas = Array.isArray(data.items) ? data.items : [];
+                } catch (_error) {
+                    if (fetchId === this.reparacionFetchId) {
+                        this.reparacionesEncontradas = [];
+                    }
+                } finally {
+                    if (fetchId === this.reparacionFetchId) {
+                        this.cargandoReparaciones = false;
+                    }
+                }
+            },
+
+            seleccionarReparacion(reparacion) {
+                this.reparacionSeleccionada = reparacion;
+                this.reparacionId = reparacion ? reparacion.id_reparacion : '';
+                this.reparacionBusqueda = '';
+                this.reparacionesEncontradas = [];
+                this.mostrarResultadosReparaciones = false;
+
+                if (
+                    reparacion &&
+                    reparacion.cliente &&
+                    (!this.clienteSeleccionado || this.clienteSeleccionado.id_cliente !== reparacion.cliente.id_cliente)
+                ) {
+                    this.seleccionarCliente(reparacion.cliente, { conservarReparacion: true });
+                }
+            },
+
+            async manejarBusquedaVenta() {
+                const termino = this.ventaBusqueda.trim();
+                const etiquetaActual = this.ventaSeleccionada ? this.etiquetaVenta(this.ventaSeleccionada) : '';
+                if (this.ventaSeleccionada && termino !== etiquetaActual) {
+                    this.ventaSeleccionada = null;
+                    this.ventaId = '';
+                }
+                this.mostrarResultadosVentas = true;
+                await this.buscarVentas(termino, true);
+            },
+
+            async buscarVentas(query = '', abrir = false) {
+                const termino = (query || '').trim();
+                if (abrir) this.mostrarResultadosVentas = true;
+
+                const fetchId = ++this.ventaFetchId;
+                this.cargandoVentas = true;
+                try {
+                    const url = new URL(this.ventasUrl, window.location.origin);
+                    if (this.clienteId) {
+                        url.searchParams.set('cliente_id', this.clienteId);
+                    }
+                    if (termino) {
+                        url.searchParams.set('q', termino);
+                    }
+                    const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                    const data = await response.json();
+                    if (fetchId !== this.ventaFetchId) return;
+                    this.ventasEncontradas = Array.isArray(data.items) ? data.items : [];
+                } catch (_error) {
+                    if (fetchId === this.ventaFetchId) {
+                        this.ventasEncontradas = [];
+                    }
+                } finally {
+                    if (fetchId === this.ventaFetchId) {
+                        this.cargandoVentas = false;
+                    }
+                }
+            },
+
+            seleccionarVenta(venta) {
+                this.ventaSeleccionada = venta;
+                this.ventaId = venta ? venta.id_venta : '';
+                this.ventaBusqueda = '';
+                this.ventasEncontradas = [];
+                this.mostrarResultadosVentas = false;
+
+                if (
+                    venta &&
+                    venta.cliente &&
+                    (!this.clienteSeleccionado || this.clienteSeleccionado.id_cliente !== venta.cliente.id_cliente)
+                ) {
+                    this.seleccionarCliente(venta.cliente, { conservarVenta: true });
+                }
+            },
+        };
+    }
+</script>
+{% endblock %}

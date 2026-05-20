@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Cierre #{{ sesion.id_sesion }}{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-2 text-center">
+            <i class="fas fa-edit text-yellow-600 dark:text-yellow-400 mr-2"></i>Editar Cierre de Caja
+        </h1>
+        <p class="text-center text-sm text-gray-500 dark:text-gray-400 mb-6">
+            Sesión #{{ sesion.id_sesion }} - {{ sesion.caja.nombre if sesion.caja else '' }}
+        </p>
+
+        <!-- Alerta de seguridad -->
+        <div class="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-500 p-4 mb-6 rounded-r-lg">
+            <div class="flex">
+                <i class="fas fa-exclamation-triangle text-yellow-500 mr-3 mt-0.5"></i>
+                <div>
+                    <p class="text-sm text-yellow-700 dark:text-yellow-300 font-medium">Acción auditada</p>
+                    <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                        Esta edición quedará registrada con tu usuario, fecha y motivo.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información actual -->
+        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-6 space-y-2">
+            <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-300">Fecha Cierre:</span>
+                <span class="font-semibold text-gray-800 dark:text-white">{{
+                    sesion.fecha_cierre|local_strftime('%d/%m/%Y %H:%M') }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-300">Cerrado por:</span>
+                <span class="text-gray-800 dark:text-gray-100">{{ sesion.usuario_cierre.username if
+                    sesion.usuario_cierre else sesion.usuario.username }}</span>
+            </div>
+            <hr class="border-gray-200 dark:border-gray-700">
+            <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-300">Total Sistema:</span>
+                <span class="font-bold text-green-600 dark:text-green-300">₲ {{
+                    "{:,.0f}".format(sesion.monto_final_sistema or 0).replace(",", ".") }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-300">Declarado Actual:</span>
+                <span class="text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(sesion.monto_final_declarado or
+                    0).replace(",", ".") }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-300">Diferencia Actual:</span>
+                {% set dif = (sesion.diferencia or 0)|float %}
+                <span
+                    class="font-semibold {% if dif == 0 %}text-green-600 dark:text-green-300{% elif dif > 0 %}text-yellow-600 dark:text-yellow-300{% else %}text-red-600 dark:text-red-300{% endif %}">
+                    ₲ {{ "{:,.0f}".format(dif).replace(",", ".") }}
+                </span>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('caja.cierre_editar', id_sesion=sesion.id_sesion) }}" class="space-y-5">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    <i class="fas fa-coins mr-1"></i>Nuevo Monto Declarado
+                </label>
+                <input type="number" name="monto_declarado" required min="0"
+                    value="{{ (sesion.monto_final_declarado or 0)|int }}"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-3 px-4 text-lg text-right bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:border-yellow-500 focus:ring-yellow-500">
+            </div>
+
+            <div class="flex items-start gap-3">
+                <input id="recalcular_sistema" name="recalcular_sistema" type="checkbox"
+                    class="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-yellow-600 focus:ring-yellow-500">
+                <div>
+                    <label for="recalcular_sistema" class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                        Recalcular Total Sistema
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Recalcula el monto del sistema según movimientos y pagos registrados.
+                    </p>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    <i class="fas fa-comment-alt mr-1 text-red-500"></i>Motivo de la Edición <span
+                        class="text-red-500">*</span>
+                </label>
+                <textarea name="motivo_edicion" rows="2" required minlength="10"
+                    placeholder="Explique por qué está editando este cierre..."
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:border-yellow-500 focus:ring-yellow-500"></textarea>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Este motivo quedará registrado en la auditoría
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    <i class="fas fa-sticky-note mr-1"></i>Observaciones
+                </label>
+                <textarea name="observaciones" rows="3"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                    placeholder="Observaciones adicionales...">{{ sesion.observaciones or '' }}</textarea>
+            </div>
+
+            <div class="flex space-x-4 pt-4">
+                <a href="{{ url_for('caja.cierre_detalle', id_sesion=sesion.id_sesion) }}"
+                    class="flex-1 text-center bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-3 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                    class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-3 rounded-lg font-semibold transition">
+                    <i class="fas fa-save mr-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

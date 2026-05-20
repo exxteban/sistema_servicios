@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Registro Vendedor{% endblock %}
+
+{% block content %}
+    {% include "ventas/pos_html/ui_pos_principal.html" %}
+    {% include "ventas/pos_html/ui_historial_ticket.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% include "ventas/pos_html/pos_perf_instrumentation.js" %}
+{% include "ventas/pos_html/pos_state_clientes.js" %}
+{% include "ventas/pos_html/pos_ventas_flujo_a.js" %}
+{% include "ventas/pos_html/pos_ventas_flujo_b.js" %}
+{% include "ventas/pos_html/pos_checkout_finalizacion.js" %}
+</script>
+{% endblock %}

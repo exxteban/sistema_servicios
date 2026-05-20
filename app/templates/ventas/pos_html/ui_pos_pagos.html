@@ -1,0 +1,513 @@
+﻿{% if not solo_registro_vendedor %}
+<style>
+    .pos-credit-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        min-height: 42px;
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid #dbe3ef;
+        background: #ffffff;
+        color: #1f2f46;
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1.2;
+        padding: 0.58rem 0.75rem;
+        box-shadow: 0 2px 8px rgba(148, 163, 184, 0.12);
+        transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .pos-credit-toggle:hover:not(:disabled) {
+        border-color: #c4d4ea;
+        background: #f8fbff;
+        color: #164b8f;
+        box-shadow: 0 8px 18px rgba(96, 165, 250, 0.14);
+        transform: translateY(-1px);
+    }
+
+    .pos-credit-toggle__icon {
+        font-size: 0.85rem;
+        opacity: 0.82;
+    }
+
+    .pos-credit-toggle[data-active="true"] {
+        border-color: #16a34a;
+        background: #16a34a;
+        color: #ffffff;
+        box-shadow: 0 10px 24px rgba(34, 197, 94, 0.28);
+    }
+
+    .pos-credit-toggle[data-active="true"]:hover:not(:disabled) {
+        border-color: #15803d;
+        background: #15803d;
+        color: #ffffff;
+    }
+
+    .pos-credit-toggle:disabled {
+        border-color: #cbd5e1;
+        background: #f1f5f9;
+        color: #94a3b8;
+        box-shadow: none;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .dark .pos-credit-toggle {
+        border: 1px solid #334155 !important;
+        background: #111827 !important;
+        color: #e2e8f0 !important;
+        box-shadow: none !important;
+    }
+
+    .dark .pos-credit-toggle:hover:not(:disabled) {
+        border-color: #475569 !important;
+        background: #1f2937 !important;
+        color: #dbeafe !important;
+    }
+
+    .dark .pos-credit-toggle[data-active="true"] {
+        border: 1px solid #22c55e !important;
+        background: #16a34a !important;
+        color: #ffffff !important;
+        box-shadow: 0 10px 24px rgba(34, 197, 94, 0.18) !important;
+    }
+
+    .dark .pos-credit-toggle:disabled {
+        border: 2px solid #334155 !important;
+        background: #1e293b !important;
+        color: #64748b !important;
+    }
+
+    @media (min-width: 1024px) and (max-width: 1535px) {
+        .pos-credit-toggle {
+            min-height: 40px;
+            font-size: 0.8rem;
+            padding: 0.52rem 0.68rem;
+        }
+    }
+
+    .pos-payment-card {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        min-height: 56px;
+        border-radius: 10px;
+        border: 1px solid #dbe3ef;
+        background: #ffffff;
+        padding: 0.62rem 0.75rem;
+        color: #1f2f46;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .pos-payment-card:hover:not(:disabled) {
+        border-color: #bfdbfe;
+        background: #fbfdff;
+        box-shadow: 0 9px 20px rgba(15, 23, 42, 0.11);
+        transform: translateY(-1px);
+    }
+
+    .pos-payment-card:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .pos-payment-card__main {
+        display: inline-flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1;
+    }
+
+    .pos-payment-card__icon {
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9px;
+        background: #eff6ff;
+        color: #2563eb;
+        font-size: 0.9rem;
+    }
+
+    .pos-payment-card__label {
+        overflow: hidden;
+        text-align: left;
+        font-size: 0.76rem;
+        font-weight: 700;
+        line-height: 1.18;
+        overflow-wrap: anywhere;
+    }
+
+    .pos-payment-card__arrow {
+        flex: 0 0 auto;
+        color: #64748b;
+        font-size: 0.72rem;
+    }
+
+    .pos-payment-card--cash .pos-payment-card__icon {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .pos-payment-card--debit .pos-payment-card__icon {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .pos-payment-card--credit .pos-payment-card__icon {
+        background: #f3e8ff;
+        color: #7c3aed;
+    }
+
+    .pos-payment-card--transfer .pos-payment-card__icon {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .pos-payment-card--digital .pos-payment-card__icon {
+        background: #cffafe;
+        color: #0891b2;
+    }
+
+    .dark .pos-payment-card {
+        border-color: #334155;
+        background: #111827;
+        color: #e5e7eb;
+        box-shadow: none;
+    }
+
+    .dark .pos-payment-card:hover:not(:disabled) {
+        border-color: #475569;
+        background: #1f2937;
+    }
+
+    .dark .pos-payment-card__arrow {
+        color: #94a3b8;
+    }
+
+    .dark .pos-payment-card--cash .pos-payment-card__icon {
+        background: rgba(34, 197, 94, 0.16);
+        color: #4ade80;
+    }
+
+    .dark .pos-payment-card--debit .pos-payment-card__icon {
+        background: rgba(59, 130, 246, 0.16);
+        color: #60a5fa;
+    }
+
+    .dark .pos-payment-card--credit .pos-payment-card__icon {
+        background: rgba(124, 58, 237, 0.18);
+        color: #a78bfa;
+    }
+
+    .dark .pos-payment-card--transfer .pos-payment-card__icon {
+        background: rgba(245, 158, 11, 0.16);
+        color: #fbbf24;
+    }
+
+    .dark .pos-payment-card--digital .pos-payment-card__icon {
+        background: rgba(6, 182, 212, 0.16);
+        color: #22d3ee;
+    }
+
+    @media (min-width: 1024px) and (max-width: 1535px) {
+        .pos-payment-card {
+            gap: 0.55rem;
+            min-height: 54px;
+            padding: 0.55rem 0.62rem;
+        }
+
+        .pos-payment-card__main {
+            gap: 0.58rem;
+        }
+
+        .pos-payment-card__icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+        }
+
+        .pos-payment-card__label {
+            font-size: 0.7rem;
+            line-height: 1.08;
+        }
+    }
+
+    .pos-save-limit-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        min-width: 152px;
+        border-radius: 10px;
+        border: 1px solid #1e3a8a;
+        background: #1e40af;
+        color: #ffffff;
+        font-size: 0.875rem;
+        font-weight: 700;
+        padding: 0.5rem 1rem;
+        white-space: nowrap;
+        transition: background-color 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+    }
+
+    .pos-save-limit-btn:hover:not(:disabled) {
+        border-color: #1d4ed8;
+        background: #1d4ed8;
+    }
+
+    .pos-save-limit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .dark .pos-save-limit-btn {
+        border-color: #64748b;
+        background: #334155;
+        color: #f8fafc;
+    }
+</style>
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 space-y-3 transition-colors duration-300">
+    {% if ventas_credito_activo and metodo_credito_pos %}
+    <div class="space-y-3 border-b border-gray-200 dark:border-gray-700 pb-3">
+        <div class="flex items-center justify-between gap-3">
+            <h3 class="font-semibold text-gray-700 dark:text-gray-200">Condicion de venta</h3>
+            <span x-show="esVentaCredito()"
+                class="inline-flex shrink-0 whitespace-nowrap rounded-full border border-emerald-700 bg-emerald-100 px-2 py-1 text-[10px] font-bold leading-none text-emerald-900 shadow-sm sm:px-2.5 sm:text-[11px] dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-100">
+                Credito activo
+            </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+            <button type="button" @click="seleccionarCondicionVenta('contado')"
+                class="pos-credit-toggle"
+                :data-active="condicionVenta === 'contado'">
+                <i class="fas fa-money-bill pos-credit-toggle__icon"></i>
+                Contado
+            </button>
+            <button type="button" @click="seleccionarCondicionVenta('credito')"
+                :disabled="!ventasCreditoDisponible()"
+                class="pos-credit-toggle"
+                :data-active="condicionVenta === 'credito'">
+                <i class="far fa-file-alt pos-credit-toggle__icon"></i>
+                Credito
+            </button>
+        </div>
+
+        <div x-show="esVentaCredito()" x-cloak
+            class="space-y-3 rounded-xl border border-blue-200 bg-slate-50 p-3 shadow-sm shadow-slate-200/70 dark:border-blue-800/60 dark:bg-blue-950/10 dark:shadow-none">
+            <div class="grid grid-cols-2 gap-2">
+                <button type="button" @click="seleccionarModoCredito('cuenta_corriente')"
+                    class="pos-credit-toggle"
+                    :data-active="creditoModo === 'cuenta_corriente'">
+                    Cuenta corriente
+                </button>
+                <button type="button" @click="seleccionarModoCredito('cuotas')"
+                    class="pos-credit-toggle"
+                    :data-active="creditoModo === 'cuotas'">
+                    Cuotas
+                </button>
+            </div>
+
+            {% include "ventas/pos_html/ui_pos_credito_cuotas.html" %}
+
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <div class="rounded-lg border border-blue-200 bg-white p-3 shadow-sm dark:border-transparent dark:bg-gray-950/20 dark:shadow-none">
+                    <div class="text-gray-500 dark:text-gray-400">Anticipo</div>
+                    <div class="mt-1 font-bold text-gray-900 dark:text-white"
+                        x-text="'Gs. ' + formatNumber(montoAnticipoActual())"></div>
+                </div>
+                <div class="rounded-lg border border-blue-200 bg-white p-3 shadow-sm dark:border-transparent dark:bg-gray-950/20 dark:shadow-none">
+                    <div class="text-gray-500 dark:text-gray-400">Saldo a financiar</div>
+                    <div class="mt-1 font-bold text-blue-800 dark:text-blue-300"
+                        x-text="'Gs. ' + formatNumber(montoFinanciadoActual())"></div>
+                </div>
+            </div>
+
+            <div x-show="esVentaCredito() && Number(clienteId || 0) > 1" x-cloak
+                class="space-y-3">
+                <div class="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+                    <div class="rounded-lg border border-blue-200 bg-white p-3 shadow-sm dark:border-blue-800/50 dark:bg-gray-950/20 dark:shadow-none">
+                        <div class="text-gray-500 dark:text-gray-400">Limite de credito</div>
+                        <div class="mt-1 font-bold text-gray-900 dark:text-white"
+                            x-text="'Gs. ' + formatNumber(resumenCreditoCliente.limiteCredito || 0)"></div>
+                    </div>
+                    <div class="rounded-lg border border-blue-200 bg-white p-3 shadow-sm dark:border-blue-800/50 dark:bg-gray-950/20 dark:shadow-none">
+                        <div class="text-gray-500 dark:text-gray-400">Credito disponible</div>
+                        <div class="mt-1 font-bold"
+                            :class="clientePuedeCubrirCompromisoCredito()
+                                ? 'text-green-700 dark:text-green-300'
+                                : 'text-red-600 dark:text-red-300'"
+                            x-text="'Gs. ' + formatNumber(resumenCreditoCliente.creditoDisponible || 0)"></div>
+                    </div>
+                    <div class="rounded-lg border border-blue-200 bg-white p-3 shadow-sm dark:border-blue-800/50 dark:bg-gray-950/20 dark:shadow-none">
+                        <div class="text-gray-500 dark:text-gray-400">Deuda actual</div>
+                        <div class="mt-1 font-bold text-blue-800 dark:text-blue-300"
+                            x-text="'Gs. ' + formatNumber(resumenCreditoCliente.saldoTotal || 0)"></div>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-white p-3 shadow-sm dark:border-blue-800/50 dark:bg-gray-950/20 dark:shadow-none">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-end">
+                        <div class="flex-1">
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Editar limite de credito</label>
+                            <input type="number" min="0" step="1000" x-model.number="limiteCreditoEdicion"
+                                class="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-blue-800/60 dark:bg-gray-900 dark:text-white">
+                        </div>
+                        <button type="button" @click="guardarLimiteCreditoCliente()"
+                            :disabled="guardandoLimiteCredito"
+                            class="pos-save-limit-btn">
+                            <span x-text="guardandoLimiteCredito ? 'Guardando...' : 'Guardar limite'">Guardar limite</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-blue-200 bg-white/90 px-3 py-2 text-xs text-slate-700 shadow-sm dark:border-blue-800/50 dark:bg-blue-950/10 dark:text-blue-100 dark:shadow-none">
+                Vencimiento estimado: {{ credito_cuenta_corriente_dias }} dias desde la venta. El seguimiento posterior se hace desde cobranzas.
+            </div>
+
+            <div x-show="creditoRequiereClienteFormal()" x-cloak
+                class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300">
+                Para vender a credito debes seleccionar un cliente distinto de Consumidor Final.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="border-t dark:border-gray-700 pt-3">
+        <div class="mb-3">
+            <h3 class="font-semibold text-gray-700 dark:text-gray-200"
+                x-text="esVentaCredito() ? 'Anticipos' : 'Metodos de pago'"></h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400"
+                x-text="esVentaCredito() ? 'Seleccione como desea cobrar ahora' : 'Seleccione como desea cobrar'"></p>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {% for metodo in metodos_pago %}
+            {% set metodo_nombre = metodo.nombre|lower %}
+            {% if 'efectivo' in metodo_nombre %}
+                {% set pago_icono = 'fas fa-money-bill-wave' %}
+                {% set pago_tipo = 'cash' %}
+            {% elif 'deb' in metodo_nombre or 'bito' in metodo_nombre %}
+                {% set pago_icono = 'far fa-credit-card' %}
+                {% set pago_tipo = 'debit' %}
+            {% elif 'cred' in metodo_nombre or 'cr' in metodo_nombre %}
+                {% set pago_icono = 'far fa-credit-card' %}
+                {% set pago_tipo = 'credit' %}
+            {% elif 'trans' in metodo_nombre or 'banc' in metodo_nombre %}
+                {% set pago_icono = 'fas fa-university' %}
+                {% set pago_tipo = 'transfer' %}
+            {% elif 'qr' in metodo_nombre or 'billetera' in metodo_nombre or 'digital' in metodo_nombre %}
+                {% set pago_icono = 'fas fa-qrcode' %}
+                {% set pago_tipo = 'digital' %}
+            {% else %}
+                {% set pago_icono = 'fas fa-wallet' %}
+                {% set pago_tipo = 'default' %}
+            {% endif %}
+            <button @click='agregarPago({{ metodo.id_metodo_pago }}, {{ metodo.nombre|tojson }})'
+                :disabled="!puedeAgregarPagoManual()"
+                class="pos-payment-card pos-payment-card--{{ pago_tipo }}">
+                <span class="pos-payment-card__main">
+                    <span class="pos-payment-card__icon">
+                        <i class="{{ pago_icono }}"></i>
+                    </span>
+                    <span class="pos-payment-card__label">{{ metodo.nombre }}</span>
+                </span>
+                <i class="fas fa-chevron-right pos-payment-card__arrow"></i>
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div x-show="pagos.length > 0" x-cloak class="flex justify-between items-center">
+        <h3 class="font-semibold text-gray-700 dark:text-gray-200"
+            x-text="esVentaCredito() ? 'Anticipos y medios de cobro' : 'Pagos'"></h3>
+        <span class="text-sm"
+            :class="saldoPendiente > 0 ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-green-600 dark:text-green-400 font-semibold'">
+            <span x-show="saldoPendiente > 0">Falta: Gs. <span x-text="formatNumber(saldoPendiente)"></span></span>
+            <span x-show="saldoPendiente <= 0 && total > 0" x-text="esVentaCredito() ? 'Credito armado' : 'Completo'"></span>
+        </span>
+    </div>
+
+    <div x-show="pagos.length > 0" x-cloak class="space-y-2 max-h-40 overflow-y-auto">
+        <template x-for="(pago, index) in pagos" :key="`${pago.id_metodo_pago}-${index}`">
+            <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 transition-colors dark:border-gray-700 dark:bg-gray-700/50"
+                :class="pago.es_credito ? 'border-blue-200 bg-blue-50 dark:border-blue-800/50 dark:bg-blue-900/10' : ''">
+                <span class="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200" x-text="pago.nombre"></span>
+                <input type="number" x-model.number="pago.monto"
+                    @input="manejarInputMontoPago(index)"
+                    :max="montoMaximoEditablePago(index)"
+                    :disabled="pago.es_credito"
+                    class="w-28 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-800 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
+                    min="0" step="1000">
+                <button @click="eliminarPago(index)" x-show="!pago.es_credito"
+                    class="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-red-600 transition hover:bg-red-100 hover:text-red-700 dark:border-red-800/50 dark:bg-transparent dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300">
+                    <i class="fas fa-times"></i>
+                </button>
+                <span x-show="pago.es_credito"
+                    class="inline-flex rounded-full border border-slate-900 bg-slate-800 px-2 py-1 text-[11px] font-semibold text-white dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100">
+                    Auto
+                </span>
+            </div>
+        </template>
+    </div>
+
+    <button @click="pagarTodoEfectivo()" x-show="pagos.length === 0 && total > 0 && !esVentaCredito()"
+        class="w-full rounded-lg border border-green-300 bg-green-50 py-2 text-sm font-medium text-green-800 shadow-sm transition hover:bg-green-100 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 dark:shadow-none">
+        <i class="fas fa-money-bill-wave mr-1"></i> Pagar Todo en Efectivo
+    </button>
+
+    <div class="space-y-1 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/40 dark:shadow-none">
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600 dark:text-gray-400">Total de la venta:</span>
+            <span class="font-semibold text-gray-800 dark:text-white"
+                x-text="'Gs. ' + formatNumber(total)"></span>
+        </div>
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600 dark:text-gray-400"
+                x-text="esVentaCredito() ? 'Cobrado ahora:' : 'Total pagado:'"></span>
+            <span class="font-semibold text-green-600 dark:text-green-400"
+                x-text="'Gs. ' + formatNumber(esVentaCredito() ? montoAnticipoActual() : totalPagado)"></span>
+        </div>
+        <div class="flex justify-between text-sm border-t border-gray-200 pt-2 dark:border-gray-700">
+            <span class="text-gray-600 dark:text-gray-400">Restante:</span>
+            <span class="font-semibold"
+                :class="saldoPendiente > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'"
+                x-text="'Gs. ' + formatNumber(saldoPendiente)"></span>
+        </div>
+        <div x-show="esVentaCredito()"
+            class="flex justify-between text-sm">
+            <span class="text-gray-600 dark:text-gray-400">Financiado:</span>
+            <span class="font-semibold text-blue-800 dark:text-blue-300"
+                x-text="'Gs. ' + formatNumber(montoFinanciadoActual())"></span>
+        </div>
+        <div x-show="creditoModoCuotasActivo()"
+            class="flex justify-between text-sm">
+            <span class="text-gray-600 dark:text-gray-400">Interes total:</span>
+            <span class="font-semibold text-blue-700 dark:text-blue-300"
+                x-text="'Gs. ' + formatNumber(resumenCreditoCuotas().interesTotal)"></span>
+        </div>
+        <div x-show="creditoModoCuotasActivo()"
+            class="flex justify-between text-sm">
+            <span class="text-gray-600 dark:text-gray-400">Total en cuotas:</span>
+            <span class="font-semibold text-blue-700 dark:text-blue-300"
+                x-text="'Gs. ' + formatNumber(resumenCreditoCuotas().totalConInteres)"></span>
+        </div>
+        <div x-show="vuelto > 0"
+            class="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-700">
+            <span class="text-gray-600 dark:text-gray-400">Vuelto:</span>
+            <span class="font-bold text-blue-800 dark:text-blue-300"
+                x-text="'Gs. ' + formatNumber(vuelto)"></span>
+        </div>
+    </div>
+</div>
+{% endif %}

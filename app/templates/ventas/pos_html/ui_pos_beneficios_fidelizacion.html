@@ -1,0 +1,61 @@
+                <div x-show="clienteSeleccionado && clienteSeleccionado.id_cliente != 1" x-cloak
+                    class="mt-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-3 shadow-sm dark:border-emerald-800/60 dark:bg-emerald-900/20"
+                    style="display: none;">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                                Beneficios de fidelización
+                            </div>
+                            <div class="text-xs text-emerald-700 dark:text-emerald-300"
+                                x-show="beneficiosFidelizacion.cargando">
+                                Consultando beneficios disponibles...
+                            </div>
+                            <div class="text-xs text-red-600 dark:text-red-300"
+                                x-show="!beneficiosFidelizacion.cargando && beneficiosFidelizacion.error"
+                                x-text="beneficiosFidelizacion.error"></div>
+                            <div class="text-xs text-emerald-700 dark:text-emerald-300"
+                                x-show="!beneficiosFidelizacion.cargando && !beneficiosFidelizacion.error"
+                                x-text="beneficiosFidelizacion.cantidad > 0
+                                    ? `Tiene ${beneficiosFidelizacion.cantidad} beneficio(s) disponible(s). Aplicarlo es opcional.`
+                                    : 'No hay beneficios vigentes disponibles ahora mismo.'"></div>
+                        </div>
+                        <button type="button"
+                            x-show="beneficiosFidelizacion.cantidad > 0 && beneficioFidelizacionId"
+                            @click="seleccionarBeneficioFidelizacion(null)"
+                            class="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-700 dark:bg-transparent dark:text-emerald-200 dark:hover:bg-emerald-900/30">
+                            No aplicar
+                        </button>
+                    </div>
+
+                    <div x-show="!beneficiosFidelizacion.cargando && beneficiosFidelizacion.items.length > 0" class="mt-3 space-y-2">
+                        <label class="block text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                            Seleccionar beneficio para esta venta
+                        </label>
+                        <select
+                            class="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-emerald-700 dark:bg-gray-900 dark:text-gray-100"
+                            :value="beneficioFidelizacionId || ''"
+                            @change="seleccionarBeneficioFidelizacion($event.target.value || null)">
+                            <option value="">No aplicar beneficio</option>
+                            <template x-for="item in beneficiosFidelizacion.items" :key="item.id_movimiento">
+                                <option
+                                    :value="item.pos_aplicable ? String(item.id_movimiento) : ''"
+                                    :disabled="!item.pos_aplicable"
+                                    x-text="`${item.resumen}${item.fecha_vencimiento_texto ? ' · vence ' + item.fecha_vencimiento_texto : ''}${item.pos_aplicable ? '' : ' · manual'}`">
+                                </option>
+                            </template>
+                        </select>
+                        <div class="text-[11px] text-gray-600 dark:text-gray-300"
+                            x-show="beneficiosFidelizacion.items.some(item => !item.pos_aplicable)">
+                            Algunos beneficios requieren canje manual y no se aplican desde POS.
+                        </div>
+                    </div>
+
+                    <div x-show="beneficioFidelizacionId && beneficioFidelizacionDescuentoEstimado() > 0"
+                        class="mt-3 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-100">
+                        <div class="font-semibold">Beneficio seleccionado</div>
+                        <div class="mt-1 flex flex-wrap items-center justify-between gap-2">
+                            <span x-text="resumenBeneficioFidelizacionSeleccionado()"></span>
+                            <span class="font-bold" x-text="`- ₲ ${formatNumber(beneficioFidelizacionDescuentoEstimado())}`"></span>
+                        </div>
+                    </div>
+                </div>

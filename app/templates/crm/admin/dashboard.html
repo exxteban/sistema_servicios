@@ -1,0 +1,805 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<style>
+    /* ── Dashboard premium styles ── */
+    .dash-kpi-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1rem;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .dash-kpi-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .dash-kpi-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transition: opacity 0.25s;
+    }
+
+    .dash-kpi-card:hover::before {
+        opacity: 1;
+    }
+
+    .kpi-teal {
+        background: linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%);
+    }
+
+    .kpi-blue {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%);
+    }
+
+    .kpi-purple {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%);
+    }
+
+    .kpi-green {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%);
+    }
+
+    .kpi-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.65rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .kpi-icon-teal {
+        background: rgba(20, 184, 166, 0.2);
+        color: #2dd4bf;
+    }
+
+    .kpi-icon-blue {
+        background: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+    }
+
+    .kpi-icon-purple {
+        background: rgba(139, 92, 246, 0.2);
+        color: #c4b5fd;
+    }
+
+    .kpi-icon-green {
+        background: rgba(34, 197, 94, 0.2);
+        color: #86efac;
+    }
+
+    /* Glow dot pulsante en KPI activo */
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        animation: pulse-ring 2s infinite;
+    }
+
+    .pulse-teal {
+        background: #2dd4bf;
+        box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.4);
+    }
+
+    .pulse-blue {
+        background: #93c5fd;
+        box-shadow: 0 0 0 0 rgba(147, 197, 253, 0.4);
+    }
+
+    .pulse-purple {
+        background: #c4b5fd;
+        box-shadow: 0 0 0 0 rgba(196, 181, 253, 0.4);
+    }
+
+    .pulse-green {
+        background: #86efac;
+        box-shadow: 0 0 0 0 rgba(134, 239, 172, 0.4);
+    }
+
+    @keyframes pulse-ring {
+        0% {
+            box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.5);
+        }
+
+        70% {
+            box-shadow: 0 0 0 7px rgba(45, 212, 191, 0);
+        }
+
+        100% {
+            box-shadow: 0 0 0 0 rgba(45, 212, 191, 0);
+        }
+    }
+
+    /* Chart */
+    .chart-wrap {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 0.875rem;
+        padding: 1rem 1.25rem;
+    }
+
+    .bar-col:hover .bar-fill {
+        filter: brightness(1.25);
+    }
+
+    /* Table */
+    .asesor-row:hover {
+        background: rgba(45, 212, 191, 0.05);
+    }
+
+    .asesor-avatar {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .progress-bar-bg {
+        height: 5px;
+        border-radius: 99px;
+        background: rgba(255, 255, 255, 0.07);
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 99px;
+        transition: width 0.6s cubic-bezier(.4, 0, .2, 1);
+    }
+
+    /* Section header pill */
+    .section-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+    }
+
+    .pill-teal {
+        background: rgba(20, 184, 166, 0.12);
+        color: #2dd4bf;
+    }
+
+    .pill-purple {
+        background: rgba(139, 92, 246, 0.12);
+        color: #c4b5fd;
+    }
+
+    /* ── Light mode overrides ── */
+    html:not(.dark) .dash-kpi-card {
+        border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    html:not(.dark) .dash-kpi-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    html:not(.dark) .kpi-teal {
+        background: linear-gradient(135deg, rgba(20, 184, 166, 0.18) 0%, rgba(240, 253, 250, 0.95) 100%);
+    }
+
+    html:not(.dark) .kpi-blue {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(239, 246, 255, 0.95) 100%);
+    }
+
+    html:not(.dark) .kpi-purple {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, rgba(245, 243, 255, 0.95) 100%);
+    }
+
+    html:not(.dark) .kpi-green {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(240, 253, 244, 0.95) 100%);
+    }
+
+    html:not(.dark) .chart-wrap {
+        background: rgba(255, 255, 255, 0.9);
+        border-color: rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    html:not(.dark) .progress-bar-bg {
+        background: rgba(0, 0, 0, 0.08);
+    }
+
+    html:not(.dark) .asesor-row:hover {
+        background: rgba(20, 184, 166, 0.06);
+    }
+
+    html:not(.dark) .pill-teal {
+        background: rgba(20, 184, 166, 0.15);
+        color: #0f766e;
+    }
+
+    html:not(.dark) .pill-purple {
+        background: rgba(139, 92, 246, 0.15);
+        color: #7c3aed;
+    }
+
+    /* Light mode text color fixes */
+    html:not(.dark) .kpi-teal .kpi-label,
+    html:not(.dark) .kpi-blue .kpi-label,
+    html:not(.dark) .kpi-purple .kpi-label,
+    html:not(.dark) .kpi-green .kpi-label {
+        color: #475569;
+    }
+
+    /* KPI card text in light mode */
+    html:not(.dark) .dash-kpi-card .text-white {
+        color: #0f172a !important;
+    }
+
+    html:not(.dark) .dash-kpi-card .text-gray-400 {
+        color: #64748b !important;
+    }
+
+    html:not(.dark) .dash-kpi-card .text-gray-500 {
+        color: #94a3b8 !important;
+    }
+
+    html:not(.dark) .dash-kpi-card .text-gray-600 {
+        color: #94a3b8 !important;
+    }
+
+    /* Chart wrap text in light mode */
+    html:not(.dark) .chart-wrap .text-gray-200 {
+        color: #1e293b !important;
+    }
+
+    html:not(.dark) .chart-wrap .text-gray-400 {
+        color: #64748b !important;
+    }
+
+    html:not(.dark) .chart-wrap .text-gray-500 {
+        color: #94a3b8 !important;
+    }
+
+    html:not(.dark) .chart-wrap .text-gray-600 {
+        color: #94a3b8 !important;
+    }
+
+    html:not(.dark) .chart-wrap .border-b {
+        border-color: rgba(0, 0, 0, 0.1) !important;
+    }
+
+    html:not(.dark) .chart-wrap [class*="border-white/"] {
+        border-color: rgba(0, 0, 0, 0.08) !important;
+    }
+
+    /* Dashboard header text */
+    html:not(.dark) h1.text-white {
+        color: #0f172a;
+    }
+
+    /* Subnav in light mode */
+    html:not(.dark) .crm-subnav {
+        background: rgba(248, 250, 252, 0.95) !important;
+        border-color: rgba(0, 0, 0, 0.1) !important;
+    }
+
+    html:not(.dark) .crm-subnav a {
+        color: #475569 !important;
+    }
+
+    html:not(.dark) .crm-subnav a:hover {
+        color: #0f172a !important;
+        background: rgba(0, 0, 0, 0.05) !important;
+    }
+
+    html:not(.dark) .crm-subnav a.text-teal-300 {
+        color: #0f766e !important;
+    }
+
+    /* Period select in light mode */
+    html:not(.dark) select.bg-gray-800\/70 {
+        background: rgba(241, 245, 249, 0.9) !important;
+        border-color: rgba(0, 0, 0, 0.15) !important;
+        color: #1e293b !important;
+    }
+
+    /* Tooltip in light mode */
+    html:not(.dark) .bg-gray-950\/95 {
+        background: rgba(255, 255, 255, 0.98) !important;
+        border-color: rgba(20, 184, 166, 0.3) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    html:not(.dark) .bg-gray-950\/95 .text-gray-100 {
+        color: #1e293b !important;
+    }
+
+    html:not(.dark) .bg-gray-950\/95 .text-gray-300 {
+        color: #475569 !important;
+    }
+
+    html:not(.dark) .bg-gray-950\/95 .text-gray-500 {
+        color: #94a3b8 !important;
+    }
+</style>
+
+<div class="p-4 h-full flex flex-col gap-5" x-data="crmDashboard()">
+
+    <!-- ── Encabezado ── -->
+    <div class="flex items-center gap-3">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center gap-2">
+                <span class="text-teal-400"><i class="fas fa-chart-line"></i></span>
+                Dashboard CRM
+            </h1>
+            <p class="text-xs text-gray-500 mt-0.5">Métricas y actividad de WhatsApp</p>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <!-- Indicador de actualización -->
+            <span x-show="refrescando" class="text-xs text-gray-500 flex items-center gap-1">
+                <i class="fas fa-sync fa-spin text-teal-400 text-[10px]"></i> Actualizando
+            </span>
+            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md border border-teal-500/30 bg-teal-500/10 text-[11px] text-teal-300">
+                <i class="fas fa-random text-[10px]"></i>
+                <span x-text="metricas.distribucion_metodo_label || 'Menor Carga (Least Busy)'"></span>
+            </span>
+            <label class="text-xs text-gray-500">Período:</label>
+            <select x-model="dias" @change="cargar()" class="bg-gray-800/70 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200
+               focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition">
+                <option value="1">Hoy</option>
+                <option value="7" selected>7 días</option>
+                <option value="30">30 días</option>
+                <option value="90">90 días</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ── KPIs ── -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+        <!-- Conversaciones activas -->
+        <a href="{{ url_for('crm.bandeja') }}" @click.prevent="navigate('{{ url_for('crm.bandeja') }}')"
+            class="dash-kpi-card kpi-teal">
+            <div class="kpi-icon kpi-icon-teal"><i class="fas fa-comments"></i></div>
+            <p class="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Conversaciones activas</p>
+            <p class="text-3xl font-extrabold text-white" x-text="metricas.activas?.total || 0"></p>
+            <div class="flex items-center gap-3 mt-1 text-[11px]">
+                <span class="flex items-center gap-1 text-gray-400">
+                    <span class="w-2 h-2 rounded-full bg-teal-400 inline-block"></span>
+                    Bot: <strong class="text-teal-300" x-text="metricas.activas?.bot || 0"></strong>
+                </span>
+                <span class="flex items-center gap-1 text-gray-400">
+                    <span class="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>
+                    Cliente: <strong class="text-blue-300" x-text="metricas.activas?.cliente || 0"></strong>
+                </span>
+            </div>
+            <div class="absolute top-3 right-3">
+                <span class="pulse-dot pulse-teal"></span>
+            </div>
+        </a>
+
+        <!-- Total contactos -->
+        <a href="{{ url_for('crm.lista_contactos') }}" @click.prevent="navigate('{{ url_for('crm.lista_contactos') }}')"
+            class="dash-kpi-card kpi-blue">
+            <div class="kpi-icon kpi-icon-blue"><i class="fas fa-address-book"></i></div>
+            <p class="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Total contactos</p>
+            <p class="text-3xl font-extrabold text-white" x-text="metricas.total_contactos || 0"></p>
+            <p class="text-[11px] text-gray-500 mt-1">Registrados en el CRM</p>
+        </a>
+
+        <!-- Mensajes bot vs asesor -->
+        <a href="{{ url_for('crm.monitor_ia') }}" @click.prevent="navigate('{{ url_for('crm.monitor_ia') }}')"
+            class="dash-kpi-card kpi-purple">
+            <div class="kpi-icon kpi-icon-purple"><i class="fas fa-robot"></i></div>
+            <p class="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Bot vs Asesor</p>
+            <div class="flex items-end gap-2">
+                <p class="text-3xl font-extrabold text-purple-300" x-text="metricas.msgs_bot || 0"></p>
+                <p class="text-lg font-bold text-gray-600 mb-0.5">/</p>
+                <p class="text-3xl font-extrabold text-blue-300" x-text="metricas.msgs_asesor || 0"></p>
+            </div>
+            <div class="flex items-center gap-3 mt-1 text-[11px]">
+                <span class="text-purple-400">Bot</span>
+                <span class="text-gray-600">/</span>
+                <span class="text-blue-400">Asesor</span>
+            </div>
+        </a>
+
+        <!-- Tiempo resp. promedio -->
+        <a href="#metricas-asesor" @click.prevent="scrollTo('metricas-asesor')" class="dash-kpi-card kpi-green">
+            <div class="kpi-icon kpi-icon-green"><i class="fas fa-clock"></i></div>
+            <p class="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Tiempo resp. prom.</p>
+            <p class="text-3xl font-extrabold text-white">
+                <span x-text="metricas.tiempo_respuesta_promedio_min || 0"></span>
+                <span class="text-lg font-medium text-gray-400">min</span>
+            </p>
+            <p class="text-[11px] text-gray-500 mt-1">Respuesta de asesores</p>
+        </a>
+
+    </div>
+
+    <!-- ── Gráfico de conversaciones por día ── -->
+    <div class="chart-wrap flex-1">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <span class="section-pill pill-teal"><i class="fas fa-chart-area"></i> Actividad</span>
+                <h3 class="text-sm font-semibold text-gray-200 mt-1.5">Conversaciones por día</h3>
+            </div>
+            <!-- Mini leyenda -->
+            <div class="flex items-center gap-1.5 text-[11px] text-gray-500">
+                <span class="w-3 h-3 rounded-sm" style="background:linear-gradient(180deg,#2dd4bf,#0d9488)"></span>
+                Conversaciones
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="cargando" class="flex items-center justify-center py-10 text-teal-400">
+            <i class="fas fa-circle-notch fa-spin text-xl"></i>
+        </div>
+
+        <!-- Chart -->
+        <div x-show="!cargando && metricas.convs_por_dia && metricas.convs_por_dia.length > 0">
+            <div>
+
+                <!-- Área del gráfico -->
+                <div class="relative" x-ref="chartArea">
+
+                    <!-- Líneas de guía horizontales -->
+                    <div class="absolute inset-0 flex flex-col justify-between pointer-events-none"
+                        style="height:176px">
+                        <div class="border-t border-white/8 border-dashed"></div>
+                        <div class="border-t border-white/5 border-dashed"></div>
+                        <div class="border-t border-white/5 border-dashed"></div>
+                        <div class="border-t border-white/5 border-dashed"></div>
+                        <div class="border-t border-white/10"></div>
+                    </div>
+
+                    <!-- Tooltip -->
+                    <div x-show="hoverPunto" x-transition.opacity class="absolute z-20 -top-2 pointer-events-none"
+                        :style="tooltipStyle()">
+                        <div
+                            class="px-3 py-2 rounded-xl bg-gray-950/95 border border-teal-500/30 text-xs text-gray-100 shadow-xl shadow-black/50">
+                            <div class="font-semibold text-gray-300 mb-0.5" x-text="formatFecha(hoverPunto?.fecha)">
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+                                <span class="text-teal-300 font-bold text-sm"
+                                    x-text="formatNumero(hoverPunto?.total)"></span>
+                                <span class="text-gray-500">convs.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barras -->
+                    <div class="relative z-10 flex items-end gap-1 border-b border-white/10" style="height:176px">
+                        <template x-for="(punto, i) in metricas.convs_por_dia" :key="i">
+                            <div class="bar-col flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                                <!-- Valor encima -->
+                                <div class="h-5 flex items-end">
+                                    <span x-show="mostrarValor(i, punto.total)"
+                                        class="text-[9px] leading-none text-teal-300 font-semibold"
+                                        x-text="formatNumero(punto.total)"></span>
+                                </div>
+                                <!-- Barra -->
+                                <button type="button" class="w-full focus:outline-none group"
+                                    @mouseenter="mostrarTooltip($event, punto)" @mousemove="moverTooltip($event)"
+                                    @mouseleave="ocultarTooltip()" @click="seleccionarPunto(punto)">
+                                    <div class="bar-fill w-full transition-all duration-300 ease-out rounded-t"
+                                        :class="selectedPunto && selectedPunto.fecha === punto.fecha ? 'ring-1 ring-teal-400/60' : ''"
+                                        :style="barStyle(punto.total)"
+                                        style="background: linear-gradient(180deg, #2dd4bf 0%, #0d9488 100%); min-height:4px; opacity:0.85;">
+                                    </div>
+                                </button>
+                                <!-- Fecha -->
+                                <span class="text-[9px] leading-tight text-gray-600 whitespace-nowrap"
+                                    x-text="mostrarLabel(i) ? labelDia(punto.fecha) : ''"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Punto seleccionado -->
+            <div x-show="selectedPunto" x-transition
+                class="mt-3 flex items-center gap-2 text-xs bg-teal-500/5 border border-teal-500/15 rounded-lg px-3 py-2">
+                <i class="fas fa-calendar-day text-teal-400 text-[11px]"></i>
+                <span class="text-gray-400">Seleccionado:</span>
+                <span class="text-gray-200 font-semibold"
+                    x-text="selectedPunto ? formatFecha(selectedPunto.fecha) : ''"></span>
+                <span class="text-teal-300 font-bold"
+                    x-text="selectedPunto ? formatNumero(selectedPunto.total) + ' convs.' : ''"></span>
+                <button type="button" class="ml-auto text-gray-500 hover:text-gray-300 transition"
+                    @click="selectedPunto = null">
+                    <i class="fas fa-times text-[10px]"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sin datos -->
+        <div x-show="!cargando && (!metricas.convs_por_dia || metricas.convs_por_dia.length === 0)"
+            class="flex flex-col items-center justify-center py-10 text-gray-600 gap-2">
+            <i class="fas fa-chart-bar text-2xl opacity-30"></i>
+            <p class="text-sm">Sin datos para el período seleccionado</p>
+        </div>
+    </div>
+
+    <!-- ── Métricas por Asesor ── -->
+    <div id="metricas-asesor" class="chart-wrap">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <span class="section-pill pill-purple"><i class="fas fa-users"></i> Equipo</span>
+                <h3 class="text-sm font-semibold text-gray-200 mt-1.5">Rendimiento por Asesor</h3>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="cargando" class="flex justify-center py-6 text-teal-400">
+            <i class="fas fa-circle-notch fa-spin"></i>
+        </div>
+
+        <!-- Tabla asesores -->
+        <div x-show="!cargando && metricas.por_asesor && metricas.por_asesor.length > 0">
+
+            <!-- Header -->
+            <div
+                class="grid grid-cols-[1fr,100px,120px,90px] gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-gray-600 border-b border-white/5 mb-1">
+                <span>Asesor</span>
+                <span class="text-center">Mensajes</span>
+                <span class="text-center">Actividad</span>
+                <span class="text-center">T. Respuesta</span>
+            </div>
+
+            <template x-for="(asesor, idx) in metricas.por_asesor" :key="asesor.id_asesor">
+                <div
+                    class="asesor-row grid grid-cols-[1fr,100px,120px,90px] gap-2 items-center px-3 py-2.5 rounded-lg border border-transparent hover:border-white/5 transition-all">
+
+                    <!-- Nombre + avatar -->
+                    <div class="flex items-center gap-2.5">
+                        <div class="asesor-avatar" :style="avatarStyle(idx)">
+                            <span x-text="iniciales(asesor.nombre)"></span>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-200 font-medium leading-tight" x-text="asesor.nombre"></p>
+                            <p class="text-[10px] text-gray-600">Asesor</p>
+                        </div>
+                    </div>
+
+                    <!-- Mensajes enviados -->
+                    <div class="text-center">
+                        <span class="text-purple-300 font-bold text-base" x-text="asesor.mensajes"></span>
+                        <p class="text-[10px] text-gray-600">mensajes</p>
+                    </div>
+
+                    <!-- Barra de actividad -->
+                    <div class="px-2">
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" :style="progressStyle(asesor.mensajes, idx)"></div>
+                        </div>
+                        <p class="text-[10px] text-gray-600 mt-1 text-center"
+                            x-text="actividadPct(asesor.mensajes) + '% del total'"></p>
+                    </div>
+
+                    <!-- Tiempo respuesta -->
+                    <div class="text-center">
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold"
+                            :class="tiempoClass(asesor.tiempo_respuesta_min)">
+                            <i class="fas fa-stopwatch text-[10px]"></i>
+                            <span x-text="asesor.tiempo_respuesta_min + ' min'"></span>
+                        </span>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Sin asesores -->
+        <div x-show="!cargando && (!metricas.por_asesor || metricas.por_asesor.length === 0)"
+            class="flex flex-col items-center justify-center py-8 text-gray-600 gap-2">
+            <i class="fas fa-user-slash text-2xl opacity-30"></i>
+            <p class="text-sm">No hay actividad de asesores en este período</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function crmDashboard() {
+        return {
+            dias: 7,
+            metricas: {},
+            cargando: false,
+            refrescando: false,
+            _refreshTimerId: null,
+            hoverPunto: null,
+            tooltipLeft: 0,
+            selectedPunto: null,
+
+            // Colores para avatares
+            _avatarColors: [
+                { bg: 'rgba(45,212,191,0.2)', color: '#2dd4bf' },
+                { bg: 'rgba(139,92,246,0.2)', color: '#c4b5fd' },
+                { bg: 'rgba(59,130,246,0.2)', color: '#93c5fd' },
+                { bg: 'rgba(251,146,60,0.2)', color: '#fdba74' },
+                { bg: 'rgba(236,72,153,0.2)', color: '#f9a8d4' },
+                { bg: 'rgba(34,197,94,0.2)', color: '#86efac' },
+            ],
+
+            navigate(url) {
+                try {
+                    if (window.appNavigateActiveTab) { window.appNavigateActiveTab(url); return; }
+                } catch (e) { }
+                window.location.href = url;
+            },
+
+            scrollTo(id) {
+                try {
+                    const el = document.getElementById(id);
+                    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch (e) { }
+            },
+
+            get maxConvs() {
+                if (!this.metricas.convs_por_dia?.length) return 1;
+                return Math.max(...this.metricas.convs_por_dia.map(p => p.total), 1);
+            },
+
+            get maxMensajes() {
+                if (!this.metricas.por_asesor?.length) return 1;
+                return Math.max(...this.metricas.por_asesor.map(a => a.mensajes), 1);
+            },
+
+            yTick(frac) {
+                return this.formatNumero(Math.round((this.maxConvs || 0) * (Number(frac) || 0)));
+            },
+
+            formatNumero(n) {
+                try { return new Intl.NumberFormat('es-AR').format(Number(n) || 0); }
+                catch { return String(Number(n) || 0); }
+            },
+
+            parseDateOnly(iso) {
+                if (!iso) return null;
+                const parts = String(iso).split('-').map(s => Number(s));
+                if (parts.length < 3) return null;
+                const [y, m, d] = parts;
+                if (!y || !m || !d) return null;
+                return new Date(y, m - 1, d, 12, 0, 0, 0);
+            },
+
+            formatFecha(iso) {
+                const d = this.parseDateOnly(iso);
+                if (!d) return String(iso || '');
+                try { return d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' }); }
+                catch { return d.toLocaleDateString(); }
+            },
+
+            labelDia(iso) {
+                const d = this.parseDateOnly(iso);
+                if (!d) return String(iso || '').slice(5);
+                try { return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }); }
+                catch { return d.toLocaleDateString(); }
+            },
+
+            get labelStep() {
+                const n = this.metricas.convs_por_dia?.length || 0;
+                if (n <= 14) return 1;
+                return Math.max(1, Math.ceil(n / 10));
+            },
+
+            mostrarLabel(i) {
+                const n = this.metricas.convs_por_dia?.length || 0;
+                if (n <= 14) return true;
+                if (i === 0 || i === n - 1) return true;
+                return i % this.labelStep === 0;
+            },
+
+            mostrarValor(i, total) {
+                const n = this.metricas.convs_por_dia?.length || 0;
+                const t = Number(total) || 0;
+                if (n <= 14) return true;
+                if (t <= 0) return false;
+                if (this.selectedPunto && this.selectedPunto.fecha === this.metricas.convs_por_dia?.[i]?.fecha) return true;
+                return i % this.labelStep === 0;
+            },
+
+            barStyle(total) {
+                const t = Number(total) || 0;
+                const h = this.maxConvs > 0 ? (t / this.maxConvs * 100) : 0;
+                const min = t > 0 ? 6 : 0;
+                return `height: ${h}%; min-height: ${min}px;`;
+            },
+
+            tooltipStyle() {
+                return `left: ${this.tooltipLeft}px; transform: translateX(-50%);`;
+            },
+
+            actualizarTooltipPos(ev) {
+                const el = this.$refs.chartArea;
+                if (!el) return;
+                const rect = el.getBoundingClientRect();
+                let x = (ev?.clientX || 0) - rect.left;
+                x = Math.max(32, Math.min(x, rect.width - 32));
+                this.tooltipLeft = x;
+            },
+
+            mostrarTooltip(ev, punto) { this.hoverPunto = punto || null; this.actualizarTooltipPos(ev); },
+            moverTooltip(ev) { if (!this.hoverPunto) return; this.actualizarTooltipPos(ev); },
+            ocultarTooltip() { this.hoverPunto = null; },
+            seleccionarPunto(punto) { this.selectedPunto = punto || null; },
+
+            // Asesor helpers
+            iniciales(nombre) {
+                if (!nombre) return '?';
+                return nombre.trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+            },
+
+            avatarStyle(idx) {
+                const c = this._avatarColors[idx % this._avatarColors.length];
+                return `background: ${c.bg}; color: ${c.color}; border: 1px solid ${c.color}33;`;
+            },
+
+            progressStyle(mensajes, idx) {
+                const c = this._avatarColors[idx % this._avatarColors.length];
+                const pct = this.maxMensajes > 0 ? Math.round(mensajes / this.maxMensajes * 100) : 0;
+                return `width: ${pct}%; background: linear-gradient(90deg, ${c.color}88, ${c.color});`;
+            },
+
+            actividadPct(mensajes) {
+                if (!this.maxMensajes) return 0;
+                return Math.round(mensajes / this.maxMensajes * 100);
+            },
+
+            tiempoClass(min) {
+                const t = Number(min) || 0;
+                if (t === 0) return 'bg-gray-700/40 text-gray-400';
+                if (t <= 5) return 'bg-green-500/15 text-green-300';
+                if (t <= 15) return 'bg-yellow-500/15 text-yellow-300';
+                return 'bg-red-500/15 text-red-300';
+            },
+
+            async cargar(opts = {}) {
+                const silent = Boolean(opts && opts.silent);
+                if (silent) this.refrescando = true;
+                else this.cargando = true;
+                try {
+                    const r = await fetch(`/crm/api/admin/metricas?dias=${this.dias}`);
+                    this.metricas = await r.json();
+                } catch (e) { console.error(e); }
+                finally {
+                    if (silent) this.refrescando = false;
+                    else this.cargando = false;
+                }
+            },
+
+            init() {
+                this.cargar();
+                const root = this.$el;
+                this._refreshTimerId = setInterval(() => {
+                    if (root && !document.contains(root)) {
+                        clearInterval(this._refreshTimerId);
+                        this._refreshTimerId = null;
+                        return;
+                    }
+                    if (this.cargando || this.refrescando) return;
+                    this.cargar({ silent: true });
+                }, 15000);
+            }
+        };
+    }
+</script>
+{% endblock %}

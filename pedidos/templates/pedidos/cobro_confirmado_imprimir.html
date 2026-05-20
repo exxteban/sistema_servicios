@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Cobro confirmado{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto mt-10 rounded-xl border border-green-200 bg-white p-6 shadow-sm dark:border-green-900/40 dark:bg-gray-800">
+    <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Cobro confirmado</h1>
+    <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+        Abriendo ticket del pedido para impresion. Si no se abre automaticamente, usa el boton de abajo.
+    </p>
+    <iframe id="pedido-cobro-ticket-frame" title="Impresion del ticket de pedido" class="hidden" aria-hidden="true"></iframe>
+    <div class="mt-5 flex flex-wrap items-center gap-2">
+        <a href="{{ destino }}"
+           class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+            Volver al pedido
+        </a>
+        <a href="{{ ticket_url }}" target="_blank" rel="noopener"
+           class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+            <i class="fas fa-print mr-2"></i>Abrir ticket
+        </a>
+    </div>
+</div>
+<script>
+    (function () {
+        var ticketUrl = {{ ticket_url|tojson }};
+        var destino = {{ destino|tojson }};
+        var frame = document.getElementById('pedido-cobro-ticket-frame');
+        var finalizado = false;
+
+        function navegarADestino(url) {
+            try {
+                if (window.appNavigateActiveTab && typeof window.appNavigateActiveTab === 'function') {
+                    window.appNavigateActiveTab(url);
+                    return;
+                }
+            } catch (err) {
+                // Si falla el runtime del shell, usamos navegación estándar.
+            }
+            window.location.replace(url);
+        }
+
+        function finalizar() {
+            if (finalizado) {
+                return;
+            }
+            finalizado = true;
+            navegarADestino(destino);
+        }
+
+        function abrirTicketManual() {
+            try {
+                window.open(ticketUrl, '_blank', 'noopener');
+            } catch (err) {
+                window.location.href = ticketUrl;
+            }
+        }
+
+        if (!frame) {
+            abrirTicketManual();
+            setTimeout(finalizar, 1200);
+            return;
+        }
+
+        var printUrl = ticketUrl;
+        try {
+            var printU = new URL(ticketUrl, window.location.origin);
+            printU.searchParams.set('embedded', '1');
+            printU.searchParams.set('_', String(Date.now()));
+            printUrl = printU.toString();
+        } catch (err) {
+            printUrl = ticketUrl;
+        }
+
+        frame.onload = function () {
+            setTimeout(function () {
+                try {
+                    var printWindow = frame.contentWindow;
+                    printWindow.onafterprint = finalizar;
+                    printWindow.focus();
+                    printWindow.print();
+                    setTimeout(finalizar, 2000);
+                } catch (err) {
+                    abrirTicketManual();
+                    setTimeout(finalizar, 1200);
+                }
+            }, 150);
+        };
+        frame.src = printUrl;
+    })();
+</script>
+{% endblock %}

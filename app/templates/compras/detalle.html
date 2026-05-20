@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Compra #{{ compra.id_compra }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-truck text-purple-600 dark:text-purple-400 mr-2"></i>Compra #{{ compra.id_compra }}
+        </h1>
+        <div class="flex flex-col gap-2 sm:flex-row">
+            {% if current_user.es_admin() or current_user.tiene_permiso('crear_compra') %}
+            <a href="{{ url_for('compras.editar', id=compra.id_compra) }}"
+                class="inline-flex items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700">
+                <i class="fas fa-pen-to-square mr-2"></i>Editar compra
+            </a>
+            {% endif %}
+            <a href="{{ url_for('compras.listar') }}"
+                class="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left mr-2"></i>Volver a compras
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Fecha</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ compra.fecha_compra.strftime('%d/%m/%Y') if compra.fecha_compra else '-' }}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Hora</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ compra.hora_compra.strftime('%H:%M') if compra.hora_compra else '-' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Proveedor</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ compra.proveedor.nombre }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400"># Factura</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ compra.numero_factura or '-' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Tipo</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ compra.tipo_compra }}</p>
+            </div>
+        </div>
+
+        <div class="mb-6 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">
+                    <i class="fas fa-file-invoice text-purple-600 dark:text-purple-400 mr-2"></i>Foto de factura
+                </h2>
+                {% if compra.factura_imagen_url %}
+                <a href="{{ compra.factura_imagen_url }}" target="_blank" rel="noopener"
+                    class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                    Abrir imagen
+                </a>
+                {% endif %}
+            </div>
+            {% if compra.factura_imagen_url %}
+            <img src="{{ compra.factura_imagen_url }}" alt="Factura de compra {{ compra.id_compra }}"
+                class="max-h-80 rounded-lg border border-gray-200 dark:border-gray-700 object-contain bg-gray-50 dark:bg-gray-900">
+            {% else %}
+            <div class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-4 py-6 text-sm text-gray-500 dark:text-gray-400">
+                Esta compra no tiene una foto de factura adjunta.
+            </div>
+            {% endif %}
+        </div>
+
+        {% if compra.observaciones %}
+        <div class="mb-6 rounded-xl border border-purple-200 bg-purple-50/70 p-4 dark:border-purple-900/50 dark:bg-purple-900/10">
+            <div class="flex items-center gap-2 mb-2">
+                <i class="fas fa-align-left text-purple-600 dark:text-purple-400"></i>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Descripción de la compra</h2>
+            </div>
+            <p class="whitespace-pre-line text-sm text-gray-700 dark:text-gray-200">{{ compra.observaciones }}</p>
+        </div>
+        {% endif %}
+
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-2 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Producto</th>
+                    <th class="px-4 py-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Cant.</th>
+                    <th class="px-4 py-2 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Precio</th>
+                    <th class="px-4 py-2 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for item in compra.detalles %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                    <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ item.producto.nombre }}</td>
+                    <td class="px-4 py-2 text-center text-gray-800 dark:text-gray-100">{{ item.cantidad }}</td>
+                    <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(item.precio_unitario).replace(",", ".") }}
+                    </td>
+                    <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(item.subtotal).replace(",", ".") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="bg-purple-50 dark:bg-purple-900/30">
+                    <td colspan="3" class="px-4 py-2 text-right font-bold text-gray-800 dark:text-gray-100">TOTAL:</td>
+                    <td class="px-4 py-2 text-right font-bold text-purple-600 dark:text-purple-400">₲ {{
+                        "{:,.0f}".format(compra.total).replace(",", ".") }}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        {% if compra.pagos.count() > 0 %}
+        <div class="mt-8 mb-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">
+                <i class="fas fa-receipt text-green-600 mr-2"></i>Historial de Pagos
+            </h3>
+            <div class="overflow-x-auto bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th class="px-4 py-2">Fecha</th>
+                            <th class="px-4 py-2">Método</th>
+                            <th class="px-4 py-2">Ref.</th>
+                            <th class="px-4 py-2 text-right">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pago in compra.pagos %}
+                        <tr class="border-b dark:border-gray-700">
+                            <td class="px-4 py-2">{{ pago.fecha_pago|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="px-4 py-2">{{ pago.metodo.nombre }}</td>
+                            <td class="px-4 py-2 text-gray-500">{{ pago.referencia or '-' }}</td>
+                            <td class="px-4 py-2 text-right font-bold text-green-600 dark:text-green-400">
+                                ₲ {{ "{:,.0f}".format(pago.monto).replace(",", ".") }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if compra.cuenta_por_pagar %}
+        <div class="mt-8 mb-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-white">Estado de Cuenta</h3>
+                <span class="px-3 py-1 rounded-full text-xs font-semibold
+                    {% if compra.cuenta_por_pagar.estado == 'pendiente' %}bg-yellow-100 text-yellow-800
+                    {% elif compra.cuenta_por_pagar.estado == 'pagada' %}bg-green-100 text-green-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ compra.cuenta_por_pagar.estado|upper }}
+                </span>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Deuda</p>
+                    <p class="text-lg font-bold text-gray-800 dark:text-white">₲ {{ "{:,.0f}".format(compra.cuenta_por_pagar.monto_total).replace(",", ".") }}</p>
+                </div>
+                <div class="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                    <p class="text-xs text-green-600 dark:text-green-400">Pagado</p>
+                    <p class="text-lg font-bold text-green-700 dark:text-green-400">₲ {{ "{:,.0f}".format(compra.cuenta_por_pagar.monto_pagado).replace(",", ".") }}</p>
+                </div>
+                <div class="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+                    <p class="text-xs text-red-600 dark:text-red-400">Pendiente</p>
+                    <p class="text-lg font-bold text-red-700 dark:text-red-400">₲ {{ "{:,.0f}".format(compra.cuenta_por_pagar.saldo_pendiente).replace(",", ".") }}</p>
+                </div>
+            </div>
+
+            {% if compra.cuenta_por_pagar.saldo_pendiente > 0 %}
+            <div class="flex justify-end">
+                <a href="{{ url_for('compras.pagar_deuda', id=compra.id_compra) }}" 
+                   class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm flex items-center">
+                    <i class="fas fa-money-bill-wave mr-2"></i>Registrar Pago
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+            <a href="{{ url_for('compras.listar') }}" class="text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>Volver
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

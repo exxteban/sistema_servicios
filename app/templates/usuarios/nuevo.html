@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Usuario{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-user-plus text-blue-600 dark:text-blue-400 mr-2"></i>Nuevo Usuario
+        </h1>
+        <a href="{{ url_for('usuarios.listar') }}"
+            class="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i>Volver
+        </a>
+    </div>
+
+    <form method="POST" action="{{ url_for('usuarios.nuevo') }}"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-6 transition-colors duration-300">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Username</label>
+                <input type="text" name="username" required value="{{ form_data.username if form_data else '' }}"
+                    class="w-full border-2 {% if error_field == 'username' %}border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-900/20{% else %}border-gray-200 dark:border-gray-700{% endif %} rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500">
+                {% if error_field == 'username' %}
+                <p class="mt-1 text-sm text-red-600 dark:text-red-400">
+                    <i class="fas fa-exclamation-circle mr-1"></i>Este username ya está en uso
+                </p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nombre Completo</label>
+                <input type="text" name="nombre_completo" required
+                    value="{{ form_data.nombre_completo if form_data else '' }}"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Contraseña</label>
+                <input type="password" name="password" required
+                    class="w-full border-2 {% if error_field == 'password' %}border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-900/20{% else %}border-gray-200 dark:border-gray-700{% endif %} rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500">
+                {% if error_field == 'password' %}
+                <p class="mt-1 text-sm text-red-600 dark:text-red-400">
+                    <i class="fas fa-exclamation-circle mr-1"></i>La contraseña debe tener al menos 4 caracteres
+                </p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Cliente asignado</label>
+                <select name="id_cliente"
+                    class="w-full border-2 {% if error_field == 'id_cliente' %}border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-900/20{% else %}border-gray-200 dark:border-gray-700{% endif %} rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    <option value="">Sin cliente asignado</option>
+                    {% for cliente in clientes_disponibles %}
+                    <option value="{{ cliente.id_cliente }}" {% if selected_cliente_id == cliente.id_cliente %}selected{% endif %}>
+                        {{ cliente.nombre }} (#{{ cliente.id_cliente }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Rol</label>
+                <select id="id_rol" name="id_rol" required
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    <option value="">Seleccione...</option>
+                    {% for rol in roles %}
+                    <option value="{{ rol.id_rol }}"
+                        data-permisos='{{ (permisos_por_rol.get(rol.id_rol, []) | tojson) }}'>{{ rol.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <div id="rolPermisosBox"
+                    class="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                    <div class="font-semibold text-gray-700 dark:text-gray-200 mb-2">Permisos del rol</div>
+                    <div id="rolPermisosLista" class="text-sm text-gray-600 dark:text-gray-300"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <input type="checkbox" name="activo" checked class="h-4 w-4">
+            <span class="text-sm text-gray-700 dark:text-gray-200">Usuario activo</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <input type="checkbox" name="modo_demo" class="h-4 w-4" {% if modo_demo %}checked{% endif %}>
+            <span class="text-sm text-gray-700 dark:text-gray-200">Modo demo</span>
+        </div>
+
+        <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">
+                <i class="fas fa-shield-alt text-gray-700 dark:text-gray-300 mr-2"></i>Permisos adicionales (opcional)
+            </h2>
+            <div class="space-y-4">
+                {% for modulo, items in permisos_por_modulo.items() %}
+                <div class="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-4">
+                    <div class="font-semibold text-gray-700 dark:text-gray-200 mb-2">{{ modulo|capitalize }}</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {% for p in items %}
+                        <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
+                            <input type="checkbox" name="permisos_extra" value="{{ p.id_permiso }}" {% if p.id_permiso
+                                in selected_permiso_ids %}checked{% endif %} class="mt-1 h-4 w-4">
+                            <span>
+                                <span class="font-medium">{{ p.nombre }}</span>
+                                <span class="text-gray-500 dark:text-gray-400">({{ p.codigo }})</span>
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+            <a href="{{ url_for('usuarios.listar') }}"
+                class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                Cancelar
+            </a>
+            <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                Guardar
+            </button>
+        </div>
+    </form>
+</div>
+<script>
+    (function () {
+        const select = document.getElementById('id_rol');
+        const lista = document.getElementById('rolPermisosLista');
+
+        function render() {
+            const opt = select.options[select.selectedIndex];
+            if (!opt || !opt.dataset.permisos) {
+                lista.textContent = 'Seleccione un rol para ver sus permisos.';
+                return;
+            }
+            let permisos = [];
+            try {
+                permisos = JSON.parse(opt.dataset.permisos || '[]') || [];
+            } catch (e) {
+                permisos = [];
+            }
+            if (!permisos.length) {
+                lista.textContent = 'Este rol no tiene permisos asignados.';
+                return;
+            }
+            lista.innerHTML = '';
+            permisos.forEach((p) => {
+                const row = document.createElement('div');
+                const name = document.createElement('span');
+                name.textContent = p.nombre;
+                const code = document.createElement('span');
+                code.className = 'text-gray-500';
+                code.textContent = ` (${p.codigo})`;
+                row.appendChild(name);
+                row.appendChild(code);
+                lista.appendChild(row);
+            });
+        }
+
+        select.addEventListener('change', render);
+        render();
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,515 @@
+<div class="space-y-6">
+    <div class="ce-stats-grid ce-stats-grid--quad">
+        <article class="ce-kpi-card ce-kpi-card--slate">
+            <div class="ce-kpi-header">
+                <div class="ce-kpi-copy">
+                    <p class="ce-kpi-eyebrow">Saldo de vacaciones {{ panel_ausencias.filtros.anio }}</p>
+                    <p class="ce-kpi-value ce-kpi-value--compact">{{ panel_ausencias.saldo_vacaciones }} días</p>
+                </div>
+                <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-umbrella-beach"></i></span>
+            </div>
+            <p class="ce-kpi-meta">Cupo anual: {{ empleado.dias_vacaciones_anuales_int() }} días. También contempla reservas pendientes.</p>
+        </article>
+        <article class="ce-kpi-card ce-kpi-card--blue">
+            <div class="ce-kpi-header">
+                <div class="ce-kpi-copy">
+                    <p class="ce-kpi-eyebrow">Vacaciones usadas</p>
+                    <p class="ce-kpi-value ce-kpi-value--compact ce-kpi-value--blue">{{ panel_ausencias.vacaciones_usadas }} días</p>
+                </div>
+                <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-calendar-check"></i></span>
+            </div>
+            <p class="ce-kpi-meta">Días hábiles legales: lunes a sábado, sin domingos ni feriados nacionales.</p>
+        </article>
+        <article class="ce-kpi-card ce-kpi-card--green">
+            <div class="ce-kpi-header">
+                <div class="ce-kpi-copy">
+                    <p class="ce-kpi-eyebrow">Vacaciones reservadas</p>
+                    <p class="ce-kpi-value ce-kpi-value--compact ce-kpi-value--green">{{ panel_ausencias.vacaciones_reservadas }} días</p>
+                </div>
+                <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-suitcase-rolling"></i></span>
+            </div>
+            <p class="ce-kpi-meta">Incluye solicitudes pendientes, aprobadas o ya tomadas dentro del año.</p>
+        </article>
+        <article class="ce-kpi-card ce-kpi-card--amber">
+            <div class="ce-kpi-header">
+                <div class="ce-kpi-copy">
+                    <p class="ce-kpi-eyebrow">Solicitudes pendientes</p>
+                    <p class="ce-kpi-value ce-kpi-value--compact ce-kpi-value--amber">{{ panel_ausencias.solicitudes_pendientes }}</p>
+                </div>
+                <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-hourglass-half"></i></span>
+            </div>
+            <p class="ce-kpi-meta">
+                {% if panel_ausencias.proxima_ausencia %}
+                Próxima ausencia: {{ panel_ausencias.proxima_ausencia.fecha_desde.strftime('%d/%m/%Y') }}.
+                {% else %}
+                No hay ausencias futuras aprobadas en este momento.
+                {% endif %}
+            </p>
+        </article>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-1 space-y-6">
+            <div id="ausencia-editor-card" class="bg-white rounded-2xl border shadow-sm {% if ausencia_en_edicion %}border-blue-300 ring-2 ring-blue-100{% else %}border-gray-200{% endif %}">
+                <div class="px-5 py-4 border-b border-gray-200">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-900">{% if ausencia_en_edicion %}Editar ausencia{% else %}Nueva ausencia{% endif %}</h2>
+                            <p class="text-sm text-gray-500">
+                                {% if ausencia_en_edicion %}
+                                Ajusta el rango, tipo y motivo sin salir de la ficha del empleado.
+                                {% else %}
+                                Registra vacaciones, día libre, permiso o reposo sin salir de la ficha.
+                                {% endif %}
+                            </p>
+                        </div>
+                        {% if ausencia_en_edicion %}
+                        <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab='vacaciones', anio=panel_ausencias.filtros.anio, tipo_ausencia=panel_ausencias.filtros.tipo, estado_ausencia=panel_ausencias.filtros.estado, page_ausencias=panel_ausencias.paginacion.page) }}"
+                            class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-times"></i>
+                            Cancelar
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <form method="post" action="{% if ausencia_en_edicion %}{{ url_for('control_empleados.editar_ausencia', id_ausencia=ausencia_en_edicion.id_ausencia) }}{% else %}{{ url_for('control_empleados.crear_ausencia', id_empleado=empleado.id_empleado) }}{% endif %}" class="p-5 space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="periodo" value="{{ periodo }}">
+                    <input type="hidden" name="anio" value="{{ panel_ausencias.filtros.anio }}">
+                    <input type="hidden" name="tipo_ausencia" value="{{ panel_ausencias.filtros.tipo }}">
+                    <input type="hidden" name="estado_ausencia" value="{{ panel_ausencias.filtros.estado }}">
+                    <input type="hidden" name="page_ausencias" value="{{ panel_ausencias.paginacion.page }}">
+                    {% if ausencia_en_edicion %}
+                    <input type="hidden" name="edit_ausencia" value="{{ ausencia_en_edicion.id_ausencia }}">
+                    {% endif %}
+
+                    <div class="space-y-3">
+                        <div class="flex items-end gap-2">
+                            <div class="flex-1">
+                                <label for="tipo_ausencia_nueva" class="block text-sm font-semibold text-gray-700 mb-2">Tipo</label>
+                                <select id="tipo_ausencia_nueva" name="tipo" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                                    {% for tipo in tipos_ausencia_formulario %}
+                                    <option value="{{ tipo.valor }}" {% if ausencia_en_edicion and tipo.valor == ausencia_en_edicion.tipo %}selected{% endif %}>{{ tipo.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% if puede_gestionar_tipos_ausencia %}
+                            <button type="button" id="toggle_tipo_ausencia_nuevo"
+                                class="inline-flex items-center justify-center rounded-xl border border-blue-200 px-3 py-2.5 text-blue-700 hover:bg-blue-50 transition-colors"
+                                title="Agregar tipo personalizado">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button type="button" id="toggle_tipo_ausencia_eliminar"
+                                class="inline-flex items-center justify-center rounded-xl border border-red-200 px-3 py-2.5 text-red-700 hover:bg-red-50 transition-colors"
+                                title="Eliminar tipos personalizados">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% if puede_gestionar_tipos_ausencia %}
+                        <div id="panel_tipo_ausencia_nuevo" class="hidden rounded-2xl border border-blue-100 bg-blue-50 p-4 space-y-3">
+                            <div>
+                                <p class="text-sm font-semibold text-blue-900">Nuevo tipo personalizado</p>
+                                <p class="text-xs text-blue-700">Se guardará solo para este cliente y aparecerá en todos sus empleados.</p>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="text" name="nombre_tipo_ausencia" maxlength="80"
+                                    form="crear_tipo_ausencia_form"
+                                    placeholder="Ejemplo: Capacitación"
+                                    class="flex-1 rounded-xl border border-blue-200 bg-white px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                                <button type="submit"
+                                    form="crear_tipo_ausencia_form"
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
+                                    <i class="fas fa-plus"></i>
+                                    Agregar tipo
+                                </button>
+                            </div>
+                        </div>
+                        <div id="panel_tipo_ausencia_eliminar" class="hidden rounded-2xl border border-red-100 bg-red-50 p-4 space-y-3">
+                            <div>
+                                <p class="text-sm font-semibold text-red-900">Tipos personalizados</p>
+                                <p class="text-xs text-red-700">Los tipos base no se pueden eliminar. Si un tipo ya tiene ausencias, el sistema lo bloqueará.</p>
+                            </div>
+                            {% if tipos_ausencia_personalizados %}
+                            <div class="space-y-2">
+                                {% for tipo_personalizado in tipos_ausencia_personalizados %}
+                                <div class="flex items-center justify-between gap-3 rounded-xl border border-red-100 bg-white px-3 py-2">
+                                    <div>
+                                        <div class="text-sm font-semibold text-gray-900">{{ tipo_personalizado.label }}</div>
+                                        <div class="text-xs text-gray-500">{{ tipo_personalizado.valor }}</div>
+                                    </div>
+                                    <button type="submit"
+                                        form="eliminar_tipo_ausencia_{{ tipo_personalizado.id_tipo_ausencia }}"
+                                        onclick="return confirm('Se eliminará este tipo personalizado. ¿Continuar?')"
+                                        class="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-red-700 hover:bg-red-50 transition-colors"
+                                        title="Eliminar tipo">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-sm text-red-800">Todavía no hay tipos personalizados para este cliente.</p>
+                            {% endif %}
+                        </div>
+                        {% elif puede_gestionar %}
+                        <p class="text-xs text-gray-500">Los botones para agregar o eliminar tipos se habilitan cuando el empleado pertenece a un cliente.</p>
+                        {% endif %}
+                    </div>
+                    {% if ausencia_en_edicion %}
+                    <div class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                        Editando la ausencia del {{ ausencia_en_edicion.fecha_desde.strftime('%d/%m/%Y') }} al {{ ausencia_en_edicion.fecha_hasta.strftime('%d/%m/%Y') }}.
+                    </div>
+                    <div class="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                        El estado se sigue cambiando desde la tabla de historial para mantener el control del flujo.
+                    </div>
+                    {% else %}
+                    <div>
+                        <label for="estado_ausencia_nueva" class="block text-sm font-semibold text-gray-700 mb-2">Estado inicial</label>
+                        <select id="estado_ausencia_nueva" name="estado" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                            {% for estado in estados_ausencia %}
+                            <option value="{{ estado.valor }}" {% if estado.valor == 'pendiente' %}selected{% endif %}>{{ estado.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 xl:grid-cols-1">
+                        <div>
+                            <label for="fecha_desde" class="block text-sm font-semibold text-gray-700 mb-2">Desde</label>
+                            <input id="fecha_desde" name="fecha_desde" type="date" value="{{ ausencia_en_edicion.fecha_desde.isoformat() if ausencia_en_edicion else fecha_hoy }}" required
+                                class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="fecha_hasta" class="block text-sm font-semibold text-gray-700 mb-2">Hasta</label>
+                            <input id="fecha_hasta" name="fecha_hasta" type="date" value="{{ ausencia_en_edicion.fecha_hasta.isoformat() if ausencia_en_edicion else fecha_hoy }}" required
+                                class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="motivo" class="block text-sm font-semibold text-gray-700 mb-2">Motivo</label>
+                        <input id="motivo" name="motivo" type="text" required
+                            value="{{ ausencia_en_edicion.motivo if ausencia_en_edicion else '' }}"
+                            placeholder="Ejemplo: vacaciones de invierno"
+                            {% if ausencia_en_edicion %}autofocus{% endif %}
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    {% if not ausencia_en_edicion %}
+                    <div>
+                        <label for="tipo_excedente" class="block text-sm font-semibold text-gray-700 mb-2">Si excede el saldo de vacaciones</label>
+                        <select id="tipo_excedente" name="tipo_excedente" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Bloquear y avisar</option>
+                            {% for tipo in tipos_ausencia_excedente %}
+                            <option value="{{ tipo.valor }}">Registrar excedente como {{ tipo.label|lower }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="mt-2 text-xs text-gray-500">Solo se usa cuando el tipo principal es vacaciones y el rango supera el saldo disponible.</p>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <label for="observaciones_ausencia" class="block text-sm font-semibold text-gray-700 mb-2">Observaciones</label>
+                        <textarea id="observaciones_ausencia" name="observaciones" rows="3"
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">{{ ausencia_en_edicion.observaciones if ausencia_en_edicion else '' }}</textarea>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        {% if ausencia_en_edicion %}
+                        El sistema valida solapes y saldo antes de actualizar la ausencia.
+                        {% else %}
+                        El sistema bloquea rangos solapados y valida el saldo de vacaciones antes de guardar.
+                        {% endif %}
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="submit" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
+                            <i class="fas {% if ausencia_en_edicion %}fa-save{% else %}fa-calendar-plus{% endif %}"></i>
+                            {% if ausencia_en_edicion %}Actualizar ausencia{% else %}Guardar ausencia{% endif %}
+                        </button>
+                    </div>
+                </form>
+                <form id="crear_tipo_ausencia_form" method="post" action="{{ url_for('control_empleados.crear_tipo_ausencia_personalizado', id_empleado=empleado.id_empleado) }}" class="hidden">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="periodo" value="{{ periodo }}">
+                    <input type="hidden" name="anio" value="{{ panel_ausencias.filtros.anio }}">
+                    <input type="hidden" name="tipo_ausencia" value="{{ panel_ausencias.filtros.tipo }}">
+                    <input type="hidden" name="estado_ausencia" value="{{ panel_ausencias.filtros.estado }}">
+                    <input type="hidden" name="page_ausencias" value="{{ panel_ausencias.paginacion.page }}">
+                </form>
+                {% for tipo_personalizado in tipos_ausencia_personalizados %}
+                <form id="eliminar_tipo_ausencia_{{ tipo_personalizado.id_tipo_ausencia }}" method="post" action="{{ url_for('control_empleados.eliminar_tipo_ausencia_personalizado', id_empleado=empleado.id_empleado, id_tipo_ausencia=tipo_personalizado.id_tipo_ausencia) }}" class="hidden">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="periodo" value="{{ periodo }}">
+                    <input type="hidden" name="anio" value="{{ panel_ausencias.filtros.anio }}">
+                    <input type="hidden" name="tipo_ausencia" value="{{ panel_ausencias.filtros.tipo }}">
+                    <input type="hidden" name="estado_ausencia" value="{{ panel_ausencias.filtros.estado }}">
+                    <input type="hidden" name="page_ausencias" value="{{ panel_ausencias.paginacion.page }}">
+                </form>
+                {% endfor %}
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <div class="px-5 py-4 border-b border-gray-200">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-900">Vista rápida</h2>
+                            <p class="text-sm text-gray-500">Próxima ausencia confirmada, cupo y feriados del año seleccionado.</p>
+                        </div>
+                        <a href="{{ url_for('control_empleados.feriados', anio=panel_ausencias.filtros.anio) }}"
+                            class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors">
+                            <i class="fas fa-calendar-day"></i>
+                            Feriados
+                        </a>
+                    </div>
+                </div>
+                <div class="p-5 space-y-4 text-sm text-gray-700">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Año</p>
+                        <p class="mt-1 font-semibold text-gray-900">{{ panel_ausencias.filtros.anio }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Próxima ausencia</p>
+                        {% if panel_ausencias.proxima_ausencia %}
+                        <p class="mt-1 font-semibold text-gray-900">{{ panel_ausencias.proxima_ausencia.motivo }}</p>
+                        <p class="text-gray-600">{{ panel_ausencias.proxima_ausencia.fecha_desde.strftime('%d/%m/%Y') }} al {{ panel_ausencias.proxima_ausencia.fecha_hasta.strftime('%d/%m/%Y') }}</p>
+                        {% else %}
+                        <p class="mt-1 text-gray-600">Sin ausencias futuras confirmadas.</p>
+                        {% endif %}
+                    </div>
+                    <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-blue-800">
+                        El cálculo usa días hábiles legales de Paraguay: lunes a sábado, excluyendo domingos y feriados nacionales.
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Feriados personalizados {{ panel_ausencias.filtros.anio }}</p>
+                        {% if panel_ausencias.feriados_personalizados %}
+                        <div class="mt-2 space-y-2">
+                            {% for feriado in panel_ausencias.feriados_personalizados[:4] %}
+                            <div class="rounded-lg border border-gray-200 px-3 py-2">
+                                <div class="font-semibold text-gray-900">{{ feriado.fecha.strftime('%d/%m/%Y') }}</div>
+                                <div class="text-gray-600">{{ feriado.motivo }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="mt-2 text-gray-600">Sin feriados personalizados cargados para este año.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="xl:col-span-2 space-y-6">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <div class="px-5 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900">Filtros</h2>
+                    <p class="text-sm text-gray-500">Puedes auditar un año concreto y paginar sin recargar otra vista.</p>
+                </div>
+                <form method="get" action="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado) }}" class="p-5 grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input type="hidden" name="periodo" value="{{ periodo }}">
+                    <input type="hidden" name="tab" value="vacaciones">
+                    <div>
+                        <label for="anio" class="block text-sm font-semibold text-gray-700 mb-2">Año</label>
+                        <select id="anio" name="anio" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                            {% for anio in panel_ausencias.opciones_anio %}
+                            <option value="{{ anio }}" {% if anio == panel_ausencias.filtros.anio %}selected{% endif %}>{{ anio }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="tipo_ausencia" class="block text-sm font-semibold text-gray-700 mb-2">Tipo</label>
+                        <select id="tipo_ausencia" name="tipo_ausencia" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Todos</option>
+                            {% for tipo in tipos_ausencia_formulario %}
+                            <option value="{{ tipo.valor }}" {% if tipo.valor == panel_ausencias.filtros.tipo %}selected{% endif %}>{{ tipo.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="estado_ausencia" class="block text-sm font-semibold text-gray-700 mb-2">Estado</label>
+                        <select id="estado_ausencia" name="estado_ausencia" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Todos</option>
+                            {% for estado in estados_ausencia %}
+                            <option value="{{ estado.valor }}" {% if estado.valor == panel_ausencias.filtros.estado %}selected{% endif %}>{{ estado.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black transition-colors">
+                            <i class="fas fa-filter"></i>
+                            Aplicar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900">Historial de ausencias</h2>
+                        <p class="text-sm text-gray-500">Vacaciones y días libres del año {{ panel_ausencias.filtros.anio }}.</p>
+                    </div>
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ panel_ausencias.paginacion.total }} registros</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Rango</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Motivo</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Días hábiles</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white">
+                            {% for ausencia in panel_ausencias.paginacion.items %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-4 text-sm text-gray-700">
+                                    <div>{{ ausencia.fecha_desde.strftime('%d/%m/%Y') }}</div>
+                                    <div class="text-gray-500">hasta {{ ausencia.fecha_hasta.strftime('%d/%m/%Y') }}</div>
+                                </td>
+                                <td class="px-4 py-4 text-sm font-semibold text-gray-900">{{ labels_tipos_ausencia.get(ausencia.tipo, ausencia.tipo.replace('_', ' ')|title) }}</td>
+                                <td class="px-4 py-4 text-sm text-gray-700">
+                                    <div>{{ ausencia.motivo }}</div>
+                                    <div class="text-xs text-gray-500">{{ ausencia.observaciones or 'Sin observaciones' }}</div>
+                                </td>
+                                <td class="px-4 py-4 text-sm text-center font-semibold text-gray-900">{{ panel_ausencias.dias_computados.get(ausencia.id_ausencia, 0) }}</td>
+                                <td class="px-4 py-4 text-center">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+                                        {% if ausencia.estado == 'pendiente' %}bg-amber-100 text-amber-700
+                                        {% elif ausencia.estado == 'aprobado' %}bg-blue-100 text-blue-700
+                                        {% elif ausencia.estado == 'tomado' %}bg-green-100 text-green-700
+                                        {% else %}bg-red-100 text-red-700{% endif %}">
+                                        {{ ausencia.estado|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 text-right">
+                                    {% if puede_gestionar %}
+                                    <div class="flex items-center justify-end gap-2 whitespace-nowrap">
+                                        <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab='vacaciones', anio=panel_ausencias.filtros.anio, tipo_ausencia=panel_ausencias.filtros.tipo, estado_ausencia=panel_ausencias.filtros.estado, page_ausencias=panel_ausencias.paginacion.page, edit_ausencia=ausencia.id_ausencia) }}"
+                                            title="Editar ausencia"
+                                            aria-label="Editar ausencia"
+                                            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                                            <i class="fas fa-pen"></i>
+                                        </a>
+                                        <form method="post" action="{{ url_for('control_empleados.actualizar_estado_ausencia', id_ausencia=ausencia.id_ausencia) }}" class="inline-flex items-center gap-2">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="periodo" value="{{ periodo }}">
+                                            <input type="hidden" name="anio" value="{{ panel_ausencias.filtros.anio }}">
+                                            <input type="hidden" name="tipo_ausencia" value="{{ panel_ausencias.filtros.tipo }}">
+                                            <input type="hidden" name="estado_ausencia" value="{{ panel_ausencias.filtros.estado }}">
+                                            <input type="hidden" name="page_ausencias" value="{{ panel_ausencias.paginacion.page }}">
+                                            <select name="estado" title="Cambiar estado" aria-label="Cambiar estado" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+                                                {% for estado in estados_ausencia %}
+                                                <option value="{{ estado.valor }}" {% if estado.valor == ausencia.estado %}selected{% endif %}>{{ estado.label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit"
+                                                title="Guardar estado"
+                                                aria-label="Guardar estado"
+                                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-blue-200 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors">
+                                                <i class="fas fa-save"></i>
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('control_empleados.eliminar_ausencia', id_ausencia=ausencia.id_ausencia) }}" class="inline-flex">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="periodo" value="{{ periodo }}">
+                                            <input type="hidden" name="anio" value="{{ panel_ausencias.filtros.anio }}">
+                                            <input type="hidden" name="tipo_ausencia" value="{{ panel_ausencias.filtros.tipo }}">
+                                            <input type="hidden" name="estado_ausencia" value="{{ panel_ausencias.filtros.estado }}">
+                                            <input type="hidden" name="page_ausencias" value="{{ panel_ausencias.paginacion.page }}">
+                                            <button type="submit"
+                                                onclick="return confirm('Se eliminará esta ausencia. ¿Continuar?')"
+                                                title="Eliminar ausencia"
+                                                aria-label="Eliminar ausencia"
+                                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="px-4 py-12 text-center">
+                                    <div class="mx-auto max-w-md">
+                                        <div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 text-xl">
+                                            <i class="fas fa-umbrella-beach"></i>
+                                        </div>
+                                        <h3 class="mt-4 text-lg font-semibold text-gray-900">Sin ausencias para este filtro</h3>
+                                        <p class="mt-2 text-sm text-gray-500">Prueba con otro año, otro estado o registra la primera ausencia.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if panel_ausencias.paginacion.pages > 1 %}
+                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                    <p class="text-sm text-gray-700">
+                        Mostrando <span class="font-semibold">{{ panel_ausencias.paginacion.first }}</span> a
+                        <span class="font-semibold">{{ panel_ausencias.paginacion.last }}</span> de
+                        <span class="font-semibold">{{ panel_ausencias.paginacion.total }}</span> ausencias
+                    </p>
+                    <div class="flex gap-2">
+                        {% if panel_ausencias.paginacion.has_prev %}
+                        <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab='vacaciones', anio=panel_ausencias.filtros.anio, tipo_ausencia=panel_ausencias.filtros.tipo, estado_ausencia=panel_ausencias.filtros.estado, page_ausencias=panel_ausencias.paginacion.prev_num) }}"
+                            class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            Anterior
+                        </a>
+                        {% endif %}
+                        {% if panel_ausencias.paginacion.has_next %}
+                        <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab='vacaciones', anio=panel_ausencias.filtros.anio, tipo_ausencia=panel_ausencias.filtros.tipo, estado_ausencia=panel_ausencias.filtros.estado, page_ausencias=panel_ausencias.paginacion.next_num) }}"
+                            class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            Siguiente
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% if ausencia_en_edicion %}
+<script>
+    requestAnimationFrame(() => {
+        const editor = document.getElementById('ausencia-editor-card');
+        if (editor) {
+            editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        const motivo = document.getElementById('motivo');
+        if (motivo) {
+            try { motivo.focus({ preventScroll: true }); } catch { }
+            try { motivo.select(); } catch { }
+        }
+    });
+</script>
+{% endif %}
+{% if puede_gestionar_tipos_ausencia %}
+<script>
+    requestAnimationFrame(() => {
+        const panelNuevo = document.getElementById('panel_tipo_ausencia_nuevo');
+        const panelEliminar = document.getElementById('panel_tipo_ausencia_eliminar');
+        const toggleNuevo = document.getElementById('toggle_tipo_ausencia_nuevo');
+        const toggleEliminar = document.getElementById('toggle_tipo_ausencia_eliminar');
+
+        const alternar = (panelActual, panelSecundario) => {
+            if (!panelActual) return;
+            panelActual.classList.toggle('hidden');
+            if (panelSecundario) {
+                panelSecundario.classList.add('hidden');
+            }
+        };
+
+        if (toggleNuevo) {
+            toggleNuevo.addEventListener('click', () => alternar(panelNuevo, panelEliminar));
+        }
+        if (toggleEliminar) {
+            toggleEliminar.addEventListener('click', () => alternar(panelEliminar, panelNuevo));
+        }
+    });
+</script>
+{% endif %}

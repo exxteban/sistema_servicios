@@ -1,0 +1,103 @@
+{# ═══════════════════════════════════════════════════════════
+   _macros.html — Macros compartidas del módulo Flujo de Caja
+   Importar con: {% from 'flujo_caja/_macros.html' import gs, tarjeta_dia, fila_movimiento %}
+═══════════════════════════════════════════════════════════ #}
+
+{% macro gs(valor) %}Gs. {{ '{:,.0f}'.format(valor).replace(',', '.') }}{% endmacro %}
+
+{# Tarjeta expandible de un día en el mapa diario #}
+{% macro tarjeta_dia(dia, ctx) %}
+{% set max_bar = [dia.ingresos, dia.egresos, 1] | max %}
+{% set h_ing = [((dia.ingresos / max_bar) * 28) | int, 4] | max %}
+{% set h_egr = [((dia.egresos / max_bar) * 28) | int, 4] | max %}
+{% set dif = dia.diferencia_real_estimado %}
+<details class="group overflow-hidden rounded-2xl border transition-all {% if dia.riesgo %}border-rose-200 bg-rose-50/60 dark:border-rose-800/30 dark:bg-slate-800/50{% elif dia.neto > 0 %}border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/30 dark:bg-slate-800/50{% else %}border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900{% endif %}">
+    <summary class="flex cursor-pointer list-none items-stretch marker:content-none">
+        <div class="flex w-20 flex-shrink-0 flex-col items-center justify-center border-r py-4 {% if dia.riesgo %}border-rose-200 dark:border-rose-800/30{% elif dia.neto > 0 %}border-emerald-200 dark:border-emerald-800/30{% else %}border-slate-200 dark:border-slate-700{% endif %}">
+            <span class="text-xs font-black uppercase tracking-widest {% if dia.riesgo %}text-rose-500{% elif dia.neto > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">{{ dia.label[:3] }}</span>
+            <span class="mt-0.5 text-3xl font-black leading-none text-slate-900 dark:text-white">{{ dia.fecha.strftime('%d') }}</span>
+            <span class="mt-0.5 text-xs font-bold uppercase text-slate-400 dark:text-slate-500">{{ dia.fecha.strftime('%b') }}</span>
+        </div>
+        <div class="flex flex-1 flex-col justify-center gap-1 px-4 py-3">
+            <div class="flex items-baseline justify-between gap-2">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Total del día</span>
+                <span class="text-base font-black {% if dia.neto < 0 %}text-rose-600 dark:text-rose-400{% elif dia.neto > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-slate-700 dark:text-slate-300{% endif %}">{% if dia.neto > 0 %}+{% endif %}{{ '{:,.0f}'.format(dia.neto).replace(',', '.') }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-2">
+                <span class="text-xs text-slate-400 dark:text-slate-500">Ingresos / egresos</span>
+                <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">{% if dia.ingresos > 0 and dia.egresos > 0 %}+{{ '{:,.0f}'.format(dia.ingresos).replace(',', '.') }} / -{{ '{:,.0f}'.format(dia.egresos).replace(',', '.') }}{% elif dia.ingresos > 0 %}+{{ '{:,.0f}'.format(dia.ingresos).replace(',', '.') }}{% elif dia.egresos > 0 %}-{{ '{:,.0f}'.format(dia.egresos).replace(',', '.') }}{% else %}—{% endif %}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-2">
+                <span class="text-xs text-slate-400 dark:text-slate-500">Dif. real</span>
+                <span class="text-sm font-bold {% if dif > 0 %}text-emerald-600 dark:text-emerald-400{% elif dif < 0 %}text-rose-600 dark:text-rose-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">{% if dif > 0 %}+{% endif %}{{ '{:,.0f}'.format(dif).replace(',', '.') if dif != 0 else '0' }}</span>
+            </div>
+        </div>
+        <div class="flex flex-shrink-0 items-center gap-3 px-4">
+            <div class="flex h-8 items-end gap-1">
+                <span class="w-2 rounded-t-sm {% if dia.ingresos > 0 %}bg-emerald-400 dark:bg-emerald-500{% else %}bg-slate-200 dark:bg-slate-700{% endif %}" style="height: {{ h_ing if dia.ingresos > 0 else 4 }}px"></span>
+                <span class="w-2 rounded-t-sm {% if dia.egresos > 0 %}bg-rose-400 dark:bg-rose-500{% else %}bg-slate-200 dark:bg-slate-700{% endif %}" style="height: {{ h_egr if dia.egresos > 0 else 4 }}px"></span>
+            </div>
+            <i class="fas fa-chevron-down text-xs text-slate-400 transition-transform duration-200 group-open:rotate-180 dark:text-slate-500"></i>
+        </div>
+    </summary>
+    <div class="border-t px-5 py-3 {% if dia.riesgo %}border-rose-200 bg-rose-50/40 dark:border-rose-800/20 dark:bg-slate-800/40{% elif dia.neto > 0 %}border-emerald-200 bg-emerald-50/30 dark:border-emerald-800/20 dark:bg-slate-800/40{% else %}border-slate-100 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30{% endif %}">
+        {% if dia['items'] %}
+        <div class="space-y-1.5">{% for mov in dia['items'] %}
+            <div class="flex items-center justify-between text-sm">
+                <div class="flex min-w-0 items-center gap-2">
+                    <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md {% if mov.tipo == 'ingreso' %}bg-emerald-100 dark:bg-emerald-900/20{% else %}bg-rose-100 dark:bg-rose-900/20{% endif %}"><i class="fas {% if mov.tipo == 'ingreso' %}fa-arrow-down text-emerald-600 dark:text-emerald-400{% else %}fa-arrow-up text-rose-600 dark:text-rose-400{% endif %} text-[9px]"></i></span>
+                    <span class="truncate font-medium text-slate-700 dark:text-slate-200">{{ mov.concepto }}</span>
+                    <span class="flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold {% if mov.estado == 'realizado' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400{% elif mov.estado == 'confirmado' %}bg-sky-100 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400{% elif mov.estado == 'cancelado' %}bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400{% else %}bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400{% endif %}">{{ mov.estado|title }}</span>
+                </div>
+                <span class="ml-3 flex-shrink-0 font-black {% if mov.tipo == 'ingreso' %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{{ '+' if mov.tipo == 'ingreso' else '-' }}{{ gs(mov.monto_operativo_decimal()) }}</span>
+            </div>
+        {% endfor %}</div>
+        {% else %}<p class="text-xs italic text-slate-400 dark:text-slate-500">Sin movimientos cargados para este día.</p>{% endif %}
+    </div>
+</details>
+{% endmacro %}
+
+{# Fila de un movimiento en el tab Movimientos y Comparativo.
+   FIX #2: acepta tab_origen para que el redirect post-acción vuelva al tab correcto
+   en lugar de hardcodear siempre 'movimientos'. #}
+{% macro fila_movimiento(mov, ctx, puede_gestionar, tab_origen='movimientos') %}
+<div class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+    <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center {% if mov.tipo == 'ingreso' %}bg-emerald-100 dark:bg-emerald-900/20{% else %}bg-rose-100 dark:bg-rose-900/20{% endif %}"><i class="fas {% if mov.tipo == 'ingreso' %}fa-arrow-down text-emerald-600 dark:text-emerald-400{% else %}fa-arrow-up text-rose-600 dark:text-rose-400{% endif %} text-xs"></i></div>
+    <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold text-slate-900 dark:text-white truncate">{{ mov.concepto }}</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">{{ mov.fecha.strftime('%d/%m') }} &middot; {{ mov.categoria|replace('_', ' ')|title }}</p>
+    </div>
+    <p class="flex-shrink-0 text-sm font-black mr-2 {% if mov.tipo == 'ingreso' %}text-emerald-700 dark:text-emerald-300{% else %}text-rose-700 dark:text-rose-300{% endif %}">{{ gs(mov.monto_operativo_decimal()) }}</p>
+    {% if puede_gestionar %}
+    <div class="flex-shrink-0 flex items-center gap-2">
+        {# js inline: oculta/muestra el campo monto_real según el estado seleccionado.
+           El campo solo tiene efecto cuando el estado es "realizado"; en cualquier
+           otro estado el backend lo ignora y lo limpia. #}
+        <form method="post" action="{{ url_for('flujo_caja.actualizar_estado_movimiento', id_movimiento=mov.id_flujo_movimiento) }}" class="flex items-center gap-2"
+              onsubmit="(function(f){var s=f.querySelector('[name=estado]');var r=f.querySelector('[name=monto_real]');if(s&&r&&s.value!=='realizado'){r.value='';}})(this)">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="tab" value="{{ tab_origen }}">
+            <input type="number" name="monto_real" step="1" min="0"
+                   value="{% if mov.monto_real is not none and mov.estado == 'realizado' %}{{ '%.0f'|format(mov.monto_real) }}{% endif %}"
+                   placeholder="Monto real"
+                   title="Solo aplica cuando el estado es Realizado"
+                   class="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 {% if mov.estado != 'realizado' %}opacity-40{% endif %}"
+                   {% if mov.estado != 'realizado' %}tabindex="-1"{% endif %}>
+            <select name="estado"
+                    onchange="(function(sel){var r=sel.closest('form').querySelector('[name=monto_real]');if(r){var esReal=sel.value==='realizado';r.classList.toggle('opacity-40',!esReal);r.tabIndex=esReal?0:-1;}})(this)"
+                    class="rounded-lg border py-1.5 pl-2 pr-7 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-300 {% if mov.estado == 'realizado' %}bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800{% elif mov.estado == 'confirmado' %}bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/20 dark:text-sky-400 dark:border-sky-800{% elif mov.estado == 'cancelado' %}bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-600{% else %}bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800{% endif %}">
+                {% for estado in ctx.estados %}<option value="{{ estado.valor }}" {% if mov.estado == estado.valor %}selected{% endif %}>{{ estado.label }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 transition-colors dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">Guardar</button>
+        </form>
+        <form method="post" action="{{ url_for('flujo_caja.eliminar_movimiento', id_movimiento=mov.id_flujo_movimiento) }}" onsubmit="return confirm('Eliminar este movimiento?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="tab" value="{{ tab_origen }}">
+            <button type="submit" class="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500 transition-colors dark:border-slate-700 dark:hover:border-rose-700 dark:hover:text-rose-400"><i class="fas fa-trash-can text-xs"></i></button>
+        </form>
+    </div>
+    {% else %}
+    <span class="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold {% if mov.estado == 'realizado' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400{% elif mov.estado == 'confirmado' %}bg-sky-100 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400{% elif mov.estado == 'cancelado' %}bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400{% else %}bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400{% endif %}">{{ mov.estado|title }}</span>
+    {% endif %}
+</div>
+{% endmacro %}

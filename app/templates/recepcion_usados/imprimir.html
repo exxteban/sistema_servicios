@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de compra Nº {{ recepcion.numero_formulario_display }}</title>
+    <style>
+        @page { size: A4; margin: 8mm; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111827; background: #fff; line-height: 1.22; font-size: 12px; }
+        .sheet { width: 100%; max-width: 194mm; margin: 0 auto; border: 1px solid #111827; padding: 8mm 8mm 9mm; page-break-inside: avoid; }
+        .header { display: grid; grid-template-columns: 1.2fr 1fr; gap: 7mm; align-items: start; margin-bottom: 4mm; }
+        .brand-box, .title-box { border: 1px solid #111827; padding: 4mm; min-height: 28mm; }
+        .brand-title { font-size: 18px; font-weight: 700; letter-spacing: 0.08em; }
+        .small { font-size: 11px; }
+        .title-box h1 { margin: 0; font-size: 14px; line-height: 1.2; text-transform: uppercase; }
+        .number { margin-top: 3mm; font-size: 18px; font-weight: 700; text-align: center; letter-spacing: 0.08em; }
+        .date-line, .line, .line-grid, .signature-row { width: 100%; }
+        .date-line { margin: 3mm 0 4mm; text-align: center; }
+        .section-title { margin: 4mm 0 2mm; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+        .line { display: flex; align-items: baseline; gap: 3px; margin-bottom: 1.2mm; }
+        .line strong { white-space: nowrap; }
+        .fill { flex: 1; border-bottom: 1px solid #111827; min-height: 15px; padding: 0 3px 1px; }
+        .line-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 6mm; margin-bottom: 1mm; }
+        .clauses { margin-top: 3mm; text-align: justify; }
+        .clauses p { margin: 0 0 1.2mm; }
+        .signature-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16mm; margin-top: 9mm; text-align: center; page-break-inside: avoid; }
+        .signature-box { padding-top: 8mm; border-top: 1px solid #111827; }
+    </style>
+</head>
+<body>
+    <script>
+        window.addEventListener('load', function () {
+            setTimeout(function () { window.print(); }, 250);
+        });
+    </script>
+
+    {% set meses = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'] %}
+    {% set mes_nombre = meses[recepcion.fecha_formulario.month] if recepcion.fecha_formulario else '________________' %}
+
+    <div class="sheet">
+        <div class="header">
+            <div class="brand-box">
+                <div class="brand-title">{{ empresa.nombre or 'RYJCELL' }}</div>
+                <div class="small" style="margin-top: 3mm;">Servicio Técnico - Pago de Facturas - Accesorios en general - Activaciones todas las líneas - Servicio de giros</div>
+                {% if empresa.telefono %}<div style="margin-top: 3mm;"><strong>Cel.:</strong> {{ empresa.telefono }}</div>{% endif %}
+                {% if empresa.direccion %}<div class="small" style="margin-top: 2mm;">Dirección: {{ empresa.direccion }}</div>{% endif %}
+            </div>
+            <div class="title-box">
+                <h1>Formulario de compra de productos electrónicos {{ empresa.nombre or 'RYJCELL' }}</h1>
+                <div class="number">Nº {{ recepcion.numero_formulario_display }}</div>
+            </div>
+        </div>
+
+        <div class="date-line">Fecha: {{ recepcion.fecha_formulario.strftime('%d') if recepcion.fecha_formulario else '__' }} de {{ mes_nombre }} de {{ recepcion.fecha_formulario.strftime('%Y') if recepcion.fecha_formulario else '20__' }}</div>
+
+        <div class="section-title">Datos personales del vendedor</div>
+        <div class="line"><strong>Nombres y Apellidos:</strong><div class="fill">{{ recepcion.vendedor_nombres_apellidos }}</div></div>
+        <div class="line-grid">
+            <div class="line"><strong>Fecha de Nacimiento:</strong><div class="fill">{{ recepcion.vendedor_fecha_nacimiento.strftime('%d/%m/%Y') if recepcion.vendedor_fecha_nacimiento else '' }}</div></div>
+            <div class="line"><strong>Nacionalidad:</strong><div class="fill">{{ recepcion.vendedor_nacionalidad or '' }}</div></div>
+            <div class="line"><strong>Nº de Doc. de Identidad:</strong><div class="fill">{{ recepcion.vendedor_numero_documento }}</div></div>
+            <div class="line"><strong>Tipo de Documento:</strong><div class="fill">{{ recepcion.vendedor_tipo_documento }}</div></div>
+            <div class="line"><strong>Estado Civil:</strong><div class="fill">{{ recepcion.vendedor_estado_civil or '' }}</div></div>
+            <div class="line"><strong>Domicilio:</strong><div class="fill">{{ recepcion.vendedor_domicilio or '' }}</div></div>
+            <div class="line"><strong>Ref.:</strong><div class="fill">{{ recepcion.vendedor_referencia_domicilio or '' }}</div></div>
+            <div class="line"><strong>Barrio:</strong><div class="fill">{{ recepcion.vendedor_barrio or '' }}</div></div>
+            <div class="line"><strong>Ciudad:</strong><div class="fill">{{ recepcion.vendedor_ciudad or '' }}</div></div>
+            <div class="line"><strong>Departamento:</strong><div class="fill">{{ recepcion.vendedor_departamento or '' }}</div></div>
+            <div class="line"><strong>Cel.:</strong><div class="fill">{{ recepcion.vendedor_telefono or '' }}</div></div>
+        </div>
+
+        <div class="section-title">Cláusulas y condiciones que rigen la compraventa</div>
+        <div class="clauses">
+            <p><strong>PRIMERA:</strong> {{ empresa.nombre or 'RyJ Cell' }} en adelante EL COMPRADOR, compra el siguiente producto electrónico descripto como: <strong>{{ recepcion.resumen_producto }}</strong>{% if recepcion.imei_serie %} | IMEI/Serie: <strong>{{ recepcion.imei_serie }}</strong>{% endif %}</p>
+            <p><strong>SEGUNDA:</strong> el precio de venta IVA incluido es de Gs. <strong>{{ '{:,.0f}'.format(recepcion.monto_compra or 0) }}</strong></p>
+            <p><strong>TERCERA:</strong> El pago será en {{ recepcion.metodo_pago|lower }}{% if recepcion.referencia_pago %} bajo referencia <strong>{{ recepcion.referencia_pago }}</strong>{% endif %} de acuerdo al pacto de ambas partes.</p>
+            <p><strong>CUARTA:</strong> el vendedor entrega en este acto al comprador el producto electrónico descripto en la cláusula primera por el monto estipulado en la cláusula segunda, sin que el vendedor tenga nada más que reclamar por la transacción.</p>
+            <p><strong>QUINTA:</strong> el vendedor declara bajo fe de juramento que el producto electrónico es de su propiedad, caso contrario exime al comprador de toda responsabilidad penal o civil por el producto electrónico vendido al comprador.</p>
+            <p><strong>SEXTA:</strong> en caso de que el aparato electrónico tenga algún vicio oculto el comprador tendrá un plazo de 30 días para requerir la devolución del importe pagado por el comprador.</p>
+            <p><strong>SEPTIMA:</strong> a todos los efectos del contrato las partes coconstituyen el domicilio especial la vendedora en <strong>{{ recepcion.domicilio_especial_vendedor or recepcion.vendedor_domicilio or '' }}</strong> y los compradores en la dirección indicada precedentemente. En dichos domicilios surtirán efectos todas las notificaciones (judiciales o extrajudiciales) que se practiquen entre las partes.</p>
+            <p><strong>AL FIEL CUMPLIMIENTO</strong> de lo convenido se obligan formalmente las partes en prueba de su conformidad con ello previa lectura y ratificación de su contenido otorgan firman este instrumento redactado en dos (02) ejemplares de un mismo tenor y un solo efecto en la ciudad de <strong>{{ recepcion.lugar_firma or recepcion.vendedor_ciudad or '' }}</strong> a los <strong>{{ recepcion.fecha_formulario.strftime('%d') if recepcion.fecha_formulario else '' }}</strong> días del mes de <strong>{{ mes_nombre }}</strong> del año <strong>{{ recepcion.fecha_formulario.strftime('%Y') if recepcion.fecha_formulario else '' }}</strong>.</p>
+        </div>
+
+        <div class="signature-row">
+            <div class="signature-box">VENDEDOR</div>
+            <div class="signature-box">COMPRADOR</div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+
+{% block title %}Fidelizacion de clientes{% endblock %}
+
+{% block content %}
+{% set total_clientes_con_saldo = clientes_con_saldo.total or 0 %}
+{% set total_movimientos = movimientos.total or 0 %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div class="flex flex-wrap items-start justify-between gap-3 px-4 py-3 md:px-5">
+            <div class="max-w-3xl">
+                <span class="inline-flex items-center gap-2 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                    <i class="fas fa-gift text-[11px]"></i>
+                    {% if config_fidelizacion.activa %}Programa activo{% else %}Programa pausado{% endif %}
+                </span>
+                <h1 class="mt-2 text-xl font-bold tracking-tight text-gray-900 dark:text-white md:text-2xl">
+                    Fidelizacion de clientes
+                </h1>
+                <p class="mt-1 max-w-2xl text-sm leading-5 text-gray-600 dark:text-gray-300">
+                    Configura una regla global simple y controla, en una sola vista, cuantas compras acumula cada cliente, que beneficios tiene disponibles y que ya fue canjeado.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                        <i class="fas fa-bolt text-[11px] text-amber-500 dark:text-amber-300"></i>
+                        {% if config_fidelizacion.activa %}Automatizacion encendida{% else %}Automatizacion pausada{% endif %}
+                    </span>
+                    <span class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                        <i class="fas fa-repeat text-[11px]"></i>
+                        Cada {{ config_fidelizacion.compras_requeridas }} compra(s) libera {{ config_fidelizacion.premios_por_objetivo }} beneficio(s)
+                    </span>
+                    <span class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                        <i class="fas fa-clock text-[11px]"></i>
+                        Ventana de {{ config_fidelizacion.compras_ventana_dias }} dia(s)
+                    </span>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 self-start">
+                <a href="{{ url_for('clientes_calificacion.panel') }}"
+                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+                    <i class="fas fa-ranking-star text-xs"></i>
+                    Calificacion
+                </a>
+                <a href="{{ url_for('clientes.listar') }}"
+                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
+                    <i class="fas fa-arrow-left text-xs"></i>
+                    Volver
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-none">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Estado</p>
+                    <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ 'Activo' if config_fidelizacion.activa else 'Pausado' }}</p>
+                </div>
+                <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl {% if config_fidelizacion.activa %}bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300{% else %}bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+                    <i class="fas {% if config_fidelizacion.activa %}fa-check{% else %}fa-pause{% endif %}"></i>
+                </span>
+            </div>
+            <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                {{ modos_generacion.get(config_fidelizacion.modo_generacion) }}
+            </p>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-none">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Clientes con saldo</p>
+                    <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ total_clientes_con_saldo }}</p>
+                </div>
+                <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                    <i class="fas fa-users"></i>
+                </span>
+            </div>
+            <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                Clientes con historial visible en el panel.
+            </p>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-none">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Movimientos</p>
+                    <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ total_movimientos }}</p>
+                </div>
+                <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
+                    <i class="fas fa-wave-square"></i>
+                </span>
+            </div>
+            <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                Historial total de ajustes, liberaciones y canjes.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="rounded-3xl border border-gray-200 bg-white p-5 shadow-lg shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-none">
+            <div class="mb-5 flex items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Configuracion</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Ajusta la regla general y el tipo de beneficio que se genera.
+                    </p>
+                </div>
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
+                    <i class="fas fa-sliders-h"></i>
+                </span>
+            </div>
+            <form method="POST" action="{{ url_for('clientes_fidelizacion.guardar_configuracion') }}" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
+                    <input type="checkbox" name="activa" value="1" {% if config_fidelizacion.activa %}checked{% endif %}
+                        class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600">
+                    <span>
+                        <span class="block font-medium text-gray-900 dark:text-white">Activar fidelizacion automatica por ventas</span>
+                        <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">El sistema acumula y libera beneficios segun la regla configurada.</span>
+                    </span>
+                </label>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Compras requeridas</label>
+                        <input type="number" name="compras_requeridas" min="1" value="{{ config_fidelizacion.compras_requeridas }}"
+                            class="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Beneficios por objetivo</label>
+                        <input type="number" name="premios_por_objetivo" min="1" value="{{ config_fidelizacion.premios_por_objetivo }}"
+                            class="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Compras validas hacia atras (dias)</label>
+                    <input type="number" name="compras_ventana_dias" min="1" value="{{ config_fidelizacion.compras_ventana_dias }}"
+                        class="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Modo de generacion</label>
+                    <select name="modo_generacion"
+                        class="w-full rounded-xl border-2 border-gray-200 bg-white py-2.5 pl-3 pr-10 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                        {% for codigo, label in modos_generacion.items() %}
+                        <option value="{{ codigo }}" {% if config_fidelizacion.modo_generacion == codigo %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Max. beneficios activos por cliente</label>
+                        <input type="number" name="max_beneficios_activos" min="0" value="{{ config_fidelizacion.max_beneficios_activos }}"
+                            class="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">0 significa sin limite.</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Max. beneficios generados por ventana</label>
+                        <input type="number" name="max_beneficios_ventana" min="0" value="{{ config_fidelizacion.max_beneficios_ventana }}"
+                            class="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">0 significa sin limite.</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Tipo de beneficio</label>
+                        <select name="beneficio_tipo"
+                            class="w-full rounded-xl border-2 border-gray-200 bg-white py-2.5 pl-3 pr-10 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                            {% for codigo, label in beneficio_tipos.items() %}
+                            <option value="{{ codigo }}" {% if config_fidelizacion.beneficio_tipo == codigo %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Vigencia del beneficio (dias)</label>
+                        <input type="number" name="beneficio_vigencia_dias" min="1" value="{{ config_fidelizacion.beneficio_vigencia_dias }}"
+                            class="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Valor del beneficio</label>
+                    <input type="text" name="beneficio_valor" value="{{ config_fidelizacion.beneficio_valor }}"
+                        class="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">Descripcion opcional</label>
+                    <input type="text" name="beneficio_descripcion" maxlength="255" value="{{ config_fidelizacion.beneficio_descripcion }}"
+                        placeholder="Ej: cambio de vidrio, mantenimiento, solo servicios, etc."
+                        class="w-full rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div class="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 text-sm text-blue-950 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-100">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">Formula actual</p>
+                    <p class="mt-2 leading-6">
+                        <strong>cada {{ config_fidelizacion.compras_requeridas }} compra(s)</strong>
+                        dentro de los ultimos
+                        <strong>{{ config_fidelizacion.compras_ventana_dias }} dia(s)</strong>
+                        libera
+                        <strong>{{ config_fidelizacion.premios_por_objetivo }} beneficio(s)</strong>
+                        de tipo
+                        <strong>{{ beneficio_resumen_config(config_fidelizacion) }}</strong>
+                        con vigencia de
+                        <strong>{{ config_fidelizacion.beneficio_vigencia_dias }} dia(s)</strong>.
+                        Modo:
+                        <strong>{{ modos_generacion.get(config_fidelizacion.modo_generacion) }}</strong>.
+                    </p>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    El sistema sincroniza ventas completadas dentro de la ventana de dias configurada, sin duplicarlas. El aviso de historial del POS no libera beneficios por si solo. Si cambias la regla global, los beneficios activos y todavia disponibles se adaptan al nuevo tipo, valor y descripcion; los ya canjeados conservan su historial.
+                </p>
+                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-700 shadow-sm shadow-blue-600/30">
+                    <i class="fas fa-save text-sm"></i>
+                    Guardar configuracion
+                </button>
+            </form>
+        </div>
+
+        <div class="xl:col-span-2 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-lg shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-none">
+            <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3 bg-white/90 dark:bg-gray-800">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Clientes con saldo o historial</h2>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {{ total_clientes_con_saldo }} cliente(s) encontrados.
+                    </p>
+                </div>
+                <form method="GET" action="{{ url_for('clientes_fidelizacion.panel') }}" class="flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="page" value="{{ movimientos.page }}">
+                    <div class="relative">
+                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 dark:text-gray-500">
+                            <i class="fas fa-search text-xs"></i>
+                        </span>
+                        <input type="text" name="buscar_cliente" value="{{ buscar_cliente }}"
+                            placeholder="Buscar cliente..."
+                            class="w-64 rounded-xl border-2 border-gray-200 bg-white py-2.5 pl-12 pr-3 text-sm text-gray-800 transition focus:border-blue-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600">
+                        Buscar
+                    </button>
+                    {% if buscar_cliente %}
+                    <a href="{{ url_for('clientes_fidelizacion.panel', page=movimientos.page) }}"
+                        class="text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+                        Limpiar
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Cliente</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Compras</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Disponibles</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Canjeados</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Detalle</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for cliente in clientes_con_saldo.items %}
+                        <tr>
+                            {% set resumen = beneficios_por_cliente.get(cliente.id_cliente, {'cantidad': 0, 'items': []}) %}
+                            <td class="px-4 py-4 text-sm font-medium text-gray-800 dark:text-gray-100">
+                                <div class="flex items-center gap-3">
+                                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200">
+                                        <i class="fas fa-user"></i>
+                                    </span>
+                                    <div>
+                                        <p class="font-semibold text-gray-900 dark:text-gray-100">{{ cliente.nombre }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Historial de fidelizacion</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-4 py-4 text-right text-sm text-gray-700 dark:text-gray-200">
+                                <span class="inline-flex min-w-[3rem] justify-center rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-700 dark:bg-gray-700 dark:text-gray-100">{{ cliente.fidelizacion_compras_acumuladas_seguras }}</span>
+                            </td>
+                            <td class="px-4 py-4 text-right text-sm {% if resumen['cantidad'] < 0 %}text-red-600 dark:text-red-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %}">
+                                <span class="inline-flex min-w-[3rem] justify-center rounded-full px-3 py-1 font-semibold {% if resumen['cantidad'] < 0 %}bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300{% else %}bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300{% endif %}">{{ resumen['cantidad'] }}</span>
+                            </td>
+                            <td class="px-4 py-4 text-right text-sm text-gray-700 dark:text-gray-200">
+                                <span class="inline-flex min-w-[3rem] justify-center rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ cliente.fidelizacion_consumos_canjeados_seguro }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                                {% if resumen['items'] %}
+                                    <div class="max-w-md">
+                                        <p class="font-medium text-gray-800 dark:text-gray-100">{{ resumen['items'][0].cantidad }} x {{ resumen['items'][0].resumen }}</p>
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            {% if resumen['items'][0].fecha_vencimiento_texto %}Vence {{ resumen['items'][0].fecha_vencimiento_texto }}{% else %}Sin vencimiento informado{% endif %}
+                                            {% if resumen['items']|length > 1 %} · +{{ resumen['items']|length - 1 }} tipo(s) adicional(es){% endif %}
+                                        </p>
+                                    </div>
+                                {% else %}
+                                    <span class="text-gray-400 dark:text-gray-500">Sin beneficios disponibles</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-4 text-right">
+                                <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente) }}" class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-blue-100 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/30">
+                                    <i class="fas fa-arrow-right text-xs"></i>
+                                    Ver ficha
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                                Todavia no hay clientes con movimientos de fidelizacion.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if clientes_con_saldo.pages > 1 %}
+            <div class="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                    Pagina {{ clientes_con_saldo.page }} de {{ clientes_con_saldo.pages }}
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if clientes_con_saldo.has_prev %}
+                    <a href="{{ url_for('clientes_fidelizacion.panel', clientes_page=clientes_con_saldo.prev_num, buscar_cliente=buscar_cliente, page=movimientos.page) }}"
+                        class="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">
+                        Anterior
+                    </a>
+                    {% endif %}
+                    {% if clientes_con_saldo.has_next %}
+                    <a href="{{ url_for('clientes_fidelizacion.panel', clientes_page=clientes_con_saldo.next_num, buscar_cliente=buscar_cliente, page=movimientos.page) }}"
+                        class="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">
+                        Siguiente
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-lg shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-none">
+        <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Movimientos recientes</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Trazabilidad de ajustes, canjes y beneficios liberados.</p>
+                </div>
+                <span class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    {{ total_movimientos }} registros
+                </span>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Fecha</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Cliente</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Tipo</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Compras</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Disponibles</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Canjeados</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Beneficio</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-300">Detalle</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for mov in movimientos.items %}
+                    <tr>
+                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{{ mov.fecha_movimiento|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-100">{{ mov.cliente.nombre if mov.cliente else 'Cliente eliminado' }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                            <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium capitalize text-gray-700 dark:bg-gray-700 dark:text-gray-200">{{ mov.tipo_movimiento.replace('_', ' ') }}</span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right {% if mov.delta_compras_acumuladas > 0 %}text-emerald-600 dark:text-emerald-400{% elif mov.delta_compras_acumuladas < 0 %}text-red-600 dark:text-red-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                            {{ '%+d'|format(mov.delta_compras_acumuladas or 0) }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right {% if mov.delta_consumos_disponibles > 0 %}text-emerald-600 dark:text-emerald-400{% elif mov.delta_consumos_disponibles < 0 %}text-red-600 dark:text-red-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                            {{ '%+d'|format(mov.delta_consumos_disponibles or 0) }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right {% if mov.delta_consumos_canjeados > 0 %}text-amber-600 dark:text-amber-400{% elif mov.delta_consumos_canjeados < 0 %}text-red-600 dark:text-red-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                            {{ '%+d'|format(mov.delta_consumos_canjeados or 0) }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{{ beneficio_resumen_movimiento(mov) if mov.beneficio_tipo or mov.beneficio_descripcion else '-' }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{{ mov.descripcion }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                            Aun no hay movimientos registrados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if movimientos.pages > 1 %}
+        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                Pagina {{ movimientos.page }} de {{ movimientos.pages }}
+            </div>
+            <div class="flex items-center gap-2">
+                {% if movimientos.has_prev %}
+                <a href="{{ url_for('clientes_fidelizacion.panel', page=movimientos.prev_num, clientes_page=clientes_con_saldo.page, buscar_cliente=buscar_cliente) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                    Anterior
+                </a>
+                {% endif %}
+                {% if movimientos.has_next %}
+                <a href="{{ url_for('clientes_fidelizacion.panel', page=movimientos.next_num, clientes_page=clientes_con_saldo.page, buscar_cliente=buscar_cliente) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                    Siguiente
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

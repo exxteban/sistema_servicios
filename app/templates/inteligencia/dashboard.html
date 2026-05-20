@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Centro de Inteligencia Comercial{% endblock %}
+
+{% block content %}
+<div class="space-y-4 2xl:space-y-5"
+     x-data="{ inteligenciaTab: '{{ vista_activa }}' }"
+     data-inteligencia-root
+     data-puede-ver-clientes="{{ 'true' if current_user.tiene_permiso('ver_clientes') else 'false' }}"
+     data-detalle-cliente-base="{{ url_for('clientes.detalle', id=0) }}">
+    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800">
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:items-start md:gap-5">
+            <div class="min-w-0 xl:col-span-2">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 font-semibold mb-1">Centro de Inteligencia Comercial</p>
+                <h1 class="text-xl md:text-2xl font-bold text-gray-900 dark:text-white leading-tight">Radar ejecutivo del negocio</h1>
+                <p class="mt-1 max-w-3xl text-sm text-gray-600 dark:text-slate-300">
+                    Esta etapa reúne señales rápidas de ventas, clientes, tienda e inventario para decidir qué conviene mover hoy.
+                </p>
+            </div>
+            
+            <div class="self-start">
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 md:px-4 md:py-3 dark:border-slate-600 dark:bg-slate-800/60">
+                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <p class="text-[11px] uppercase tracking-wider text-gray-500 dark:text-slate-400 font-semibold">Corte</p>
+                                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ panel.fecha_corte_label }}</p>
+                            </div>
+                            <div class="flex flex-col gap-1 text-xs">
+                                <div class="text-gray-600 dark:text-slate-300"><span class="text-blue-600 dark:text-blue-400 font-medium">Actual:</span> {{ panel.periodo_actual_label }}</div>
+                                <div class="text-gray-500 dark:text-slate-400"><span class="font-medium text-gray-700 dark:text-slate-300">Anterior:</span> {{ panel.periodo_anterior_label }}</div>
+                            </div>
+                        </div>
+
+                        <form method="get" action="{{ url_for('inteligencia.dashboard') }}">
+                            <input type="hidden" name="vista" value="{{ vista_activa }}">
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="inteligencia-periodo" class="text-[11px] uppercase tracking-wider text-gray-500 dark:text-slate-400 font-semibold mr-4">Período</label>
+                                <span class="text-[10px] md:text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Activo: {{ panel.periodo_label }}</span>
+                            </div>
+                            <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                                <select id="inteligencia-periodo" name="periodo" onchange="this.closest('form').querySelector('button[type=submit]').click()" class="w-full rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none">
+                                    {% for periodo in panel.periodos_disponibles %}
+                                    <option value="{{ periodo.valor }}" {% if periodo.activo %}selected{% endif %}>{{ periodo.label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="inline-flex items-center justify-center rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:ring-2 focus:ring-blue-500/50">
+                                    Aplicar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="rounded-2xl bg-white dark:bg-gray-800 shadow-md p-4 2xl:p-5">
+        <div class="flex flex-col gap-3">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">Navegación</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Elegí una vista del centro de inteligencia</h2>
+            </div>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-3" role="tablist" aria-label="Vistas del centro de inteligencia">
+                <a href="{{ url_for('inteligencia.dashboard', vista='resumen', periodo=panel.periodo_clave) }}"
+                   role="tab"
+                   aria-selected="{{ 'true' if vista_activa == 'resumen' else 'false' }}"
+                   @click.prevent="inteligenciaTab = 'resumen'; window.history.replaceState({}, '', $el.href)"
+                   class="rounded-2xl border p-4 text-left transition"
+                   :aria-selected="inteligenciaTab === 'resumen'"
+                   :class="inteligenciaTab === 'resumen' ? 'border-blue-300 bg-blue-50 text-blue-900 shadow-sm dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:bg-blue-50/60 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-200 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/5'">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-base font-bold">Resumen</span>
+                        <span class="inline-flex min-w-9 items-center justify-center rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold dark:bg-gray-800/70">{{ panel.acciones_hoy|length }}</span>
+                    </div>
+                    <p class="mt-2 text-sm opacity-80">Indicadores clave (KPIs), prioridades y segmentos del día.</p>
+                </a>
+                <a href="{{ url_for('inteligencia.dashboard', vista='comercial', periodo=panel.periodo_clave) }}"
+                   role="tab"
+                   aria-selected="{{ 'true' if vista_activa == 'comercial' else 'false' }}"
+                   @click.prevent="inteligenciaTab = 'comercial'; window.history.replaceState({}, '', $el.href)"
+                   class="rounded-2xl border p-4 text-left transition"
+                   :aria-selected="inteligenciaTab === 'comercial'"
+                   :class="inteligenciaTab === 'comercial' ? 'border-cyan-300 bg-cyan-50 text-cyan-900 shadow-sm dark:border-cyan-500/40 dark:bg-cyan-500/10 dark:text-cyan-100' : 'border-gray-200 bg-white text-gray-700 hover:border-cyan-200 hover:bg-cyan-50/60 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-200 dark:hover:border-cyan-500/40 dark:hover:bg-cyan-500/5'">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-base font-bold">Comercial</span>
+                        <span class="inline-flex min-w-9 items-center justify-center rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold dark:bg-gray-800/70">{{ panel.campanas.resumen.campanas_activables }}</span>
+                    </div>
+                    <p class="mt-2 text-sm opacity-80">Ventas, campañas y clientes que conviene mover hoy.</p>
+                </a>
+                <a href="{{ url_for('inteligencia.dashboard', vista='operacion', periodo=panel.periodo_clave) }}"
+                   role="tab"
+                   aria-selected="{{ 'true' if vista_activa == 'operacion' else 'false' }}"
+                   @click.prevent="inteligenciaTab = 'operacion'; window.history.replaceState({}, '', $el.href)"
+                   class="rounded-2xl border p-4 text-left transition"
+                   :aria-selected="inteligenciaTab === 'operacion'"
+                   :class="inteligenciaTab === 'operacion' ? 'border-orange-300 bg-orange-50 text-orange-900 shadow-sm dark:border-orange-500/40 dark:bg-orange-500/10 dark:text-orange-100' : 'border-gray-200 bg-white text-gray-700 hover:border-orange-200 hover:bg-orange-50/60 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-200 dark:hover:border-orange-500/40 dark:hover:bg-orange-500/5'">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-base font-bold">Operación</span>
+                        <span class="inline-flex min-w-9 items-center justify-center rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold dark:bg-gray-800/70">{{ panel.stock.riesgo_count + panel.stock.inmovilizado_count }}</span>
+                    </div>
+                    <p class="mt-2 text-sm opacity-80">Stock, tienda e inventario para detectar trabas rápidas.</p>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% include "inteligencia/_tab_resumen.html" %}
+    {% include "inteligencia/_tab_comercial.html" %}
+    {% include "inteligencia/_tab_operacion.html" %}
+    {% include "inteligencia/_modal_detalles.html" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    {% include "inteligencia/_charts_js.html" %}
+{% endblock %}

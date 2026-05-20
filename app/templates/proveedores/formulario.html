@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if proveedor else 'Nuevo' }} Proveedor{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <!-- Encabezado -->
+    <div class="flex items-center gap-3">
+        <a href="{{ url_for('proveedores.listar') }}"
+            class="text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-truck text-purple-600 dark:text-purple-400 mr-2"></i>
+            {{ 'Editar Proveedor' if proveedor else 'Nuevo Proveedor' }}
+        </h1>
+    </div>
+
+    <!-- Formulario -->
+    <form method="POST"
+        action="{{ url_for('proveedores.editar', id_proveedor=proveedor.id_proveedor) if proveedor else url_for('proveedores.nuevo') }}"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-6 transition-colors duration-300">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <!-- Información Básica -->
+        <div>
+            <h2
+                class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
+                <i class="fas fa-info-circle text-purple-600 dark:text-purple-400 mr-2"></i>Información Básica
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                        Nombre <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="nombre" required value="{{ proveedor.nombre if proveedor else '' }}"
+                        class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                        placeholder="Nombre del proveedor">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">RUC</label>
+                    <input type="text" name="ruc" value="{{ proveedor.ruc if proveedor else '' }}"
+                        class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                        placeholder="00000000-0">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Teléfono</label>
+                    <input type="tel" name="telefono" value="{{ proveedor.telefono if proveedor else '' }}"
+                        class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                        placeholder="0981-000000">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Email</label>
+                    <input type="email" name="email" value="{{ proveedor.email if proveedor else '' }}"
+                        class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                        placeholder="proveedor@ejemplo.com">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Dirección</label>
+                    <textarea name="direccion" rows="2"
+                        class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                        placeholder="Dirección completa">{{ proveedor.direccion if proveedor else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información de Contacto -->
+        <div>
+            <h2
+                class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
+                <i class="fas fa-user text-purple-600 dark:text-purple-400 mr-2"></i>Persona de Contacto
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nombre del
+                        Contacto</label>
+                    <input type="text" name="contacto_nombre"
+                        value="{{ proveedor.contacto_nombre if proveedor else '' }}"
+                        class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                        placeholder="Nombre completo">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Teléfono del
+                        Contacto</label>
+                    <input type="tel" name="contacto_telefono"
+                        value="{{ proveedor.contacto_telefono if proveedor else '' }}"
+                        class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                        placeholder="0981-000000">
+                </div>
+            </div>
+        </div>
+
+        <!-- Condiciones Comerciales -->
+        <div>
+            <h2
+                class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
+                <i class="fas fa-handshake text-purple-600 dark:text-purple-400 mr-2"></i>Condiciones Comerciales
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Días de
+                        Crédito</label>
+                    <input type="number" name="dias_credito" min="0"
+                        value="{{ proveedor.dias_credito if proveedor else 0 }}"
+                        class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                        placeholder="0">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">0 = Pago al contado</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notas -->
+        <div>
+            <h2
+                class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
+                <i class="fas fa-sticky-note text-purple-600 dark:text-purple-400 mr-2"></i>Notas Adicionales
+            </h2>
+            <textarea name="notas" rows="3"
+                class="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+                placeholder="Notas, observaciones o información adicional...">{{ proveedor.notas if proveedor else '' }}</textarea>
+        </div>
+
+        <!-- Botones -->
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <a href="{{ url_for('proveedores.listar') }}"
+                class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                Cancelar
+            </a>
+            <button type="submit" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                <i class="fas fa-save mr-1"></i>
+                {{ 'Actualizar' if proveedor else 'Guardar' }} Proveedor
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

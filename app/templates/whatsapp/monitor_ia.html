@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+
+{% block title %}Monitor IA - WhatsApp{% endblock %}
+
+{% block content %}
+<div class="h-full flex flex-col" x-data="monitorPanel()">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-blue-500/20 rounded-xl">
+                <i class="fas fa-robot text-2xl text-blue-500"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">Monitor IA</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Conversaciones del bot con clientes</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido principal -->
+    <div class="flex-1 min-h-0 flex gap-4">
+        <!-- Lista de conversaciones (izquierda) -->
+        <div class="w-80 flex-shrink-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+            <!-- Filtros -->
+            <div class="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+                <h2 class="text-sm font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    <i class="fas fa-robot mr-1"></i> Conversaciones
+                    <span class="ml-1 text-xs font-normal text-gray-400" x-text="'(' + monitorTotal + ')'"></span>
+                </h2>
+                <!-- Búsqueda -->
+                <input type="text" x-model="monitorBusqueda" placeholder="Buscar teléfono o nombre..."
+                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+                <!-- Filtro modo -->
+                <div class="flex gap-1 flex-wrap">
+                    <template x-for="m in ['todos','bot','asesor','derivacion']" :key="m">
+                        <button @click="monitorFiltroModo = m; monitorPagina = 1; cargarMonitor()"
+                            class="px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all"
+                            :class="monitorFiltroModo === m
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                            x-text="m === 'todos' ? 'Todos' : m.charAt(0).toUpperCase() + m.slice(1)">
+                        </button>
+                    </template>
+                </div>
+                <!-- Filtro activa -->
+                <div class="flex gap-1">
+                    <template x-for="[val, label] in [['', 'Todas'], ['true', 'Activas'], ['false', 'Cerradas']]" :key="val">
+                        <button @click="monitorFiltroActiva = val; monitorPagina = 1; cargarMonitor()"
+                            class="px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all"
+                            :class="monitorFiltroActiva === val
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                            x-text="label">
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Lista -->
+            <div class="flex-1 overflow-y-auto">
+                <template x-if="monitorCargando && monitorConversaciones.length === 0">
+                    <div class="p-6 text-center text-gray-400 dark:text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p class="text-xs">Cargando...</p>
+                    </div>
+                </template>
+                <template x-if="!monitorCargando && monitorConversacionesFiltradas.length === 0">
+                    <div class="p-6 text-center text-gray-400 dark:text-gray-500">
+                        <i class="fas fa-inbox text-3xl mb-2 opacity-30"></i>
+                        <p class="text-xs">Sin resultados</p>
+                    </div>
+                </template>
+                <template x-for="conv in monitorConversacionesFiltradas" :key="conv.id">
+                    <button @click="seleccionarMonitorConv(conv)"
+                        class="w-full text-left p-3 border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        :class="monitorConvActiva && monitorConvActiva.id === conv.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500' : ''">
+                        <div class="flex items-start gap-2">
+                            <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                                :class="conv.modo === 'bot' ? 'bg-blue-500/15' : conv.modo === 'asesor' ? 'bg-green-500/15' : 'bg-yellow-500/15'">
+                                <i class="text-sm"
+                                    :class="conv.modo === 'bot' ? 'fas fa-robot text-blue-500' : conv.modo === 'asesor' ? 'fas fa-user text-green-500' : 'fas fa-clock text-yellow-500'"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="font-semibold text-xs text-gray-800 dark:text-gray-200 truncate" x-text="conv.nombre_contacto"></span>
+                                    <span class="text-[10px] text-gray-400 flex-shrink-0" x-text="formatTime(conv.ultima_actividad)"></span>
+                                </div>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5" x-text="conv.ultimo_mensaje || '—'"></p>
+                                <div class="flex items-center gap-1 mt-1 flex-wrap">
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                                        :class="conv.modo === 'bot' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : conv.modo === 'asesor' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'"
+                                        x-text="conv.modo"></span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                                        :class="conv.activa ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                                        x-text="conv.activa ? 'activa' : 'cerrada'"></span>
+                                    <template x-if="conv.origen_web_bot">
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 font-medium">
+                                            Web Bot
+                                        </span>
+                                    </template>
+                                    <span x-show="conv.tool_calls_count > 0" class="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 font-medium">
+                                        🔧 <span x-text="conv.tool_calls_count"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </button>
+                </template>
+            </div>
+
+            <!-- Paginación -->
+            <div class="p-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between" x-show="monitorPages > 1">
+                <button @click="monitorPagina--; cargarMonitor()" :disabled="monitorPagina <= 1"
+                    class="px-3 py-1 text-xs rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                    Pág <span x-text="monitorPagina"></span>/<span x-text="monitorPages"></span>
+                </span>
+                <button @click="monitorPagina++; cargarMonitor()" :disabled="monitorPagina >= monitorPages"
+                    class="px-3 py-1 text-xs rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Detalle de conversación (derecha) -->
+        <div class="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+            <!-- Sin selección -->
+            <template x-if="!monitorConvActiva">
+                <div class="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                    <div class="text-center">
+                        <i class="fas fa-robot text-6xl mb-4 opacity-20"></i>
+                        <p class="text-lg font-medium">Seleccioná una conversación</p>
+                        <p class="text-sm mt-1">Ver el historial completo del bot con el cliente</p>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Con selección -->
+            <template x-if="monitorConvActiva">
+                <div class="flex flex-col h-full">
+                    <!-- Header del chat -->
+                    <div class="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                                :class="monitorConvActiva.modo === 'bot' ? 'bg-blue-500/15' : monitorConvActiva.modo === 'asesor' ? 'bg-green-500/15' : 'bg-yellow-500/15'">
+                                <i :class="monitorConvActiva.modo === 'bot' ? 'fas fa-robot text-blue-500' : monitorConvActiva.modo === 'asesor' ? 'fas fa-user text-green-500' : 'fas fa-clock text-yellow-500'"></i>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-gray-800 dark:text-gray-200" x-text="monitorConvActiva.nombre_contacto"></span>
+                                <p class="text-xs text-gray-500 dark:text-gray-400" x-text="monitorConvActiva.telefono"></p>
+                                <template x-if="monitorConvActiva.origen_web_bot">
+                                    <p class="text-[11px] text-sky-600 dark:text-sky-300">Origen: Web Bot</p>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs px-2 py-1 rounded-full font-medium"
+                                :class="monitorConvActiva.modo === 'bot' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : monitorConvActiva.modo === 'asesor' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'"
+                                x-text="'Modo: ' + monitorConvActiva.modo"></span>
+                            <span class="text-xs px-2 py-1 rounded-full font-medium"
+                                :class="monitorConvActiva.activa ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                                x-text="monitorConvActiva.activa ? 'Activa' : 'Cerrada'"></span>
+                            <span class="text-xs text-gray-400" x-text="'Inicio: ' + formatTime(monitorConvActiva.inicio_sesion)"></span>
+                        </div>
+                    </div>
+
+                    <!-- Mensajes -->
+                    <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-[#e5ddd5] dark:bg-gray-900/50" x-ref="monitorChatMessages">
+                        <template x-if="monitorMensajesCargando">
+                            <div class="flex justify-center py-8">
+                                <i class="fas fa-spinner fa-spin text-gray-400 text-2xl"></i>
+                            </div>
+                        </template>
+                        <template x-for="msg in monitorMensajes" :key="msg.id">
+                            <div>
+                                <!-- Mensaje normal -->
+                                <template x-if="msg.contenido !== '[tool_call]' && msg.contenido !== '[tool_result]'">
+                                    <div class="flex" :class="msg.direccion === 'entrante' ? 'justify-start' : 'justify-end'">
+                                        <div class="max-w-[72%] rounded-2xl px-4 py-2 shadow-sm"
+                                            :class="msg.direccion === 'entrante'
+                                                ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-tl-sm'
+                                                : (msg.remitente === 'bot'
+                                                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100 rounded-tr-sm'
+                                                    : 'bg-green-100 dark:bg-green-900/40 text-green-900 dark:text-green-100 rounded-tr-sm')">
+                                            <p class="text-sm whitespace-pre-wrap" x-text="msg.contenido"></p>
+                                            <div class="flex items-center justify-end gap-1 mt-1">
+                                                <span class="text-[10px] opacity-60" x-text="formatTime(msg.created_at)"></span>
+                                                <template x-if="msg.direccion === 'saliente'">
+                                                    <span class="text-[10px] opacity-50" x-text="msg.remitente === 'bot' ? '🤖' : '👤'"></span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- Tool call (colapsable) -->
+                                <template x-if="msg.tool_call && (msg.contenido === '[tool_call]' || msg.contenido === '[tool_result]')">
+                                    <div class="flex justify-center my-1">
+                                        <div class="max-w-[80%] w-full">
+                                            <button @click="msg._open = !msg._open"
+                                                class="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700/50 text-purple-700 dark:text-purple-300 text-xs font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30 transition">
+                                                <i class="fas fa-wrench text-purple-500"></i>
+                                                <span x-text="getToolName(msg)"></span>
+                                                <span class="ml-auto text-[10px] opacity-60" x-text="formatTime(msg.created_at)"></span>
+                                                <i class="fas text-[10px] opacity-50" :class="msg._open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                                            </button>
+                                            <div x-show="msg._open" x-transition class="mt-1 rounded-xl overflow-hidden border border-purple-200 dark:border-purple-700/50">
+                                                <pre class="text-[11px] p-3 bg-gray-900 text-green-300 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed" x-text="formatToolCall(msg)"></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Contexto JSON (colapsable, al pie) -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
+                        <button @click="monitorContextoAbierto = !monitorContextoAbierto"
+                            class="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition">
+                            <i class="fas fa-code text-gray-400"></i>
+                            Contexto JSON (debug)
+                            <i class="fas ml-auto" :class="monitorContextoAbierto ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div x-show="monitorContextoAbierto" x-transition class="border-t border-gray-200 dark:border-gray-700">
+                            <pre class="text-[11px] p-4 bg-gray-900 text-green-300 overflow-x-auto max-h-48 whitespace-pre-wrap break-all leading-relaxed" x-text="JSON.stringify(monitorContexto, null, 2)"></pre>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function monitorPanel() {
+    return {
+        // ── Estado Monitor IA ──────────────────────────────────────────
+        monitorCargando: false,
+        monitorConversaciones: [],
+        monitorConvActiva: null,
+        monitorMensajes: [],
+        monitorMensajesCargando: false,
+        monitorContexto: {},
+        monitorContextoAbierto: false,
+        monitorFiltroModo: 'todos',
+        monitorFiltroActiva: '',
+        monitorBusqueda: '',
+        monitorPagina: 1,
+        monitorPages: 1,
+        monitorTotal: 0,
+        pollInterval: null,
+
+        get monitorConversacionesFiltradas() {
+            const q = this.monitorBusqueda.trim().toLowerCase();
+            if (!q) return this.monitorConversaciones;
+            return this.monitorConversaciones.filter(c =>
+                (c.nombre_contacto || '').toLowerCase().includes(q) ||
+                (c.telefono || '').toLowerCase().includes(q)
+            );
+        },
+
+        // ── Init / Destroy ──────────────────────────────────────────────
+        async init() {
+            await this.cargarMonitor();
+            // Refrescar cada 10 segundos
+            this.pollInterval = setInterval(() => this.cargarMonitor(), 10000);
+        },
+
+        destroy() {
+            if (this.pollInterval) clearInterval(this.pollInterval);
+        },
+
+        // ── Fetch helper ────────────────────────────────────────────────
+        async fetchJson(url, opts = {}) {
+            try {
+                const resp = await fetch(url, {
+                    headers: { 'Content-Type': 'application/json' },
+                    ...opts
+                });
+                let data = null;
+                try { data = await resp.json(); } catch { data = null; }
+
+                if (!resp.ok) {
+                    const msg = (data && (data.mensaje || data.error)) ? (data.mensaje || data.error) : `Error HTTP ${resp.status}`;
+                    if (window.mostrarNotificacion) window.mostrarNotificacion(msg, 'error');
+                    return null;
+                }
+                if (data && data.error && window.mostrarNotificacion) {
+                    window.mostrarNotificacion(data.error, 'error');
+                }
+                return data;
+            } catch (e) {
+                console.error('Monitor IA API error:', e);
+                if (window.mostrarNotificacion) window.mostrarNotificacion('No se pudo contactar con el servidor.', 'error');
+                return null;
+            }
+        },
+
+        // ── Monitor IA ──────────────────────────────────────────────────
+        async cargarMonitor() {
+            // No mostrar spinner en polling automático, solo en carga inicial
+            const mostrarSpinner = this.monitorConversaciones.length === 0;
+            if (mostrarSpinner) this.monitorCargando = true;
+
+            const params = new URLSearchParams({ page: this.monitorPagina });
+            if (this.monitorFiltroModo && this.monitorFiltroModo !== 'todos') params.set('modo', this.monitorFiltroModo);
+            if (this.monitorFiltroActiva !== '') params.set('activa', this.monitorFiltroActiva);
+
+            const data = await this.fetchJson(`/whatsapp/admin/ia_conversaciones?${params}`);
+            if (mostrarSpinner) this.monitorCargando = false;
+
+            if (!data) return;
+            this.monitorConversaciones = data.conversaciones || [];
+            this.monitorTotal = data.total || 0;
+            this.monitorPages = data.pages || 1;
+        },
+
+        async seleccionarMonitorConv(conv) {
+            this.monitorConvActiva = conv;
+            this.monitorMensajes = [];
+            this.monitorContexto = {};
+            this.monitorContextoAbierto = false;
+            this.monitorMensajesCargando = true;
+
+            const data = await this.fetchJson(`/whatsapp/admin/ia_conversacion/${conv.id}/mensajes`);
+            this.monitorMensajesCargando = false;
+            if (!data) return;
+
+            this.monitorConvActiva = { ...conv, ...data.conversacion };
+            this.monitorMensajes = (data.mensajes || []).map(m => ({ ...m, _open: false }));
+            this.monitorContexto = data.contexto || {};
+
+            this.$nextTick(() => {
+                const el = this.$refs.monitorChatMessages;
+                if (el) el.scrollTop = el.scrollHeight;
+            });
+        },
+
+        getToolName(msg) {
+            if (!msg.tool_call) return 'tool';
+            const tc = msg.tool_call;
+            if (tc.tool_name) return tc.tool_name;
+            if (tc.raw_message && tc.raw_message.tool_calls && tc.raw_message.tool_calls[0]) {
+                return tc.raw_message.tool_calls[0].function?.name || 'tool_call';
+            }
+            if (tc.tool_call_id) return 'tool_result';
+            return 'tool';
+        },
+
+        formatToolCall(msg) {
+            if (!msg.tool_call) return '';
+            try {
+                return JSON.stringify(msg.tool_call, null, 2);
+            } catch {
+                return String(msg.tool_call);
+            }
+        },
+
+        // ── Shared ──────────────────────────────────────────────────────
+        parseServerDate(isoStr) {
+            if (!isoStr) return null;
+            const s = String(isoStr).trim();
+            if (!s) return null;
+            const hasTz = /[zZ]$/.test(s) || /[+-]\d\d:\d\d$/.test(s);
+            const d = new Date(hasTz ? s : `${s}Z`);
+            return isNaN(d.getTime()) ? null : d;
+        },
+
+        formatTime(isoStr) {
+            if (!isoStr) return '';
+            try {
+                const d = this.parseServerDate(isoStr);
+                if (!d) return '';
+                const now = new Date();
+                const isToday = d.toDateString() === now.toDateString();
+                if (isToday) {
+                    return d.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit', hour12: false });
+                }
+                return d.toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit' }) + ' ' +
+                       d.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit', hour12: false });
+            } catch { return ''; }
+        }
+    };
+}
+</script>
+{% endblock %}

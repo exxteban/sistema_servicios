@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de gastos corrientes</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.1cm;
+        }
+
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 9pt;
+            color: #1f2937;
+        }
+
+        h1, h2, h3, p {
+            margin: 0;
+        }
+
+        .header {
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #d1d5db;
+        }
+
+        .title {
+            font-size: 18pt;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .muted {
+            color: #6b7280;
+            font-size: 8pt;
+        }
+
+        .meta-table,
+        .summary-table,
+        .category-table,
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .meta-table td {
+            padding: 4px 6px;
+            border: 1px solid #e5e7eb;
+            font-size: 8.5pt;
+        }
+
+        .section-title {
+            margin-top: 18px;
+            margin-bottom: 6px;
+            font-size: 11pt;
+            color: #111827;
+        }
+
+        .summary-table td,
+        .summary-table th,
+        .category-table td,
+        .category-table th,
+        .detail-table td,
+        .detail-table th {
+            border: 1px solid #e5e7eb;
+            padding: 5px 6px;
+            vertical-align: top;
+        }
+
+        .summary-table th,
+        .category-table th,
+        .detail-table th {
+            background-color: #f3f4f6;
+            font-size: 8pt;
+            text-align: left;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .small {
+            font-size: 7.5pt;
+        }
+
+        .pill {
+            padding: 2px 5px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 7.5pt;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">Reporte de Gastos Corrientes</h1>
+        <p class="muted">Período {{ reporte.periodo }} · Generado {{ reporte.generado_el }}</p>
+    </div>
+
+    <table class="meta-table">
+        <tr>
+            <td><strong>Categoría</strong></td>
+            <td>{{ reporte.categoria }}</td>
+            <td><strong>Estado</strong></td>
+            <td>{{ reporte.estado }}</td>
+        </tr>
+        <tr>
+            <td><strong>Vencidos</strong></td>
+            <td>{{ reporte.vencidos }}</td>
+            <td><strong>Alertas activas</strong></td>
+            <td>{{ reporte.alertas_activas }}</td>
+        </tr>
+    </table>
+
+    <h2 class="section-title">Resumen general</h2>
+    <table class="summary-table">
+        <tr>
+            <th>Total estimado</th>
+            <th>Total pagado</th>
+            <th>Total pendiente</th>
+            <th>% pagado</th>
+            <th>% pendiente</th>
+            <th>Desvío</th>
+        </tr>
+        <tr>
+            <td>{{ reporte.total_estimado }}</td>
+            <td>{{ reporte.total_pagado }}</td>
+            <td>{{ reporte.total_pendiente }}</td>
+            <td>{{ reporte.comparativo.porcentaje_pagado }}</td>
+            <td>{{ reporte.comparativo.porcentaje_pendiente }}</td>
+            <td>{{ reporte.comparativo.desviacion }} ({{ reporte.comparativo.estado_desviacion }})</td>
+        </tr>
+    </table>
+
+    <h2 class="section-title">Comparativo del período</h2>
+    <table class="summary-table">
+        <tr>
+            <th>Gastos analizados</th>
+            <th>Pagados</th>
+            <th>Pendientes</th>
+        </tr>
+        <tr>
+            <td>{{ reporte.comparativo.cantidad_items }}</td>
+            <td>{{ reporte.comparativo.cantidad_pagados }}</td>
+            <td>{{ reporte.comparativo.cantidad_pendientes }}</td>
+        </tr>
+    </table>
+
+    <h2 class="section-title">Top categorías</h2>
+    <table class="category-table">
+        <tr>
+            <th>Categoría</th>
+            <th>Gastos</th>
+            <th>Pagados</th>
+            <th>Pendientes</th>
+            <th>Estimado</th>
+            <th>Pagado</th>
+            <th>% pagado</th>
+        </tr>
+        {% for categoria in reporte['categorias_resumen'] %}
+        <tr>
+            <td>{{ categoria.label }}</td>
+            <td>{{ categoria.cantidad }}</td>
+            <td>{{ categoria.pagados }}</td>
+            <td>{{ categoria.pendientes }}</td>
+            <td>{{ categoria.total_estimado }}</td>
+            <td>{{ categoria.total_pagado }}</td>
+            <td>{{ categoria.porcentaje_pagado }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="7">No hay categorías disponibles para este filtro.</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2 class="section-title">Detalle mensual</h2>
+    <table class="detail-table">
+        <tr>
+            <th>Concepto</th>
+            <th>Categoría</th>
+            <th>Vencimiento</th>
+            <th>Estimado</th>
+            <th>Pagado</th>
+            <th>Pendiente</th>
+            <th>Estado</th>
+            <th>Alerta</th>
+            <th>Pago</th>
+            <th>Comprobante</th>
+        </tr>
+        {% for item in reporte['items'] %}
+        <tr>
+            <td>{{ item.nombre }}</td>
+            <td>{{ item.categoria }}</td>
+            <td>{{ item.vencimiento }}</td>
+            <td>{{ item.estimado }}</td>
+            <td>{{ item.pagado }}</td>
+            <td>{{ item.pendiente }}</td>
+            <td>{{ item.estado }}</td>
+            <td>{{ item.alerta }}</td>
+            <td>{{ item.medio_pago }}</td>
+            <td>{{ item.comprobante }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="10">No hay gastos corrientes para mostrar en este período.</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <p class="muted small" style="margin-top: 10px;">
+        Documento generado desde el módulo de gastos corrientes.
+    </p>
+</body>
+</html>

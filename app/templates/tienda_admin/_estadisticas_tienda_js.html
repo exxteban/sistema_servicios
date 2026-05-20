@@ -1,0 +1,470 @@
+const tiendaDashboardStatsState = {
+    initialized: false,
+    range: 'week',
+    page: 1,
+    perPage: 10,
+    chart: null,
+    evolutionChart: null,
+};
+
+function obtenerControlesEstadisticasTienda() {
+    return {
+        modal: document.getElementById('modalEstadisticasTienda'),
+        backdrop: document.getElementById('modalEstadisticasTiendaBackdrop'),
+        close: document.getElementById('btnCerrarEstadisticasTienda'),
+        loading: document.getElementById('statsTiendaLoading'),
+        from: document.getElementById('statsTiendaDesde'),
+        to: document.getElementById('statsTiendaHasta'),
+        category: document.getElementById('statsTiendaCategoria'),
+        apply: document.getElementById('btnAplicarFiltrosEstadisticasTienda'),
+        tableBody: document.getElementById('tablaEstadisticasTiendaBody'),
+        paginationInfo: document.getElementById('statsTiendaPaginacionInfo'),
+        pageNumbers: document.getElementById('statsTiendaPageNumbers'),
+        prev: document.getElementById('btnStatsTiendaPrev'),
+        next: document.getElementById('btnStatsTiendaNext'),
+        chart: document.getElementById('chartEstadisticasTienda'),
+        evolutionChart: document.getElementById('chartEvolucionEstadisticasTienda'),
+        total: document.getElementById('statsTiendaTotalVisitas'),
+        unique: document.getElementById('statsTiendaVisitantesUnicos'),
+        leads: document.getElementById('statsTiendaLeads'),
+        conversion: document.getElementById('statsTiendaConversion'),
+        periodo: document.getElementById('statsTiendaPeriodoInfo'),
+        peakHours: document.getElementById('statsTiendaHorariosPico'),
+        categories: document.getElementById('statsTiendaCategoriasPopulares'),
+        devices: document.getElementById('statsTiendaDispositivos'),
+        browsers: document.getElementById('statsTiendaNavegadores'),
+        rangeButtons: Array.from(document.querySelectorAll('#modalEstadisticasTienda [data-range]')),
+    };
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function formatearNumeroStatsTienda(value) {
+    return new Intl.NumberFormat('es-PY').format(Number(value || 0));
+}
+
+function actualizarBotonesRangeEstadisticasTienda(range) {
+    const { rangeButtons } = obtenerControlesEstadisticasTienda();
+    rangeButtons.forEach((button) => {
+        const active = button.dataset.range === range;
+        button.classList.toggle('bg-indigo-600', active);
+        button.classList.toggle('text-white', active);
+        button.classList.toggle('bg-gray-100', !active);
+        button.classList.toggle('text-gray-700', !active);
+        button.classList.toggle('dark:bg-gray-700', !active);
+        button.classList.toggle('dark:text-gray-200', !active);
+    });
+}
+
+function actualizarFechasEstadisticasTienda(range) {
+    const { from, to } = obtenerControlesEstadisticasTienda();
+    const today = new Date();
+    const start = new Date(today);
+
+    if (range === 'day') {
+        start.setDate(today.getDate());
+    } else if (range === 'month') {
+        start.setDate(today.getDate() - 29);
+    } else {
+        start.setDate(today.getDate() - 6);
+    }
+
+    from.value = start.toISOString().slice(0, 10);
+    to.value = today.toISOString().slice(0, 10);
+}
+
+function construirQueryEstadisticasTienda() {
+    const { from, to, category } = obtenerControlesEstadisticasTienda();
+    const params = new URLSearchParams();
+    params.set('range', tiendaDashboardStatsState.range);
+    params.set('desde', from.value);
+    params.set('hasta', to.value);
+    params.set('page', String(tiendaDashboardStatsState.page));
+    params.set('per_page', String(tiendaDashboardStatsState.perPage));
+    if (category.value) {
+        params.set('categoria_id', category.value);
+    }
+    return params.toString();
+}
+
+function renderizarResumenEstadisticasTienda(summary, desde, hasta) {
+    const controls = obtenerControlesEstadisticasTienda();
+    controls.total.textContent = formatearNumeroStatsTienda(summary.total_visitas);
+    controls.unique.textContent = formatearNumeroStatsTienda(summary.visitantes_unicos);
+    controls.leads.textContent = formatearNumeroStatsTienda(summary.leads_generados);
+    controls.conversion.textContent = `${Number(summary.conversion_global || 0).toFixed(2)}%`;
+    controls.periodo.textContent = `${desde} → ${hasta}`;
+}
+
+function renderizarListaMetricasStatsTienda(container, items, emptyLabel, formatter) {
+    if (!container) return;
+    if (!items?.length) {
+        container.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400">${emptyLabel}</p>`;
+        return;
+    }
+
+    const maxValue = Math.max(...items.map((item) => Number(item.value ?? item.total_visitas ?? 0)), 1);
+    container.innerHTML = items.map((item) => {
+        const value = Number(item.value ?? item.total_visitas ?? 0);
+        const label = item.label || item.hora || item.categoria || 'Sin dato';
+        const width = Math.max(12, Math.round((value / maxValue) * 100));
+        return `
+            <div>
+                <div class="flex items-center justify-between gap-3 text-sm mb-1">
+                    <span class="text-gray-700 dark:text-gray-200">${escapeHtml(label)}</span>
+                    <span class="font-medium text-gray-900 dark:text-white">${formatter(value)}</span>
+                </div>
+                <div class="h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                    <div class="h-full rounded-full bg-indigo-500" style="width: ${width}%"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderizarInsightsEstadisticasTienda(insights) {
+    const controls = obtenerControlesEstadisticasTienda();
+    renderizarListaMetricasStatsTienda(
+        controls.peakHours,
+        insights?.horarios_pico || [],
+        'Aún no hay suficientes eventos para detectar horarios pico.',
+        (value) => `${formatearNumeroStatsTienda(value)} visitas`,
+    );
+    renderizarListaMetricasStatsTienda(
+        controls.categories,
+        insights?.categorias_populares || [],
+        'No hay categorías con tráfico en el rango seleccionado.',
+        (value) => `${formatearNumeroStatsTienda(value)} visitas`,
+    );
+    renderizarListaMetricasStatsTienda(
+        controls.devices,
+        insights?.dispositivos || [],
+        'No hay datos de dispositivos disponibles.',
+        (value) => `${formatearNumeroStatsTienda(value)} visitas`,
+    );
+    renderizarListaMetricasStatsTienda(
+        controls.browsers,
+        insights?.navegadores || [],
+        'No hay datos de navegadores disponibles.',
+        (value) => `${formatearNumeroStatsTienda(value)} visitas`,
+    );
+}
+
+function iconoTendenciaStatsTienda(direction) {
+    if (direction === 'up') {
+        return '<span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><i class="fas fa-arrow-trend-up"></i> Subiendo</span>';
+    }
+    if (direction === 'down') {
+        return '<span class="inline-flex items-center gap-1 text-red-600 dark:text-red-400"><i class="fas fa-arrow-trend-down"></i> Bajando</span>';
+    }
+    return '<span class="inline-flex items-center gap-1 text-gray-500 dark:text-gray-400"><i class="fas fa-minus"></i> Estable</span>';
+}
+
+function construirPaginasVisiblesStatsTienda(currentPage, totalPages) {
+    if (totalPages <= 1) return [1];
+    if (totalPages <= 7) {
+        return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    let start = Math.max(2, currentPage - 1);
+    let end = Math.min(totalPages - 1, currentPage + 1);
+
+    if (currentPage <= 3) {
+        start = 2;
+        end = 4;
+    }
+    if (currentPage >= totalPages - 2) {
+        start = totalPages - 3;
+        end = totalPages - 1;
+    }
+
+    const pages = [1];
+    if (start > 2) {
+        pages.push('ellipsis-start');
+    }
+    for (let page = start; page <= end; page += 1) {
+        pages.push(page);
+    }
+    if (end < totalPages - 1) {
+        pages.push('ellipsis-end');
+    }
+    pages.push(totalPages);
+    return pages;
+}
+
+function renderizarTablaEstadisticasTienda(items, pagination) {
+    const controls = obtenerControlesEstadisticasTienda();
+    if (!items.length) {
+        controls.tableBody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">No hay datos para mostrar con los filtros actuales.</td></tr>';
+    } else {
+        controls.tableBody.innerHTML = items.map((item) => `
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                <td class="px-4 py-3">
+                    <div class="font-medium text-gray-900 dark:text-white">${escapeHtml(item.nombre)}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">${escapeHtml(item.codigo || 'Sin código')}</div>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">${escapeHtml(item.categoria)}</td>
+                <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">${formatearNumeroStatsTienda(item.total_visitas)}</td>
+                <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">${formatearNumeroStatsTienda(item.visitantes_unicos)}</td>
+                <td class="px-4 py-3 text-sm text-right text-emerald-600 dark:text-emerald-400 font-medium">${formatearNumeroStatsTienda(item.leads_generados)}</td>
+                <td class="px-4 py-3 text-sm text-right text-amber-600 dark:text-amber-400 font-medium">${Number(item.conversion_leads || 0).toFixed(2)}%</td>
+                <td class="px-4 py-3 text-sm text-right">
+                    <div>${iconoTendenciaStatsTienda(item.tendencia_direccion)}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">${Number(item.tendencia_porcentaje || 0).toFixed(2)}%</div>
+                </td>
+                <td class="px-4 py-3 text-center">
+                    <button type="button" class="btn-detalle-estadistica-tienda inline-flex items-center gap-2 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:hover:bg-indigo-900/60 dark:text-indigo-300 px-3 py-1.5 text-xs font-medium transition" data-product-id="${item.id_producto}" data-product-name="${escapeHtml(item.nombre)}">
+                        <i class="fas fa-eye"></i> Detalle
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    tiendaDashboardStatsState.page = Number(pagination.page || 1);
+    controls.paginationInfo.textContent = `Página ${pagination.page} de ${pagination.total_pages} · ${formatearNumeroStatsTienda(pagination.total_items)} resultados`;
+    const paginasVisibles = construirPaginasVisiblesStatsTienda(
+        Number(pagination.page || 1),
+        Math.max(1, Number(pagination.total_pages || 1)),
+    );
+    controls.pageNumbers.innerHTML = paginasVisibles.map((pageItem) => {
+        if (typeof pageItem !== 'number') {
+            return '<span class="px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400 select-none">…</span>';
+        }
+        const active = pageItem === Number(pagination.page || 1);
+        const className = active
+            ? 'rounded-lg px-3 py-2 text-sm font-semibold bg-indigo-600 text-white'
+            : 'rounded-lg px-3 py-2 text-sm font-medium bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600';
+        return `<button type="button" class="${className}" data-page="${pageItem}">${pageItem}</button>`;
+    }).join('');
+    controls.prev.disabled = !pagination.has_prev;
+    controls.next.disabled = !pagination.has_next;
+    controls.tableBody.querySelectorAll('.btn-detalle-estadistica-tienda').forEach((button) => {
+        button.addEventListener('click', () => {
+            abrirDetalleProductoDesdeEstadisticasTienda(
+                Number(button.dataset.productId),
+                button.dataset.productName || '',
+            );
+        });
+    });
+}
+
+async function renderizarChartEstadisticasTienda(data) {
+    const { chart } = obtenerControlesEstadisticasTienda();
+    if (!chart) return;
+
+    const ChartLib = await window.ensureChartJs();
+    const ctx = chart.getContext('2d');
+
+    if (tiendaDashboardStatsState.chart) {
+        tiendaDashboardStatsState.chart.destroy();
+    }
+
+    tiendaDashboardStatsState.chart = new ChartLib(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Visitas',
+                data: data.values,
+                backgroundColor: 'rgba(99, 102, 241, 0.65)',
+                borderColor: '#4f46e5',
+                borderWidth: 1,
+                borderRadius: 8,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false,
+                },
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                    },
+                },
+            },
+        },
+    });
+}
+
+async function renderizarChartEvolucionEstadisticasTienda(data) {
+    const { evolutionChart } = obtenerControlesEstadisticasTienda();
+    if (!evolutionChart) return;
+
+    const ChartLib = await window.ensureChartJs();
+    const ctx = evolutionChart.getContext('2d');
+
+    if (tiendaDashboardStatsState.evolutionChart) {
+        tiendaDashboardStatsState.evolutionChart.destroy();
+    }
+
+    tiendaDashboardStatsState.evolutionChart = new ChartLib(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels || [],
+            datasets: [
+                {
+                    label: 'Visitas',
+                    data: data.visitas || [],
+                    borderColor: '#4f46e5',
+                    backgroundColor: 'rgba(79, 70, 229, 0.15)',
+                    fill: true,
+                    tension: 0.35,
+                },
+                {
+                    label: 'Consultas WhatsApp',
+                    data: data.consultas || [],
+                    borderColor: '#059669',
+                    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+                    fill: false,
+                    tension: 0.35,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                    },
+                },
+            },
+        },
+    });
+}
+
+function limpiarChartsEstadisticasTienda() {
+    if (tiendaDashboardStatsState.chart) {
+        tiendaDashboardStatsState.chart.destroy();
+        tiendaDashboardStatsState.chart = null;
+    }
+    if (tiendaDashboardStatsState.evolutionChart) {
+        tiendaDashboardStatsState.evolutionChart.destroy();
+        tiendaDashboardStatsState.evolutionChart = null;
+    }
+}
+
+async function cargarEstadisticasTienda() {
+    const controls = obtenerControlesEstadisticasTienda();
+    controls.loading.classList.remove('hidden');
+
+    try {
+        const response = await fetch(`/api/tienda/admin/estadisticas/productos-mas-vistos?${construirQueryEstadisticasTienda()}`);
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || 'No se pudieron cargar las estadísticas.');
+        }
+
+        renderizarResumenEstadisticasTienda(data.summary, data.desde, data.hasta);
+        renderizarTablaEstadisticasTienda(data.ranking || [], data.pagination);
+        renderizarInsightsEstadisticasTienda(data.insights || {});
+        await renderizarChartEstadisticasTienda(data.chart || { labels: [], values: [] });
+        await renderizarChartEvolucionEstadisticasTienda(data.evolution || { labels: [], visitas: [], consultas: [] });
+    } catch (error) {
+        controls.tableBody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-sm text-red-500">${escapeHtml(error.message)}</td></tr>`;
+        renderizarInsightsEstadisticasTienda({});
+        limpiarChartsEstadisticasTienda();
+    } finally {
+        controls.loading.classList.add('hidden');
+    }
+}
+
+function abrirModalEstadisticasTienda() {
+    inicializarEstadisticasTienda();
+    const { modal } = obtenerControlesEstadisticasTienda();
+    tiendaDashboardStatsState.page = 1;
+    actualizarBotonesRangeEstadisticasTienda(tiendaDashboardStatsState.range);
+    actualizarFechasEstadisticasTienda(tiendaDashboardStatsState.range);
+    modal.classList.remove('hidden');
+    cargarEstadisticasTienda();
+}
+
+function cerrarModalEstadisticasTienda() {
+    const { modal } = obtenerControlesEstadisticasTienda();
+    if (!modal) return;
+    modal.classList.add('hidden');
+    limpiarChartsEstadisticasTienda();
+}
+
+function abrirDetalleProductoDesdeEstadisticasTienda(idProducto, nombreProducto) {
+    cerrarModalEstadisticasTienda();
+    if (typeof abrirModalEstadisticasProducto === 'function') {
+        abrirModalEstadisticasProducto(idProducto, nombreProducto);
+    }
+}
+
+function inicializarEstadisticasTienda() {
+    if (tiendaDashboardStatsState.initialized) {
+        return;
+    }
+    tiendaDashboardStatsState.initialized = true;
+
+    const controls = obtenerControlesEstadisticasTienda();
+    controls.close?.addEventListener('click', cerrarModalEstadisticasTienda);
+    controls.backdrop?.addEventListener('click', cerrarModalEstadisticasTienda);
+    controls.apply?.addEventListener('click', () => {
+        tiendaDashboardStatsState.page = 1;
+        tiendaDashboardStatsState.range = 'custom';
+        actualizarBotonesRangeEstadisticasTienda('custom');
+        cargarEstadisticasTienda();
+    });
+    controls.prev?.addEventListener('click', () => {
+        if (tiendaDashboardStatsState.page <= 1) return;
+        tiendaDashboardStatsState.page -= 1;
+        cargarEstadisticasTienda();
+    });
+    controls.next?.addEventListener('click', () => {
+        tiendaDashboardStatsState.page += 1;
+        cargarEstadisticasTienda();
+    });
+    controls.pageNumbers?.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target.closest('button[data-page]') : null;
+        if (!target) return;
+        const requestedPage = Number(target.dataset.page || 0);
+        if (!Number.isInteger(requestedPage) || requestedPage < 1 || requestedPage === tiendaDashboardStatsState.page) {
+            return;
+        }
+        tiendaDashboardStatsState.page = requestedPage;
+        cargarEstadisticasTienda();
+    });
+    controls.rangeButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            tiendaDashboardStatsState.range = button.dataset.range;
+            tiendaDashboardStatsState.page = 1;
+            actualizarBotonesRangeEstadisticasTienda(tiendaDashboardStatsState.range);
+            actualizarFechasEstadisticasTienda(tiendaDashboardStatsState.range);
+            cargarEstadisticasTienda();
+        });
+    });
+}
+
+window.abrirModalEstadisticasTienda = abrirModalEstadisticasTienda;
+window.cerrarModalEstadisticasTienda = cerrarModalEstadisticasTienda;
+window.abrirDetalleProductoDesdeEstadisticasTienda = abrirDetalleProductoDesdeEstadisticasTienda;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarEstadisticasTienda);
+} else {
+    inicializarEstadisticasTienda();
+}

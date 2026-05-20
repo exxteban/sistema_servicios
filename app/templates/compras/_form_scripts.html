@@ -1,0 +1,303 @@
+<script>
+    // Productos data for search component
+    const productosData = {{ productos| tojson }};
+
+    function compraApp() {
+        return {
+            saldoCaja: {{ saldo_caja|default(0) }},
+            tipoCompra: 'contado',
+            idProveedorSeleccionado: '',
+            items: [{ id: '', cantidad: 1, precio: 0, nombreProducto: '' }],
+            modalProveedor: {
+                visible: false,
+                nombre: '',
+                ruc: '',
+                telefono: '',
+                email: '',
+                direccion: ''
+            },
+            modalProducto: {
+                visible: false,
+                codigo: '',
+                nombre: '',
+                id_categoria: '',
+                nueva_categoria: '',
+                mostrarNuevaCategoria: false,
+                precio_compra: 0,
+                precio_venta: 0,
+                precio_mayorista: null,
+                stock_minimo: 5,
+                usa_precios_opciones: false,
+                precios_opciones: '',
+                porcentaje_iva: 10
+            },
+            guardandoProducto: false,
+            guardandoProveedor: false,
+
+            get total() {
+                return this.items.reduce((sum, item) => sum + (item.cantidad * item.precio), 0);
+            },
+
+            addItem() {
+                this.items.push({ id: '', cantidad: 1, precio: 0, nombreProducto: '' });
+            },
+
+            removeItem(index) {
+                if (this.items.length > 1) {
+                    this.items.splice(index, 1);
+                }
+            },
+
+            formatNumber(num) {
+                return new Intl.NumberFormat('es-PY').format(Math.round(num));
+            },
+
+            abrirModalProducto() {
+                this.modalProducto = {
+                    visible: true,
+                    codigo: '',
+                    nombre: '',
+                    id_categoria: '',
+                    nueva_categoria: '',
+                    mostrarNuevaCategoria: false,
+                    precio_compra: 0,
+                    precio_venta: 0,
+                    precio_mayorista: null,
+                    stock_minimo: 5,
+                    usa_precios_opciones: false,
+                    precios_opciones: '',
+                    porcentaje_iva: 10
+                };
+            },
+
+            abrirModalProveedor() {
+                this.modalProveedor = {
+                    visible: true,
+                    nombre: '',
+                    ruc: '',
+                    telefono: '',
+                    email: '',
+                    direccion: ''
+                };
+                this.$nextTick(() => {
+                    const input = this.$root.querySelector('input[x-model="modalProveedor.nombre"]');
+                    input?.focus?.();
+                });
+            },
+
+            cerrarModalProducto() {
+                this.modalProducto.visible = false;
+            },
+
+            cerrarModalProveedor() {
+                this.modalProveedor.visible = false;
+            },
+
+            insertarProveedorEnSelect(proveedor) {
+                const select = this.$refs.proveedorSelect;
+                if (!select) return;
+
+                const idValue = String(proveedor.id_proveedor);
+                for (const opt of Array.from(select.options)) {
+                    if (opt.value === idValue) {
+                        this.idProveedorSeleccionado = idValue;
+                        return;
+                    }
+                }
+
+                const nuevaOpcion = new Option(proveedor.nombre, idValue);
+                const compare = (a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' });
+
+                let inserted = false;
+                for (let i = 1; i < select.options.length; i++) {
+                    if (compare(select.options[i].text, proveedor.nombre) > 0) {
+                        select.add(nuevaOpcion, select.options[i]);
+                        inserted = true;
+                        break;
+                    }
+                }
+                if (!inserted) {
+                    select.add(nuevaOpcion);
+                }
+
+                this.idProveedorSeleccionado = idValue;
+            },
+
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            },
+
+            async fetchJson(url, options) {
+                const response = await fetch(url, options);
+                let data = null;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = null;
+                }
+                return { response, data };
+            },
+
+            async fetchJsonWithRetry(url, options, retryOpts = {}) {
+                const retries = Number.isFinite(retryOpts.retries) ? retryOpts.retries : 2;
+                const baseDelayMs = Number.isFinite(retryOpts.baseDelayMs) ? retryOpts.baseDelayMs : 400;
+                const maxDelayMs = Number.isFinite(retryOpts.maxDelayMs) ? retryOpts.maxDelayMs : 2000;
+
+                let lastError = null;
+                for (let attempt = 0; attempt <= retries; attempt++) {
+                    try {
+                        const result = await this.fetchJson(url, options);
+                        const status = result.response.status;
+                        const shouldRetry = status === 429 || status >= 500;
+                        if (!shouldRetry || attempt === retries) return result;
+                        const delay = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt));
+                        await this.sleep(delay);
+                    } catch (err) {
+                        lastError = err;
+                        if (attempt === retries) throw lastError;
+                        const delay = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt));
+                        await this.sleep(delay);
+                    }
+                }
+                throw lastError || new Error('Error de conexión');
+            },
+
+            async buscarProductoExacto(query) {
+                const q = (query || '').trim();
+                if (!q) return null;
+                try {
+                    const { response, data } = await this.fetchJson(`/productos/buscar_exacto?q=${encodeURIComponent(q)}`, {
+                        method: 'GET',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (!response.ok) return null;
+                    if (!data || !data.id) return null;
+                    return data;
+                } catch (e) {
+                    return null;
+                }
+            },
+
+            async guardarProveedorRapido() {
+                const nombre = (this.modalProveedor.nombre || '').trim();
+                if (!nombre) {
+                    alert('El nombre es obligatorio');
+                    return;
+                }
+
+                this.guardandoProveedor = true;
+                try {
+                    const response = await fetch('/proveedores/crear_rapido', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            nombre,
+                            ruc: (this.modalProveedor.ruc || '').trim(),
+                            telefono: (this.modalProveedor.telefono || '').trim(),
+                            email: (this.modalProveedor.email || '').trim(),
+                            direccion: (this.modalProveedor.direccion || '').trim()
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (response.ok && data.success) {
+                        this.insertarProveedorEnSelect(data.proveedor);
+                        this.cerrarModalProveedor();
+                        alert(`✓ Proveedor "${data.proveedor.nombre}" creado correctamente`);
+                    } else {
+                        alert('Error: ' + (data.error || 'No se pudo crear el proveedor'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error de conexión al crear el proveedor');
+                } finally {
+                    this.guardandoProveedor = false;
+                }
+            },
+
+            async guardarProductoRapido() {
+                if (!this.modalProducto.codigo || !this.modalProducto.nombre) {
+                    alert('Código y nombre son obligatorios');
+                    return;
+                }
+
+                if (!this.modalProducto.id_categoria && !this.modalProducto.nueva_categoria) {
+                    alert('Debe seleccionar o crear una categoría');
+                    return;
+                }
+
+                if (!this.modalProducto.precio_venta || this.modalProducto.precio_venta <= 0) {
+                    alert('Precio de venta es obligatorio y debe ser mayor a 0');
+                    return;
+                }
+
+                if (this.modalProducto.stock_minimo === null || this.modalProducto.stock_minimo === undefined || this.modalProducto.stock_minimo < 0) {
+                    alert('Stock mínimo debe ser mayor o igual a 0');
+                    return;
+                }
+
+                if (this.modalProducto.usa_precios_opciones && !(this.modalProducto.precios_opciones || '').trim()) {
+                    alert('Debe cargar al menos un precio en precios opcionales');
+                    return;
+                }
+
+                this.guardandoProducto = true;
+
+                try {
+                    const codigo = (this.modalProducto.codigo || '').trim();
+                    const payload = {
+                        codigo,
+                        nombre: (this.modalProducto.nombre || '').trim(),
+                        id_categoria: this.modalProducto.id_categoria === 'nueva' ? null : this.modalProducto.id_categoria,
+                        nueva_categoria: (this.modalProducto.nueva_categoria || '').trim(),
+                        precio_compra: this.modalProducto.precio_compra,
+                        precio_venta: this.modalProducto.precio_venta,
+                        precio_mayorista: this.modalProducto.precio_mayorista,
+                        stock_minimo: this.modalProducto.stock_minimo,
+                        usa_precios_opciones: this.modalProducto.usa_precios_opciones,
+                        precios_opciones: (this.modalProducto.precios_opciones || '').trim(),
+                        porcentaje_iva: this.modalProducto.porcentaje_iva
+                    };
+
+                    const { response, data } = await this.fetchJsonWithRetry('/productos/crear_rapido', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }, { retries: 2, baseDelayMs: 500, maxDelayMs: 2500 });
+
+                    if (response.ok && data && data.success) {
+                        this.cerrarModalProducto();
+                        alert(`✓ Producto "${data.producto.nombre}" creado correctamente`);
+                        location.reload();
+                    } else {
+                        const msg = (data && data.error) ? String(data.error) : 'No se pudo crear el producto';
+                        const yaExiste = response.status === 400 && msg.toLowerCase().includes('ya existe');
+                        if (yaExiste || response.status >= 500) {
+                            const existente = await this.buscarProductoExacto(codigo);
+                            if (existente) {
+                                this.cerrarModalProducto();
+                                alert(`✓ Producto "${existente.nombre}" ya quedó guardado`);
+                                location.reload();
+                                return;
+                            }
+                        }
+                        alert('Error: ' + msg);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    const codigo = (this.modalProducto.codigo || '').trim();
+                    const existente = await this.buscarProductoExacto(codigo);
+                    if (existente) {
+                        this.cerrarModalProducto();
+                        alert(`✓ Producto "${existente.nombre}" ya quedó guardado`);
+                        location.reload();
+                        return;
+                    }
+                    alert('Error de conexión al crear el producto');
+                } finally {
+                    this.guardandoProducto = false;
+                }
+            }
+        }
+    }
+</script>

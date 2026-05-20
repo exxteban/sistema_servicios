@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Registrar pago{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200">
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Registrar pago</h1>
+                    <p class="text-sm text-gray-500">Gasto: {{ gasto.nombre }} · Período {{ periodo }}</p>
+                </div>
+                <a href="{{ url_for('gastos_corrientes.detalle', id_gasto_corriente=gasto.id_gasto_corriente) }}"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
+                </a>
+            </div>
+        </div>
+
+        <form method="post" enctype="multipart/form-data"
+            action="{{ url_for('gastos_corrientes.nuevo_pago', id_gasto_corriente=gasto.id_gasto_corriente) }}"
+            class="p-6 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="periodo" value="{{ periodo }}">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label for="fecha_pago" class="block text-sm font-semibold text-gray-700 mb-2">Fecha de pago</label>
+                    <input id="fecha_pago" name="fecha_pago" type="date" value="{{ fecha_hoy }}" required
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="monto_pagado" class="block text-sm font-semibold text-gray-700 mb-2">Monto pagado</label>
+                    <input id="monto_pagado" name="monto_pagado" type="number" min="1" step="1"
+                        value="{{ '{:.0f}'.format(gasto.monto_estimado_decimal()).replace(',', '') }}"
+                        required class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="numero_comprobante" class="block text-sm font-semibold text-gray-700 mb-2">Comprobante</label>
+                    <input id="numero_comprobante" name="numero_comprobante" type="text"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="comprobante_adjunto" class="block text-sm font-semibold text-gray-700 mb-2">Adjunto</label>
+                    <input id="comprobante_adjunto" name="comprobante_adjunto" type="file"
+                        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    <p class="mt-2 text-xs text-gray-500">Puedes adjuntar imagen o PDF del comprobante. Máximo 5 MB.</p>
+                </div>
+                <div class="md:col-span-2">
+                    <label for="observacion" class="block text-sm font-semibold text-gray-700 mb-2">Observación</label>
+                    <textarea id="observacion" name="observacion" rows="4"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500"></textarea>
+                </div>
+            </div>
+
+            <label class="flex items-start gap-3 rounded-2xl border border-emerald-100 p-4 bg-emerald-50">
+                <input type="checkbox" name="pagado_desde_caja" value="1"
+                    {% if (request.method == 'POST' and request.form.get('pagado_desde_caja')) or (request.method != 'POST' and gasto.requiere_caja_por_defecto) %}checked{% endif %}
+                    class="mt-1 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                <div>
+                    <div class="text-sm font-semibold text-emerald-900">Descontar desde caja</div>
+                    <div class="text-sm text-emerald-700">Si lo marcas, se generará un egreso trazable en la caja abierta del usuario actual.</div>
+                </div>
+            </label>
+
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <a href="{{ url_for('gastos_corrientes.detalle', id_gasto_corriente=gasto.id_gasto_corriente) }}"
+                    class="inline-flex items-center justify-center px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+                    <i class="fas fa-check"></i>
+                    Confirmar pago
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

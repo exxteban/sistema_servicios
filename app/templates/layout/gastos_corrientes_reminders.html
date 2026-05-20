@@ -1,0 +1,224 @@
+{% if current_user.is_authenticated and (current_user.es_admin() or current_user.tiene_permiso('ver_gastos_corrientes')) %}
+<script>
+    (function () {
+        if (window.__gastosCorrientesRemindersInitialized) {
+            return;
+        }
+        window.__gastosCorrientesRemindersInitialized = true;
+
+        const remindersUrl = {{ url_for('gastos_corrientes.resumen_alertas') | tojson }};
+        const gastosUrl = {{ url_for('gastos_corrientes.index') | tojson }};
+        const gastosTitle = 'Gastos corrientes';
+        const gastosIcon = 'fas fa-file-invoice-dollar';
+        const storagePrefix = 'gastos-corrientes-alert';
+        let lastKeys = null;
+        let pollInterval = null;
+
+        function buildAlertKey(item) {
+            return String(item && item.alert_key ? item.alert_key : '');
+        }
+
+        function wasAlreadyNotified(key) {
+            try {
+                return key && window.localStorage && localStorage.getItem(`${storagePrefix}:${key}`) === '1';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function markNotified(key) {
+            try {
+                if (key && window.localStorage) {
+                    localStorage.setItem(`${storagePrefix}:${key}`, '1');
+                }
+            } catch (e) {
+            }
+        }
+
+        function ensureSummaryHost() {
+            if (!document.body) {
+                return null;
+            }
+
+            let host = document.getElementById('app-gastos-summary-host');
+            if (!host) {
+                host = document.createElement('div');
+                host.id = 'app-gastos-summary-host';
+                host.className = 'app-gastos-summary-host';
+                host.hidden = true;
+
+                const link = document.createElement('a');
+                link.href = gastosUrl;
+                link.setAttribute('data-tab-url', gastosUrl);
+                link.setAttribute('data-tab-title', gastosTitle);
+                link.setAttribute('data-tab-icon', gastosIcon);
+                link.className = 'app-tab-link app-gastos-summary';
+
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-file-invoice-dollar app-gastos-summary__icon';
+
+                const text = document.createElement('span');
+                text.className = 'app-gastos-summary__text';
+                text.dataset.role = 'summary-text';
+
+                const meta = document.createElement('div');
+                meta.className = 'app-gastos-summary__meta';
+
+                const overdue = document.createElement('span');
+                overdue.className = 'app-gastos-summary__badge app-gastos-summary__badge--overdue';
+                overdue.dataset.role = 'overdue-badge';
+                overdue.hidden = true;
+
+                const alert = document.createElement('span');
+                alert.className = 'app-gastos-summary__badge app-gastos-summary__badge--alert';
+                alert.dataset.role = 'alert-badge';
+                alert.hidden = true;
+
+                meta.appendChild(overdue);
+                meta.appendChild(alert);
+                link.appendChild(icon);
+                link.appendChild(text);
+                link.appendChild(meta);
+                host.appendChild(link);
+                document.body.appendChild(host);
+            }
+
+            return host;
+        }
+
+        function updateSummary(detail) {
+            const host = ensureSummaryHost();
+            if (!host) {
+                return;
+            }
+
+            const overdueCount = Number(detail && detail.overdue_count || 0);
+            const alertCount = Number(detail && detail.alert_count || 0);
+            const count = Number(detail && detail.count || 0);
+            const period = String(detail && detail.periodo ? detail.periodo : '');
+
+            const link = host.querySelector('.app-gastos-summary');
+            const text = host.querySelector('[data-role="summary-text"]');
+            const overdueBadge = host.querySelector('[data-role="overdue-badge"]');
+            const alertBadge = host.querySelector('[data-role="alert-badge"]');
+            if (!link || !text || !overdueBadge || !alertBadge) {
+                return;
+            }
+
+            if (count <= 0) {
+                host.classList.remove('is-visible');
+                window.setTimeout(() => {
+                    if (!host.classList.contains('is-visible')) {
+                        host.hidden = true;
+                    }
+                }, 180);
+                return;
+            }
+
+            const targetUrl = new URL(gastosUrl, window.location.origin);
+            if (period) {
+                targetUrl.searchParams.set('periodo', period);
+            }
+            if (overdueCount > 0) {
+                targetUrl.searchParams.set('estado', 'vencido');
+            }
+            link.href = targetUrl.toString();
+            link.setAttribute('data-tab-url', targetUrl.toString());
+            text.textContent = `Gastos: ${count} alerta${count === 1 ? '' : 's'}`;
+            link.title = `Vencidos: ${overdueCount} | Por vencer: ${alertCount}`;
+
+            overdueBadge.hidden = overdueCount <= 0;
+            overdueBadge.textContent = `${overdueCount} vencido${overdueCount === 1 ? '' : 's'}`;
+
+            alertBadge.hidden = alertCount <= 0;
+            alertBadge.textContent = `${alertCount} por vencer`;
+
+            host.hidden = false;
+            window.requestAnimationFrame(() => {
+                host.classList.add('is-visible');
+            });
+        }
+
+        function notifyNewItems(items) {
+            if (!Array.isArray(items) || !items.length || typeof window.mostrarNotificacion !== 'function') {
+                return;
+            }
+
+            const unseenItems = items.filter((item) => {
+                const key = buildAlertKey(item);
+                return key && !wasAlreadyNotified(key);
+            });
+            if (!unseenItems.length) {
+                return;
+            }
+
+            const primary = unseenItems[0];
+            const total = unseenItems.length;
+            const isOverdue = String(primary && primary.estado_alerta ? primary.estado_alerta : '') === 'overdue';
+            const message = isOverdue
+                ? `Gastos corrientes: "${primary.nombre}" ya venció.${total > 1 ? ` Hay ${total} alertas nuevas.` : ''}`
+                : `Gastos corrientes: "${primary.nombre}" está por vencer.${total > 1 ? ` Hay ${total} alertas nuevas.` : ''}`;
+            window.mostrarNotificacion(message, 'warning');
+            unseenItems.forEach((item) => markNotified(buildAlertKey(item)));
+        }
+
+        async function checkReminders() {
+            try {
+                const response = await fetch(`${remindersUrl}?limit=20`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+                const items = Array.isArray(data.items) ? data.items : [];
+                const keys = items.map((item) => buildAlertKey(item)).filter(Boolean).sort();
+                const newItems = lastKeys === null
+                    ? items
+                    : items.filter((item) => !lastKeys.includes(buildAlertKey(item)));
+
+                notifyNewItems(newItems);
+                updateSummary(data);
+                window.dispatchEvent(new CustomEvent('gastos-corrientes:alertas-actualizadas', { detail: data }));
+                lastKeys = keys;
+            } catch (e) {
+            }
+        }
+
+        function startPolling() {
+            checkReminders();
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+            pollInterval = setInterval(checkReminders, 15000);
+        }
+
+        function stopPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+
+        function init() {
+            ensureSummaryHost();
+            startPolling();
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    stopPolling();
+                } else {
+                    startPolling();
+                }
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init, { once: true });
+        } else {
+            init();
+        }
+    })();
+</script>
+{% endif %}

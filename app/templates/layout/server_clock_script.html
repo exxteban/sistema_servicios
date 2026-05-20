@@ -1,0 +1,86 @@
+    <script>
+        (function () {
+            const anchorId = 'app-server-time-anchor';
+            let offsetMs = null;
+            const dtfCache = new Map();
+
+            function getAnchor() {
+                return document.getElementById(anchorId);
+            }
+
+            function computeOffset() {
+                const anchor = getAnchor();
+                if (!anchor) return null;
+                const raw = anchor.getAttribute('data-app-server-epoch-ms');
+                const serverMs = raw ? Number(raw) : NaN;
+                if (!Number.isFinite(serverMs)) return null;
+                offsetMs = serverMs - Date.now();
+                return offsetMs;
+            }
+
+            function getTimeZone() {
+                const anchor = getAnchor();
+                if (!anchor) return '';
+                return anchor.getAttribute('data-app-timezone') || '';
+            }
+
+            function getDtf(mode, tz) {
+                const key = `${mode}|${tz || ''}`;
+                if (dtfCache.has(key)) return dtfCache.get(key);
+
+                const base = { hour12: false };
+                const opts = mode === 'date'
+                    ? { ...base, year: 'numeric', month: '2-digit', day: '2-digit' }
+                    : mode === 'datetime'
+                        ? { ...base, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }
+                        : { ...base, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+
+                if (tz) opts.timeZone = tz;
+                const dtf = new Intl.DateTimeFormat('es-ES', opts);
+                dtfCache.set(key, dtf);
+                return dtf;
+            }
+
+            function formatWithParts(ms, mode, tz) {
+                try {
+                    const dtf = getDtf(mode, tz);
+                    const parts = dtf.formatToParts(new Date(ms));
+                    const map = {};
+                    for (const p of parts) {
+                        map[p.type] = p.value;
+                    }
+                    if (mode === 'date') return `${map.day}/${map.month}/${map.year}`;
+                    if (mode === 'datetime') return `${map.day}/${map.month}/${map.year} ${map.hour}:${map.minute}:${map.second}`;
+                    return `${map.hour}:${map.minute}:${map.second}`;
+                } catch {
+                    const d = new Date(ms);
+                    const pad = (n) => String(n).padStart(2, '0');
+                    const date = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+                    const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                    if (mode === 'date') return date;
+                    if (mode === 'datetime') return `${date} ${time}`;
+                    return time;
+                }
+            }
+
+            function updateClocks() {
+                if (offsetMs === null && computeOffset() === null) return;
+                const tz = getTimeZone();
+                const nowMs = Date.now() + offsetMs;
+
+                document.querySelectorAll('[data-app-clock]').forEach((el) => {
+                    const mode = el.getAttribute('data-app-clock-format') || 'time';
+                    const value = formatWithParts(nowMs, mode, tz);
+                    const textEl = el.querySelector('[data-app-clock-text]');
+                    if (textEl) {
+                        textEl.textContent = value;
+                    } else {
+                        el.textContent = value;
+                    }
+                });
+            }
+
+            updateClocks();
+            setInterval(updateClocks, 1000);
+        })();
+    </script>

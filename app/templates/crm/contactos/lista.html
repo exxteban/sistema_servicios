@@ -1,0 +1,143 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<div class="p-4 h-full flex flex-col gap-4" x-data="crmContactos()">
+
+    <!-- Filtros -->
+    <div class="flex flex-wrap items-center gap-2">
+        <div class="relative">
+            <input type="text" x-model="q" @input.debounce.300ms="cargar()"
+                placeholder="Buscar por nombre o teléfono..."
+                class="w-64 bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-teal-500/50 pl-8">
+            <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+        </div>
+
+        <select x-model="etiqueta" @change="cargar()"
+            class="bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+            <option value="">Todas las etiquetas</option>
+            {% for e in etiquetas %}
+            <option value="{{ e.id }}">{{ e.nombre }}</option>
+            {% endfor %}
+        </select>
+
+        <span class="ml-auto text-xs text-gray-500" x-text="total + ' contactos'"></span>
+    </div>
+
+    <!-- Tabla de contactos -->
+    <div class="flex-1 overflow-auto">
+        <div x-show="cargando" class="flex items-center justify-center py-12">
+            <i class="fas fa-spinner fa-spin text-teal-400 text-2xl"></i>
+        </div>
+
+        <div x-show="!cargando && items.length === 0" class="flex flex-col items-center justify-center py-16 text-gray-500">
+            <i class="fas fa-address-book text-4xl mb-3 opacity-40"></i>
+            <p class="text-sm">No hay contactos</p>
+        </div>
+
+        <div x-show="!cargando" class="grid gap-2">
+            <template x-for="c in items" :key="c.id">
+                <a :href="`/crm/contactos/${c.id}`" @click.prevent="abrirContacto(c.id)"
+                    class="bg-gray-800/50 hover:bg-gray-700/60 border border-white/5 hover:border-teal-500/30 rounded-xl p-3 flex items-center gap-3 transition-all group">
+                    <!-- Avatar -->
+                    <div class="w-10 h-10 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center text-sm font-bold flex-shrink-0"
+                        x-text="(c.nombre || c.telefono).charAt(0).toUpperCase()">
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-sm text-gray-100" x-text="c.nombre || c.telefono"></span>
+                            <span x-show="c.bloqueado" class="text-xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400">bloqueado</span>
+                        </div>
+                        <p class="text-xs text-gray-500" x-text="c.telefono"></p>
+                        <div x-show="c.etiquetas && c.etiquetas.length > 0" class="flex flex-wrap gap-1 mt-1">
+                            <template x-for="et in c.etiquetas" :key="et.id">
+                                <span class="text-xs px-1.5 py-0.5 rounded-full"
+                                    :style="`background-color: ${et.color}22; color: ${et.color}`"
+                                    x-text="et.nombre">
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="text-right flex-shrink-0">
+                        <p class="text-xs text-gray-400" x-text="c.total_conversaciones + ' conv.'"></p>
+                        <p class="text-xs text-gray-500" x-text="formatFecha(c.ultimo_contacto)"></p>
+                    </div>
+                </a>
+            </template>
+        </div>
+
+        <!-- Paginación -->
+        <div x-show="paginas > 1" class="flex items-center justify-center gap-2 mt-4">
+            <button @click="pagina--; cargar()" :disabled="pagina <= 1"
+                class="px-3 py-1.5 rounded-lg bg-gray-700/50 text-sm text-gray-300 disabled:opacity-40 hover:bg-gray-600/50 transition-colors">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <span class="text-sm text-gray-400" x-text="`Página ${pagina} de ${paginas}`"></span>
+            <button @click="pagina++; cargar()" :disabled="pagina >= paginas"
+                class="px-3 py-1.5 rounded-lg bg-gray-700/50 text-sm text-gray-300 disabled:opacity-40 hover:bg-gray-600/50 transition-colors">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function crmContactos() {
+    return {
+        items: [],
+        total: 0,
+        pagina: 1,
+        paginas: 1,
+        cargando: false,
+        q: '',
+        etiqueta: '',
+
+        abrirContacto(id) {
+            const url = `/crm/contactos/${id}`;
+            try {
+                if (window.appNavigateActiveTab) {
+                    window.appNavigateActiveTab(url);
+                    return;
+                }
+            } catch (e) { }
+            window.location.href = url;
+        },
+
+        async cargar() {
+            this.cargando = true;
+            this.pagina = 1;
+            await this._fetch();
+        },
+
+        async _fetch() {
+            try {
+                const p = new URLSearchParams({
+                    q: this.q,
+                    etiqueta: this.etiqueta || '',
+                    pagina: this.pagina,
+                    por_pagina: 30,
+                });
+                const r = await fetch(`/crm/api/contactos?${p}`);
+                const d = await r.json();
+                this.items = d.items || [];
+                this.total = d.total || 0;
+                this.paginas = d.paginas || 1;
+            } catch(e) {
+                console.error(e);
+            } finally {
+                this.cargando = false;
+            }
+        },
+
+        formatFecha(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        },
+
+        init() { this.cargar(); }
+    };
+}
+</script>
+{% endblock %}

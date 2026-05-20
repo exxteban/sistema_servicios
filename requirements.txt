@@ -1,0 +1,33 @@
+# Framework - Versiones compatibles
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+Flask-Caching==2.3.0
+Flask-WTF==1.2.1
+Werkzeug==3.0.1
+
+# Base de datos
+SQLAlchemy==2.0.49
+PyMySQL==1.1.0
+
+# Utilidades
+python-dotenv==1.0.0
+waitress==3.0.2
+openpyxl==3.1.5
+Pillow>=10.0.0
+
+# Para formularios
+WTForms==3.1.1
+email-validator==2.1.0
+
+# Desarrollo
+python-dateutil==2.8.2
+xhtml2pdf==0.2.17; platform_machine != "ARM64" and platform_machine != "aarch64"
+xhtml2pdf==0.2.16; platform_machine == "ARM64" or platform_machine == "aarch64"
+python-bidi==0.4.2; platform_machine == "ARM64" or platform_machine == "aarch64"
+cryptography==46.0.3; platform_machine == "ARM64" or platform_machine == "aarch64"
+segno==1.6.1
+
+# WhatsApp + IA
+requests==2.31.0
+openai>=1.30.0

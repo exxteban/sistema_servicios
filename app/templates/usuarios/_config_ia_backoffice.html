@@ -1,0 +1,114 @@
+{% if ia_backoffice_puede_gestionar %}
+<form method="POST" action="{{ url_for('usuarios.configuracion_ia_backoffice') }}"
+      class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-6 transition-colors duration-300">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Asistente IA interno</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Configuracion separada del bot de WhatsApp. Solo root puede cambiar este interruptor.
+                </p>
+            </div>
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {% if ia_backoffice_config.enabled %}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200{% else %}bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                {% if ia_backoffice_config.enabled %}Activo{% else %}Apagado{% endif %}
+            </span>
+        </div>
+
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <div class="text-sm font-medium text-gray-800 dark:text-gray-100">Habilitar asistente interno</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">El MVP trabaja en modo solo lectura.</div>
+            </div>
+            <div class="relative inline-flex items-center">
+                <input type="hidden" name="ia_backoffice_enabled" value="0">
+                <input id="ia_backoffice_enabled" type="checkbox" name="ia_backoffice_enabled" value="1"
+                       class="config-switch-input" {% if ia_backoffice_config.enabled %}checked{% endif %}>
+                <label for="ia_backoffice_enabled" class="config-switch-track cursor-pointer" aria-label="Activar asistente IA interno">
+                    <span class="config-switch-thumb"></span>
+                </label>
+            </div>
+        </div>
+
+        <input type="hidden" name="ia_backoffice_readonly_mode" value="1">
+        <input type="hidden" name="ia_backoffice_advanced_model_enabled" value="0">
+
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <div class="text-sm font-medium text-gray-800 dark:text-gray-100">Acciones asistidas</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Prepara borradores confirmables, sin ejecutar cambios automaticos.</div>
+            </div>
+            <div class="relative inline-flex items-center">
+                <input type="hidden" name="ia_backoffice_assisted_actions_enabled" value="0">
+                <input id="ia_backoffice_assisted_actions_enabled" type="checkbox" name="ia_backoffice_assisted_actions_enabled" value="1"
+                       class="config-switch-input" {% if ia_backoffice_config.assisted_actions_enabled %}checked{% endif %}>
+                <label for="ia_backoffice_assisted_actions_enabled" class="config-switch-track cursor-pointer" aria-label="Activar acciones asistidas">
+                    <span class="config-switch-thumb"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+                <label for="ia_backoffice_provider" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Proveedor
+                </label>
+                <select id="ia_backoffice_provider" name="ia_backoffice_provider"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-3 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    <option value="deepseek" {% if ia_backoffice_config.provider == 'deepseek' %}selected{% endif %}>DeepSeek</option>
+                    <option value="openai" {% if ia_backoffice_config.provider == 'openai' %}selected{% endif %}>OpenAI</option>
+                </select>
+            </div>
+            <div>
+                <label for="ia_backoffice_model" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Modelo
+                </label>
+                <input id="ia_backoffice_model" name="ia_backoffice_model" type="text"
+                       value="{{ ia_backoffice_config.model }}"
+                       class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+            </div>
+            <div>
+                <label for="ia_backoffice_deepseek_base_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Base URL DeepSeek
+                </label>
+                <input id="ia_backoffice_deepseek_base_url" name="ia_backoffice_deepseek_base_url" type="text"
+                       value="{{ ia_backoffice_config.deepseek_base_url }}"
+                       class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+            </div>
+            <div>
+                <label for="ia_backoffice_max_tokens" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Max tokens
+                </label>
+                <input id="ia_backoffice_max_tokens" name="ia_backoffice_max_tokens" type="number" min="80" max="4000"
+                       value="{{ ia_backoffice_config.max_tokens }}"
+                       class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+            </div>
+            <div>
+                <label for="ia_backoffice_daily_token_budget" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Presupuesto diario
+                </label>
+                <input id="ia_backoffice_daily_token_budget" name="ia_backoffice_daily_token_budget" type="number" min="0" max="10000000"
+                       value="{{ ia_backoffice_config.daily_token_budget }}"
+                       class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Cantidad maxima de tokens por dia. Usa 0 para dejarlo sin limite.</p>
+            </div>
+            <div>
+                <label for="ia_backoffice_monthly_token_budget" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Presupuesto mensual
+                </label>
+                <input id="ia_backoffice_monthly_token_budget" name="ia_backoffice_monthly_token_budget" type="number" min="0" max="100000000"
+                       value="{{ ia_backoffice_config.monthly_token_budget }}"
+                       class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Cantidad maxima de tokens por mes. Usa 0 para dejarlo sin limite.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex justify-end">
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+            Guardar asistente IA
+        </button>
+    </div>
+</form>
+{% endif %}

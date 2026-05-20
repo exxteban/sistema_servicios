@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imprimir flujo de caja proyectado</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f8fafc;
+            --sheet: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --line: #dbe2ea;
+            --hero-a: #ffffff;
+            --hero-b: #f8fbff;
+            --hero-c: #eefbf7;
+            --ok-bg: #ecfdf5;
+            --ok-text: #047857;
+            --warn-bg: #fffbeb;
+            --warn-text: #b45309;
+            --danger-bg: #fef2f2;
+            --danger-text: #b91c1c;
+            --sky-bg: #eff6ff;
+            --sky-text: #1d4ed8;
+            --violet-bg: #f5f3ff;
+            --violet-text: #6d28d9;
+            --shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        @page {
+            margin: 10mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.45;
+            padding: 16px;
+        }
+
+        .document {
+            max-width: 920px;
+            margin: 0 auto;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 12px;
+            padding: 11px 16px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        .btn-print {
+            background: #2563eb;
+        }
+
+        .btn-pdf {
+            background: #059669;
+        }
+
+        .sheet {
+            background: var(--sheet);
+            border-radius: 18px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            border: 1px solid #e5ebf2;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, var(--hero-a) 0%, var(--hero-b) 52%, var(--hero-c) 100%);
+            color: var(--text);
+            padding: 24px;
+            border-bottom: 1px solid var(--line);
+            border-top: 6px solid #2563eb;
+        }
+
+        .hero-grid {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+        }
+
+        .hero-brand {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .hero-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            background: #fff;
+            border: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex: 0 0 auto;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        }
+
+        .hero-logo img {
+            max-width: 42px;
+            max-height: 42px;
+        }
+
+        .hero-kicker {
+            margin: 0 0 8px;
+            font-size: 11px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: #2563eb;
+            font-weight: 700;
+        }
+
+        .hero-title {
+            margin: 0;
+            font-size: 30px;
+            line-height: 1.1;
+        }
+
+        .hero-meta {
+            margin: 10px 0 0;
+            color: #334155;
+            font-size: 14px;
+        }
+
+        .hero-submeta {
+            margin: 6px 0 0;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .hero-sep {
+            color: #94a3b8;
+            margin: 0 8px;
+        }
+
+        .content {
+            padding: 18px;
+        }
+
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 16px;
+            background: #fff;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            min-width: 0;
+        }
+
+        .card-ok { background: var(--ok-bg); border-color: #c7f0dc; }
+        .card-danger { background: var(--danger-bg); border-color: #f6c8c8; }
+        .card-sky { background: var(--sky-bg); border-color: #cfe0ff; }
+        .card-violet { background: var(--violet-bg); border-color: #ddd3ff; }
+
+        .card-label {
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+        }
+
+        .card-value {
+            margin: 8px 0 4px;
+            font-size: 24px;
+            line-height: 1.1;
+            font-weight: 700;
+            color: var(--text);
+            overflow-wrap: anywhere;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .card-help {
+            margin: 0;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .text-ok { color: var(--ok-text); }
+        .text-danger { color: var(--danger-text); }
+        .text-sky { color: var(--sky-text); }
+        .text-violet { color: var(--violet-text); }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1.3fr 0.95fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: #fff;
+            padding: 18px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 22px;
+            line-height: 1.15;
+        }
+
+        .panel-help {
+            margin: 5px 0 0;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .badge {
+            border-radius: 999px;
+            padding: 7px 11px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .badge-ok { background: var(--ok-bg); color: var(--ok-text); }
+        .badge-warn { background: var(--warn-bg); color: var(--warn-text); }
+        .badge-danger { background: var(--danger-bg); color: var(--danger-text); }
+
+        .alert {
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid #f6c8c8;
+            background: var(--danger-bg);
+        }
+
+        .alert-warn {
+            border-color: #f7dfac;
+            background: var(--warn-bg);
+        }
+
+        .alert-ok {
+            border-color: #c7f0dc;
+            background: var(--ok-bg);
+        }
+
+        .alert-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .alert-body {
+            margin: 7px 0 0;
+            font-size: 13px;
+        }
+
+        .notes {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #f8fafc;
+            font-size: 13px;
+        }
+
+        .stack {
+            display: grid;
+            gap: 12px;
+        }
+
+        .mini-card {
+            border-radius: 16px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .mini-card p {
+            margin: 0;
+        }
+
+        .mini-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+        }
+
+        .mini-value {
+            margin-top: 7px !important;
+            font-size: 21px;
+            font-weight: 700;
+            line-height: 1.15;
+            overflow-wrap: anywhere;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .mini-help {
+            margin-top: 4px !important;
+            font-size: 12px;
+        }
+
+        .table-panel {
+            margin-bottom: 16px;
+        }
+
+        .table-wrap {
+            overflow: hidden;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            table-layout: fixed;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        th, td {
+            padding: 9px 10px;
+            border-bottom: 1px solid #e5ebf2;
+            vertical-align: top;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            overflow-wrap: anywhere;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #475569;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            color: #1e293b;
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .text-right { text-align: right; }
+        .muted { color: var(--muted); }
+        .strong { font-weight: 700; }
+        .small { font-size: 12px; }
+        .row-risk { background: #fff7f7; }
+
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.9fr;
+            gap: 16px;
+        }
+
+        .dist-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .pill {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 5px 9px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .pill-ok { background: var(--ok-bg); color: var(--ok-text); }
+        .pill-sky { background: var(--sky-bg); color: var(--sky-text); }
+        .pill-warn { background: var(--warn-bg); color: var(--warn-text); }
+
+        body.pdf-exporting {
+            background: #fff;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body.pdf-exporting .toolbar {
+            display: none !important;
+        }
+
+        body.pdf-exporting .document {
+            max-width: 100%;
+        }
+
+        body.pdf-exporting .sheet {
+            box-shadow: none;
+            border-radius: 0;
+            border: 0;
+        }
+
+        body.pdf-exporting .kpis {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        body.pdf-exporting .two-col,
+        body.pdf-exporting .bottom-grid {
+            grid-template-columns: 1fr;
+        }
+
+        body.pdf-exporting .card-value {
+            font-size: 22px;
+        }
+
+        body.pdf-exporting .mini-value {
+            font-size: 19px;
+        }
+
+        body.pdf-exporting table {
+            font-size: 11px;
+        }
+
+        @media print {
+            .toolbar {
+                display: none !important;
+            }
+
+            html,
+            body {
+                width: 100%;
+            }
+
+            body {
+                background: #fff;
+                padding: 0;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .document {
+                width: 100%;
+                max-width: none;
+                margin: 0;
+            }
+
+            .sheet {
+                width: 100%;
+                box-shadow: none;
+                border-radius: 0;
+                border: 0;
+            }
+
+            .hero,
+            .content {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            .kpis {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .two-col,
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .kpis {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .two-col,
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 12px;
+            }
+
+            .hero {
+                padding: 18px;
+            }
+
+            .hero-grid,
+            .hero-brand {
+                display: block;
+            }
+
+            .hero-logo {
+                margin-bottom: 12px;
+            }
+
+            .kpis,
+            .dist-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .content {
+                padding: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% from 'flujo_caja/_macros.html' import gs %}
+    {% set activos = ctx.movimientos | rejectattr('estado', 'equalto', 'cancelado') | list %}
+    {% set ingresos = activos | selectattr('tipo', 'equalto', 'ingreso') | list %}
+    {% set egresos = activos | selectattr('tipo', 'equalto', 'egreso') | list %}
+    {% set cancelados = ctx.movimientos | selectattr('estado', 'equalto', 'cancelado') | list %}
+
+    <div class="document" id="flujo-caja-pdf-content">
+        <div class="toolbar" data-pdf-ignore="true">
+            <button type="button" id="btn-generar-pdf" class="btn btn-pdf">Generar PDF</button>
+            <button type="button" id="btn-imprimir" class="btn btn-print">Imprimir</button>
+        </div>
+
+        <div class="sheet">
+            <div class="hero">
+                <div class="hero-grid">
+                    <div class="hero-brand">
+                        <div class="hero-logo">
+                            {% if app_brand_logo_path %}
+                            <img src="{{ static_url(app_brand_logo_path) }}" alt="Logo empresa">
+                            {% else %}
+                            <span style="font-size: 26px; font-weight: 700;">FC</span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="hero-kicker">Reporte semanal</p>
+                            <h1 class="hero-title">Flujo de caja proyectado</h1>
+                            <p class="hero-meta">
+                                {{ app_brand_name or 'Sistema de Gestion' }}
+                                <span class="hero-sep">|</span>
+                                {{ ctx.semana.fecha_inicio.strftime('%d/%m/%Y') }} al {{ ctx.semana.fecha_fin.strftime('%d/%m/%Y') }}
+                            </p>
+                            <p class="hero-submeta">
+                                Generado el {{ fecha_generacion|local_strftime('%d/%m/%Y %H:%M') }}
+                                <span class="hero-sep">|</span>
+                                Estado: {{ ctx.semana.estado|title }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="kpis">
+                    <div class="card">
+                        <p class="card-label">Saldo inicial</p>
+                        <p class="card-value">{{ gs(ctx.resumen.saldo_inicial) }}</p>
+                        <p class="card-help">Base para iniciar la semana</p>
+                    </div>
+                    <div class="card card-ok">
+                        <p class="card-label text-ok">Ingresos</p>
+                        <p class="card-value text-ok">{{ gs(ctx.resumen.total_ingresos) }}</p>
+                        <p class="card-help">Cobros y entradas proyectadas</p>
+                    </div>
+                    <div class="card card-danger">
+                        <p class="card-label text-danger">Egresos</p>
+                        <p class="card-value text-danger">{{ gs(ctx.resumen.total_egresos) }}</p>
+                        <p class="card-help">Pagos y salidas proyectadas</p>
+                    </div>
+                    <div class="card {% if ctx.resumen.resultado < 0 %}card-danger{% else %}card-sky{% endif %}">
+                        <p class="card-label {% if ctx.resumen.resultado < 0 %}text-danger{% else %}text-sky{% endif %}">Resultado</p>
+                        <p class="card-value {% if ctx.resumen.resultado < 0 %}text-danger{% else %}text-sky{% endif %}">{% if ctx.resumen.resultado >= 0 %}+{% endif %}{{ gs(ctx.resumen.resultado) }}</p>
+                        <p class="card-help">Ingresos menos egresos</p>
+                    </div>
+                    <div class="card card-violet">
+                        <p class="card-label text-violet">Saldo final</p>
+                        <p class="card-value {% if ctx.resumen.saldo_final < 0 %}text-danger{% else %}text-violet{% endif %}">{{ gs(ctx.resumen.saldo_final) }}</p>
+                        <p class="card-help">Saldo inicial + resultado</p>
+                    </div>
+                </div>
+
+                <div class="two-col">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="panel-title">Semaforo de liquidez</h2>
+                                <p class="panel-help">Lectura rapida del riesgo semanal y su impacto.</p>
+                            </div>
+                            <div>
+                                {% if ctx.resumen.semaforo_tono == 'danger' %}
+                                <span class="badge badge-danger">Rojo</span>
+                                {% elif ctx.resumen.semaforo_tono == 'warning' %}
+                                <span class="badge badge-warn">Amarillo</span>
+                                {% else %}
+                                <span class="badge badge-ok">Verde</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="alert {% if ctx.resumen.semaforo_tono == 'warning' %}alert-warn{% elif ctx.resumen.semaforo_tono == 'success' %}alert-ok{% endif %}">
+                            <p class="alert-title {% if ctx.resumen.semaforo_tono == 'danger' %}text-danger{% elif ctx.resumen.semaforo_tono == 'warning' %}text-sky{% else %}text-ok{% endif %}">{{ ctx.resumen.semaforo_mensaje }}</p>
+                            <p class="alert-body {% if ctx.resumen.semaforo_tono == 'danger' %}text-danger{% elif ctx.resumen.semaforo_tono == 'warning' %}text-sky{% else %}text-ok{% endif %}">{{ ctx.resumen.recomendacion }}</p>
+                        </div>
+
+                        {% if ctx.semana.notas %}
+                        <div class="notes"><span class="strong">Notas:</span> {{ ctx.semana.notas }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header" style="margin-bottom: 10px;">
+                            <div>
+                                <h2 class="panel-title">Comparativo real</h2>
+                                <p class="panel-help">Seguimiento de lo realizado frente a lo estimado.</p>
+                            </div>
+                        </div>
+
+                        <div class="stack">
+                            <div class="mini-card card-ok">
+                                <p class="mini-title text-ok">Ingresos realizados</p>
+                                <p class="mini-value text-ok">{{ gs(ctx.resumen.ingresos_realizados) }}</p>
+                                <p class="mini-help muted">de {{ gs(ctx.resumen.total_ingresos_estimados) }} estimados</p>
+                            </div>
+                            <div class="mini-card card-danger">
+                                <p class="mini-title text-danger">Egresos realizados</p>
+                                <p class="mini-value text-danger">{{ gs(ctx.resumen.egresos_realizados) }}</p>
+                                <p class="mini-help muted">de {{ gs(ctx.resumen.total_egresos_estimados) }} estimados</p>
+                            </div>
+                            <div class="mini-card {% if ctx.resumen.diferencia_real_vs_estimado < 0 %}card-danger{% else %}card-sky{% endif %}">
+                                <p class="mini-title {% if ctx.resumen.diferencia_real_vs_estimado < 0 %}text-danger{% else %}text-sky{% endif %}">Diferencia real vs estimado</p>
+                                <p class="mini-value {% if ctx.resumen.diferencia_real_vs_estimado < 0 %}text-danger{% else %}text-sky{% endif %}">{% if ctx.resumen.diferencia_real_vs_estimado >= 0 %}+{% endif %}{{ gs(ctx.resumen.diferencia_real_vs_estimado) }}</p>
+                                <p class="mini-help muted">Solo toma movimientos ya realizados</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-panel panel" style="padding: 16px;">
+                    <div class="panel-header" style="padding: 0 2px; margin-bottom: 12px;">
+                        <div>
+                            <h2 class="panel-title">Resumen diario</h2>
+                            <p class="panel-help">Comportamiento esperado dia por dia, con saldo acumulado.</p>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Dia</th>
+                                    <th class="text-right">Ingresos</th>
+                                    <th class="text-right">Egresos</th>
+                                    <th class="text-right">Neto</th>
+                                    <th class="text-right">Dif. real</th>
+                                    <th class="text-right">Saldo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dia in ctx.dias %}
+                                <tr class="{% if dia.riesgo %}row-risk{% endif %}">
+                                    <td>
+                                        <div class="strong">{{ dia.label }}</div>
+                                        <div class="small muted">{{ dia.fecha.strftime('%d/%m/%Y') }}</div>
+                                    </td>
+                                    <td class="text-right text-ok strong">{{ gs(dia.ingresos) }}</td>
+                                    <td class="text-right text-danger strong">{{ gs(dia.egresos) }}</td>
+                                    <td class="text-right strong {% if dia.neto < 0 %}text-danger{% elif dia.neto > 0 %}text-ok{% endif %}">{% if dia.neto > 0 %}+{% endif %}{{ gs(dia.neto) }}</td>
+                                    <td class="text-right strong {% if dia.diferencia_real_estimado < 0 %}text-danger{% elif dia.diferencia_real_estimado > 0 %}text-ok{% else %}muted{% endif %}">{% if dia.diferencia_real_estimado > 0 %}+{% endif %}{{ gs(dia.diferencia_real_estimado) if dia.diferencia_real_estimado != 0 else 'Gs. 0' }}</td>
+                                    <td class="text-right strong {% if dia.saldo < 0 %}text-danger{% endif %}">{{ gs(dia.saldo) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bottom-grid">
+                    <div class="panel" style="padding: 16px;">
+                        <div class="panel-header" style="padding: 0 2px; margin-bottom: 12px;">
+                            <div>
+                                <h2 class="panel-title">Movimientos activos</h2>
+                                <p class="panel-help">Detalle operativo de la semana actual.</p>
+                            </div>
+                            <span class="badge badge-ok" style="background: #f1f5f9; color: #475569;">{{ activos|length }} items</span>
+                        </div>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Concepto</th>
+                                        <th>Categoria</th>
+                                        <th>Estado</th>
+                                        <th class="text-right">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mov in activos %}
+                                    <tr>
+                                        <td class="muted">{{ mov.fecha.strftime('%d/%m') }}</td>
+                                        <td>
+                                            <div class="strong">{{ mov.concepto }}</div>
+                                            <div class="small {% if mov.tipo == 'ingreso' %}text-ok{% else %}text-danger{% endif %}">{{ mov.tipo|title }}</div>
+                                        </td>
+                                        <td class="muted">{{ mov.categoria|replace('_', ' ')|title }}</td>
+                                        <td>
+                                            {% if mov.estado == 'realizado' %}
+                                            <span class="pill pill-ok">{{ mov.estado|title }}</span>
+                                            {% elif mov.estado == 'confirmado' %}
+                                            <span class="pill pill-sky">{{ mov.estado|title }}</span>
+                                            {% else %}
+                                            <span class="pill pill-warn">{{ mov.estado|title }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-right strong {% if mov.tipo == 'ingreso' %}text-ok{% else %}text-danger{% endif %}">{{ gs(mov.monto_operativo_decimal()) }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="muted">Sin movimientos activos en esta semana.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="panel" style="margin-bottom: 16px;">
+                            <div class="panel-header" style="margin-bottom: 12px;">
+                                <div>
+                                    <h2 class="panel-title">Distribucion</h2>
+                                    <p class="panel-help">Totales separados por tipo de movimiento.</p>
+                                </div>
+                            </div>
+                            <div class="dist-grid">
+                                <div class="mini-card card-ok">
+                                    <p class="mini-title text-ok">Ingresos activos</p>
+                                    <p class="mini-value text-ok">{{ ingresos|length }}</p>
+                                    <p class="mini-help muted">Movimientos de entrada</p>
+                                </div>
+                                <div class="mini-card card-danger">
+                                    <p class="mini-title text-danger">Egresos activos</p>
+                                    <p class="mini-value text-danger">{{ egresos|length }}</p>
+                                    <p class="mini-help muted">Movimientos de salida</p>
+                                </div>
+                                <div class="mini-card">
+                                    <p class="mini-title muted">Cancelados</p>
+                                    <p class="mini-value">{{ cancelados|length }}</p>
+                                    <p class="mini-help muted">No impactan en los totales</p>
+                                </div>
+                                <div class="mini-card card-sky">
+                                    <p class="mini-title text-sky">Realizados</p>
+                                    <p class="mini-value text-sky">{{ activos | selectattr('estado', 'equalto', 'realizado') | list | length }}</p>
+                                    <p class="mini-help muted">Ya ejecutados</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if cancelados %}
+                        <div class="panel" style="padding: 16px;">
+                            <div class="panel-header" style="padding: 0 2px; margin-bottom: 12px;">
+                                <div>
+                                    <h2 class="panel-title">Movimientos cancelados</h2>
+                                    <p class="panel-help">Quedan visibles para trazabilidad, sin afectar saldos.</p>
+                                </div>
+                            </div>
+                            <div class="table-wrap">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Concepto</th>
+                                            <th class="text-right">Estimado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for mov in cancelados %}
+                                        <tr>
+                                            <td class="muted">{{ mov.fecha.strftime('%d/%m') }}</td>
+                                            <td>{{ mov.concepto }}</td>
+                                            <td class="text-right strong muted">{{ gs(mov.monto_estimado_decimal()) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        (function () {
+            const btnPdf = document.getElementById('btn-generar-pdf');
+            const btnPrint = document.getElementById('btn-imprimir');
+
+            function setPdfMode(enabled) {
+                if (enabled) {
+                    document.body.classList.add('pdf-exporting');
+                    return;
+                }
+                document.body.classList.remove('pdf-exporting');
+            }
+
+            function setButtonState(button, text, disabled) {
+                if (!button) {
+                    return;
+                }
+
+                button.textContent = text;
+                button.disabled = disabled;
+            }
+
+            function restoreButtons() {
+                setButtonState(btnPdf, 'Generar PDF', false);
+                setButtonState(btnPrint, 'Imprimir', false);
+                setPdfMode(false);
+            }
+
+            function buildPdfOptions() {
+                const period = '{{ ctx.semana.fecha_inicio.strftime("%Y-%m-%d") }}_{{ ctx.semana.fecha_fin.strftime("%Y-%m-%d") }}';
+                return {
+                    margin: [8, 8, 10, 8],
+                    filename: 'flujo_caja_proyectado_' + period + '.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        scrollY: 0,
+                        backgroundColor: '#ffffff',
+                        windowWidth: 1200,
+                        onclone: function (doc) {
+                            doc.body.classList.add('pdf-exporting');
+                        }
+                    },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak: { mode: ['css', 'legacy'], avoid: ['.card', '.mini-card', '.panel', '.table-wrap', 'tr'] }
+                };
+            }
+
+            function downloadPdf() {
+                if (!btnPdf) {
+                    return;
+                }
+
+                setButtonState(btnPdf, 'Generando...', true);
+                setButtonState(btnPrint, 'Imprimir', true);
+                setPdfMode(true);
+
+                const element = document.getElementById('flujo-caja-pdf-content');
+                html2pdf().set(buildPdfOptions()).from(element).save().then(restoreButtons).catch(function (err) {
+                    console.error('Error generando PDF:', err);
+                    restoreButtons();
+                    alert('Error al generar el PDF');
+                });
+            }
+
+            function printPdf() {
+                if (!btnPrint) {
+                    return;
+                }
+
+                setButtonState(btnPrint, 'Preparando impresion...', true);
+                setButtonState(btnPdf, 'Generar PDF', true);
+                setPdfMode(true);
+
+                window.requestAnimationFrame(function () {
+                    window.print();
+                });
+            }
+
+            if (btnPdf) {
+                btnPdf.addEventListener('click', downloadPdf);
+            }
+
+            if (btnPrint) {
+                btnPrint.addEventListener('click', printPdf);
+            }
+
+            window.addEventListener('afterprint', restoreButtons);
+
+            if ({{ 'true' if auto_print else 'false' }}) {
+                window.addEventListener('load', function () {
+                    setTimeout(function () {
+                        printPdf();
+                    }, 250);
+                });
+            }
+
+            if ({{ 'true' if auto_pdf else 'false' }}) {
+                window.addEventListener('load', function () {
+                    setTimeout(downloadPdf, 250);
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

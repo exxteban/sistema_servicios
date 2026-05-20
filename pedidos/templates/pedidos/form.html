@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+
+{% block title %}{% if pedido %}Editar{% else %}Nuevo{% endif %} Pedido{% endblock %}
+
+{% block content %}
+{% set es_nuevo = not pedido %}
+{% set cliente_value = pedido.id_cliente if pedido else request.form.get('id_cliente', '') %}
+{% set descuento_value = pedido.descuento_monto if pedido else request.form.get('descuento_monto', '0') %}
+{% set observaciones_value = pedido.observaciones if pedido else request.form.get('observaciones', '') %}
+{% set tipo_pago_inicial_value = request.form.get('tipo_pago_inicial', '') %}
+{% set metodo_pago_inicial_value = request.form.get('id_metodo_pago_inicial', '') %}
+{% set monto_pago_inicial_value = request.form.get('monto_pago_inicial', '') %}
+{% set referencia_pago_inicial_value = request.form.get('referencia_pago_inicial', '') %}
+{% set observaciones_pago_inicial_value = request.form.get('observaciones_pago_inicial', '') %}
+<div class="max-w-5xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-6">
+            <i class="fas fa-clipboard-list text-blue-600 dark:text-blue-400 mr-2"></i>
+            {% if pedido %}Editar Pedido{% else %}Nuevo Pedido{% endif %}
+        </h1>
+
+        <form method="POST"
+            action="{{ url_for('pedidos.editar', id_pedido=pedido.id_pedido) if pedido else url_for('pedidos.nuevo') }}"
+            class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Cliente *</label>
+                    <div class="flex gap-2">
+                        <select name="id_cliente" id="pedido-id-cliente" required
+                            class="flex-1 border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            <option value="">Seleccionar cliente...</option>
+                            {% for cliente in clientes %}
+                            <option value="{{ cliente.id_cliente }}" {% if cliente_value|string == cliente.id_cliente|string %}selected{% endif %}>
+                                {{ cliente.nombre }}{% if cliente.telefono %} · {{ cliente.telefono }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" id="pedido-nuevo-cliente-btn" data-permiso="crear_cliente"
+                            class="h-11 w-11 shrink-0 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow"
+                            title="Nuevo cliente" aria-label="Nuevo cliente">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Descuento</label>
+                    <input type="number" step="0.01" min="0" name="descuento_monto" id="descuento-monto"
+                        value="{{ descuento_value }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Estado</label>
+                    <input type="text" disabled value="{{ pedido.estado_label if pedido else 'Borrador' }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Observaciones</label>
+                    <textarea name="observaciones" rows="4"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">{{ observaciones_value }}</textarea>
+                </div>
+            </div>
+
+            {% if es_nuevo %}
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Subtotal inicial</p>
+                    <p class="text-lg font-semibold text-gray-800 dark:text-white" id="pedido-subtotal-preview"
+                        data-value="{{ resumen_inicial.subtotal if resumen_inicial else 0 }}">
+                        Gs. {{ "{:,.0f}".format((resumen_inicial.subtotal if resumen_inicial else 0) or 0).replace(",", ".") }}
+                    </p>
+                </div>
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total estimado</p>
+                    <p class="text-lg font-semibold text-gray-800 dark:text-white" id="pedido-total-preview"
+                        data-value="{{ resumen_inicial.total if resumen_inicial else 0 }}">
+                        Gs. {{ "{:,.0f}".format((resumen_inicial.total if resumen_inicial else 0) or 0).replace(",", ".") }}
+                    </p>
+                </div>
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Seña / pago inicial</p>
+                    <p class="text-lg font-semibold text-emerald-600 dark:text-emerald-400" id="pedido-pago-preview"
+                        data-value="{{ resumen_inicial.pago_inicial if resumen_inicial else 0 }}">
+                        Gs. {{ "{:,.0f}".format((resumen_inicial.pago_inicial if resumen_inicial else 0) or 0).replace(",", ".") }}
+                    </p>
+                </div>
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Saldo estimado</p>
+                    <p class="text-lg font-semibold text-amber-600 dark:text-amber-400" id="pedido-saldo-preview"
+                        data-value="{{ resumen_inicial.saldo if resumen_inicial else 0 }}">
+                        Gs. {{ "{:,.0f}".format((resumen_inicial.saldo if resumen_inicial else 0) or 0).replace(",", ".") }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div class="xl:col-span-2 bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 space-y-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Productos del pedido</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Cargá los productos antes de guardar para ver el costo inicial.</p>
+                        </div>
+                        <span class="text-sm text-gray-500 dark:text-gray-400" id="pedido-items-count">0 item(s)</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div class="md:col-span-5">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Buscar producto</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="pedido-producto-q"
+                                    class="flex-1 border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                                    placeholder="Nombre o codigo">
+                                <button type="button" id="pedido-producto-buscar"
+                                    class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white">
+                                    Buscar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Producto</label>
+                            <select id="pedido-producto-select"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                                <option value="">Seleccionar producto...</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Cant.</label>
+                            <input type="number" id="pedido-item-cantidad" min="1" value="1"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Precio</label>
+                            <input type="number" id="pedido-item-precio" step="0.01" min="0"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                                placeholder="Precio unitario">
+                            <p class="mt-1 text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+                                Se completa solo. Si lo cambiás, aplica a este pedido.
+                            </p>
+                        </div>
+                        <div class="md:col-span-10">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Observacion del item</label>
+                            <input type="text" id="pedido-item-observaciones"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                                placeholder="Nota opcional del producto">
+                        </div>
+                        <div class="md:col-span-2 flex items-end">
+                            <button type="button" id="pedido-agregar-item"
+                                class="w-full px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">
+                                Agregar
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="hidden text-sm text-red-600 dark:text-red-400" id="pedido-items-error"></p>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-white dark:bg-gray-800">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Producto</th>
+                                    <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Cant.</th>
+                                    <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">P. Unit.</th>
+                                    <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Subtotal</th>
+                                    <th class="px-3 py-2 text-center text-xs text-gray-500 dark:text-gray-300">Accion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pedido-items-body" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                    <div id="pedido-items-empty"
+                        class="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                        Todavia no agregaste productos al pedido.
+                    </div>
+                    <div id="pedido-items-hidden"></div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4">
+                        <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-3">Seña o pago inicial</h2>
+                        <div class="space-y-3">
+                            <select name="tipo_pago_inicial"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                                <option value="">Sin pago inicial</option>
+                                {% for tipo_pago in tipos_pago %}
+                                <option value="{{ tipo_pago }}" {% if tipo_pago_inicial_value == tipo_pago %}selected{% endif %}>
+                                    {{ tipo_pago.replace('_', ' ').title() }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <select name="id_metodo_pago_inicial"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                                <option value="">Metodo de pago...</option>
+                                {% for metodo in metodos_pago %}
+                                <option value="{{ metodo.id_metodo_pago }}" {% if metodo_pago_inicial_value|string == metodo.id_metodo_pago|string %}selected{% endif %}>
+                                    {{ metodo.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <input type="number" step="0.01" min="0" name="monto_pago_inicial" id="monto-pago-inicial"
+                                value="{{ monto_pago_inicial_value }}"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                                placeholder="Monto recibido">
+                            <input type="text" name="referencia_pago_inicial" value="{{ referencia_pago_inicial_value }}"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                                placeholder="Referencia o comprobante">
+                            <textarea name="observaciones_pago_inicial" rows="3"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                                placeholder="Observaciones del cobro inicial">{{ observaciones_pago_inicial_value }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border {% if sesion_caja_activa %}border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20{% else %}border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20{% endif %} p-4">
+                        {% if sesion_caja_activa %}
+                        <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Caja abierta detectada.</p>
+                        <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Podés registrar una seña en efectivo desde el alta del pedido.</p>
+                        {% else %}
+                        <p class="text-sm font-medium text-amber-700 dark:text-amber-300">No hay caja abierta para este usuario.</p>
+                        <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">Si el pago inicial es en efectivo, primero abrí caja. Para otros metodos el sistema igual intentara registrar el cobro.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% elif pedido %}
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Subtotal</p>
+                    <p class="text-lg font-semibold text-gray-800 dark:text-white">Gs. {{ "{:,.0f}".format(pedido.subtotal or 0).replace(",", ".") }}</p>
+                </div>
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total</p>
+                    <p class="text-lg font-semibold text-gray-800 dark:text-white">Gs. {{ "{:,.0f}".format(pedido.total or 0).replace(",", ".") }}</p>
+                </div>
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Pagado</p>
+                    <p class="text-lg font-semibold text-emerald-600 dark:text-emerald-400">Gs. {{ "{:,.0f}".format(pedido.total_pagado or 0).replace(",", ".") }}</p>
+                </div>
+                <div class="rounded-lg bg-gray-50 dark:bg-gray-900 p-3">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Saldo</p>
+                    <p class="text-lg font-semibold text-amber-600 dark:text-amber-400">Gs. {{ "{:,.0f}".format(pedido.saldo_pendiente or 0).replace(",", ".") }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="flex justify-end gap-3">
+                <a href="{{ url_for('pedidos.detalle', id_pedido=pedido.id_pedido) if pedido else url_for('pedidos.listar') }}"
+                    class="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                    <i class="fas fa-save mr-2"></i>Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% include "pedidos/_cliente_modal.html" %}
+{% if es_nuevo %}
+<script id="pedido-productos-iniciales-json" type="application/json">{{ (productos_formulario_json or [])|tojson }}</script>
+<script id="pedido-items-iniciales-json" type="application/json">{{ (items_iniciales or [])|tojson }}</script>
+<script>
+(function () {
+    function readJsonScript(id) {
+        const node = document.getElementById(id);
+        if (!node) {
+            return [];
+        }
+        try {
+            return JSON.parse(node.textContent || '[]');
+        } catch (error) {
+            console.error(`No se pudo leer el JSON inicial de ${id}.`, error);
+            return [];
+        }
+    }
+
+    const productosIniciales = readJsonScript('pedido-productos-iniciales-json');
+    const items = readJsonScript('pedido-items-iniciales-json');
+    const selectProducto = document.getElementById('pedido-producto-select');
+    const inputBusqueda = document.getElementById('pedido-producto-q');
+    const btnBuscar = document.getElementById('pedido-producto-buscar');
+    const inputCantidad = document.getElementById('pedido-item-cantidad');
+    const inputPrecio = document.getElementById('pedido-item-precio');
+    const inputObservaciones = document.getElementById('pedido-item-observaciones');
+    const btnAgregar = document.getElementById('pedido-agregar-item');
+    const body = document.getElementById('pedido-items-body');
+    const empty = document.getElementById('pedido-items-empty');
+    const hidden = document.getElementById('pedido-items-hidden');
+    const errorBox = document.getElementById('pedido-items-error');
+    const countBox = document.getElementById('pedido-items-count');
+    const descuentoInput = document.getElementById('descuento-monto');
+    const pagoInicialInput = document.getElementById('monto-pago-inicial');
+    const subtotalBox = document.getElementById('pedido-subtotal-preview');
+    const totalBox = document.getElementById('pedido-total-preview');
+    const pagoBox = document.getElementById('pedido-pago-preview');
+    const saldoBox = document.getElementById('pedido-saldo-preview');
+    let productos = Array.isArray(productosIniciales) ? productosIniciales : [];
+
+    function formatGs(value) {
+        return 'Gs. ' + Number(value || 0).toLocaleString('es-PY', { maximumFractionDigits: 0 });
+    }
+
+    function toNumber(value) {
+        const parsed = parseFloat(String(value || '0').replace(',', '.'));
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function optionLabel(producto) {
+        let label = `${producto.nombre} · ${producto.codigo || '-' } · ${formatGs(producto.precio_venta || 0)}`;
+        if (producto.stock_disponible_pedidos !== null && producto.stock_disponible_pedidos !== undefined) {
+            label += ` · Disp. pedidos: ${producto.stock_disponible_pedidos}`;
+        }
+        return label;
+    }
+
+    function renderProductos() {
+        const current = selectProducto.value;
+        const options = ['<option value="">Seleccionar producto...</option>'];
+        productos.forEach((producto) => {
+            options.push(
+                `<option value="${producto.id_producto}">${escapeHtml(optionLabel(producto))}</option>`
+            );
+        });
+        selectProducto.innerHTML = options.join('');
+        if (current) {
+            selectProducto.value = current;
+        }
+    }
+
+    function updateSummary() {
+        const subtotal = items.reduce((acc, item) => acc + (toNumber(item.cantidad) * toNumber(item.precio_unitario)), 0);
+        const descuento = Math.max(0, toNumber(descuentoInput ? descuentoInput.value : 0));
+        const total = Math.max(0, subtotal - descuento);
+        const pagoInicial = Math.max(0, toNumber(pagoInicialInput ? pagoInicialInput.value : 0));
+        const saldo = Math.max(0, total - pagoInicial);
+        subtotalBox.textContent = formatGs(subtotal);
+        totalBox.textContent = formatGs(total);
+        pagoBox.textContent = formatGs(pagoInicial);
+        saldoBox.textContent = formatGs(saldo);
+        countBox.textContent = `${items.length} item(s)`;
+    }
+
+    function renderItems() {
+        hidden.innerHTML = '';
+        if (!items.length) {
+            body.innerHTML = '';
+            empty.classList.remove('hidden');
+            updateSummary();
+            return;
+        }
+
+        empty.classList.add('hidden');
+        body.innerHTML = items.map((item, index) => {
+            const subtotal = toNumber(item.cantidad) * toNumber(item.precio_unitario);
+            return `
+                <tr class="align-top">
+                    <td class="px-3 py-3">
+                        <div class="font-medium text-gray-800 dark:text-gray-100">${escapeHtml(item.nombre || '')}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${escapeHtml(item.codigo || '-')}</div>
+                        ${item.observaciones ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${escapeHtml(item.observaciones)}</div>` : ''}
+                    </td>
+                    <td class="px-3 py-3 text-right text-sm text-gray-700 dark:text-gray-200">${escapeHtml(item.cantidad)}</td>
+                    <td class="px-3 py-3 text-right text-sm text-gray-700 dark:text-gray-200">${formatGs(item.precio_unitario)}</td>
+                    <td class="px-3 py-3 text-right text-sm font-semibold text-gray-700 dark:text-gray-200">${formatGs(subtotal)}</td>
+                    <td class="px-3 py-3 text-center">
+                        <button type="button" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm" data-remove-index="${index}">
+                            Quitar
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        items.forEach((item) => {
+            hidden.insertAdjacentHTML('beforeend', `
+                <input type="hidden" name="items_id_producto" value="${escapeHtml(item.id_producto)}">
+                <input type="hidden" name="items_cantidad" value="${escapeHtml(item.cantidad)}">
+                <input type="hidden" name="items_precio_unitario" value="${escapeHtml(item.precio_unitario)}">
+                <input type="hidden" name="items_observaciones" value="${escapeHtml(item.observaciones || '')}">
+            `);
+        });
+
+        updateSummary();
+    }
+
+    function setError(message) {
+        if (!errorBox) return;
+        if (message) {
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+            return;
+        }
+        errorBox.textContent = '';
+        errorBox.classList.add('hidden');
+    }
+
+    async function buscarProductos() {
+        const q = (inputBusqueda.value || '').trim();
+        btnBuscar.disabled = true;
+        btnBuscar.textContent = 'Buscando...';
+        setError('');
+        try {
+            const response = await fetch(`{{ url_for('pedidos_api.buscar_productos') }}?q=${encodeURIComponent(q)}&limit=20`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error((data && (data.error || data.message)) || 'No se pudieron cargar productos.');
+            }
+            productos = Array.isArray(data.items) ? data.items : [];
+            renderProductos();
+        } catch (error) {
+            setError(error.message || 'No se pudieron cargar productos.');
+        } finally {
+            btnBuscar.disabled = false;
+            btnBuscar.textContent = 'Buscar';
+        }
+    }
+
+    function agregarItem() {
+        const idProducto = Number(selectProducto.value || 0);
+        const producto = productos.find((item) => Number(item.id_producto) === idProducto);
+        const cantidad = Math.max(1, parseInt(inputCantidad.value || '1', 10));
+        const precio = toNumber(inputPrecio.value || (producto ? producto.precio_venta : 0));
+        const observaciones = (inputObservaciones.value || '').trim();
+
+        if (!producto) {
+            setError('Seleccioná un producto para agregar.');
+            return;
+        }
+        if (precio <= 0) {
+            setError('El precio unitario debe ser mayor a cero.');
+            return;
+        }
+
+        items.push({
+            id_producto: Number(producto.id_producto),
+            codigo: producto.codigo || '',
+            nombre: producto.nombre || '',
+            cantidad: cantidad,
+            precio_unitario: precio,
+            observaciones: observaciones,
+        });
+        inputCantidad.value = '1';
+        inputPrecio.value = '';
+        inputObservaciones.value = '';
+        selectProducto.value = '';
+        setError('');
+        renderItems();
+    }
+
+    body.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-remove-index]');
+        if (!button) return;
+        const index = Number(button.getAttribute('data-remove-index'));
+        if (Number.isInteger(index) && index >= 0) {
+            items.splice(index, 1);
+            renderItems();
+        }
+    });
+
+    selectProducto.addEventListener('change', function () {
+        const producto = productos.find((item) => String(item.id_producto) === String(selectProducto.value || ''));
+        if (producto && !inputPrecio.value) {
+            inputPrecio.value = producto.precio_venta || '';
+        }
+    });
+    btnBuscar.addEventListener('click', buscarProductos);
+    inputBusqueda.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            buscarProductos();
+        }
+    });
+    btnAgregar.addEventListener('click', agregarItem);
+    descuentoInput.addEventListener('input', updateSummary);
+    pagoInicialInput.addEventListener('input', updateSummary);
+
+    renderProductos();
+    renderItems();
+})();
+</script>
+{% endif %}
+{% endblock %}

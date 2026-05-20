@@ -1,0 +1,605 @@
+{% extends "base.html" %}
+
+{% block title %}WhatsApp - Panel{% endblock %}
+
+{% block content %}
+<div class="h-full flex flex-col" x-data="whatsappPanel">
+    <!-- Header con pestañas -->
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-green-500/20 rounded-xl">
+                <i class="fab fa-whatsapp text-2xl text-green-500"></i>
+            </div>
+            <!-- Pestañas -->
+            <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/60 rounded-xl p-1">
+                <button @click="pestanaActiva = 'asesor'"
+                    class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200"
+                    :class="pestanaActiva === 'asesor'
+                        ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'">
+                    <i class="fas fa-headset mr-2"></i>Mis Conversaciones
+                </button>
+            </div>
+        </div>
+        <!-- Toggle Online/Offline (solo en pestaña asesor) -->
+        <div class="flex items-center gap-3" x-show="pestanaActiva === 'asesor'">
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Convs: <span x-text="estadoAsesor.conversaciones_activas">0</span>/<span x-text="estadoAsesor.max_conversaciones">5</span>
+            </p>
+            <button @click="toggleOnline()"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 shadow-sm"
+                :class="estadoAsesor.online
+                    ? 'bg-green-500 hover:bg-green-600 text-white shadow-green-500/25'
+                    : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200'">
+                <span class="w-2.5 h-2.5 rounded-full" :class="estadoAsesor.online ? 'bg-white animate-pulse' : 'bg-gray-500 dark:bg-gray-400'"></span>
+                <span x-text="estadoAsesor.online ? 'Online' : 'Offline'"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ══ PESTAÑA: MIS CONVERSACIONES ══ -->
+    <div class="flex-1 min-h-0 flex flex-col" x-show="pestanaActiva === 'asesor'">
+
+    <!-- Main Content: Sidebar + Chat -->
+    <div class="flex-1 min-h-0 flex gap-4">
+        <!-- Conversations List (Left Panel) -->
+        <div class="w-80 flex-shrink-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+            <div class="p-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-sm font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    <i class="fas fa-comments mr-1"></i> Conversaciones
+                </h2>
+            </div>
+
+            <div class="flex-1 overflow-y-auto">
+                <template x-if="conversaciones.length === 0 && cola.length === 0">
+                    <div class="p-6 text-center text-gray-400 dark:text-gray-500">
+                        <i class="fab fa-whatsapp text-4xl mb-3 opacity-30"></i>
+                        <p class="text-sm">No hay conversaciones asignadas</p>
+                        <p class="text-xs mt-1" x-show="!estadoAsesor.online">Activa tu estado Online para recibir conversaciones</p>
+                    </div>
+                </template>
+
+                <template x-if="conversaciones.length > 0">
+                    <div class="px-3 py-2 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Asignadas
+                    </div>
+                </template>
+                <template x-for="conv in conversaciones" :key="conv.id_asignacion">
+                    <button @click="seleccionarConversacion(conv)"
+                        class="w-full text-left p-3 border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        :class="conversacionActiva && conversacionActiva.id_conversacion === conv.id_conversacion ? 'bg-green-50 dark:bg-green-900/20 border-l-4 border-l-green-500' : ''">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-user text-green-600 dark:text-green-400"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate" x-text="conv.nombre_contacto"></span>
+                                    <span class="text-xs text-gray-400" x-text="formatTime(conv.ultimo_mensaje_at)"></span>
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5" x-text="conv.ultimo_mensaje"></p>
+                                <div class="flex items-center gap-1 mt-1 flex-wrap">
+                                    <span class="inline-block text-xs px-2 py-0.5 rounded-full"
+                                        :class="conv.estado_asignacion === 'pendiente' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'"
+                                        x-text="conv.estado_asignacion === 'pendiente' ? 'Pendiente' : 'Activa'"></span>
+                                    <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                                        :class="conv.origen_tipo === 'bot_tienda' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'">
+                                        <i class="text-[11px]" :class="conv.origen_icono || 'fab fa-whatsapp'"></i>
+                                        <span x-text="conv.origen_label || 'WhatsApp'"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </button>
+                </template>
+
+                <template x-if="cola.length > 0">
+                    <div class="px-3 py-2 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        En cola
+                    </div>
+                </template>
+                <template x-for="conv in cola" :key="conv.id_conversacion">
+                    <div class="w-full p-3 border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gray-500/10 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-user-clock text-gray-500 dark:text-gray-300"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate" x-text="conv.nombre_contacto"></span>
+                                    <span class="text-xs text-gray-400" x-text="formatTime(conv.ultimo_mensaje_at)"></span>
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5" x-text="conv.ultimo_mensaje"></p>
+                                <div class="flex items-center justify-between mt-2">
+                                    <div class="flex items-center gap-1 flex-wrap">
+                                        <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                            En cola
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                                            :class="conv.origen_tipo === 'bot_tienda' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'">
+                                            <i class="text-[11px]" :class="conv.origen_icono || 'fab fa-whatsapp'"></i>
+                                            <span x-text="conv.origen_label || 'WhatsApp'"></span>
+                                        </span>
+                                    </div>
+                                    <button @click="tomarConversacion(conv)"
+                                        class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition shadow-sm">
+                                        Tomar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Chat Area (Right Panel) -->
+        <div class="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+            <template x-if="!conversacionActiva">
+                <div class="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                    <div class="text-center">
+                        <i class="fab fa-whatsapp text-6xl mb-4 opacity-20"></i>
+                        <p class="text-lg font-medium">Selecciona una conversación</p>
+                        <p class="text-sm mt-1">Elige una conversación de la lista para empezar a responder</p>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="conversacionActiva">
+                <div class="flex flex-col h-full">
+                    <!-- Chat Header -->
+                    <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800/80">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                                <i class="fas fa-user text-green-600 dark:text-green-400"></i>
+                            </div>
+                            <div>
+                                <button type="button" @click="abrirClienteDesdeChat()"
+                                    class="font-semibold text-gray-800 dark:text-gray-200 hover:underline hover:text-green-700 dark:hover:text-green-300 transition cursor-pointer">
+                                    <span x-text="conversacionActiva.nombre_contacto"></span>
+                                </button>
+                                <p class="text-xs text-gray-500 dark:text-gray-400" x-text="conversacionActiva.telefono"></p>
+                                <span class="inline-flex items-center gap-1 mt-1 text-[11px] px-2 py-0.5 rounded-full"
+                                    :class="conversacionActiva.origen_tipo === 'bot_tienda' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'">
+                                    <i class="text-[11px]" :class="conversacionActiva.origen_icono || 'fab fa-whatsapp'"></i>
+                                    <span x-text="conversacionActiva.origen_label || 'WhatsApp'"></span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <template x-if="conversacionActiva.estado_asignacion === 'pendiente'">
+                                <button @click="aceptarConversacion()"
+                                    class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition shadow-sm">
+                                    <i class="fas fa-check mr-1"></i> Aceptar
+                                </button>
+                            </template>
+                            <button @click="abrirModalTransferir()"
+                                class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold rounded-lg transition shadow-sm"
+                                title="Transferir a otro asesor">
+                                <i class="fas fa-share mr-1"></i> Transferir
+                            </button>
+                            <button @click="devolverConversacion()"
+                                class="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-semibold rounded-lg transition shadow-sm"
+                                title="Devolver al pool">
+                                <i class="fas fa-undo mr-1"></i> Devolver
+                            </button>
+                            <button @click="cerrarConversacion()"
+                                class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition shadow-sm"
+                                title="Cerrar conversación">
+                                <i class="fas fa-times mr-1"></i> Cerrar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Messages Area -->
+                    <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-[#e5ddd5] dark:bg-gray-900/50" id="chat-messages" x-ref="chatMessages">
+                        <template x-for="msg in mensajes" :key="msg.id">
+                            <div>
+                                <template x-if="msg.es_nota">
+                                    <div class="flex justify-center">
+                                        <div class="max-w-[85%] rounded-2xl px-4 py-2 shadow-sm bg-yellow-100 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-100 border border-yellow-200 dark:border-yellow-700/40">
+                                            <div class="flex items-center gap-2">
+                                                <i class="fas fa-sticky-note text-xs opacity-80"></i>
+                                                <span class="text-[11px] font-semibold" x-text="msg.nota_scope === 'contacto' ? 'Nota (cliente)' : 'Nota (chat)'"></span>
+                                                <span class="text-[10px] opacity-60 ml-auto" x-text="formatTime(msg.created_at)"></span>
+                                            </div>
+                                            <p class="text-sm whitespace-pre-wrap mt-1" x-text="msg.contenido"></p>
+                                            <p class="text-[10px] opacity-60 mt-1" x-text="msg.autor || ''"></p>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template x-if="!msg.es_nota">
+                                    <div class="flex" :class="msg.direccion === 'entrante' ? 'justify-start' : 'justify-end'">
+                                        <div class="max-w-[70%] rounded-2xl px-4 py-2 shadow-sm"
+                                            :class="msg.direccion === 'entrante'
+                                                ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-tl-sm'
+                                                : (msg.remitente === 'bot'
+                                                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100 rounded-tr-sm'
+                                                    : 'bg-green-100 dark:bg-green-900/40 text-green-900 dark:text-green-100 rounded-tr-sm')">
+                                            <p class="text-sm whitespace-pre-wrap" x-text="msg.contenido"></p>
+                                            <div class="flex items-center justify-end gap-1 mt-1">
+                                                <span class="text-[10px] opacity-60" x-text="formatTime(msg.created_at)"></span>
+                                                <template x-if="msg.direccion === 'saliente'">
+                                                    <span class="text-[10px] opacity-50" x-text="msg.remitente === 'bot' ? '🤖' : '👤'"></span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="mostrandoNota" class="p-3 border-t border-yellow-200 dark:border-yellow-700/40 bg-yellow-50 dark:bg-yellow-900/15">
+                        <div class="flex items-start gap-2">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <select x-model="notaScope"
+                                        class="px-3 py-1.5 rounded-lg border border-yellow-200 dark:border-yellow-700/40 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs outline-none">
+                                        <option value="conversacion">Nota del chat</option>
+                                        <option value="contacto">Nota del cliente</option>
+                                    </select>
+                                    <span class="text-[11px] text-yellow-800 dark:text-yellow-200 opacity-80">Solo visible para el equipo</span>
+                                </div>
+                                <textarea x-model="textoNota" rows="2" placeholder="Escribí una nota interna..."
+                                    class="w-full px-3 py-2 rounded-xl border border-yellow-200 dark:border-yellow-700/40 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-sm outline-none resize-none"></textarea>
+                            </div>
+                            <div class="flex flex-col gap-2 pt-7">
+                                <button type="button" @click="enviarNota()"
+                                    class="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl transition shadow-sm disabled:cursor-not-allowed"
+                                    :disabled="!textoNota.trim()">
+                                    <i class="fas fa-save"></i>
+                                </button>
+                                <button type="button" @click="mostrandoNota = false"
+                                    class="px-3 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl transition shadow-sm">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
+                        <form @submit.prevent="enviarMensaje()" class="flex items-center gap-2">
+                            <button type="button" @click="mostrandoNota = !mostrandoNota"
+                                class="px-4 py-2.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-700 dark:text-yellow-300 rounded-xl transition shadow-sm">
+                                <i class="fas fa-sticky-note"></i>
+                            </button>
+                            <input type="text" x-model="textoMensaje"
+                                placeholder="Escribe un mensaje..."
+                                class="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
+                                :disabled="conversacionActiva.estado_asignacion !== 'activa'"
+                                x-ref="inputMensaje">
+                            <button type="submit"
+                                class="px-4 py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl transition shadow-sm disabled:cursor-not-allowed"
+                                :disabled="!textoMensaje.trim() || conversacionActiva.estado_asignacion !== 'activa' || enviando">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </form>
+                        <p class="text-xs text-gray-400 mt-1 text-center" x-show="conversacionActiva.estado_asignacion === 'pendiente'">
+                            Acepta la conversación para poder responder
+                        </p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    </div><!-- /pestaña asesor -->
+
+    <!-- ══ PESTAÑA: MONITOR IA ══ -->
+    {% if es_monitor %}
+    <div class="flex-1 min-h-0 flex gap-4" x-show="pestanaActiva === 'monitor'">
+
+        <!-- Lista de conversaciones (izquierda) -->
+        <div class="w-80 flex-shrink-0 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+            <!-- Filtros -->
+            <div class="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+                <h2 class="text-sm font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    <i class="fas fa-robot mr-1"></i> Conversaciones
+                    <span class="ml-1 text-xs font-normal text-gray-400" x-text="'(' + monitorTotal + ')'"></span>
+                </h2>
+                <!-- Búsqueda -->
+                <input type="text" x-model="monitorBusqueda" placeholder="Buscar teléfono o nombre..."
+                    class="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition">
+                <!-- Filtro modo -->
+                <div class="flex gap-1 flex-wrap">
+                    <template x-for="m in ['todos','bot','asesor','derivacion']" :key="m">
+                        <button @click="monitorFiltroModo = m; monitorPagina = 1; cargarMonitor()"
+                            class="px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all"
+                            :class="monitorFiltroModo === m
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                            x-text="m === 'todos' ? 'Todos' : m.charAt(0).toUpperCase() + m.slice(1)">
+                        </button>
+                    </template>
+                </div>
+                <!-- Filtro activa -->
+                <div class="flex gap-1">
+                    <template x-for="[val, label] in [['', 'Todas'], ['true', 'Activas'], ['false', 'Cerradas']]" :key="val">
+                        <button @click="monitorFiltroActiva = val; monitorPagina = 1; cargarMonitor()"
+                            class="px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all"
+                            :class="monitorFiltroActiva === val
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                            x-text="label">
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Lista -->
+            <div class="flex-1 overflow-y-auto">
+                <template x-if="monitorCargando && monitorConversaciones.length === 0">
+                    <div class="p-6 text-center text-gray-400 dark:text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p class="text-xs">Cargando...</p>
+                    </div>
+                </template>
+                <template x-if="!monitorCargando && monitorConversacionesFiltradas.length === 0">
+                    <div class="p-6 text-center text-gray-400 dark:text-gray-500">
+                        <i class="fas fa-inbox text-3xl mb-2 opacity-30"></i>
+                        <p class="text-xs">Sin resultados</p>
+                    </div>
+                </template>
+                <template x-for="conv in monitorConversacionesFiltradas" :key="conv.id">
+                    <button @click="seleccionarMonitorConv(conv)"
+                        class="w-full text-left p-3 border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        :class="monitorConvActiva && monitorConvActiva.id === conv.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500' : ''">
+                        <div class="flex items-start gap-2">
+                            <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                                :class="conv.modo === 'bot' ? 'bg-blue-500/15' : conv.modo === 'asesor' ? 'bg-green-500/15' : 'bg-yellow-500/15'">
+                                <i class="text-sm"
+                                    :class="conv.modo === 'bot' ? 'fas fa-robot text-blue-500' : conv.modo === 'asesor' ? 'fas fa-user text-green-500' : 'fas fa-clock text-yellow-500'"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="font-semibold text-xs text-gray-800 dark:text-gray-200 truncate" x-text="conv.nombre_contacto"></span>
+                                    <span class="text-[10px] text-gray-400 flex-shrink-0" x-text="formatTime(conv.ultima_actividad)"></span>
+                                </div>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5" x-text="conv.ultimo_mensaje || '—'"></p>
+                                <div class="flex items-center gap-1 mt-1 flex-wrap">
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                                        :class="conv.modo === 'bot' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : conv.modo === 'asesor' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'"
+                                        x-text="conv.modo"></span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                                        :class="conv.activa ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                                        x-text="conv.activa ? 'activa' : 'cerrada'"></span>
+                                    <span x-show="conv.tool_calls_count > 0" class="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 font-medium">
+                                        🔧 <span x-text="conv.tool_calls_count"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </button>
+                </template>
+            </div>
+
+            <!-- Paginación -->
+            <div class="p-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between" x-show="monitorPages > 1">
+                <button @click="monitorPagina--; cargarMonitor()" :disabled="monitorPagina <= 1"
+                    class="px-3 py-1 text-xs rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                    Pág <span x-text="monitorPagina"></span>/<span x-text="monitorPages"></span>
+                </span>
+                <button @click="monitorPagina++; cargarMonitor()" :disabled="monitorPagina >= monitorPages"
+                    class="px-3 py-1 text-xs rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Detalle de conversación (derecha) -->
+        <div class="flex-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+            <!-- Sin selección -->
+            <template x-if="!monitorConvActiva">
+                <div class="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                    <div class="text-center">
+                        <i class="fas fa-robot text-6xl mb-4 opacity-20"></i>
+                        <p class="text-lg font-medium">Seleccioná una conversación</p>
+                        <p class="text-sm mt-1">Ver el historial completo del bot con el cliente</p>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Con selección -->
+            <template x-if="monitorConvActiva">
+                <div class="flex flex-col h-full">
+                    <!-- Header del chat -->
+                    <div class="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                                :class="monitorConvActiva.modo === 'bot' ? 'bg-blue-500/15' : monitorConvActiva.modo === 'asesor' ? 'bg-green-500/15' : 'bg-yellow-500/15'">
+                                <i :class="monitorConvActiva.modo === 'bot' ? 'fas fa-robot text-blue-500' : monitorConvActiva.modo === 'asesor' ? 'fas fa-user text-green-500' : 'fas fa-clock text-yellow-500'"></i>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-gray-800 dark:text-gray-200" x-text="monitorConvActiva.nombre_contacto"></span>
+                                <p class="text-xs text-gray-500 dark:text-gray-400" x-text="monitorConvActiva.telefono"></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs px-2 py-1 rounded-full font-medium"
+                                :class="monitorConvActiva.modo === 'bot' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : monitorConvActiva.modo === 'asesor' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'"
+                                x-text="'Modo: ' + monitorConvActiva.modo"></span>
+                            <span class="text-xs px-2 py-1 rounded-full font-medium"
+                                :class="monitorConvActiva.activa ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                                x-text="monitorConvActiva.activa ? 'Activa' : 'Cerrada'"></span>
+                            <span class="text-xs text-gray-400" x-text="'Inicio: ' + formatTime(monitorConvActiva.inicio_sesion)"></span>
+                        </div>
+                    </div>
+
+                    <!-- Mensajes -->
+                    <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-[#e5ddd5] dark:bg-gray-900/50" x-ref="monitorChatMessages">
+                        <template x-if="monitorMensajesCargando">
+                            <div class="flex justify-center py-8">
+                                <i class="fas fa-spinner fa-spin text-gray-400 text-2xl"></i>
+                            </div>
+                        </template>
+                        <template x-for="msg in monitorMensajes" :key="msg.id">
+                            <div>
+                                <!-- Mensaje normal -->
+                                <template x-if="msg.contenido !== '[tool_call]' && msg.contenido !== '[tool_result]'">
+                                    <div class="flex" :class="msg.direccion === 'entrante' ? 'justify-start' : 'justify-end'">
+                                        <div class="max-w-[72%] rounded-2xl px-4 py-2 shadow-sm"
+                                            :class="msg.direccion === 'entrante'
+                                                ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-tl-sm'
+                                                : (msg.remitente === 'bot'
+                                                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100 rounded-tr-sm'
+                                                    : 'bg-green-100 dark:bg-green-900/40 text-green-900 dark:text-green-100 rounded-tr-sm')">
+                                            <p class="text-sm whitespace-pre-wrap" x-text="msg.contenido"></p>
+                                            <div class="flex items-center justify-end gap-1 mt-1">
+                                                <span class="text-[10px] opacity-60" x-text="formatTime(msg.created_at)"></span>
+                                                <template x-if="msg.direccion === 'saliente'">
+                                                    <span class="text-[10px] opacity-50" x-text="msg.remitente === 'bot' ? '🤖' : '👤'"></span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- Tool call (colapsable) -->
+                                <template x-if="msg.tool_call && (msg.contenido === '[tool_call]' || msg.contenido === '[tool_result]')">
+                                    <div class="flex justify-center my-1">
+                                        <div class="max-w-[80%] w-full">
+                                            <button @click="msg._open = !msg._open"
+                                                class="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700/50 text-purple-700 dark:text-purple-300 text-xs font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30 transition">
+                                                <i class="fas fa-wrench text-purple-500"></i>
+                                                <span x-text="getToolName(msg)"></span>
+                                                <span class="ml-auto text-[10px] opacity-60" x-text="formatTime(msg.created_at)"></span>
+                                                <i class="fas text-[10px] opacity-50" :class="msg._open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                                            </button>
+                                            <div x-show="msg._open" x-transition class="mt-1 rounded-xl overflow-hidden border border-purple-200 dark:border-purple-700/50">
+                                                <pre class="text-[11px] p-3 bg-gray-900 text-green-300 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed" x-text="formatToolCall(msg)"></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Contexto JSON (colapsable, al pie) -->
+                    <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
+                        <button @click="monitorContextoAbierto = !monitorContextoAbierto"
+                            class="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition">
+                            <i class="fas fa-code text-gray-400"></i>
+                            Contexto JSON (debug)
+                            <i class="fas ml-auto" :class="monitorContextoAbierto ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div x-show="monitorContextoAbierto" x-transition class="border-t border-gray-200 dark:border-gray-700">
+                            <pre class="text-[11px] p-4 bg-gray-900 text-green-300 overflow-x-auto max-h-48 whitespace-pre-wrap break-all leading-relaxed" x-text="JSON.stringify(monitorContexto, null, 2)"></pre>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+    </div><!-- /pestaña monitor -->
+    {% endif %}
+
+    <div x-show="modalDevolver" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="cerrarModalDevolver()" @keydown.escape.window="cerrarModalDevolver()">
+        <div class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-9 h-9 rounded-xl bg-yellow-500/15 flex items-center justify-center">
+                        <i class="fas fa-undo text-yellow-500"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-gray-800 dark:text-gray-200">Devolver conversación</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400" x-text="conversacionActiva ? (conversacionActiva.nombre_contacto || conversacionActiva.telefono) : ''"></p>
+                    </div>
+                </div>
+                <button class="w-9 h-9 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400" @click="cerrarModalDevolver()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-2">
+                <label class="flex items-start gap-2 p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/60 cursor-pointer">
+                    <input type="radio" x-model="destinoDevolver" value="cola_asesores" class="mt-1">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Cola de asesores</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Vuelve a la cola para que la tome otro asesor.</p>
+                    </div>
+                </label>
+                <label class="flex items-start gap-2 p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/60 cursor-pointer">
+                    <input type="radio" x-model="destinoDevolver" value="pool_ia" class="mt-1">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Pool IA</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Sale de la cola de asesores y vuelve a modo bot.</p>
+                    </div>
+                </label>
+            </div>
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2 bg-gray-50 dark:bg-gray-800/80">
+                <button class="px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                    @click="cerrarModalDevolver()" :disabled="devolviendo">
+                    Cancelar
+                </button>
+                <button class="px-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    @click="confirmarDevolucion()" :disabled="devolviendo">
+                    <span x-show="!devolviendo"><i class="fas fa-check mr-1"></i> Confirmar</span>
+                    <span x-show="devolviendo"><i class="fas fa-spinner fa-spin mr-1"></i> Guardando…</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="modalTransferir" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="cerrarModalTransferir()" @keydown.escape.window="cerrarModalTransferir()">
+        <div class="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-500/15 flex items-center justify-center">
+                        <i class="fas fa-share text-indigo-500"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-gray-800 dark:text-gray-200">Transferir conversación</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400" x-text="conversacionActiva ? (conversacionActiva.nombre_contacto || conversacionActiva.telefono) : ''"></p>
+                    </div>
+                </div>
+                <button class="w-9 h-9 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400" @click="cerrarModalTransferir()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-4 space-y-3">
+                <div class="flex items-center gap-2">
+                    <select x-model="idAsesorTransferir"
+                        class="flex-1 px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                        :disabled="cargandoAsesores || transfiriendo">
+                        <option value="">Seleccionar asesor online…</option>
+                        <template x-for="a in asesoresOnline" :key="a.id_usuario">
+                            <option :value="a.id_usuario" x-text="a.nombre + ' (' + a.conversaciones_activas + '/' + a.max_conversaciones + ')' + (a.disponible ? '' : ' - sin cupo')"></option>
+                        </template>
+                    </select>
+                    <button class="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition disabled:opacity-50"
+                        @click="cargarAsesoresOnline()" :disabled="cargandoAsesores || transfiriendo" title="Actualizar lista">
+                        <i class="fas fa-sync-alt" :class="cargandoAsesores ? 'fa-spin' : ''"></i>
+                    </button>
+                </div>
+
+                <p class="text-xs text-gray-500 dark:text-gray-400" x-show="!cargandoAsesores && asesoresOnline.length === 0">
+                    No hay asesores online disponibles para transferir.
+                </p>
+            </div>
+
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2 bg-gray-50 dark:bg-gray-800/80">
+                <button class="px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                    @click="cerrarModalTransferir()" :disabled="transfiriendo">
+                    Cancelar
+                </button>
+                <button class="px-3 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    @click="confirmarTransferencia()" :disabled="!idAsesorTransferir || transfiriendo">
+                    <span x-show="!transfiriendo"><i class="fas fa-share mr-1"></i> Transferir</span>
+                    <span x-show="transfiriendo"><i class="fas fa-spinner fa-spin mr-1"></i> Transfiriendo…</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /wrapper principal -->
+{% endblock %}
+
+{% block extra_js %}
+{% include 'whatsapp/_panel_asesor_js.html' %}
+{% endblock %}

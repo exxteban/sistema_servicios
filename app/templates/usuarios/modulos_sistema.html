@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Modulos del Sistema{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    {% include 'usuarios/_config_switch_styles.html' %}
+
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-puzzle-piece text-amber-500 mr-2"></i>Modulos del sistema
+            </h1>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 max-w-3xl">
+                Este panel solo lo ve el usuario root. Desde aca podes decidir que modulos aparecen en el sistema y cuales quedan bloqueados a nivel de rutas.
+            </p>
+        </div>
+        <a href="{{ url_for('main.dashboard') }}"
+           class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            <i class="fas fa-arrow-left"></i>Volver
+        </a>
+    </div>
+
+    <form method="POST" action="{{ url_for('usuarios.modulos_sistema') }}"
+          class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-4 transition-colors duration-300">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% for modulo in modulos %}
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between gap-4">
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">{{ modulo.titulo }}</h2>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {% if modulo.activo %}bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-300{% else %}bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+                        {% if modulo.activo %}Visible{% else %}Oculto{% endif %}
+                    </span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    {{ modulo.detalle }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    Clave interna: <code>{{ modulo.clave }}</code>
+                </p>
+            </div>
+
+            <div class="relative inline-flex items-center shrink-0">
+                <input type="hidden" name="{{ modulo.clave }}" value="0">
+                <input id="{{ modulo.clave }}"
+                       type="checkbox"
+                       name="{{ modulo.clave }}"
+                       value="1"
+                       class="config-switch-input"
+                       onchange="this.form.submit()"
+                       {% if modulo.activo %}checked{% endif %}>
+                <label for="{{ modulo.clave }}" class="config-switch-track cursor-pointer" aria-label="Alternar {{ modulo.titulo }}">
+                    <span class="config-switch-thumb"></span>
+                </label>
+            </div>
+        </div>
+        {% endfor %}
+    </form>
+</div>
+{% endblock %}

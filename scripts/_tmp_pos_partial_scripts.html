@@ -1,0 +1,928 @@
+
+    
+<script>
+(function () {
+    const STORAGE_KEY = 'pos_perf_nav_start_v1';
+    const PERF_WINDOW_MS = 15000;
+    const state = {
+        startedAt: performance.now(),
+        summaryPrinted: false,
+        marks: {
+            script_loaded_ms: 0
+        },
+        requests: {},
+        navigation: null
+    };
+
+    function nowMs() {
+        return performance.now();
+    }
+
+    function mark(name, value) {
+        state.marks[name] = value;
+    }
+
+    function readNavigationStart() {
+        try {
+            const raw = sessionStorage.getItem(STORAGE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || !parsed.started_at_ms) return null;
+            if ((Date.now() - parsed.started_at_ms) > PERF_WINDOW_MS) return null;
+            return parsed;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function clearNavigationStart() {
+        try {
+            sessionStorage.removeItem(STORAGE_KEY);
+        } catch (e) {
+        }
+    }
+
+    function extractUrl(input) {
+        if (!input) return '';
+        if (typeof input === 'string') return input;
+        if (typeof input.url === 'string') return input.url;
+        return String(input);
+    }
+
+    function trackFetch(url, startedAt, finishedAt, ok, status) {
+        const normalized = extractUrl(url);
+        if (!normalized) return;
+
+        if (
+            normalized.includes('/clientes/buscar_json')
+            && normalized.includes('?q=')
+            && !state.requests.clientes_default
+        ) {
+            state.requests.clientes_default = {
+                duration_ms: finishedAt - startedAt,
+                ok: !!ok,
+                status: status ?? null
+            };
+        }
+
+        if (normalized.includes('/ventas/validar-carrito') && !state.requests.validar_carrito) {
+            state.requests.validar_carrito = {
+                duration_ms: finishedAt - startedAt,
+                ok: !!ok,
+                status: status ?? null
+            };
+        }
+    }
+
+    function printSummary(reason) {
+        if (state.summaryPrinted) return;
+        state.summaryPrinted = true;
+        const tabLoad = window.__posPerfTabLoadTiming || null;
+        const rel = (nameA, nameB) => {
+            if (!tabLoad) return null;
+            const a = tabLoad[nameA];
+            const b = tabLoad[nameB];
+            if (typeof a !== 'number' || typeof b !== 'number') return null;
+            return b - a;
+        };
+
+        const summary = {
+            reason,
+            route: window.location.pathname,
+            nav_to_script_ms: state.navigation ? (state.navigation.script_started_at_ms - state.navigation.started_at_ms) : null,
+            tab_fetch_ms: rel('fetch_start_perf', 'fetch_response_perf'),
+            tab_response_text_ms: rel('fetch_response_perf', 'response_text_end_perf'),
+            tab_extract_ms: rel('extract_start_perf', 'extract_end_perf'),
+            tab_apply_payload_ms: rel('apply_payload_start_perf', 'apply_payload_end_perf'),
+            tab_script_replace_ms: rel('script_replace_start_perf', 'script_replace_end_perf'),
+            alpine_init_ms: (state.marks.alpine_init_start_ms !== undefined && state.marks.alpine_init_end_ms !== undefined)
+                ? (state.marks.alpine_init_end_ms - state.marks.alpine_init_start_ms)
+                : null,
+            input_found_ms: state.marks.input_found_ms ?? null,
+            input_focused_ms: state.marks.input_focused_ms ?? null,
+            clientes_default_fetch_ms: state.requests.clientes_default ? state.requests.clientes_default.duration_ms : null,
+            validar_carrito_fetch_ms: state.requests.validar_carrito ? state.requests.validar_carrito.duration_ms : null
+        };
+
+        console.groupCollapsed('[POS PERF]');
+        console.table(summary);
+        console.log('detail', {
+            navigation: state.navigation,
+            tabLoad,
+            marks: state.marks,
+            requests: state.requests
+        });
+        console.groupEnd();
+
+        window.dispatchEvent(new CustomEvent('pos:perf-summary', { detail: summary }));
+        clearNavigationStart();
+    }
+
+    function waitForInput(activeState) {
+        const startedAt = nowMs();
+        const maxWaitMs = 5000;
+
+        function check() {
+            const input = document.querySelector('[x-ref="inputBusqueda"]');
+            const elapsed = nowMs() - startedAt;
+
+            if (input && activeState.marks.input_found_ms === undefined) {
+                activeState.marks.input_found_ms = nowMs() - activeState.startedAt;
+            }
+
+            if (input && document.activeElement === input) {
+                activeState.marks.input_focused_ms = nowMs() - activeState.startedAt;
+                if (activeState.printSummary) {
+                    activeState.printSummary('input-focused');
+                }
+                return;
+            }
+
+            if (elapsed >= maxWaitMs) {
+                if (activeState.printSummary) {
+                    activeState.printSummary(input ? 'input-found-timeout-focus' : 'input-not-found');
+                }
+                return;
+            }
+
+            requestAnimationFrame(check);
+        }
+
+        requestAnimationFrame(check);
+    }
+
+    state.navigation = readNavigationStart();
+    if (state.navigation) {
+        state.navigation.script_started_at_ms = Date.now();
+    }
+
+    window.__posPerfDebugState = state;
+    window.__posPerfWaitForInput = waitForInput;
+    state.printSummary = printSummary;
+
+    if (!window.__posPerfFetchPatched && typeof window.fetch === 'function') {
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = async function (...args) {
+            const startedAt = nowMs();
+            try {
+                const response = await originalFetch(...args);
+                const activeState = window.__posPerfDebugState;
+                if (activeState && activeState.trackFetch) {
+                    activeState.trackFetch(args[0], startedAt, nowMs(), true, response.status);
+                }
+                return response;
+            } catch (error) {
+                const activeState = window.__posPerfDebugState;
+                if (activeState && activeState.trackFetch) {
+                    activeState.trackFetch(args[0], startedAt, nowMs(), false, null);
+                }
+                throw error;
+            }
+        };
+        window.__posPerfFetchPatched = true;
+    }
+
+    if (!window.__posPerfAlpinePatched && window.Alpine && typeof window.Alpine.initTree === 'function') {
+        const originalInitTree = window.Alpine.initTree.bind(window.Alpine);
+        window.Alpine.initTree = function (root, ...rest) {
+            const activeState = window.__posPerfDebugState;
+            const isPosRoot = !!(root && root.querySelector && root.querySelector('[x-ref="inputBusqueda"]'));
+            if (activeState && isPosRoot) {
+                activeState.marks.alpine_init_start_ms = nowMs() - activeState.startedAt;
+            }
+
+            const result = originalInitTree(root, ...rest);
+
+            if (activeState && isPosRoot) {
+                activeState.marks.alpine_init_end_ms = nowMs() - activeState.startedAt;
+                if (typeof window.__posPerfWaitForInput === 'function') {
+                    window.__posPerfWaitForInput(activeState);
+                }
+            }
+            return result;
+        };
+        window.__posPerfAlpinePatched = true;
+    } else {
+        requestAnimationFrame(() => waitForInput(state));
+    }
+
+    state.trackFetch = trackFetch;
+})();
+(function () {
+        const POS_STATE_KEY = 'pos_venta_actual';
+        const POS_STATE_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 horas
+        const PENDING_SALES_KEY = 'pos_ventas_pendientes_v1';
+        const LAST_SALE_KEY = 'pos_ultima_venta';
+    const POS_EMPRESA = {"direccion": "Santa Rosa c/ 10 de Agosto", "nombre": "Pablito\u0027s Cell", "ruc": "00000000-0", "telefono": "0984758819"};
+    const REPARACION_DATA = null;
+    const COLA_COBRO_DATA = null;
+    const REPARACION_TOKEN = null;
+    const VENDEDORES_CAJEROS = [{"id_usuario": 1, "nombre_completo": "Administrador del Sistema", "rol": "Administrador"}];
+    const VENDEDOR_ID_INICIAL = 1;
+    const OCULTAR_SELECTOR_VENDEDOR_POS = true;
+    const CAJA_FLUJO_ENVIADO_ACTIVO = false;
+    const PUEDE_ENVIAR_CAJA_VENTA = true;
+    const CAJA_EXIGIR_CAJERO_PARA_COBRO = false;
+    const PUEDE_COBRAR_POS_DIRECTO = true;
+    const SOLO_REGISTRO_VENDEDOR = false;
+    const POS_VENTAS_CREDITO_ACTIVO = false;
+    const POS_METODO_CREDITO = null;
+
+    function readInitialPosState() {
+        try {
+            const raw = sessionStorage.getItem(POS_STATE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            const ageMs = Date.now() - Number(parsed && parsed.timestamp ? parsed.timestamp : 0);
+            if (!Number.isFinite(ageMs) || ageMs > POS_STATE_MAX_AGE_MS) {
+                sessionStorage.removeItem(POS_STATE_KEY);
+                return null;
+            }
+            return parsed;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    const POS_INITIAL_STATE = readInitialPosState();
+
+    function posApp() {
+        return {
+            busqueda: '',
+            resultados: [],
+            carrito: [],
+            estadoRestaurado: false,
+            ultimaVentaId: null,
+            isOnline: true,
+            forzarPrecioMayorista: false,
+            bloquearPrecioMayorista: false,
+            ventasPendientes: [],
+            mostrarModalVentaPendiente: false,
+            ventaPendienteActual: null,
+            offlineTicketHtml: '',
+            printFocusPollId: null,
+            printFocusTimeoutId: null,
+            printEnCurso: false,
+
+            // Client Search State
+            buscandoCliente: false,
+            busquedaCliente: '',
+            clientesEncontrados: [],
+            mostrarResultadosClientes: false,
+
+            clienteId: 1, // Default a consumidor final
+            clienteSeleccionado: null,
+            alertaClienteFielActiva: POS_INITIAL_STATE && typeof POS_INITIAL_STATE.alertaClienteFielActiva === 'boolean'
+                ? POS_INITIAL_STATE.alertaClienteFielActiva
+                : true,
+            clienteFielResumen: {
+                clienteId: null,
+                cantidadCompras: 0,
+                cargando: false,
+                error: '',
+                urlHistorial: ''
+            },
+            clienteFielCache: {},
+            vendedoresCajeros: (typeof VENDEDORES_CAJEROS !== 'undefined' && Array.isArray(VENDEDORES_CAJEROS)) ? VENDEDORES_CAJEROS : [],
+            vendedorId: (typeof VENDEDOR_ID_INICIAL !== 'undefined' && VENDEDOR_ID_INICIAL !== null) ? Number(VENDEDOR_ID_INICIAL) : null,
+            ocultarSelectorVendedorPos: !!OCULTAR_SELECTOR_VENDEDOR_POS,
+            cajaFlujoEnviadoActivo: !!CAJA_FLUJO_ENVIADO_ACTIVO,
+            puedeEnviarCajaVenta: !!PUEDE_ENVIAR_CAJA_VENTA,
+            cajaExigirCajeroParaCobro: !!CAJA_EXIGIR_CAJERO_PARA_COBRO,
+            puedeCobrarPosDirecto: !!PUEDE_COBRAR_POS_DIRECTO,
+            soloRegistroVendedor: !!SOLO_REGISTRO_VENDEDOR,
+            ventasCreditoActivo: !!POS_VENTAS_CREDITO_ACTIVO,
+            creditoMetodoPagoId: POS_METODO_CREDITO ? Number(POS_METODO_CREDITO.id_metodo_pago || 0) : null,
+            creditoMetodoPagoNombre: POS_METODO_CREDITO ? String(POS_METODO_CREDITO.nombre || 'Credito Tienda') : 'Credito Tienda',
+            condicionVenta: (POS_INITIAL_STATE && POS_INITIAL_STATE.condicionVenta === 'credito' && POS_VENTAS_CREDITO_ACTIVO && POS_METODO_CREDITO)
+                ? 'credito'
+                : 'contado',
+            creditoModo: (POS_INITIAL_STATE && POS_INITIAL_STATE.creditoModo === 'cuenta_corriente')
+                ? 'cuenta_corriente'
+                : 'cuenta_corriente',
+            enviandoCaja: false,
+            reparacionId: null,
+            colaCobroId: null,
+            reparacionToken: (typeof REPARACION_TOKEN !== 'undefined' && REPARACION_TOKEN !== null) ? String(REPARACION_TOKEN) : '',
+
+            // Nuevo cliente dropdown data
+            clientesDefault: [], // Clientes cargados inicialmente
+            descuento: 0,
+            subtotal: 0,
+            total: 0,
+            procesando: false,
+
+            // Pagos múltiples
+            pagos: [],
+            totalPagado: 0,
+            saldoPendiente: 0,
+            vuelto: 0,
+
+            // Control de stock warnings
+            mostrarModalStock: false,
+            itemsConWarning: [],
+
+            // Modal de precios por opciones
+            mostrarModalPrecioOpciones: false,
+            productoPrecioOpciones: null,
+            preciosOpcionesActuales: [],
+
+            // Vista previa de venta (antes de registrar)
+            mostrarModalVistaPrevia: false,
+            ticketPreviewHtml: '',
+            confirmandoVenta: false,
+
+            // CRM Historial
+            mostrarModalHistorial: false,
+            historialCargando: false,
+            historialDatos: {
+                cliente: null,
+                historial: [],
+                estadisticas: { total_gastado: 0, cantidad_compras: 0, promedio_compra: 0 }
+            },
+
+            init() {
+                this.isOnline = navigator.onLine;
+                this.cargarVentasPendientes();
+                this.cargarUltimaVenta();
+                if (this.isOnline) {
+                    this.sincronizarVentasPendientes();
+                }
+                const self = this;
+                window.addEventListener('online', () => {
+                    self.isOnline = true;
+                    self.sincronizarVentasPendientes();
+                });
+                window.addEventListener('offline', () => {
+                    self.isOnline = false;
+                });
+
+                // Cargar cliente por defecto (Consumidor Final id=1)
+                this.buscarClientes('', true).then(() => {
+                    if (typeof REPARACION_DATA !== 'undefined' && REPARACION_DATA && REPARACION_DATA.id) {
+                        const rid = REPARACION_DATA.id;
+                        const skipKey = `pos_reparacion_skip_${rid}`;
+                        const skipTokenKey = `pos_reparacion_skip_token_${rid}`;
+                        const skip = sessionStorage.getItem(skipKey) === '1';
+                        const tokenActual = this.reparacionToken || '';
+                        const tokenSkip = sessionStorage.getItem(skipTokenKey) || '';
+                        if (skip && tokenSkip === tokenActual) {
+                            this.restaurarEstado();
+                        } else {
+                            this.cargarDatosReparacion();
+                        }
+                    } else if (typeof COLA_COBRO_DATA !== 'undefined' && COLA_COBRO_DATA && COLA_COBRO_DATA.id) {
+                        this.cargarDatosPendienteCaja();
+                    } else {
+                        // Después de cargar clientes, intentar restaurar estado guardado
+                        this.restaurarEstado();
+                    }
+                });
+
+                // Configurar watchers para auto-guardar estado
+                this.$watch('carrito', () => this.guardarEstado(), { deep: true });
+                this.$watch('clienteId', () => {
+                    this.guardarEstado();
+                    this.actualizarResumenCreditoCliente();
+                });
+                this.$watch('vendedorId', () => this.guardarEstado());
+                this.$watch('descuento', () => this.guardarEstado());
+                this.$watch('pagos', () => this.guardarEstado(), { deep: true });
+                this.$watch('alertaClienteFielActiva', () => this.guardarEstado());
+                this.$watch('condicionVenta', () => this.guardarEstado());
+                this.$watch('creditoModo', () => this.guardarEstado());
+                this.enfocarBusqueda();
+            },
+
+            enfocarBusqueda() {
+                this.$nextTick(() => {
+                    const input = this.$refs.inputBusqueda;
+                    if (!input || typeof input.focus !== 'function') return;
+                    try {
+                        input.focus({ preventScroll: true });
+                    } catch (e) {
+                        input.focus();
+                    }
+                    if (typeof input.select === 'function') input.select();
+                });
+            },
+
+            limpiarRestauracionFocoImpresion() {
+                if (this.printFocusPollId) {
+                    clearInterval(this.printFocusPollId);
+                    this.printFocusPollId = null;
+                }
+                if (this.printFocusTimeoutId) {
+                    clearTimeout(this.printFocusTimeoutId);
+                    this.printFocusTimeoutId = null;
+                }
+            },
+
+            configurarRestauracionFocoImpresion(printWindow) {
+                this.limpiarRestauracionFocoImpresion();
+                const restaurar = () => {
+                    this.limpiarRestauracionFocoImpresion();
+                    this.enfocarBusqueda();
+                };
+
+                const onFocus = () => restaurar();
+                const onVis = () => {
+                    if (!document.hidden) restaurar();
+                };
+
+                window.addEventListener('focus', onFocus, { once: true });
+                document.addEventListener('visibilitychange', onVis, { once: true });
+
+                if (printWindow) {
+                    this.printFocusPollId = setInterval(() => {
+                        try {
+                            if (printWindow.closed) restaurar();
+                        } catch (e) {
+                            restaurar();
+                        }
+                    }, 250);
+                }
+
+                this.printFocusTimeoutId = setTimeout(restaurar, 1500);
+            },
+
+            async imprimirTicketVenta(idVenta) {
+                const abrirFallback = () => {
+                    const w = window.open(`/ventas/${idVenta}/ticket`, '_blank');
+                    if (!w) return false;
+                    this.configurarRestauracionFocoImpresion(w);
+                    return true;
+                };
+
+                if (this.printEnCurso) return true;
+                this.printEnCurso = true;
+
+                try {
+                    const frame = this.$refs.ticketPrintFrame;
+                    if (!frame) {
+                        return abrirFallback();
+                    }
+
+                    const url = `/ventas/${idVenta}/ticket?embedded=1&_=${Date.now()}`;
+
+                    return await new Promise((resolve) => {
+                        let finished = false;
+
+                        const finish = (ok) => {
+                            if (finished) return;
+                            finished = true;
+                            try { frame.onload = null; } catch (e) { }
+                            this.printEnCurso = false;
+                            resolve(ok);
+                        };
+
+                        const fallback = () => {
+                            this.enfocarBusqueda();
+                            finish(abrirFallback());
+                        };
+
+                        frame.onload = () => {
+                            setTimeout(() => {
+                                try {
+                                    frame.contentWindow.focus();
+                                    frame.contentWindow.print();
+                                    this.enfocarBusqueda();
+                                    finish(true);
+                                } catch (e) {
+                                    fallback();
+                                }
+                            }, 150);
+                        };
+
+                        try {
+                            frame.src = url;
+                        } catch (e) {
+                            fallback();
+                            return;
+                        }
+
+                        setTimeout(() => {
+                            if (!finished) fallback();
+                        }, 5000);
+                    });
+                } catch (e) {
+                    this.printEnCurso = false;
+                    return abrirFallback();
+                }
+            },
+
+            // --- Carga de Reparación ---
+            cargarDatosReparacion() {
+                try {
+                    sessionStorage.removeItem(POS_STATE_KEY); // Limpiar estado anterior
+                    this.condicionVenta = 'contado';
+                    this.creditoModo = 'cuenta_corriente';
+                    this.reparacionId = REPARACION_DATA.id || null;
+                    if (this.reparacionId) {
+                        sessionStorage.removeItem(`pos_reparacion_skip_${this.reparacionId}`);
+                        sessionStorage.removeItem(`pos_reparacion_skip_token_${this.reparacionId}`);
+                    }
+
+                    // 1. Cargar Items
+                    if (REPARACION_DATA.items && Array.isArray(REPARACION_DATA.items)) {
+                        this.carrito = REPARACION_DATA.items.map(item => ({
+                            id_producto: item.id,
+                            codigo: item.codigo || '',
+                            nombre: item.nombre,
+                            precio: parseFloat(item.precio),
+                            precio_base: parseFloat(item.precio_base || item.precio),
+                            precio_mayorista: item.precio_mayorista ? parseFloat(item.precio_mayorista) : null,
+                            precio_manual: item.precio_manual === true,
+                            cantidad: parseInt(item.cantidad),
+                            iva: parseInt(item.iva),
+                            stock_disponible: parseInt(item.stock),
+                            stock_minimo: parseInt(item.stock_minimo || 0),
+                            stock_restante: null,
+                            es_servicio: item.es_servicio,
+                            stock_warning: false,
+                            low_stock_warning: false,
+                            green_stock_hint: false
+                        }));
+
+                        this.carrito.forEach(item => this.validarStockItem(item));
+                    }
+
+                    // 2. Cargar Cliente
+                    if (REPARACION_DATA.cliente_id && REPARACION_DATA.cliente_id != 1) {
+                        this.clienteId = REPARACION_DATA.cliente_id;
+                        // Buscar detalles del cliente
+                        fetch(`/clientes/${this.clienteId}/historial_json`)
+                            .then(r => r.json())
+                            .then(d => {
+                                if (d.success && d.cliente) {
+                                    this.clienteSeleccionado = d.cliente;
+                                    this.actualizarAlertaClienteFiel(d.cliente);
+                                    // Actualizar precios si corresponde
+                                    if (this.usaPrecioMayorista()) {
+                                        this.actualizarPreciosSegunCliente();
+                                    }
+                                }
+                            })
+                            .catch(e => console.error('Error cargando cliente de reparación:', e));
+                    }
+
+                    if (REPARACION_DATA.id_usuario_vendedor) {
+                        const candidato = Number(REPARACION_DATA.id_usuario_vendedor);
+                        if (this.vendedoresCajeros.some(v => Number(v.id_usuario) === candidato)) {
+                            this.vendedorId = candidato;
+                        }
+                    }
+
+                    // 3. Cargar Abono
+                    if (REPARACION_DATA.abono > 0) {
+                        this.descuento = parseFloat(REPARACION_DATA.abono);
+                        mostrarNotificacion('Abono de reparación aplicado como descuento', 'info');
+                    }
+
+                    this.actualizarTotal();
+                    mostrarNotificacion('Datos de reparación cargados', 'success');
+
+                } catch (e) {
+                    console.error('Error cargando datos de reparación:', e);
+                    mostrarNotificacion('Error al cargar datos de la reparación', 'error');
+                }
+            },
+
+            cargarDatosPendienteCaja() {
+                try {
+                    sessionStorage.removeItem(POS_STATE_KEY);
+                    this.condicionVenta = 'contado';
+                    this.creditoModo = 'cuenta_corriente';
+                    this.reparacionId = null;
+                    this.colaCobroId = Number(COLA_COBRO_DATA.id) || null;
+                    if (COLA_COBRO_DATA.reparacion_id) {
+                        this.reparacionId = Number(COLA_COBRO_DATA.reparacion_id) || null;
+                    }
+
+                    if (COLA_COBRO_DATA.items && Array.isArray(COLA_COBRO_DATA.items)) {
+                        this.carrito = COLA_COBRO_DATA.items.map(item => ({
+                            id_producto: item.id,
+                            codigo: item.codigo || '',
+                            nombre: item.nombre,
+                            precio: parseFloat(item.precio),
+                            precio_base: parseFloat(item.precio_base || item.precio),
+                            precio_mayorista: item.precio_mayorista ? parseFloat(item.precio_mayorista) : null,
+                            precio_manual: item.precio_manual === true,
+                            precio_opcion_id: item.precio_opcion_id || null,
+                            cantidad: parseInt(item.cantidad),
+                            iva: parseInt(item.iva),
+                            stock_disponible: parseInt(item.stock),
+                            stock_minimo: parseInt(item.stock_minimo || 0),
+                            stock_restante: null,
+                            es_servicio: item.es_servicio,
+                            stock_warning: false,
+                            low_stock_warning: false,
+                            green_stock_hint: false
+                        }));
+
+                        this.carrito.forEach(item => this.validarStockItem(item));
+                    }
+
+                    if (COLA_COBRO_DATA.cliente_id && COLA_COBRO_DATA.cliente_id != 1) {
+                        this.clienteId = COLA_COBRO_DATA.cliente_id;
+                        fetch(`/clientes/${this.clienteId}/historial_json`)
+                            .then(r => r.json())
+                            .then(d => {
+                                if (d.success && d.cliente) {
+                                    this.clienteSeleccionado = d.cliente;
+                                    this.actualizarAlertaClienteFiel(d.cliente);
+                                    if (this.usaPrecioMayorista()) {
+                                        this.actualizarPreciosSegunCliente();
+                                    }
+                                }
+                            })
+                            .catch(e => console.error('Error cargando cliente de pendiente:', e));
+                    }
+
+                    if (COLA_COBRO_DATA.id_usuario_vendedor) {
+                        const candidato = Number(COLA_COBRO_DATA.id_usuario_vendedor);
+                        if (this.vendedoresCajeros.some(v => Number(v.id_usuario) === candidato)) {
+                            this.vendedorId = candidato;
+                        }
+                    }
+
+                    if (COLA_COBRO_DATA.descuento > 0) {
+                        this.descuento = parseFloat(COLA_COBRO_DATA.descuento);
+                    }
+
+                    this.limpiarColaCobroDeUrl();
+                    this.actualizarTotal();
+                    mostrarNotificacion(`Pendiente #${this.colaCobroId} cargado`, 'success');
+                } catch (e) {
+                    console.error('Error cargando pendiente de caja:', e);
+                    mostrarNotificacion('Error al cargar pendiente de caja', 'error');
+                }
+            },
+
+            limpiarColaCobroDeUrl() {
+                try {
+                    const url = new URL(window.location.href);
+                    if (!url.searchParams.has('cola_id')) return;
+                    url.searchParams.delete('cola_id');
+                    const nuevaUrl = `${url.pathname}${url.search}${url.hash}`;
+                    window.history.replaceState({}, document.title, nuevaUrl);
+                } catch (e) {
+                }
+            },
+
+            // --- Persistencia de Estado ---
+
+            guardarEstado() {
+                // No guardar si estamos restaurando o si el carrito está vacío y no hay cambios
+                const vendedorInicial = (typeof VENDEDOR_ID_INICIAL !== 'undefined' && VENDEDOR_ID_INICIAL !== null)
+                    ? Number(VENDEDOR_ID_INICIAL)
+                    : null;
+                if (this.carrito.length === 0 && this.pagos.length === 0 && this.descuento === 0 && this.clienteId === 1 && this.alertaClienteFielActiva === true && (
+                    this.vendedorId === vendedorInicial || !this.vendedorId
+                ) && this.condicionVenta === 'contado') {
+                    sessionStorage.removeItem(POS_STATE_KEY);
+                    return;
+                }
+
+                const estado = {
+                    carrito: this.carrito.map(item => ({
+                        id_producto: item.id_producto,
+                        cantidad: item.cantidad,
+                        precio: item.precio,
+                        precio_manual: item.precio_manual === true,
+                        precio_opcion_id: item.precio_opcion_id || null
+                    })),
+                    clienteId: this.clienteId,
+                    vendedorId: this.vendedorId,
+                    alertaClienteFielActiva: this.alertaClienteFielActiva === true,
+                    descuento: this.descuento,
+                    condicionVenta: this.condicionVenta,
+                    creditoModo: this.creditoModo,
+                    pagos: this.pagos,
+                    timestamp: Date.now()
+                };
+
+                try {
+                    sessionStorage.setItem(POS_STATE_KEY, JSON.stringify(estado));
+                } catch (e) {
+                    console.warn('Error guardando estado del POS:', e);
+                }
+            },
+
+            async restaurarEstado() {
+                try {
+                    const guardado = sessionStorage.getItem(POS_STATE_KEY);
+                    if (!guardado) return;
+
+                    const estado = JSON.parse(guardado);
+
+                    // Verificar age del estado
+                    if (Date.now() - estado.timestamp > POS_STATE_MAX_AGE_MS) {
+                        sessionStorage.removeItem(POS_STATE_KEY);
+                        return;
+                    }
+
+                    // Restaurar carrito validando con servidor
+                    if (estado.carrito && estado.carrito.length > 0) {
+                        await this.validarYRestaurarCarrito(estado.carrito);
+                    }
+
+                    // Restaurar cliente
+                    if (estado.clienteId && estado.clienteId !== 1) {
+                        this.clienteId = estado.clienteId;
+                        // Buscar datos del cliente
+                        const clienteEncontrado = this.clientesDefault.find(c => c.id_cliente == estado.clienteId);
+                        if (clienteEncontrado) {
+                            this.clienteSeleccionado = clienteEncontrado;
+                        }
+                    }
+
+                    if (estado.vendedorId) {
+                        const vendedorRecuperado = Number(estado.vendedorId);
+                        if (this.vendedoresCajeros.some(v => Number(v.id_usuario) === vendedorRecuperado)) {
+                            this.vendedorId = vendedorRecuperado;
+                        }
+                    }
+
+                    if (typeof estado.alertaClienteFielActiva === 'boolean') {
+                        this.alertaClienteFielActiva = estado.alertaClienteFielActiva;
+                    }
+
+                    // Restaurar descuento
+                    if (estado.descuento) {
+                        this.descuento = estado.descuento;
+                    }
+
+                    if (estado.condicionVenta === 'credito' && this.ventasCreditoActivo && this.creditoMetodoPagoId) {
+                        this.condicionVenta = 'credito';
+                    }
+                    if (estado.creditoModo === 'cuenta_corriente') {
+                        this.creditoModo = 'cuenta_corriente';
+                    }
+
+                    // Restaurar pagos
+                    if (estado.pagos && estado.pagos.length > 0) {
+                        this.pagos = estado.pagos;
+                    }
+
+                    await this.actualizarAlertaClienteFiel();
+                    this.actualizarTotal();
+                    this.estadoRestaurado = true;
+
+                    if (this.carrito.length > 0) {
+                        mostrarNotificacion('Venta en progreso restaurada', 'info');
+                    }
+
+                } catch (e) {
+                    console.warn('Error restaurando estado del POS:', e);
+                    sessionStorage.removeItem(POS_STATE_KEY);
+                }
+            },
+
+            async validarYRestaurarCarrito(carritoGuardado) {
+                const ids = carritoGuardado.map(item => item.id_producto);
+
+                try {
+                    const response = await fetch('/ventas/validar-carrito', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids })
+                    });
+
+                    const data = await response.json();
+                    const productosValidados = data.productos || {};
+
+                    const carritoRestaurado = [];
+                    const productosEliminados = [];
+
+                    for (const itemGuardado of carritoGuardado) {
+                        const validacion = productosValidados[String(itemGuardado.id_producto)];
+
+                        if (validacion && validacion.existe) {
+                            const esMayorista = this.usaPrecioMayorista();
+                            let precioAplicar = (esMayorista && validacion.precio_mayorista)
+                                ? validacion.precio_mayorista
+                                : validacion.precio;
+                            let precioManual = false;
+                            let precioOpcionId = null;
+
+                            if (itemGuardado.precio_opcion_id) {
+                                const opciones = Array.isArray(validacion.precios_opciones) ? validacion.precios_opciones : [];
+                                const encontrada = opciones.find(o => String(o.id) === String(itemGuardado.precio_opcion_id));
+                                if (encontrada && encontrada.precio !== undefined && encontrada.precio !== null) {
+                                    precioAplicar = parseFloat(encontrada.precio) || 0;
+                                    precioManual = true;
+                                    precioOpcionId = encontrada.id;
+                                }
+                            } else if (itemGuardado.precio_manual === true) {
+                                const p = parseFloat(itemGuardado.precio);
+                                if (!Number.isNaN(p) && p >= 0) {
+                                    precioAplicar = p;
+                                    precioManual = true;
+                                }
+                            }
+
+                            const nuevoItem = {
+                                id_producto: itemGuardado.id_producto,
+                                codigo: validacion.codigo,
+                                nombre: validacion.nombre,
+                                precio: precioAplicar,
+                                precio_base: validacion.precio,
+                                precio_mayorista: validacion.precio_mayorista,
+                                cantidad: itemGuardado.cantidad,
+                                iva: validacion.iva,
+                                precio_manual: precioManual,
+                                precio_opcion_id: precioOpcionId,
+                                stock_disponible: validacion.stock,
+                                stock_minimo: validacion.stock_minimo,
+                                stock_restante: null,
+                                es_servicio: validacion.es_servicio,
+                                stock_warning: false,
+                                low_stock_warning: false,
+                                green_stock_hint: false
+                            };
+                            this.validarStockItem(nuevoItem);
+                            carritoRestaurado.push(nuevoItem);
+                        } else {
+                            productosEliminados.push(itemGuardado.id_producto);
+                        }
+                    }
+
+                    this.carrito = carritoRestaurado;
+
+                    if (productosEliminados.length > 0) {
+                        mostrarNotificacion(`${productosEliminados.length} producto(s) ya no disponible(s) fueron removidos`, 'warning');
+                    }
+
+                } catch (e) {
+                    console.warn('Error validando carrito con servidor:', e);
+                }
+            },
+
+            limpiarEstadoGuardado() {
+                sessionStorage.removeItem(POS_STATE_KEY);
+            },
+
+            cargarVentasPendientes() {
+                try {
+                    const raw = localStorage.getItem(PENDING_SALES_KEY);
+                    if (!raw) {
+                        this.ventasPendientes = [];
+                        return;
+                    }
+                    const data = JSON.parse(raw);
+                    if (!Array.isArray(data)) {
+                        this.ventasPendientes = [];
+                        return;
+                    }
+                    this.ventasPendientes = data.filter(v => v && v.client_request_id && v.payload && v.payload.items && v.payload.pagos);
+                } catch (e) {
+                    this.ventasPendientes = [];
+                }
+            },
+
+            guardarVentasPendientes() {
+                try {
+                    localStorage.setItem(PENDING_SALES_KEY, JSON.stringify(this.ventasPendientes));
+                } catch (e) {
+                }
+            },
+
+            generarClientRequestId() {
+                try {
+                    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                        return window.crypto.randomUUID();
+                    }
+                } catch (e) {
+                }
+                return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+            },
+
+            escapeHtml(value) {
+                const s = String(value ?? '');
+                return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+            },
+
+            generarTicketProvisionalHtml(ventaPendiente) {
+                const payload = ventaPendiente.payload || {};
+                const empresa = POS_EMPRESA || {};
+                const items = Array.isArray(payload.items) ? payload.items : [];
+                const pagos = Array.isArray(payload.pagos) ? payload.pagos : [];
+                const subtotal = items.reduce((sum, it) => sum + ((parseFloat(it.precio) || 0) * (parseInt(it.cantidad) || 0)), 0);
+                const descuento = parseFloat(payload.descuento) || 0;
+                const total = Math.max(0, subtotal - descuento);
+                const totalPagado = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
+                const vuelto = Math.max(0, totalPagado - total);
+                const fecha = new Date(ventaPendiente.created_at || Date.now()).toLocaleString('es-PY');
+                const moneda = '₲';
+
+                const rows = items.map(it => {
+                    const nombre = this.escapeHtml(it.nombre || '');
+                    const codigo = this.escapeHtml(it.codigo || '');
+                    const cant = parseInt(it.cantidad) || 0;
+                    const precio = parseFloat(it.precio) || 0;
+                    const lineTotal = precio * cant;
+                    return `
+                            <tr>
+                                <td style="vertical-align: top;">
+                                    <div>${nombre}

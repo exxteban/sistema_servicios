@@ -1,0 +1,620 @@
+{% extends "base.html" %}
+
+{% block title %}Calificacion de clientes{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-ranking-star text-blue-600 dark:text-blue-400 mr-2"></i>
+                Calificacion de clientes
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Reglas configurables para actualizar estrellas segun compras, reparaciones e inactividad.
+            </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="abrir-ayuda-calificacion"
+                class="h-10 w-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 transition shadow-sm"
+                title="Ver ayuda sobre reglas">
+                <i class="fas fa-question"></i>
+            </button>
+            <form method="POST" action="{{ url_for('clientes_calificacion.aplicar_reglas') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition shadow-md">
+                    <i class="fas fa-play mr-2"></i>Aplicar ahora
+                </button>
+            </form>
+            <a href="{{ url_for('clientes.listar') }}"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100 px-4 py-2 rounded-lg transition">
+                <i class="fas fa-arrow-left mr-2"></i>Volver
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Nueva regla</h2>
+            <form method="POST" action="{{ url_for('clientes_calificacion.crear_regla') }}" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nombre</label>
+                        <input type="text" name="nombre" required maxlength="120" placeholder="Cliente VIP mensual"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Metrica</label>
+                        <select name="metrica" id="metrica-regla"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            {% for codigo, label in metricas.items() %}
+                            <option value="{{ codigo }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Condicion</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <select name="operador"
+                                class="border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                                {% for codigo, label in operadores.items() %}
+                                <option value="{{ codigo }}">{{ codigo }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="valor" value="5"
+                                class="border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                        </div>
+                    </div>
+                    <div id="periodo-wrapper">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Periodo</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" name="periodo_dias" min="0" value="30"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">dias</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Accion</label>
+                        <select name="accion" id="accion-regla"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            {% for codigo, label in acciones.items() %}
+                            <option value="{{ codigo }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Estrellas</label>
+                        <select name="estrellas"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            {% for n in [1, 2, 3, 4, 5] %}
+                            <option value="{{ n }}" {% if n == 5 %}selected{% endif %}>{{ n }} de 5</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Prioridad</label>
+                        <input type="number" name="prioridad" min="1" value="100"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Reaplicar cada</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" name="reaplicar_cada_dias" id="reaplicar-regla" min="0" value="0"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">dias</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                        <input type="checkbox" name="activa" value="1" checked
+                            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        Crear activa
+                    </label>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition">
+                        <i class="fas fa-plus mr-2"></i>Crear regla
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Automatizacion</h2>
+                <form method="POST" action="{{ url_for('clientes_calificacion.guardar_configuracion') }}" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                        <input type="checkbox" name="auto_activa" value="1" {% if config_auto.activa %}checked{% endif %}
+                            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        Recalificar automaticamente
+                    </label>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Cada</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" name="intervalo_horas" min="1" value="{{ config_auto.intervalo_horas }}"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">horas</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        La resta de estrellas depende de una regla creada por el administrador y se controla con "reaplicar cada".
+                    </p>
+                    <button type="submit" class="w-full bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition">
+                        Guardar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Reglas existentes</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs text-gray-500 dark:text-gray-300">Regla</th>
+                        <th class="px-4 py-3 text-left text-xs text-gray-500 dark:text-gray-300">Condicion</th>
+                        <th class="px-4 py-3 text-left text-xs text-gray-500 dark:text-gray-300">Accion</th>
+                        <th class="px-4 py-3 text-center text-xs text-gray-500 dark:text-gray-300">Estado</th>
+                        <th class="px-4 py-3 text-center text-xs text-gray-500 dark:text-gray-300">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for regla in reglas %}
+                    <tr>
+                        <td class="px-4 py-3">
+                            <p class="font-semibold text-gray-800 dark:text-gray-100">{{ regla.nombre }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Prioridad {{ regla.prioridad }}</p>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                            {{ metricas.get(regla.metrica, regla.metrica) }} {{ regla.operador }} {{ "{:,.0f}".format(regla.valor).replace(",", ".") }}
+                            {% if regla.periodo_dias %}<span class="text-gray-500">en {{ regla.periodo_dias }} dias</span>{% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                            {{ acciones.get(regla.accion, regla.accion) }}: {{ regla.estrellas_seguras }}
+                            {% if regla.reaplicar_cada_dias %}
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">Reaplica cada {{ regla.reaplicar_cada_dias }} dias</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 rounded-full text-xs {% if regla.activa %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300{% else %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300{% endif %}">
+                                {{ 'Activa' if regla.activa else 'Pausada' }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex justify-center gap-2">
+                                <button type="button"
+                                    class="text-amber-600 hover:text-amber-800 dark:text-amber-400 js-editar-regla"
+                                    title="Editar regla"
+                                    data-action="{{ url_for('clientes_calificacion.editar_regla', id_regla=regla.id_regla) }}"
+                                    data-nombre="{{ regla.nombre|e }}"
+                                    data-metrica="{{ regla.metrica }}"
+                                    data-operador="{{ regla.operador }}"
+                                    data-valor="{{ regla.valor }}"
+                                    data-periodo="{{ regla.periodo_dias or '' }}"
+                                    data-accion="{{ regla.accion }}"
+                                    data-estrellas="{{ regla.estrellas_seguras }}"
+                                    data-prioridad="{{ regla.prioridad }}"
+                                    data-reaplicar="{{ regla.reaplicar_cada_dias or 0 }}"
+                                    data-activa="{{ '1' if regla.activa else '0' }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <form method="POST" action="{{ url_for('clientes_calificacion.alternar_regla', id_regla=regla.id_regla) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="text-blue-600 hover:text-blue-800 dark:text-blue-400" title="Pausar o activar">
+                                        <i class="fas {{ 'fa-pause' if regla.activa else 'fa-play' }}"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('clientes_calificacion.eliminar_regla', id_regla=regla.id_regla) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400" title="Eliminar">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                            Todavia no hay reglas. Crea una para empezar a automatizar estrellas.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Ultimos cambios automaticos</h2>
+        </div>
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+            {% for item in historial.items %}
+            <div class="px-4 py-3">
+                <div class="flex flex-wrap justify-between gap-2">
+                    <p class="font-medium text-gray-800 dark:text-gray-100">{{ item.cliente.nombre if item.cliente else 'Cliente eliminado' }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ item.fecha_cambio|local_strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+                <p class="text-sm text-gray-700 dark:text-gray-200">
+                    {{ item.estrellas_anteriores }} -> {{ item.estrellas_nuevas }} estrellas
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.motivo }}</p>
+            </div>
+            {% else %}
+            <div class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                Aun no hay cambios automaticos registrados.
+            </div>
+            {% endfor %}
+        </div>
+        {% if historial.pages > 1 %}
+        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                Pagina {{ historial.page }} de {{ historial.pages }} · {{ historial.total }} cambios
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                {% if historial.has_prev %}
+                <a href="{{ url_for('clientes_calificacion.panel', historial_page=historial.prev_num) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                    Anterior
+                </a>
+                {% else %}
+                <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                    Anterior
+                </span>
+                {% endif %}
+
+                {% for p in historial.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}
+                {% if p %}
+                {% if p == historial.page %}
+                <span class="px-3 py-1.5 rounded-lg text-sm bg-blue-600 text-white font-semibold min-w-[2.25rem] text-center">
+                    {{ p }}
+                </span>
+                {% else %}
+                <a href="{{ url_for('clientes_calificacion.panel', historial_page=p) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 min-w-[2.25rem] text-center">
+                    {{ p }}
+                </a>
+                {% endif %}
+                {% else %}
+                <span class="px-2 text-gray-400 dark:text-gray-500">...</span>
+                {% endif %}
+                {% endfor %}
+
+                {% if historial.has_next %}
+                <a href="{{ url_for('clientes_calificacion.panel', historial_page=historial.next_num) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                    Siguiente
+                </a>
+                {% else %}
+                <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                    Siguiente
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div id="modal-editar-regla" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-gray-900/60" id="cerrar-editar-regla-overlay"></div>
+    <div class="relative min-h-full flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Editar regla</h2>
+                <button type="button" id="cerrar-editar-regla"
+                    class="h-9 w-9 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form method="POST" id="form-editar-regla" class="p-5 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Nombre</label>
+                        <input type="text" name="nombre" id="editar-nombre" required maxlength="120"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Metrica</label>
+                        <select name="metrica" id="editar-metrica"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            {% for codigo, label in metricas.items() %}
+                            <option value="{{ codigo }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Condicion</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <select name="operador" id="editar-operador"
+                                class="border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                                {% for codigo, label in operadores.items() %}
+                                <option value="{{ codigo }}">{{ codigo }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="valor" id="editar-valor"
+                                class="border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                        </div>
+                    </div>
+                    <div id="editar-periodo-wrapper">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Periodo</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" name="periodo_dias" id="editar-periodo" min="0"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">dias</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Accion</label>
+                        <select name="accion" id="editar-accion"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            {% for codigo, label in acciones.items() %}
+                            <option value="{{ codigo }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Estrellas</label>
+                        <select name="estrellas" id="editar-estrellas"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            {% for n in [1, 2, 3, 4, 5] %}
+                            <option value="{{ n }}">{{ n }} de 5</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Prioridad</label>
+                        <input type="number" name="prioridad" id="editar-prioridad" min="1"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Reaplicar cada</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" name="reaplicar_cada_dias" id="editar-reaplicar" min="0"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">dias</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                        <input type="checkbox" name="activa" id="editar-activa" value="1"
+                            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        Regla activa
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="cancelar-editar-regla"
+                            class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100 transition">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
+                            Guardar cambios
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="modal-ayuda-calificacion" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-gray-900/60" id="cerrar-ayuda-overlay"></div>
+    <div class="relative min-h-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Como funciona la calificacion</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Guia rapida para crear reglas sin enredarse.</p>
+                </div>
+                <button type="button" id="cerrar-ayuda-calificacion"
+                    class="h-9 w-9 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-4">
+                        <h3 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">Prioridad</h3>
+                        <p class="text-sm text-blue-900 dark:text-blue-100">
+                            Decide que regla se procesa primero cuando un cliente cumple varias al mismo tiempo.
+                        </p>
+                        <p class="text-sm text-blue-900 dark:text-blue-100 mt-2">
+                            Numero mas bajo = mas importante. `10` se aplica antes que `100`.
+                        </p>
+                        <p class="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                            Ejemplo: una regla VIP con prioridad 10 y una regla de deuda con prioridad 100.
+                        </p>
+                    </div>
+                    <div class="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-4">
+                        <h3 class="font-semibold text-emerald-800 dark:text-emerald-200 mb-2">Reaplicar cada</h3>
+                        <p class="text-sm text-emerald-900 dark:text-emerald-100">
+                            Evita que la misma regla se aplique demasiado seguido.
+                        </p>
+                        <p class="text-sm text-emerald-900 dark:text-emerald-100 mt-2">
+                            Si pones `30`, esa regla solo podra volver a afectar al cliente despues de 30 dias.
+                        </p>
+                        <p class="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
+                            Recomendado para reglas de sumar o restar estrellas.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Que significa cada campo</h3>
+                    <div class="space-y-2 text-sm text-gray-700 dark:text-gray-200">
+                        <p><strong>Nombre:</strong> es el titulo interno de la regla. Ejemplo: `Cliente VIP mensual`.</p>
+                        <p><strong>Metrica:</strong> que dato va a mirar el sistema. Ejemplo: cantidad de compras, monto gastado, dias desde la ultima compra.</p>
+                        <p><strong>Condicion:</strong> la comparacion. Ejemplo: `compras >= 5` o `dias desde ultima compra > 90`.</p>
+                        <p><strong>Periodo:</strong> se usa para metricas como compras o reparaciones. Ejemplo: `ultimos 30 dias`.</p>
+                        <p><strong>Accion:</strong> que debe hacer el sistema si la condicion se cumple.</p>
+                        <p><strong>Estrellas:</strong> cuantas estrellas asigna, suma, resta o limita esa accion.</p>
+                        <p><strong>Crear activa:</strong> si queda encendida apenas guardas la regla.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Acciones recomendadas</h3>
+                    <div class="space-y-2 text-sm text-gray-700 dark:text-gray-200">
+                        <p><strong>Asignar estrellas:</strong> deja al cliente exactamente en ese nivel. Ideal para categorias claras.</p>
+                        <p><strong>Sumar estrellas:</strong> aumenta desde el nivel actual. Conviene usar `Reaplicar cada` para que no suba demasiado rapido.</p>
+                        <p><strong>Restar estrellas:</strong> baja desde el nivel actual. Conviene usar `Reaplicar cada 15 o 30 dias`.</p>
+                        <p><strong>Limitar maximo:</strong> aunque cumpla otras reglas, no puede pasar de cierto nivel. Sirve mucho para clientes con deuda.</p>
+                        <p><strong>Exigir minimo:</strong> asegura un piso de estrellas para clientes valiosos o preferenciales.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Ejemplos utiles</h3>
+                    <div class="space-y-2 text-sm text-gray-700 dark:text-gray-200">
+                        <p><strong>Cliente VIP:</strong> Compras en ultimos 30 dias `>= 5` -> Asignar `5` estrellas.</p>
+                        <p><strong>Cliente tecnico frecuente:</strong> Reparaciones en ultimos 60 dias `>= 3` -> Asignar `4` estrellas.</p>
+                        <p><strong>Cliente inactivo:</strong> Dias desde ultima compra `> 90` -> Restar `1` estrella -> Reaplicar cada `30` dias.</p>
+                        <p><strong>Cliente con deuda:</strong> Saldo pendiente `> 0` -> Limitar maximo a `3` estrellas.</p>
+                    </div>
+                </div>
+
+                <div class="rounded-xl bg-amber-50 dark:bg-amber-900/20 p-4">
+                    <h3 class="font-semibold text-amber-800 dark:text-amber-200 mb-2">Consejo practico</h3>
+                    <p class="text-sm text-amber-900 dark:text-amber-100">
+                        Para empezar, te conviene crear pocas reglas: una para clientes muy activos, una para clientes inactivos y una para clientes con deuda. Asi se vuelve facil de entender y ajustar.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const metricasConPeriodo = new Set({{ metricas_con_periodo|list|tojson }});
+        const metrica = document.getElementById('metrica-regla');
+        const periodo = document.getElementById('periodo-wrapper');
+        const accion = document.getElementById('accion-regla');
+        const reaplicar = document.getElementById('reaplicar-regla');
+
+        const actualizarPeriodo = () => {
+            if (!metrica || !periodo) return;
+            periodo.classList.toggle('opacity-50', !metricasConPeriodo.has(metrica.value));
+        };
+        const actualizarReaplicar = () => {
+            if (!accion || !reaplicar) return;
+            if ((accion.value === 'sumar' || accion.value === 'restar') && Number(reaplicar.value || 0) <= 0) {
+                reaplicar.value = '30';
+            }
+        };
+
+        if (metrica) metrica.addEventListener('change', actualizarPeriodo);
+        if (accion) accion.addEventListener('change', actualizarReaplicar);
+        actualizarPeriodo();
+        actualizarReaplicar();
+    })();
+</script>
+<script>
+    (function () {
+        const metricasConPeriodo = new Set({{ metricas_con_periodo|list|tojson }});
+        const modal = document.getElementById('modal-editar-regla');
+        const form = document.getElementById('form-editar-regla');
+        const botones = document.querySelectorAll('.js-editar-regla');
+        const cerrar = document.getElementById('cerrar-editar-regla');
+        const cancelar = document.getElementById('cancelar-editar-regla');
+        const overlay = document.getElementById('cerrar-editar-regla-overlay');
+        const campos = {
+            nombre: document.getElementById('editar-nombre'),
+            metrica: document.getElementById('editar-metrica'),
+            operador: document.getElementById('editar-operador'),
+            valor: document.getElementById('editar-valor'),
+            periodo: document.getElementById('editar-periodo'),
+            periodoWrapper: document.getElementById('editar-periodo-wrapper'),
+            accion: document.getElementById('editar-accion'),
+            estrellas: document.getElementById('editar-estrellas'),
+            prioridad: document.getElementById('editar-prioridad'),
+            reaplicar: document.getElementById('editar-reaplicar'),
+            activa: document.getElementById('editar-activa')
+        };
+        if (!modal || !form || !botones.length || !cerrar || !cancelar || !overlay) return;
+
+        const actualizarPeriodo = () => {
+            if (!campos.metrica || !campos.periodoWrapper) return;
+            campos.periodoWrapper.classList.toggle('opacity-50', !metricasConPeriodo.has(campos.metrica.value));
+        };
+        const actualizarReaplicar = () => {
+            if (!campos.accion || !campos.reaplicar) return;
+            const accion = campos.accion.value;
+            if ((accion === 'sumar' || accion === 'restar') && Number(campos.reaplicar.value || 0) <= 0) {
+                campos.reaplicar.value = '30';
+            }
+        };
+        const abrirModal = (btn) => {
+            form.action = btn.dataset.action || '';
+            campos.nombre.value = btn.dataset.nombre || '';
+            campos.metrica.value = btn.dataset.metrica || 'compras_cantidad';
+            campos.operador.value = btn.dataset.operador || '>=';
+            campos.valor.value = btn.dataset.valor || '0';
+            campos.periodo.value = btn.dataset.periodo || '0';
+            campos.accion.value = btn.dataset.accion || 'asignar';
+            campos.estrellas.value = btn.dataset.estrellas || '3';
+            campos.prioridad.value = btn.dataset.prioridad || '100';
+            campos.reaplicar.value = btn.dataset.reaplicar || '0';
+            campos.activa.checked = btn.dataset.activa === '1';
+            actualizarPeriodo();
+            actualizarReaplicar();
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            campos.nombre.focus();
+        };
+        const cerrarModal = () => {
+            modal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        };
+
+        botones.forEach((btn) => btn.addEventListener('click', () => abrirModal(btn)));
+        cerrar.addEventListener('click', cerrarModal);
+        cancelar.addEventListener('click', cerrarModal);
+        overlay.addEventListener('click', cerrarModal);
+        campos.metrica.addEventListener('change', actualizarPeriodo);
+        campos.accion.addEventListener('change', actualizarReaplicar);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                cerrarModal();
+            }
+        });
+    })();
+</script>
+<script>
+    (function () {
+        const abrir = document.getElementById('abrir-ayuda-calificacion');
+        const modal = document.getElementById('modal-ayuda-calificacion');
+        const cerrar = document.getElementById('cerrar-ayuda-calificacion');
+        const overlay = document.getElementById('cerrar-ayuda-overlay');
+        if (!abrir || !modal || !cerrar || !overlay) return;
+
+        const abrirModal = () => {
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        };
+        const cerrarModal = () => {
+            modal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        };
+
+        abrir.addEventListener('click', abrirModal);
+        cerrar.addEventListener('click', cerrarModal);
+        overlay.addEventListener('click', cerrarModal);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                cerrarModal();
+            }
+        });
+    })();
+</script>
+{% endblock %}

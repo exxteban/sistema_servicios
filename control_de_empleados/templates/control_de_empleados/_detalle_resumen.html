@@ -1,0 +1,495 @@
+<div class="ce-stats-grid ce-stats-grid--summary lg:grid-cols-5 gap-3">
+    <article class="ce-kpi-card ce-kpi-card--slate">
+        <div class="ce-kpi-header">
+            <div class="ce-kpi-copy">
+                <p class="ce-kpi-eyebrow">Sueldo base</p>
+                <p class="ce-kpi-value ce-kpi-value--compact">Gs. {{ '{:,.0f}'.format(resumen.salario_base).replace(',', '.') }}</p>
+            </div>
+            <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-wallet"></i></span>
+        </div>
+        <p class="ce-kpi-meta">Monto fijo mensual.</p>
+    </article>
+    <article class="ce-kpi-card ce-kpi-card--green">
+        <div class="ce-kpi-header">
+            <div class="ce-kpi-copy">
+                <p class="ce-kpi-eyebrow">Extras</p>
+                <p class="ce-kpi-value ce-kpi-value--compact ce-kpi-value--green">Gs. {{ '{:,.0f}'.format(resumen.extras).replace(',', '.') }}</p>
+            </div>
+            <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-arrow-trend-up"></i></span>
+        </div>
+        <p class="ce-kpi-meta">Bonos y horas extra del periodo.</p>
+    </article>
+    <article class="ce-kpi-card ce-kpi-card--red">
+        <div class="ce-kpi-header">
+            <div class="ce-kpi-copy">
+                <p class="ce-kpi-eyebrow">Descuentos</p>
+                <p class="ce-kpi-value ce-kpi-value--compact ce-kpi-value--red">Gs. {{ '{:,.0f}'.format(resumen.descuentos).replace(',', '.') }}</p>
+            </div>
+            <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-arrow-trend-down"></i></span>
+        </div>
+        <p class="ce-kpi-meta">
+            Manual: Gs. {{ '{:,.0f}'.format(resumen.descuentos_manual).replace(',', '.') }}
+            {% if resumen.descuento_llegadas_tardias > 0 %}
+            · Tardías: Gs. {{ '{:,.0f}'.format(resumen.descuento_llegadas_tardias).replace(',', '.') }}
+            {% endif %}
+            {% if resumen.descuento_asistencia > 0 %}
+            · Asistencia: Gs. {{ '{:,.0f}'.format(resumen.descuento_asistencia).replace(',', '.') }}
+            {% endif %}
+        </p>
+    </article>
+    <article class="ce-kpi-card ce-kpi-card--total">
+        <div class="ce-kpi-header">
+            <div class="ce-kpi-copy">
+                <p class="ce-kpi-eyebrow">Total estimado</p>
+                <p class="ce-kpi-value">Gs. {{ '{:,.0f}'.format(resumen.total_estimado).replace(',', '.') }}</p>
+            </div>
+            <span class="ce-kpi-badge">Liquidación actual</span>
+        </div>
+        <p class="ce-kpi-meta">Base + extras - descuentos en {{ periodo }}.</p>
+    </article>
+    <article class="ce-kpi-card ce-kpi-card--amber">
+        <div class="ce-kpi-header">
+            <div class="ce-kpi-copy">
+                <p class="ce-kpi-eyebrow">Llegadas tardías del mes</p>
+                <p class="ce-kpi-value ce-kpi-value--amber">{{ resumen.llegadas_tardias_mes }}</p>
+            </div>
+            <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-clock"></i></span>
+        </div>
+        <p class="ce-kpi-meta">
+            {% if resumen.descuento_llegadas_tardias > 0 %}
+            {{ resumen.llegadas_tardias_descontadas }} x Gs. {{ '{:,.0f}'.format(resumen.config_llegadas_tardias.monto).replace(',', '.') }} c/u.
+        {% else %}
+            Descuento desde la N° {{ resumen.config_llegadas_tardias.desde }}.
+        {% endif %}
+        </p>
+    </article>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div class="xl:col-span-1">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden" x-data="{ fichaRapidaAbierta: false }">
+            <button type="button"
+                @click="fichaRapidaAbierta = !fichaRapidaAbierta"
+                class="w-full px-5 py-4 flex items-center justify-between gap-4 text-left border-b border-gray-200">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-900">Ficha rápida</h2>
+                    <p class="text-sm text-gray-500">Los datos clave para ubicar al empleado.</p>
+                </div>
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 transition-transform duration-200"
+                    :class="fichaRapidaAbierta ? 'rotate-180' : ''">
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </span>
+            </button>
+            <div class="p-5 space-y-4" x-show="fichaRapidaAbierta" x-cloak x-transition.opacity.duration.150ms>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Documento</p>
+                    <p class="mt-1 text-sm font-medium text-gray-900">{{ empleado.documento or 'Sin dato' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Teléfono</p>
+                    <p class="mt-1 text-sm font-medium text-gray-900">{{ empleado.telefono or 'Sin dato' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Ingreso</p>
+                    <p class="mt-1 text-sm font-medium text-gray-900">{{ empleado.fecha_ingreso.strftime('%d/%m/%Y') if empleado.fecha_ingreso else 'Sin fecha' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Notas</p>
+                    <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ empleado.notas or 'Sin notas' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="xl:col-span-2 space-y-6" x-data="{ resumenTab: 'historial' }">
+        <div class="ce-subtabs-shell">
+            <div class="ce-subtabs-nav">
+                <button type="button"
+                    @click="resumenTab = 'historial'"
+                    data-tab="historial"
+                    :class="resumenTab === 'historial' ? 'ce-subtab ce-subtab--historial is-active' : 'ce-subtab ce-subtab--historial'">
+                    <span class="flex items-center justify-center w-5 h-5 rounded-full text-xs"
+                          :class="resumenTab === 'historial' ? 'bg-white/20' : 'bg-teal-100 text-teal-600'">
+                        <i class="fas fa-list-ul"></i>
+                    </span>
+                    <span>Historial</span>
+                    <span class="ce-subtab-badge">{{ resumen.historial_total }}</span>
+                </button>
+                {% if puede_gestionar %}
+                <button type="button"
+                    @click="resumenTab = 'movimientos'"
+                    data-tab="movimientos"
+                    :class="resumenTab === 'movimientos' ? 'ce-subtab ce-subtab--movimientos is-active' : 'ce-subtab ce-subtab--movimientos'">
+                    <span class="flex items-center justify-center w-5 h-5 rounded-full text-xs"
+                          :class="resumenTab === 'movimientos' ? 'bg-white/20' : 'bg-indigo-100 text-indigo-600'">
+                        <i class="fas fa-plus"></i>
+                    </span>
+                    <span>Agregar movimiento</span>
+                    <span class="ce-subtab-badge">{{ resumen.movimientos_manual_count }}</span>
+                </button>
+                <button type="button"
+                    @click="resumenTab = 'tardias'"
+                    data-tab="tardias"
+                    :class="resumenTab === 'tardias' ? 'ce-subtab ce-subtab--tardias is-active' : 'ce-subtab ce-subtab--tardias'">
+                    <span class="flex items-center justify-center w-5 h-5 rounded-full text-xs"
+                          :class="resumenTab === 'tardias' ? 'bg-white/20' : 'bg-amber-100 text-amber-600'">
+                        <i class="fas fa-clock"></i>
+                    </span>
+                    <span>Registrar tardía</span>
+                    <span class="ce-subtab-badge">{{ resumen.historial_llegadas_tardias_count }}</span>
+                </button>
+                <button type="button"
+                    @click="resumenTab = 'pago'"
+                    data-tab="pago"
+                    :class="resumenTab === 'pago' ? 'ce-subtab ce-subtab--pago is-active' : 'ce-subtab ce-subtab--pago'">
+                    <span class="flex items-center justify-center w-5 h-5 rounded-full text-xs"
+                          :class="resumenTab === 'pago' ? 'bg-white/20' : 'bg-emerald-100 text-emerald-600'">
+                        <i class="fas fa-check-circle"></i>
+                    </span>
+                    <span>Registrar pago</span>
+                    <span class="ce-subtab-badge">{{ 'OK' if resumen.esta_pagado else 'Pend.' }}</span>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if puede_gestionar %}
+        <div x-show="resumenTab !== 'historial'" x-cloak x-transition.opacity.duration.150ms class="space-y-4">
+        <div x-show="resumenTab === 'tardias'" class="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <h2 class="text-sm sm:text-base font-semibold text-amber-900">Llegadas tardías y descuento automático</h2>
+                    <p class="mt-1 text-xs sm:text-sm leading-snug text-amber-800">
+                        En {{ periodo }}, este empleado lleva <strong>{{ resumen.llegadas_tardias_mes }}</strong> llegadas tardías computadas.
+                        La regla actual empieza a descontar desde la N° <strong>{{ resumen.config_llegadas_tardias.desde }}</strong>
+                        por <strong>Gs. {{ '{:,.0f}'.format(resumen.config_llegadas_tardias.monto).replace(',', '.') }}</strong> cada una.
+                    </p>
+                    <a href="{{ url_for('control_empleados.configuracion') }}#descuento-llegadas-tardias"
+                        class="mt-2 inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-amber-900 hover:text-amber-700 transition-colors">
+                        <i class="fas fa-cog text-[11px]"></i>
+                        Configurar descuento por tardías
+                    </a>
+                </div>
+                <div class="rounded-lg bg-white px-3 py-2 border border-amber-200 min-w-fit">
+                    <div class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-amber-700 whitespace-nowrap">Descuento automático</div>
+                    <div class="mt-0.5 text-lg sm:text-xl font-bold leading-tight text-amber-900">Gs. {{ '{:,.0f}'.format(resumen.descuento_llegadas_tardias).replace(',', '.') }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm">
+            <div x-show="resumenTab === 'tardias'" x-cloak>
+            <div class="px-5 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Registrar llegada tardía</h2>
+                <p class="text-sm text-gray-500">Cárgala desde aquí para que impacte directo en el resumen salarial del mes.</p>
+            </div>
+            <form method="post" action="{{ url_for('control_empleados.crear_llegada_tardia', id_empleado=empleado.id_empleado) }}" class="p-5 space-y-4 border-b border-gray-100 bg-amber-50/40">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="periodo" value="{{ periodo }}">
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="fecha_llegada_tardia" class="block text-sm font-semibold text-gray-700 mb-2">Fecha</label>
+                        <input id="fecha_llegada_tardia" name="fecha_movimiento" type="date" value="{{ fecha_periodo }}" required
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="motivo_llegada_tardia" class="block text-sm font-semibold text-gray-700 mb-2">Motivo</label>
+                        <input id="motivo_llegada_tardia" name="motivo" type="text" required placeholder="Ejemplo: ingreso fuera de horario"
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label for="observaciones_llegada_tardia" class="block text-sm font-semibold text-gray-700 mb-2">Observaciones</label>
+                        <input id="observaciones_llegada_tardia" name="observaciones" type="text" placeholder="Opcional"
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-white px-4 py-3 text-sm text-amber-800">
+                    <p>Se registra como tardanza tomada y suma al contador automático del periodo.</p>
+                    <button type="submit"
+                        class="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors">
+                        <i class="fas fa-clock"></i>
+                        Guardar tardanza
+                    </button>
+                </div>
+            </form>
+            </div>
+            {% include 'control_de_empleados/_detalle_movimientos_form.html' %}
+            <div x-show="resumenTab === 'pago'" x-cloak>
+            {% if not resumen.esta_pagado %}
+            <div class="px-5 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Registrar Pago del Mes</h2>
+                <p class="text-sm text-gray-500">Confirma que se ha realizado el pago por este periodo.</p>
+            </div>
+            <form method="post" action="{{ url_for('control_empleados.registrar_pago', id_empleado=empleado.id_empleado) }}" class="p-5 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="periodo" value="{{ periodo }}">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="fecha_pago" class="block text-sm font-semibold text-gray-700 mb-2">Fecha de Pago</label>
+                        <input id="fecha_pago" name="fecha_pago" type="date" value="{{ fecha_periodo }}" required class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="metodo_pago" class="block text-sm font-semibold text-gray-700 mb-2">Método de Pago</label>
+                        <select id="metodo_pago" name="metodo_pago" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="notas_pago" class="block text-sm font-semibold text-gray-700 mb-2">Notas (opcional)</label>
+                        <input id="notas_pago" name="notas" type="text" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="flex justify-end mt-4">
+                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors">
+                        <i class="fas fa-check-circle"></i>
+                        Confirmar Pago por Gs. {{ '{:,.0f}'.format(resumen.total_estimado).replace(',', '.') }}
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div class="p-5 flex items-center justify-between gap-4 bg-blue-50/60">
+                <div>
+                    <h2 class="text-lg font-semibold text-blue-900">Pago Registrado</h2>
+                    <p class="text-sm text-blue-700 mt-1">El pago de <strong>Gs. {{ '{:,.0f}'.format(resumen.pago.total_pagado).replace(',', '.') }}</strong> fue realizado el {{ resumen.pago.fecha_pago.strftime('%d/%m/%Y') }}.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="{{ url_for('control_empleados.historial_pagos', id_empleado=empleado.id_empleado) }}"
+                        class="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-colors">
+                        Ver historial
+                    </a>
+                    {% if puede_gestionar %}
+                    <form method="post" action="{{ url_for('control_empleados.eliminar_pago', id_pago=resumen.pago.id_pago) }}" class="inline-flex">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="periodo" value="{{ periodo }}">
+                        <input type="hidden" name="return_to" value="detalle">
+                        <button type="submit"
+                            onclick="return confirm('Se eliminará este pago registrado. ¿Continuar?')"
+                            class="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors">
+                            Eliminar pago
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            </div>
+        </div>
+        </div>
+        {% endif %}
+
+        <div x-show="resumenTab === 'historial'" x-transition.opacity.duration.150ms>
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Historial del mes</h2>
+                    <p class="text-sm text-gray-500">Aquí queda guardado todo lo que modifica o explica el pago del periodo.</p>
+                </div>
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ resumen.historial_total }} registros · {{ resumen.movimientos_manual_count }} manuales · {{ resumen.historial_llegadas_tardias_count }} tardanzas</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Concepto</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Observaciones</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Aguinaldo</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Monto</th>
+                            {% if puede_gestionar %}
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Corrección</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white">
+                        {% for item in resumen.historial_items %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-4 text-sm text-gray-700">{{ item.fecha.strftime('%d/%m/%Y') }}</td>
+                            <td class="px-4 py-4 text-sm">
+                                <div class="font-semibold text-gray-900">{{ item.tipo_label }}</div>
+                                {% if item.origen == 'llegada_tardia' %}
+                                <div class="mt-1">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {% if item.computable %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                                        {{ item.estado.replace('_', ' ')|title }}
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-4 text-sm text-gray-700">
+                                {{ item.concepto }}
+                                {% if item.calculo_detalle %}
+                                <div class="mt-1 text-xs text-blue-700">{{ item.calculo_detalle }}</div>
+                                {% endif %}
+                                {% if item.origen == 'llegada_tardia' and item.numero_computable %}
+                                <div class="mt-1 text-xs text-amber-700">Tardanza N° {{ item.numero_computable }} del periodo.</div>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-4 text-sm text-gray-500">{{ item.observaciones or '—' }}</td>
+                            <td class="px-4 py-4 text-center">
+                                {% if item.origen == 'movimiento' and puede_gestionar %}
+                                <form method="post" action="{{ url_for('control_empleados.actualizar_movimiento_aguinaldo', id_movimiento=item.id) }}" class="inline-flex items-center">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="periodo" value="{{ periodo }}">
+                                    <input type="hidden" name="tab" value="{{ tab }}">
+                                    <input type="hidden" name="page_historial" value="{{ resumen.historial_paginacion.page }}">
+                                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" name="incide_aguinaldo" value="1" {% if item.incide_aguinaldo %}checked{% endif %}
+                                            onchange="this.form.submit()"
+                                            class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {% if item.incide_aguinaldo %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                                            {{ 'Incluye' if item.incide_aguinaldo else 'No' }}
+                                        </span>
+                                    </label>
+                                </form>
+                                {% elif item.origen == 'movimiento' %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {% if item.incide_aguinaldo %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                                    {{ 'Incluye' if item.incide_aguinaldo else 'No' }}
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                                    No aplica
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-4 text-sm font-bold text-right {% if item.es_descuento %}text-red-600{% elif item.monto > 0 %}text-green-600{% else %}text-gray-400{% endif %}">
+                                {% if item.monto > 0 %}
+                                {% if item.es_descuento %}-{% else %}+{% endif %}Gs. {{ '{:,.0f}'.format(item.monto).replace(',', '.') }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </td>
+                            {% if puede_gestionar %}
+                            <td class="px-4 py-4 text-right">
+                                {% if item.origen == 'movimiento' %}
+                                <form method="post" action="{{ url_for('control_empleados.eliminar_movimiento', id_movimiento=item.id) }}" class="inline-flex">
+                                {% else %}
+                                <form method="post" action="{{ url_for('control_empleados.eliminar_ausencia', id_ausencia=item.id) }}" class="inline-flex">
+                                {% endif %}
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="periodo" value="{{ periodo }}">
+                                    <input type="hidden" name="tab" value="{{ tab }}">
+                                    <input type="hidden" name="page_historial" value="{{ resumen.historial_paginacion.page }}">
+                                    <button type="submit"
+                                        onclick="return confirm('Se eliminará este registro. ¿Continuar?')"
+                                        class="inline-flex items-center px-3 py-2 rounded-lg border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors">
+                                        Eliminar
+                                    </button>
+                                </form>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="{{ 7 if puede_gestionar else 6 }}" class="px-4 py-12 text-center">
+                                <div class="mx-auto max-w-md">
+                                    <div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 text-xl">
+                                        <i class="fas fa-file-invoice-dollar"></i>
+                                    </div>
+                                    <h3 class="mt-4 text-lg font-semibold text-gray-900">Sin registros para este mes</h3>
+                                    <p class="mt-2 text-sm text-gray-500">Si el sueldo se mantiene igual y no hubo tardanzas, no necesitas cargar nada más.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if resumen.historial_paginacion.pages > 1 %}
+            <div class="px-5 py-4 border-t border-gray-200 flex items-center justify-between gap-4">
+                <p class="text-sm text-gray-500">Página {{ resumen.historial_paginacion.page }} de {{ resumen.historial_paginacion.pages }}</p>
+                <div class="flex items-center gap-2">
+                    {% if resumen.historial_paginacion.has_prev %}
+                    <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab=tab, page_historial=resumen.historial_paginacion.prev_num) }}"
+                        class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                        Anterior
+                    </a>
+                    {% endif %}
+                    {% if resumen.historial_paginacion.has_next %}
+                    <a href="{{ url_for('control_empleados.detalle', id_empleado=empleado.id_empleado, periodo=periodo, tab=tab, page_historial=resumen.historial_paginacion.next_num) }}"
+                        class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                        Siguiente
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        </div>
+
+    </div>
+</div>
+{% if puede_gestionar %}
+<script>
+    requestAnimationFrame(() => {
+        const panelNuevo = document.getElementById('panel_tipo_movimiento_nuevo');
+        const panelEliminar = document.getElementById('panel_tipo_movimiento_eliminar');
+        const toggleNuevo = document.getElementById('toggle_tipo_movimiento_nuevo');
+        const toggleEliminar = document.getElementById('toggle_tipo_movimiento_eliminar');
+        const alternar = (panelActual, panelSecundario) => {
+            if (!panelActual) return;
+            panelActual.classList.toggle('hidden');
+            if (panelSecundario) panelSecundario.classList.add('hidden');
+        };
+        if (toggleNuevo) toggleNuevo.addEventListener('click', () => alternar(panelNuevo, panelEliminar));
+        if (toggleEliminar) toggleEliminar.addEventListener('click', () => alternar(panelEliminar, panelNuevo));
+
+        const tipo = document.getElementById('tipo');
+        const cantidadGrupo = document.getElementById('grupo_cantidad_movimiento');
+        const cantidad = document.getElementById('cantidad_movimiento');
+        const unidad = document.getElementById('unidad_cantidad_movimiento');
+        const detalle = document.getElementById('detalle_calculo_movimiento');
+        const monto = document.getElementById('monto');
+        const concepto = document.getElementById('concepto');
+        let conceptoAuto = false;
+
+        const moneda = (valor) => Math.round(valor).toLocaleString('es-PY');
+        const opcionSeleccionada = () => tipo ? tipo.options[tipo.selectedIndex] : null;
+        const actualizarCalculo = () => {
+            const opcion = opcionSeleccionada();
+            const esCantidad = opcion && opcion.dataset.modoCalculo === 'cantidad';
+            const unidadTexto = opcion ? opcion.dataset.unidad || '' : '';
+            const valorUnitario = opcion ? Number(opcion.dataset.valorUnitario || 0) : 0;
+            if (!cantidadGrupo || !cantidad || !monto) return;
+            cantidadGrupo.classList.toggle('hidden', !esCantidad);
+            monto.readOnly = !!esCantidad;
+            monto.classList.toggle('bg-gray-50', !!esCantidad);
+            cantidad.required = !!esCantidad;
+            if (!esCantidad) {
+                if (detalle) detalle.textContent = '';
+                if (unidad) unidad.textContent = '';
+                return;
+            }
+            if (unidad) unidad.textContent = unidadTexto ? `(${unidadTexto})` : '';
+            const cantidadValor = Number(cantidad.value || 0);
+            const total = cantidadValor > 0 ? cantidadValor * valorUnitario : 0;
+            monto.value = total > 0 ? Math.round(total) : '';
+            if (detalle) detalle.textContent = `Gs. ${moneda(valorUnitario)} por ${unidadTexto || 'unidad'}`;
+            if (concepto && (conceptoAuto || !concepto.value.trim()) && cantidadValor > 0) {
+                concepto.value = `${opcion.text}: ${cantidad.value} ${unidadTexto}`.trim();
+                conceptoAuto = true;
+            }
+        };
+        if (tipo) tipo.addEventListener('change', actualizarCalculo);
+        if (cantidad) cantidad.addEventListener('input', actualizarCalculo);
+        if (concepto) concepto.addEventListener('input', () => { conceptoAuto = false; });
+        actualizarCalculo();
+
+        const modo = document.getElementById('modo_calculo_tipo_movimiento');
+        const unidadTipo = document.getElementById('unidad_tipo_movimiento');
+        const valorTipo = document.getElementById('valor_unitario_tipo_movimiento');
+        const actualizarNuevoTipo = () => {
+            const requiereCantidad = modo && modo.value === 'cantidad';
+            [unidadTipo, valorTipo].forEach((campo) => {
+                if (!campo) return;
+                campo.required = !!requiereCantidad;
+                campo.classList.toggle('hidden', !requiereCantidad);
+            });
+        };
+        if (modo) modo.addEventListener('change', actualizarNuevoTipo);
+        actualizarNuevoTipo();
+    });
+</script>
+{% endif %}

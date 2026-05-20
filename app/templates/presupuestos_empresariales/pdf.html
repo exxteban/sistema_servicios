@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Presupuesto Nº {{ presupuesto.numero_presupuesto_display }}</title>
+    <style>
+        @page { size: A4; margin: 16mm 12mm 16mm; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #1f2937; font-size: 10pt; }
+        table { width: 100%; border-collapse: collapse; }
+        .header td { vertical-align: top; }
+        .brand-box { width: 60%; }
+        .logo-wrap {
+            width: 170px;
+            height: 78px;
+            margin-bottom: 10px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        .logo {
+            width: auto;
+            height: 78px;
+            max-width: 170px;
+            max-height: 78px;
+        }
+        .company-name { font-size: 18pt; font-weight: bold; color: #065f46; }
+        .doc-box {
+            width: 40%;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            padding: 10px;
+        }
+        .doc-title { font-size: 16pt; font-weight: bold; color: #111827; }
+        .muted { color: #6b7280; }
+        .section-title {
+            margin: 18px 0 8px;
+            font-size: 11pt;
+            font-weight: bold;
+            color: #065f46;
+            border-bottom: 1px solid #d1d5db;
+            padding-bottom: 4px;
+        }
+        .info-table td {
+            border: 1px solid #e5e7eb;
+            padding: 7px 8px;
+            vertical-align: top;
+        }
+        .items th {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            padding: 7px 8px;
+            text-align: left;
+            color: #065f46;
+        }
+        .items td {
+            border: 1px solid #e5e7eb;
+            padding: 7px 8px;
+        }
+        .text-right { text-align: right; }
+        .totals-box {
+            margin-top: 14px;
+            width: 40%;
+            margin-left: auto;
+        }
+        .totals-box td {
+            border: 1px solid #d1d5db;
+            padding: 7px 8px;
+        }
+        .total-final td {
+            background: #065f46;
+            color: #ffffff;
+            font-weight: bold;
+        }
+        .block {
+            border: 1px solid #e5e7eb;
+            padding: 10px;
+            background: #ffffff;
+            white-space: pre-line;
+        }
+    </style>
+</head>
+<body>
+    <table class="header">
+        <tr>
+            <td class="brand-box">
+                {% if logo_src %}
+                <div class="logo-wrap">
+                    <img src="{{ logo_src }}" alt="Logo empresa" class="logo">
+                </div>
+                {% endif %}
+                <div class="company-name">{{ empresa.nombre or 'RYJCELL' }}</div>
+                {% if empresa.ruc %}<div><strong>RUC:</strong> {{ empresa.ruc }}</div>{% endif %}
+                {% if empresa.telefono %}<div><strong>Teléfono:</strong> {{ empresa.telefono }}</div>{% endif %}
+                {% if empresa.direccion %}<div><strong>Dirección:</strong> {{ empresa.direccion }}</div>{% endif %}
+            </td>
+            <td class="doc-box">
+                <div class="doc-title">Presupuesto</div>
+                <div><strong>Nº:</strong> {{ presupuesto.numero_presupuesto_display }}</div>
+                <div><strong>Fecha:</strong> {{ presupuesto.fecha_emision.strftime('%d/%m/%Y') if presupuesto.fecha_emision else '-' }}</div>
+                <div><strong>Validez:</strong> {{ presupuesto.validez_dias }} día(s)</div>
+                <div><strong>Vence:</strong> {{ presupuesto.valido_hasta.strftime('%d/%m/%Y') if presupuesto.valido_hasta else '-' }}</div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">Destinatario</div>
+    <table class="info-table">
+        <tr>
+            <td width="50%"><strong>Empresa:</strong><br>{{ presupuesto.destinatario_nombre }}</td>
+            <td width="50%"><strong>Contacto:</strong><br>{{ presupuesto.destinatario_contacto or '-' }}</td>
+        </tr>
+        <tr>
+            <td><strong>RUC / CI:</strong><br>{{ presupuesto.destinatario_ruc or '-' }}</td>
+            <td><strong>Teléfono:</strong><br>{{ presupuesto.destinatario_telefono or '-' }}</td>
+        </tr>
+        <tr>
+            <td><strong>Email:</strong><br>{{ presupuesto.destinatario_email or '-' }}</td>
+            <td><strong>Asunto:</strong><br>{{ presupuesto.asunto }}</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>Dirección:</strong><br>{{ presupuesto.destinatario_direccion or '-' }}</td>
+        </tr>
+    </table>
+
+    <div class="section-title">Detalle presupuestado</div>
+    <table class="items">
+        <thead>
+            <tr>
+                <th width="52%">Descripción</th>
+                <th width="12%" class="text-right">Cantidad</th>
+                <th width="18%" class="text-right">Precio unitario</th>
+                <th width="18%" class="text-right">Importe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in presupuesto.items %}
+            <tr>
+                <td>{{ item.descripcion }}</td>
+                <td class="text-right">{{ item.cantidad }}</td>
+                <td class="text-right">Gs. {{ "{:,.0f}".format(item.precio_unitario or 0).replace(",", ".") }}</td>
+                <td class="text-right">Gs. {{ "{:,.0f}".format(item.total or 0).replace(",", ".") }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="totals-box">
+        <tr>
+            <td><strong>Subtotal</strong></td>
+            <td class="text-right">Gs. {{ "{:,.0f}".format(presupuesto.subtotal or 0).replace(",", ".") }}</td>
+        </tr>
+        <tr>
+            <td><strong>Descuento</strong></td>
+            <td class="text-right">Gs. {{ "{:,.0f}".format(presupuesto.descuento or 0).replace(",", ".") }}</td>
+        </tr>
+        <tr class="total-final">
+            <td><strong>Total</strong></td>
+            <td class="text-right">Gs. {{ "{:,.0f}".format(presupuesto.total or 0).replace(",", ".") }}</td>
+        </tr>
+    </table>
+
+    <div class="section-title">Observaciones</div>
+    <div class="block">{{ presupuesto.observaciones or 'Sin observaciones.' }}</div>
+
+    <div class="section-title">Condiciones comerciales</div>
+    <div class="block">{{ presupuesto.condiciones or 'Sin condiciones.' }}</div>
+</body>
+</html>

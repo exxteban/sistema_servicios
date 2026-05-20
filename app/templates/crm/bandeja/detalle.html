@@ -1,0 +1,491 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<div class="h-full flex min-h-0" x-data="crmDetalle({{ conv.id }}, {{ contacto.id if contacto else 'null' }})">
+
+    <!-- Panel izquierdo: info del contacto + acciones -->
+    <div class="crm-panel-left w-72 flex-shrink-0 border-r border-white/10 flex flex-col overflow-auto bg-gray-900/60">
+        <!-- Header -->
+        <div class="p-4 border-b border-white/10">
+            <div class="flex items-center gap-3 mb-3">
+                <a :href="backUrl" class="text-gray-500 hover:text-gray-300 transition-colors text-sm">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
+                    {% if conv.modo == 'bot' %}bg-blue-500/20 text-blue-300
+                    {% elif conv.modo == 'asesor' %}bg-green-500/20 text-green-300
+                    {% else %}bg-yellow-500/20 text-yellow-300{% endif %}">
+                    {{ (conv.nombre_contacto or conv.telefono)[0].upper() }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-gray-100 truncate">
+                        {{ conv.nombre_contacto or (contacto.nombre if contacto else conv.telefono) or conv.telefono }}
+                    </p>
+                    <p class="text-xs text-gray-500">{{ conv.telefono }}</p>
+                </div>
+            </div>
+
+            <!-- Modo badge -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs px-2 py-0.5 rounded-full
+                    {% if conv.modo == 'bot' %}bg-blue-500/20 text-blue-300
+                    {% elif conv.modo == 'asesor' %}bg-green-500/20 text-green-300
+                    {% else %}bg-yellow-500/20 text-yellow-300{% endif %}">
+                    {{ 'pendiente' if conv.modo == 'derivacion' else conv.modo }}
+                </span>
+                {% if conv.activa %}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300">activa</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Acciones rápidas -->
+        {% if puede_operar_panel %}
+        <div class="p-3 border-b border-white/10 flex flex-col gap-2">
+            <button x-show="modoConv !== 'asesor' || estadoAsig !== 'activa'" @click="tomar()"
+                class="w-full px-3 py-2 rounded-lg bg-teal-500/15 text-teal-300 text-sm hover:bg-teal-500/25 transition-colors text-left font-medium">
+                <i class="fas fa-hand-paper mr-2 text-teal-400"></i> Tomar conversación
+            </button>
+            <button x-show="estadoAsig === 'activa'" @click="devolver()"
+                class="w-full px-3 py-2 rounded-lg bg-yellow-500/15 text-yellow-300 text-sm hover:bg-yellow-500/25 transition-colors text-left font-medium">
+                <i class="fas fa-undo mr-2 text-yellow-400"></i> Devolver a cola
+            </button>
+            <button @click="cerrar()"
+                class="w-full px-3 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm hover:bg-red-500/25 transition-colors text-left font-medium">
+                <i class="fas fa-times mr-2 text-red-400"></i> Cerrar conversación
+            </button>
+            {% if contacto %}
+            <a href="{{ url_for('crm.perfil_contacto', id_contacto=contacto.id) }}"
+                class="w-full px-3 py-2 rounded-lg bg-gray-700/50 text-gray-300 text-sm hover:bg-gray-600/50 transition-colors text-left">
+                <i class="fas fa-user mr-2"></i> Ver perfil del contacto
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if current_user.es_admin() or current_user.es_supervisor() %}
+        <div class="p-3 border-b border-white/10 flex flex-col gap-2">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <i class="fas fa-user-tag text-teal-400 mr-1"></i> Reasignación (admin)
+            </p>
+            <p class="text-xs text-gray-500">
+                Asignado a:
+                <span class="text-gray-300">
+                    {{ conv.asignacion.asesor.nombre_completo if conv.asignacion and conv.asignacion.asesor else '—' }}
+                </span>
+            </p>
+            <div class="flex gap-2 w-full">
+                <select x-model="idAsesorReasignar"
+                    class="flex-1 min-w-0 bg-gray-700/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+                    <option value="">Seleccionar asesor…</option>
+                    <template x-for="a in asesores" :key="a.id_usuario">
+                        <option :value="a.id_usuario" x-text="a.nombre + (a.online ? ' (online)' : '')"></option>
+                    </template>
+                </select>
+                <button @click="reasignar()" :disabled="!idAsesorReasignar || reasignando"
+                    class="flex-shrink-0 px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 text-sm hover:bg-teal-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    <i class="fas fa-exchange-alt" x-show="!reasignando"></i>
+                    <i class="fas fa-spinner fa-spin" x-show="reasignando"></i>
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Info de la conversación -->
+        <div class="p-3 border-b border-white/10 text-xs text-gray-500 flex flex-col gap-1.5">
+            <div class="flex justify-between">
+                <span>Inicio</span>
+                <span class="text-gray-400">{{ conv.inicio_sesion.strftime('%d/%m/%Y %H:%M') if conv.inicio_sesion else
+                    '—' }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Última actividad</span>
+                <span class="text-gray-400"
+                    x-text="formatFecha('{{ conv.ultima_actividad.isoformat() if conv.ultima_actividad else '' }}')"></span>
+            </div>
+            <div class="flex justify-between">
+                <span>Total mensajes</span>
+                <span class="text-gray-400" x-text="mensajes.length"></span>
+            </div>
+        </div>
+
+        <!-- Nota interna rápida -->
+        {% if puede_operar_panel %}
+        <div class="p-3 flex flex-col gap-2">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <i class="fas fa-sticky-note text-yellow-400 mr-1"></i> Nota interna
+            </p>
+            <textarea x-model="textNota" rows="3" placeholder="Agregar nota (solo visible para asesores)..."
+                class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-yellow-500/50 resize-none transition-colors"></textarea>
+            <button @click="enviarNota()" :disabled="!textNota.trim()"
+                class="w-full px-3 py-1.5 rounded-lg bg-yellow-500/15 text-yellow-300 text-sm hover:bg-yellow-500/25 disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-medium">
+                <i class="fas fa-save mr-1.5"></i> Guardar nota
+            </button>
+        </div>
+        {% else %}
+        <div class="p-3 text-xs text-gray-500 border-b border-white/10">
+            Vista de solo lectura. Desde esta bandeja podés revisar y reasignar conversaciones.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Panel central: chat -->
+    <div class="flex-1 flex flex-col min-w-0 min-h-0 bg-gray-950/30 dark:bg-[#131620]">
+        <!-- Header del chat -->
+        <div class="px-4 py-3 border-b border-white/10 flex items-center gap-3 flex-shrink-0">
+            <p class="text-sm font-medium text-gray-200">Historial de conversación</p>
+            <div x-show="cargando" class="ml-2">
+                <i class="fas fa-spinner fa-spin text-teal-400 text-xs"></i>
+            </div>
+            <!-- Plantillas rápidas -->
+            {% if puede_operar_panel %}
+            <div class="ml-auto relative" x-data="{ abierto: false }">
+                <button @click="abierto = !abierto"
+                    :class="abierto ? 'bg-teal-500/30 text-teal-300' : 'bg-gray-700/50 text-gray-400'"
+                    class="px-3 py-1.5 rounded-lg text-sm hover:bg-gray-600/50 transition-colors" title="Plantillas">
+                    <i class="fas fa-bolt mr-1"></i> Plantillas
+                </button>
+                <div x-show="abierto" @click.outside="abierto = false"
+                    class="absolute right-0 top-full mt-1 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-2 max-h-60 overflow-auto"
+                    style="display:none">
+                    <template x-for="p in plantillas" :key="p.id">
+                        <button @click="usarPlantilla(p); abierto = false"
+                            class="w-full text-left px-2 py-2 rounded-lg hover:bg-white/10 transition-colors">
+                            <p class="text-sm font-medium text-teal-300" x-text="p.titulo"></p>
+                            <p class="text-xs text-gray-400 truncate mt-0.5" x-text="p.contenido.substring(0, 70)"></p>
+                        </button>
+                    </template>
+                    <p x-show="plantillas.length === 0" class="text-xs text-gray-500 text-center py-3">Sin plantillas
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Mensajes -->
+        <div class="flex-1 overflow-auto p-4 flex flex-col gap-2 bg-gray-950/20" id="chat-messages">
+            <div x-show="cargando && mensajes.length === 0" class="flex items-center justify-center py-12">
+                <i class="fas fa-spinner fa-spin text-teal-400 text-xl"></i>
+            </div>
+
+            <template x-for="msg in mensajes" :key="msg.id">
+                <div :class="msg.direccion === 'saliente' ? 'items-end' : 'items-start'" class="flex flex-col">
+                    <!-- Evento operativo -->
+                    <template x-if="msg.es_evento">
+                        <div class="self-center max-w-xl px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[11px] text-gray-400">
+                            <span x-text="msg.contenido"></span>
+                            <span class="ml-2 opacity-60" x-text="formatHora(msg.created_at)"></span>
+                        </div>
+                    </template>
+
+                    <!-- Nota interna -->
+                    <template x-if="msg.es_nota && !msg.es_evento">
+                        <div class="max-w-sm bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2">
+                            <div class="flex items-center gap-1.5 mb-1">
+                                <i class="fas fa-sticky-note text-yellow-400 text-xs"></i>
+                                <span class="text-xs text-yellow-400 font-medium">Nota interna</span>
+                                <span class="text-xs text-gray-500 ml-auto" x-text="formatHora(msg.created_at)"></span>
+                            </div>
+                            <p class="text-sm text-gray-200 whitespace-pre-wrap break-words" x-text="msg.contenido"></p>
+                            <p class="text-xs text-gray-500 mt-1" x-text="msg.autor || ''"></p>
+                        </div>
+                    </template>
+
+                    <!-- Mensaje normal -->
+                    <template x-if="!msg.es_nota && !msg.es_evento">
+                        <div :class="{
+                                'bg-teal-500/20 text-teal-50 rounded-br-sm border border-teal-500/10': msg.direccion === 'saliente' && msg.remitente === 'asesor',
+                                'bg-blue-500/15 text-blue-100 rounded-br-sm border border-blue-500/10': msg.direccion === 'saliente' && msg.remitente === 'bot',
+                                'bg-white/6 text-gray-200 rounded-bl-sm border border-white/5': msg.direccion === 'entrante'
+                            }" class="max-w-xs lg:max-w-md px-3 py-2 rounded-xl text-sm">
+                            <p class="whitespace-pre-wrap break-words" x-text="msg.contenido"></p>
+                            <div class="flex items-center gap-1.5 mt-1">
+                                <span class="text-xs opacity-50" x-text="formatHora(msg.created_at)"></span>
+                                <span x-show="msg.remitente === 'bot'" class="text-xs opacity-50">· bot</span>
+                                <span x-show="msg.asesor" class="text-xs opacity-50" x-text="'· ' + msg.asesor"></span>
+                                <span x-show="msg.wa_status && msg.direccion === 'saliente'"
+                                    class="text-xs opacity-40 ml-auto" x-text="msg.wa_status"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <div x-show="!cargando && mensajes.length === 0"
+                class="flex flex-col items-center justify-center py-16 text-gray-500">
+                <i class="fas fa-comments text-3xl mb-2 opacity-30"></i>
+                <p class="text-sm">Sin mensajes</p>
+            </div>
+        </div>
+
+        <!-- Input de respuesta -->
+        {% if puede_operar_panel %}
+        <div class="p-3 border-t border-white/8 flex-shrink-0 bg-gray-900/40">
+            <div class="flex gap-2 items-end">
+                <textarea x-model="textMensaje" @keydown.enter.prevent="if(!$event.shiftKey) enviar()" rows="2"
+                    placeholder="Escribir respuesta... (Enter para enviar, Shift+Enter para nueva línea)"
+                    class="flex-1 bg-white/5 rounded-xl px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none resize-none transition-colors"></textarea>
+                <button @click="enviar()" :disabled="!textMensaje.trim() || enviando"
+                    class="px-4 py-2 rounded-xl bg-teal-500/90 text-white text-sm font-medium hover:bg-teal-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors self-end shadow-lg shadow-teal-500/20">
+                    <i class="fas fa-paper-plane" x-show="!enviando"></i>
+                    <i class="fas fa-spinner fa-spin" x-show="enviando"></i>
+                </button>
+            </div>
+            <p x-show="error" class="text-xs text-red-400 mt-1" x-text="error"></p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Panel derecho: notas de la conversación -->
+    <div class="crm-panel-right w-64 flex-shrink-0 border-l border-white/10 flex flex-col overflow-auto bg-gray-900/60">
+        <div class="p-3 border-b border-white/10">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <i class="fas fa-sticky-note text-yellow-400 mr-1"></i> Notas de esta conv.
+            </p>
+        </div>
+        <div class="flex-1 overflow-auto p-3 flex flex-col gap-2">
+            <template x-for="nota in notas" :key="nota.id">
+                <div class="bg-yellow-500/5 border border-yellow-500/15 rounded-xl p-2.5 group">
+                    <p class="text-xs text-gray-200 whitespace-pre-wrap" x-text="nota.contenido"></p>
+                    <div class="flex items-center justify-between mt-1.5">
+                        <span class="text-xs text-gray-500"
+                            x-text="(nota.autor || '') + ' · ' + formatFecha(nota.created_at)"></span>
+                    </div>
+                </div>
+            </template>
+            <div x-show="notas.length === 0" class="text-center text-gray-600 text-xs py-6">
+                <i class="fas fa-sticky-note text-xl mb-1 block opacity-20"></i>
+                Sin notas
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function crmDetalle(idConv, idContacto) {
+        return {
+            idConv,
+            idContacto,
+            backUrl: new URLSearchParams(window.location.search).get('back') || '/crm/bandeja',
+            mensajes: [],
+            notas: [],
+            plantillas: [],
+            asesores: [],
+            idAsesorReasignar: '',
+            reasignando: false,
+            cargando: false,
+            textMensaje: '',
+            textNota: '',
+            enviando: false,
+            error: '',
+            modoConv: '{{ conv.modo }}',
+            estadoAsig: null,
+            pollInterval: null,
+            esAdmin: {{ 'true' if (current_user.es_admin() or current_user.es_supervisor()) else 'false' }},
+
+        async cargar() {
+        this.cargando = true;
+        try {
+            const r = await fetch(`/crm/api/asesor/conversacion/${this.idConv}/mensajes`);
+            const d = await r.json();
+            const msgs = (d.mensajes || []).map(m => ({ ...m, es_nota: false }));
+            const notasMsgs = (d.notas || []).map(n => ({
+                id: 'nota-' + n.id,
+                es_nota: true,
+                es_evento: false,
+                contenido: n.contenido,
+                autor: n.autor,
+                created_at: n.created_at,
+                direccion: 'saliente',
+            }));
+            const eventosMsgs = (d.eventos || []).map(e => ({
+                id: 'evento-' + e.id,
+                es_nota: false,
+                es_evento: true,
+                contenido: this.describeEvento(e),
+                created_at: e.created_at,
+                direccion: 'centro',
+            }));
+            this.notas = d.notas || [];
+            // Mezclar mensajes y notas por fecha
+            const todos = [...msgs, ...notasMsgs, ...eventosMsgs].sort((a, b) => {
+                return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+            });
+            this.mensajes = todos;
+            this.modoConv = d.conversacion?.modo || this.modoConv;
+            this.$nextTick(() => this.scrollAbajo());
+        } catch (e) { console.error(e); }
+        finally { this.cargando = false; }
+    },
+
+        async cargarPlantillas() {
+        try {
+            const r = await fetch('/crm/api/plantillas');
+            const d = await r.json();
+            this.plantillas = d.plantillas || [];
+        } catch (e) { }
+    },
+
+        async cargarAsesores() {
+        if (!this.esAdmin) return;
+        try {
+            const r = await fetch('/crm/api/admin/asesores');
+            const d = await r.json();
+            this.asesores = d.asesores || [];
+        } catch (e) { }
+    },
+
+        async reasignar() {
+        if (!this.esAdmin || !this.idAsesorReasignar || this.reasignando) return;
+        if (!confirm('¿Reasignar esta conversación?')) return;
+        this.reasignando = true;
+        try {
+            const r = await fetch('/crm/api/admin/reasignar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_conversacion: this.idConv, id_asesor: Number(this.idAsesorReasignar) }),
+            });
+            const d = await r.json();
+            if (d.ok) {
+                if (window.appReloadActiveTab) {
+                    window.appReloadActiveTab();
+                } else {
+                    window.location.reload();
+                }
+            }
+        } catch (e) { }
+        finally { this.reasignando = false; }
+    },
+
+        async enviar() {
+        if (!this.textMensaje.trim() || this.enviando) return;
+        this.enviando = true;
+        this.error = '';
+        try {
+            const r = await fetch(`/crm/api/asesor/responder/${this.idConv}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mensaje: this.textMensaje }),
+            });
+            const d = await r.json();
+            if (d.ok) {
+                this.textMensaje = '';
+                await this.cargar();
+            } else {
+                this.error = d.error || 'Error al enviar';
+            }
+        } catch (e) {
+            this.error = 'Error de conexión';
+        } finally {
+            this.enviando = false;
+        }
+    },
+
+        async enviarNota() {
+        if (!this.textNota.trim()) return;
+        try {
+            const r = await fetch(`/crm/api/asesor/conversacion/${this.idConv}/notas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contenido: this.textNota }),
+            });
+            const d = await r.json();
+            if (d.ok) {
+                this.textNota = '';
+                await this.cargar();
+            }
+        } catch (e) { console.error(e); }
+    },
+
+        async tomar() {
+        const r = await fetch(`/crm/api/asesor/tomar/${this.idConv}`, { method: 'POST' });
+        const d = await r.json();
+        if (d.ok) { this.estadoAsig = 'activa'; this.modoConv = 'asesor'; }
+    },
+
+        async devolver() {
+        if (!confirm('¿Devolver esta conversación a la cola?')) return;
+        await fetch(`/crm/api/asesor/devolver/${this.idConv}`, { method: 'POST' });
+        if (window.appNavigateActiveTab) {
+            window.appNavigateActiveTab(this.backUrl);
+        } else {
+            window.location.href = this.backUrl;
+        }
+    },
+
+        async cerrar() {
+        if (!confirm('¿Cerrar esta conversación?')) return;
+        await fetch(`/crm/api/asesor/cerrar/${this.idConv}`, { method: 'POST' });
+        if (window.appNavigateActiveTab) {
+            window.appNavigateActiveTab(this.backUrl);
+        } else {
+            window.location.href = this.backUrl;
+        }
+    },
+
+    usarPlantilla(p) {
+        this.textMensaje = p.contenido;
+    },
+
+    scrollAbajo() {
+        const el = document.getElementById('chat-messages');
+        if (el) el.scrollTop = el.scrollHeight;
+    },
+
+    parseServerDate(isoStr) {
+        if (!isoStr) return null;
+        const s = String(isoStr).trim();
+        if (!s) return null;
+        const hasTz = /[zZ]$/.test(s) || /[+-]\d\d:\d\d$/.test(s);
+        const d = new Date(hasTz ? s : `${s}Z`);
+        return isNaN(d.getTime()) ? null : d;
+    },
+
+    formatHora(iso) {
+        if (!iso) return '';
+        const d = this.parseServerDate(iso);
+        if (!d) return '';
+        return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    },
+
+    describeEvento(evento) {
+        const d = evento?.detalle || {};
+        switch (evento?.tipo) {
+            case 'asignacion_creada': return `Asignada a asesor #${d.id_asesor || '-'} para atención.`;
+            case 'asignacion_actualizada': return `Reasignada a asesor #${d.id_asesor || '-'}${d.id_asesor_anterior ? ` desde #${d.id_asesor_anterior}` : ''}.`;
+            case 'asesor_tomo_conversacion': return `${evento.usuario || 'Un asesor'} tomó la conversación.`;
+            case 'asesor_acepto_conversacion': return `${evento.usuario || 'Un asesor'} aceptó la conversación.`;
+            case 'asesor_devolvio_conversacion': return `${evento.usuario || 'Un asesor'} devolvió la conversación a la cola.`;
+            case 'asesor_cerro_conversacion': return `${evento.usuario || 'Un asesor'} cerró la conversación.`;
+            case 'asignacion_transferida': return `${evento.usuario || 'Un asesor'} transfirió la conversación a asesor #${d.id_asesor_destino || '-'}.`;
+            case 'timeout_asignacion': return `Timeout de asignación: ${d.motivo || 'sin detalle'} (${d.accion || 'cola_general'}).`;
+            case 'asesor_offline': return `La conversación volvió a cola porque el asesor #${d.id_asesor || '-'} quedó offline.`;
+            case 'cola_asesores': return 'La conversación quedó en cola para asesores.';
+            case 'handoff_web_creado': return 'Se creó un handoff desde el bot web.';
+            case 'handoff_web_consumido': return 'Se vinculó una conversación de WhatsApp con un handoff del bot web.';
+            default: return evento?.tipo || 'Evento';
+        }
+    },
+
+    formatFecha(iso) {
+        if (!iso) return '';
+        const d = this.parseServerDate(iso);
+        if (!d) return '';
+        const ahora = new Date();
+        const diff = (ahora - d) / 1000;
+        if (diff < 60) return 'ahora';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+        return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+    },
+
+    init() {
+        this.cargar();
+        this.cargarPlantillas();
+        this.cargarAsesores();
+        this.pollInterval = setInterval(() => this.cargar(), 15000);
+    }
+    };
+}
+</script>
+{% endblock %}

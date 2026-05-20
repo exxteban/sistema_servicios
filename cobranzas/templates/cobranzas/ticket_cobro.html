@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ticket Cobro #{{ pago.id_pago_cuenta }}</title>
+    {% set paper_width_value = paper_width_mm if paper_width_mm in [48, 58, 80] else 58 %}
+    <style>
+        @page {
+            size: {{ paper_width_value }}mm auto;
+            margin: 0;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: {{ paper_width_value }}mm;
+            max-width: {{ paper_width_value }}mm;
+            background: #fff !important;
+            color: #000 !important;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+        body {
+            padding: 2mm {{ 4 if paper_width_value == 80 else 3 }}mm 3mm;
+        }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .bold { font-weight: bold; }
+        .small { font-size: 10px; }
+        .sep {
+            border: none;
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        td {
+            padding: 1px 0;
+            vertical-align: top;
+        }
+        .label { width: 38%; }
+        .value { width: 62%; }
+    </style>
+</head>
+<body>
+    <div class="center">
+        {% if empresa.nombre %}<div class="bold">{{ empresa.nombre|thermal_safe }}</div>{% endif %}
+        {% if empresa.ruc %}<div class="small">RUC: {{ empresa.ruc|thermal_safe }}</div>{% endif %}
+        {% if empresa.telefono %}<div class="small">Tel: {{ empresa.telefono|thermal_safe }}</div>{% endif %}
+        {% if empresa.direccion %}<div class="small">{{ empresa.direccion|thermal_safe }}</div>{% endif %}
+    </div>
+
+    <hr class="sep" />
+    <div class="center bold">COMPROBANTE DE PAGO</div>
+    <div class="center small">{{ ticket_detalle.comprobante_pago }}</div>
+    <hr class="sep" />
+
+    <table>
+        <tr><td class="label">Fecha:</td><td class="value">{{ pago.fecha_pago|local_strftime('%d/%m/%Y %H:%M') }}</td></tr>
+        <tr><td class="label">Comprobante:</td><td class="value">{{ ticket_detalle.comprobante_pago }}</td></tr>
+        <tr><td class="label">Cuenta:</td><td class="value">#{{ cuenta.id_cuenta_cobrar }}</td></tr>
+        <tr><td class="label">Venta:</td><td class="value">#{{ cuenta.id_venta }}</td></tr>
+        <tr><td class="label">Comprobante venta:</td><td class="value">{{ ticket_detalle.tipo_comprobante_venta }} {{ ticket_detalle.numero_comprobante_venta }}</td></tr>
+        <tr><td class="label">Cliente:</td><td class="value">{{ cuenta.cliente.nombre if cuenta and cuenta.cliente else ('Cliente #' ~ cuenta.id_cliente) }}</td></tr>
+        <tr><td class="label">Cobrador:</td><td class="value">{{ pago.usuario.nombre_completo if pago.usuario else ('Usuario #' ~ pago.id_usuario) }}</td></tr>
+        <tr><td class="label">Metodo:</td><td class="value">{{ pago.metodo.nombre if pago.metodo else '-' }}</td></tr>
+        <tr><td class="label">Referencia:</td><td class="value">{{ pago.referencia or '-' }}</td></tr>
+    </table>
+
+    {% if ticket_detalle.cuota_principal_numero %}
+    <hr class="sep" />
+    <table>
+        <tr>
+            <td class="label">Cuota principal:</td>
+            <td class="value">
+                #{{ ticket_detalle.cuota_principal_numero }}
+                {% if ticket_detalle.total_cuotas_plan %}
+                de {{ ticket_detalle.total_cuotas_plan }}
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="label">Monto en cuota:</td>
+            <td class="value">{{ moneda_simbolo }} {{ "{:,.0f}".format(ticket_detalle.cuota_principal_monto).replace(",", ".") }}</td>
+        </tr>
+        <tr>
+            <td class="label">Cuotas tocadas:</td>
+            <td class="value">{{ ticket_detalle.cantidad_cuotas_aplicadas }}</td>
+        </tr>
+    </table>
+    {% endif %}
+
+    {% if ticket_detalle.cuotas_aplicadas %}
+    <hr class="sep" />
+    <div class="bold">Aplicado a cuotas</div>
+    <table>
+        {% for cuota in ticket_detalle.cuotas_aplicadas %}
+        <tr>
+            <td class="label">
+                Cuota #{{ cuota.numero_cuota }}
+                {% if ticket_detalle.total_cuotas_plan %}
+                de {{ ticket_detalle.total_cuotas_plan }}
+                {% endif %}
+            </td>
+            <td class="value right">{{ moneda_simbolo }} {{ "{:,.0f}".format(cuota.monto_aplicado or 0).replace(",", ".") }}</td>
+        </tr>
+        {% if cuota.fecha_vencimiento %}
+        <tr>
+            <td class="small" colspan="2">Vencimiento: {{ cuota.fecha_vencimiento }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </table>
+    {% endif %}
+
+    <hr class="sep" />
+    <table>
+        <tr>
+            <td>Monto cobrado</td>
+            <td class="right bold">{{ moneda_simbolo }} {{ "{:,.0f}".format(pago.monto or 0).replace(",", ".") }}</td>
+        </tr>
+        <tr>
+            <td>Saldo anterior</td>
+            <td class="right">{{ moneda_simbolo }} {{ "{:,.0f}".format(saldo_antes).replace(",", ".") }}</td>
+        </tr>
+        <tr>
+            <td>Saldo actual</td>
+            <td class="right bold">{{ moneda_simbolo }} {{ "{:,.0f}".format(saldo_despues).replace(",", ".") }}</td>
+        </tr>
+    </table>
+
+    <hr class="sep" />
+    <div class="center small">{{ footer_text|default('Gracias por su pago')|thermal_safe }}</div>
+    <div style="height: 15mm;"></div>
+
+    {% if not preview and not embedded %}
+    <script>
+        var returnTo = {{ return_to|default('', true)|tojson }};
+        var salidaEjecutada = false;
+
+        function salirDeTicket() {
+            if (salidaEjecutada) {
+                return;
+            }
+            salidaEjecutada = true;
+            if (returnTo) {
+                window.location.replace(returnTo);
+                return;
+            }
+            window.close();
+        }
+
+        window.onload = function () {
+            setTimeout(function () {
+                window.print();
+            }, 400);
+        };
+        window.onafterprint = salirDeTicket;
+        // Fallback para navegadores que no disparan onafterprint de forma consistente.
+        setTimeout(salirDeTicket, 8000);
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Flask
+instance/
+.webassets-cache
+
+# Base de datos
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Datos locales del cliente (no versionar)
+Base de datos/*
+!Base de datos/*.csv.bundle
+
+# CSV de importación (se copia al servidor, no se versiona)
+deploy/**/*.csv
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Archivos de salida/diagnóstico locales
+verify_output*.txt
+.local-arm/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.bak
+*.backup
+backups/
+
+# Archivos subidos por los usuarios
+app/static/uploads/
+app/static/tienda_uploads/
+
+# Node modules (para Tailwind)
+node_modules/
+distribucion_local/.build/
+distribucion_local/artifacts/
+distribucion_local/licensing/private_key.pem
+distribucion_local/licensing/*.secret

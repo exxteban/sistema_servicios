@@ -1,0 +1,313 @@
+<div data-inteligencia-modal class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60" data-inteligencia-modal-close></div>
+    <div class="relative w-full max-w-5xl max-h-[85vh] overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-2xl">
+        <div class="flex items-start justify-between gap-4 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
+            <div>
+                <h3 data-inteligencia-modal-titulo class="text-lg font-bold text-gray-900 dark:text-white"></h3>
+                <p data-inteligencia-modal-descripcion class="mt-1 text-sm text-gray-500 dark:text-gray-400"></p>
+            </div>
+            <button type="button" data-inteligencia-modal-close class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div data-inteligencia-modal-items class="max-h-[70vh] overflow-y-auto p-4 space-y-3"></div>
+    </div>
+</div>
+<script type="application/json" data-inteligencia-clientes>{{ panel.clientes|tojson }}</script>
+<script type="application/json" data-inteligencia-stock>{{ panel.stock|tojson }}</script>
+<script type="application/json" data-inteligencia-kpi-clientes-series>{{ panel.clientes_activos.series|tojson }}</script>
+<script>
+    (() => {
+        const scriptNode = document.currentScript;
+        const scriptScope = scriptNode?.closest('[data-app-tab-content]') || scriptNode?.parentElement || document;
+        const root = scriptNode?.closest('[data-inteligencia-root]')
+            || scriptScope.querySelector?.('[data-inteligencia-root]')
+            || document.querySelector('[data-inteligencia-root]');
+        if (!root || root.dataset.inteligenciaModalInit === '1') return;
+        root.dataset.inteligenciaModalInit = '1';
+
+        const modal = root.querySelector('[data-inteligencia-modal]');
+        const titleNode = modal?.querySelector('[data-inteligencia-modal-titulo]');
+        const descriptionNode = modal?.querySelector('[data-inteligencia-modal-descripcion]');
+        const itemsNode = modal?.querySelector('[data-inteligencia-modal-items]');
+        const dataNode = root.querySelector('[data-inteligencia-clientes]');
+        const stockNode = root.querySelector('[data-inteligencia-stock]');
+        const kpiSeriesNode = root.querySelector('[data-inteligencia-kpi-clientes-series]');
+        if (!modal || !titleNode || !descriptionNode || !itemsNode) return;
+        const puedeVerClientes = root.dataset.puedeVerClientes === 'true';
+        const detalleClienteBase = root.dataset.detalleClienteBase || '';
+        let clientesData = {};
+        let stockDetalle = {};
+        let kpiSeriesClientes = {};
+
+        try { clientesData = JSON.parse(dataNode?.textContent || '{}'); } catch (_) { clientesData = {}; }
+        try { stockDetalle = JSON.parse(stockNode?.textContent || '{}'); } catch (_) { stockDetalle = {}; }
+        try { kpiSeriesClientes = JSON.parse(kpiSeriesNode?.textContent || '{}'); } catch (_) { kpiSeriesClientes = {}; }
+
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        const renderEstadoVacio = (mensaje) => `<div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-4"><p class="text-sm text-gray-600 dark:text-gray-300">${escapeHtml(mensaje)}</p></div>`;
+        const detalleClienteUrl = (id) => detalleClienteBase.replace(/0$/, String(id || 0));
+        const badgeClass = (prioridad) => prioridad === 'alta'
+            ? 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+            : (prioridad === 'media'
+                ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200');
+        const badgeLabel = (prioridad) => prioridad ? prioridad.charAt(0).toUpperCase() + prioridad.slice(1) : 'Baja';
+        const numberFormatter = new Intl.NumberFormat('es-PY');
+        const segmentosDetalle = () => {
+            const detalle = clientesData?.segmentos_detalle;
+            return detalle && typeof detalle === 'object' ? detalle : {};
+        };
+        const itemsDesdeTrigger = (trigger) => {
+            if (!trigger) return [];
+            const raw = trigger.getAttribute('data-inteligencia-modal-items') || '';
+            if (!raw) return [];
+            try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (_) {
+                return [];
+            }
+        };
+        const obtenerItemsCliente = (clave) => {
+            const itemsSegmento = Array.isArray(segmentosDetalle()[clave]) ? segmentosDetalle()[clave] : [];
+            if (itemsSegmento.length > 0) {
+                return itemsSegmento;
+            }
+            if (clave === 'para_activar') {
+                const detallePriorizado = Array.isArray(clientesData?.para_activar_detalle) ? clientesData.para_activar_detalle : [];
+                if (detallePriorizado.length > 0) {
+                    return detallePriorizado;
+                }
+                return Array.isArray(clientesData?.clientes_para_activar) ? clientesData.clientes_para_activar : [];
+            }
+            return itemsSegmento;
+        };
+        const cerrarModal = () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.classList.remove('overflow-hidden');
+        };
+        const mostrarModal = () => {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+        };
+        const renderClienteItem = (cliente) => {
+            const detalleUrl = detalleClienteUrl(cliente.id_cliente);
+            const botonCliente = puedeVerClientes
+                ? `<a href="${escapeHtml(detalleUrl)}" data-tab-url="${escapeHtml(detalleUrl)}" data-tab-title="Cliente" data-tab-icon="fas fa-user" class="app-tab-link inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700/60"><i class="fas fa-user"></i> Ver ficha</a>`
+                : '';
+            const botonLlamar = cliente.telefono_enlace
+                ? `<a href="${escapeHtml(cliente.telefono_enlace)}" class="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:bg-sky-500/20"><i class="fas fa-phone"></i> Llamar</a>`
+                : '';
+            const botonWhatsapp = cliente.whatsapp_url
+                ? `<a href="${escapeHtml(cliente.whatsapp_url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"><i class="fab fa-whatsapp"></i> WhatsApp</a>`
+                : '';
+            const canales = [botonCliente, botonLlamar, botonWhatsapp].filter(Boolean).join('');
+            const motivo = cliente.motivo || `${cliente.dias_inactivo} días sin comprar`;
+            const accion = cliente.accion || 'Revisar oportunidad comercial';
+
+            return `<article class="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <p class="text-base font-semibold text-gray-900 dark:text-white">${escapeHtml(cliente.nombre)}</p>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">${escapeHtml(motivo)}</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeClass(cliente.prioridad)}">${escapeHtml(badgeLabel(cliente.prioridad))}</span>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-500 dark:text-gray-400 md:grid-cols-3 xl:grid-cols-6">
+                    <div><p>Días inactivo</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${numberFormatter.format(Number(cliente.dias_inactivo || 0))}</p></div>
+                    <div><p>Última compra</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${escapeHtml(cliente.ultima_compra_label)}</p></div>
+                    <div><p>Compras</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${escapeHtml(cliente.cantidad_compras)}</p></div>
+                    <div><p>Total gastado</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${escapeHtml(cliente.total_gastado_label)}</p></div>
+                    <div><p>Ticket promedio</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${escapeHtml(cliente.ticket_promedio_label)}</p></div>
+                    <div><p>Teléfono</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${escapeHtml(cliente.telefono_label)}</p></div>
+                </div>
+                <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-gray-900/80">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">Por qué contactarlo</p>
+                        <p class="mt-2 text-sm text-amber-900 dark:text-amber-100">${escapeHtml(motivo)}</p>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-sky-500/30 dark:bg-gray-900/80">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-sky-200">Siguiente paso sugerido</p>
+                        <p class="mt-2 text-sm text-slate-900 dark:text-slate-100">${escapeHtml(accion)}</p>
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    ${canales || '<span class="inline-flex items-center rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">Sin canal directo cargado</span>'}
+                </div>
+            </article>`;
+        };
+        const abrirModal = ({ clave, titulo, descripcion, trigger }) => {
+            const items = itemsDesdeTrigger(trigger).length
+                ? itemsDesdeTrigger(trigger)
+                : (clave ? obtenerItemsCliente(clave) : []);
+            titleNode.textContent = titulo || 'Clientes sugeridos';
+            descriptionNode.textContent = descripcion || '';
+            itemsNode.innerHTML = items.length
+                ? items.map(renderClienteItem).join('')
+                : renderEstadoVacio('No hay clientes para mostrar en este segmento con el corte actual.');
+            mostrarModal();
+        };
+        const abrirModalStock = (tipo) => {
+            const esRiesgo = tipo === 'riesgo';
+            const items = esRiesgo
+                ? (Array.isArray(stockDetalle.riesgo_detalle) ? stockDetalle.riesgo_detalle : [])
+                : (Array.isArray(stockDetalle.inmovilizado_detalle) ? stockDetalle.inmovilizado_detalle : []);
+            const total = Number(esRiesgo ? stockDetalle.riesgo_count : stockDetalle.inmovilizado_count) || items.length;
+            titleNode.textContent = esRiesgo ? 'Stock en riesgo' : 'Stock inmovilizado';
+            descriptionNode.textContent = esRiesgo
+                ? `${numberFormatter.format(total)} producto${total === 1 ? '' : 's'} con stock igual o por debajo del mínimo.`
+                : `${numberFormatter.format(total)} producto${total === 1 ? '' : 's'} sin salida en los últimos 60 días.`;
+            itemsNode.innerHTML = items.length ? items.map((producto) => {
+                const badge = esRiesgo
+                    ? '<span class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">Riesgo</span>'
+                    : '<span class="inline-flex items-center rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Inmovilizado</span>';
+                const tituloProducto = producto.producto_url
+                    ? `<a href="${escapeHtml(producto.producto_url)}" data-tab-url="${escapeHtml(producto.producto_url)}" data-tab-title="Producto" data-tab-icon="fas fa-box-open" class="app-tab-link text-sm font-semibold text-gray-900 underline-offset-2 hover:text-orange-600 hover:underline dark:text-white dark:hover:text-orange-300">${escapeHtml(producto.nombre || '')}</a>`
+                    : `<p class="text-sm font-semibold text-gray-900 dark:text-white">${escapeHtml(producto.nombre || '')}</p>`;
+                const bloqueEstado = esRiesgo
+                    ? `<div class="mt-3 grid grid-cols-2 gap-3 text-xs text-gray-500 dark:text-gray-400 md:grid-cols-3"><div><p>Stock actual</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${numberFormatter.format(Number(producto.stock_actual || 0))}</p></div><div><p>Stock mínimo</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${numberFormatter.format(Number(producto.stock_minimo || 0))}</p></div><div><p>Diferencia</p><p class="mt-1 text-sm font-semibold ${Number(producto.diferencia_minimo || 0) < 0 ? 'text-rose-700 dark:text-rose-300' : 'text-gray-900 dark:text-white'}">${numberFormatter.format(Number(producto.diferencia_minimo || 0))}</p></div></div>`
+                    : `<div class="mt-3 grid grid-cols-2 gap-3 text-xs text-gray-500 dark:text-gray-400"><div><p>Stock actual</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${numberFormatter.format(Number(producto.stock_actual || 0))}</p></div><div><p>Sin salida</p><p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">${numberFormatter.format(Number(producto.dias_sin_salida || 60))}+ días</p></div></div>`;
+                return `<div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4"><div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between"><div>${tituloProducto}<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Código: ${escapeHtml(producto.codigo || '-')}</p></div>${badge}</div>${bloqueEstado}<p class="mt-3 text-sm text-gray-700 dark:text-gray-300">${escapeHtml(producto.accion || '')}</p></div>`;
+            }).join('') : renderEstadoVacio('No hay productos para mostrar en este bloque con el corte actual.');
+            mostrarModal();
+        };
+        const abrirModalKpiClientes = (button) => {
+            const titulo = button.getAttribute('data-kpi-titulo') || 'Clientes activos';
+            const periodoActual = button.getAttribute('data-kpi-actual-periodo') || '';
+            const periodoAnterior = button.getAttribute('data-kpi-anterior-periodo') || '';
+            const valorActual = Number(button.getAttribute('data-kpi-actual') || 0);
+            const valorAnterior = Number(button.getAttribute('data-kpi-anterior') || 0);
+            const variacion = button.getAttribute('data-kpi-variacion') || 'Sin cambios';
+            const direccion = button.getAttribute('data-kpi-direccion') || 'flat';
+            const diferencia = valorActual - valorAnterior;
+            const maximo = Math.max(valorActual, valorAnterior, 1);
+            const anchoActual = Math.max((valorActual / maximo) * 100, 4);
+            const anchoAnterior = Math.max((valorAnterior / maximo) * 100, 4);
+            const colorBarraActual = direccion === 'down' ? 'bg-rose-500/90' : 'bg-violet-500/90';
+            const badgeVariacion = direccion === 'up'
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                : (direccion === 'down'
+                    ? 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200');
+            const signoDiferencia = diferencia > 0 ? '+' : '';
+            const serieActual = Array.isArray(kpiSeriesClientes.actual) ? kpiSeriesClientes.actual.map((valor) => Number(valor || 0)) : [];
+            const serieAnterior = Array.isArray(kpiSeriesClientes.anterior) ? kpiSeriesClientes.anterior.map((valor) => Number(valor || 0)) : [];
+            const etiquetas = Array.isArray(kpiSeriesClientes.etiquetas) ? kpiSeriesClientes.etiquetas : [];
+            const puntosCantidad = Math.max(serieActual.length, serieAnterior.length);
+            const serieFallback = [valorAnterior, valorActual];
+            const serieActualGrafico = puntosCantidad >= 2 ? serieActual : serieFallback;
+            const serieAnteriorGrafico = puntosCantidad >= 2 ? serieAnterior : [valorAnterior, valorAnterior];
+            const maxSerie = Math.max(...serieActualGrafico, ...serieAnteriorGrafico, 1);
+            const minSerie = Math.min(...serieActualGrafico, ...serieAnteriorGrafico, 0);
+            const rangoSerie = Math.max(maxSerie - minSerie, 1);
+            const construirPath = (serie) => {
+                if (!Array.isArray(serie) || serie.length < 2) return '';
+                const ancho = 272;
+                const alto = 52;
+                const inicioX = 24;
+                const inicioY = 14;
+                const pasoX = serie.length > 1 ? ancho / (serie.length - 1) : ancho;
+                return serie.map((valor, idx) => {
+                    const x = inicioX + (pasoX * idx);
+                    const y = inicioY + (alto - (((Number(valor || 0) - minSerie) / rangoSerie) * alto));
+                    return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+                }).join(' ');
+            };
+            const pathActual = construirPath(serieActualGrafico);
+            const pathAnterior = construirPath(serieAnteriorGrafico);
+            const indiceUltimo = serieActualGrafico.length - 1;
+            const ultimoActual = Number(serieActualGrafico[indiceUltimo] || 0);
+            const ultimoAnterior = Number(serieAnteriorGrafico[indiceUltimo] || 0);
+            const etiquetaActual = etiquetas[indiceUltimo]?.actual || periodoActual;
+            const etiquetaAnterior = etiquetas[indiceUltimo]?.anterior || periodoAnterior;
+
+            titleNode.textContent = `${titulo}: comparación de períodos`;
+            descriptionNode.textContent = `Actual ${periodoActual} vs anterior ${periodoAnterior}`;
+            itemsNode.innerHTML = `<div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${badgeVariacion}">${escapeHtml(variacion)}</span>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">Diferencia: <span class="font-semibold text-gray-900 dark:text-white">${signoDiferencia}${numberFormatter.format(diferencia)}</span></p>
+                </div>
+                <div class="mt-4 rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3">
+                    <div class="flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+                        <p>Evolución entre períodos</p>
+                        <p>máx ${numberFormatter.format(maxSerie)}</p>
+                    </div>
+                    <svg viewBox="0 0 320 96" class="mt-2 h-24 w-full" role="img" aria-label="Líneas comparadas de clientes activos">
+                        <line x1="20" y1="76" x2="300" y2="76" stroke="currentColor" class="text-gray-300 dark:text-gray-600" stroke-width="1.2" vector-effect="non-scaling-stroke"></line>
+                        <path d="${pathAnterior}" fill="none" stroke="currentColor" class="text-slate-400 dark:text-slate-500" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                        <path d="${pathActual}" fill="none" stroke="currentColor" class="${direccion === 'down' ? 'text-rose-500 dark:text-rose-400' : 'text-violet-500 dark:text-violet-400'}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                    </svg>
+                    <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                        <span class="inline-flex items-center gap-1"><span class="inline-block h-2.5 w-2.5 rounded-full bg-violet-500"></span>Actual (${escapeHtml(etiquetaActual)}): <strong class="text-gray-800 dark:text-gray-100">${numberFormatter.format(ultimoActual)}</strong></span>
+                        <span class="inline-flex items-center gap-1"><span class="inline-block h-2.5 w-2.5 rounded-full bg-slate-400"></span>Anterior (${escapeHtml(etiquetaAnterior)}): <strong class="text-gray-800 dark:text-gray-100">${numberFormatter.format(ultimoAnterior)}</strong></span>
+                    </div>
+                </div>
+                <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">${escapeHtml(periodoActual)}</p>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">${numberFormatter.format(valorActual)}</p>
+                        </div>
+                        <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                            <div class="h-full ${colorBarraActual}" style="width: ${anchoActual}%"></div>
+                        </div>
+                    </div>
+                    <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">${escapeHtml(periodoAnterior)}</p>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">${numberFormatter.format(valorAnterior)}</p>
+                        </div>
+                        <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                            <div class="h-full bg-slate-400/90 dark:bg-slate-500/80" style="width: ${anchoAnterior}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            mostrarModal();
+        };
+
+        root.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (!target) return;
+
+            const closeTrigger = target.closest('[data-inteligencia-modal-close]');
+            if (closeTrigger) {
+                event.preventDefault();
+                cerrarModal();
+                return;
+            }
+
+            const kpiTrigger = target.closest('[data-inteligencia-kpi-clientes]');
+            if (kpiTrigger) {
+                event.preventDefault();
+                abrirModalKpiClientes(kpiTrigger);
+                return;
+            }
+
+            const clientesTrigger = target.closest('[data-inteligencia-modal-clave]');
+            if (clientesTrigger) {
+                event.preventDefault();
+                abrirModal({
+                    clave: clientesTrigger.getAttribute('data-inteligencia-modal-clave') || '',
+                    titulo: clientesTrigger.getAttribute('data-inteligencia-modal-titulo') || '',
+                    descripcion: clientesTrigger.getAttribute('data-inteligencia-modal-descripcion') || '',
+                    trigger: clientesTrigger,
+                });
+                return;
+            }
+
+            const stockTrigger = target.closest('[data-inteligencia-modal-stock]');
+            if (stockTrigger) {
+                event.preventDefault();
+                abrirModalStock(stockTrigger.getAttribute('data-inteligencia-modal-stock') || '');
+            }
+        });
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !modal.classList.contains('hidden')) cerrarModal();
+        });
+    })();
+</script>

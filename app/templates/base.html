@@ -1,0 +1,56 @@
+{% if request.args.get('partial') %}
+{% if request.args.get('include_css') %}
+<link rel="stylesheet" href="{{ static_url('css/style.css') }}">
+{% endif %}
+{% set page_title = '' %}
+{% if self.title is defined %}
+{% set page_title = self.title() %}
+{% endif %}
+{% block extra_css %}{% endblock %}
+<div id="partial-content" data-page-title="{{ page_title | striptags | trim | e }}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="flash-message mb-6 p-5 rounded-xl shadow-lg border-2 {% if category == 'success' %}bg-green-50 text-green-900 border-green-400 dark:bg-green-900/30 dark:text-green-100 dark:border-green-600{% elif category == 'danger' %}bg-red-50 text-red-900 border-red-500 dark:bg-red-900/30 dark:text-red-100 dark:border-red-600{% elif category == 'warning' %}bg-yellow-50 text-yellow-900 border-yellow-400 dark:bg-yellow-900/30 dark:text-yellow-100 dark:border-yellow-600{% else %}bg-blue-50 text-blue-900 border-blue-400 dark:bg-blue-900/30 dark:text-blue-100 dark:border-blue-600{% endif %} animate-slide-down"
+        role="alert" data-flash-category="{{ category }}">
+        <div class="flex justify-between items-start gap-4">
+            <div class="flex items-start gap-3 flex-1">
+                <span class="text-3xl flex-shrink-0 mt-0.5">
+                    {% if category == 'success' %}✓{% elif category == 'danger' %}✗{% elif category == 'warning' %}⚠{%
+                    else %}ℹ{% endif %}
+                </span>
+                <div class="flex-1">
+                    <span class="font-semibold text-lg block">{{ message }}</span>
+                </div>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()"
+                class="text-3xl hover:opacity-70 transition-opacity flex-shrink-0 leading-none"
+                aria-label="Cerrar mensaje">&times;</button>
+        </div>
+    </div>
+    {% endfor %}
+    <style>
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-slide-down {
+            animation: slideDown 0.3s ease-out;
+        }
+    </style>
+    {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+</div>
+<div id="partial-scripts">
+    {% block extra_js %}{% endblock %}
+</div>
+{% else %}
+{% extends "layout_refactored.html" %}
+{% endif %}

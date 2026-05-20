@@ -1,0 +1,182 @@
+.store-style-moderno .hero-banner {
+  text-align: center;
+  align-items: center;
+}
+
+.store-style-moderno .hero-banner-content {
+  margin: 0 auto;
+}
+
+.store-style-clasico .hero-banner {
+  text-align: center;
+  align-items: center;
+}
+
+.store-style-clasico .hero-banner-content {
+  margin: 0 auto;
+  max-width: 760px;
+}
+
+.store-style-clasico .hero-banner-button {
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.store-style-clasico .category-chip {
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.82rem;
+}
+
+.store-style-clasico .store-header-title {
+  letter-spacing: 0.06em;
+}
+
+@media (min-width: 1024px) {
+  .store-style-clasico .product-page-layout {
+    grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 0.9fr);
+  }
+}
+
+.store-style-minimalista .hero-banner {
+  text-align: center;
+  align-items: center;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.store-style-minimalista .hero-banner-content {
+  margin: 0 auto;
+  max-width: 680px;
+}
+
+.store-style-minimalista .hero-banner-button {
+  border-radius: 0;
+  border: 1px solid #0f172a;
+}
+
+.store-style-minimalista .category-chip {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.store-style-minimalista .category-chip-active {
+  background: #0f172a;
+  border-color: #0f172a;
+}
+
+.store-style-minimalista .store-header {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.store-style-minimalista .store-footer {
+  background: #ffffff;
+}
+
+.store-style-minimalista .product-page-gallery {
+  border-radius: 0;
+}
+
+.store-style-minimalista .product-page-description {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.store-style-boutique .store-header {
+  background: rgba(255, 250, 245, 0.92);
+}
+
+.store-style-boutique .store-header-title {
+  font-family: "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.store-style-boutique .hero-banner {
+  border-radius: 10px;
+  text-align: center;
+  align-items: center;
+}
+
+.store-style-boutique .hero-banner-content {
+  margin: 0 auto;
+  max-width: 720px;
+}
+
+.store-style-boutique .hero-banner-button {
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.store-style-boutique .catalog-section-title {
+  font-family: "Times New Roman", serif;
+  font-weight: 700;
+}
+
+.store-style-boutique .category-chip {
+  border-radius: 6px;
+  background: #fffaf5;
+  border-color: #e7d8c9;
+}
+
+.store-style-boutique .category-chip-active {
+  color: #ffffff;
+}
+
+.store-style-boutique .product-card {
+  border-radius: 10px;
+}
+
+.store-style-tech .store-header {
+  background: rgba(15, 23, 42, 0.92);
+  border-bottom-color: rgba(56, 189, 248, 0.35);
+}
+
+.store-style-tech .store-header-title {
+  color: #e2e8f0;
+  letter-spacing: 0.01em;
+}
+
+.store-style-tech .hero-banner {
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  text-align: center;
+  align-items: center;
+}
+
+.store-style-tech .hero-banner-content {
+  margin: 0 auto;
+  max-width: 760px;
+}
+
+.store-style-tech .hero-banner-button {
+  border-radius: 10px;
+  border: 1px solid #0ea5e9;
+}
+
+.store-style-tech .catalog-section-title {
+  letter-spacing: 0.03em;
+}
+
+.store-style-tech .category-chip {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.store-style-tech .category-chip-active {
+  color: #ffffff;
+}
+
+.store-style-tech .product-page-gallery {
+  border-radius: 10px;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.store-style-tech .product-page-description {
+  border-radius: 10px;
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: none;
+}

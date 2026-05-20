@@ -1,0 +1,377 @@
+<script type="application/json" data-inteligencia-charts-json>{{ {
+    'clientes_series': panel.clientes_activos.series,
+    'activacion_clientes': [
+        {
+            'label': 'Por activar',
+            'value': panel.clientes.total_para_activar,
+        },
+        {
+            'label': 'Alto valor',
+            'value': panel.clientes.valiosos_dormidos,
+        },
+        {
+            'label': 'Frecuentes',
+            'value': panel.clientes.frecuentes_en_pausa,
+        },
+    ],
+    'ventas_tendencia': panel.ventas.tendencia,
+    'ventas_categorias': panel.ventas.categorias,
+}|tojson }}</script>
+<script>
+    (() => {
+        const root = document.querySelector('[data-inteligencia-root]');
+        if (!root || root.dataset.inteligenciaChartsInit === '1') return;
+        root.dataset.inteligenciaChartsInit = '1';
+
+        const dataNode = document.querySelector('[data-inteligencia-charts-json]');
+        let chartData = {};
+        try {
+            chartData = JSON.parse(dataNode?.textContent || '{}');
+        } catch (_) {
+            chartData = {};
+        }
+
+        const chartRegistry = new Map();
+        const currencyFormatter = new Intl.NumberFormat('es-PY');
+        const compactCurrencyFormatter = new Intl.NumberFormat('es-PY', {
+            notation: 'compact',
+            maximumFractionDigits: 1,
+        });
+        let renderTimer = null;
+
+        const isDarkMode = () => document.documentElement.classList.contains('dark');
+        const isVisible = (node) => Boolean(node && node.getClientRects().length && !node.closest('[hidden]'));
+        const formatMoney = (value) => `₲ ${currencyFormatter.format(Math.round(Number(value || 0)))}`;
+        const formatCompactMoney = (value) => `₲ ${compactCurrencyFormatter.format(Number(value || 0))}`;
+        const palette = () => ({
+            text: isDarkMode() ? '#e5e7eb' : '#111827',
+            muted: isDarkMode() ? '#94a3b8' : '#6b7280',
+            grid: isDarkMode() ? 'rgba(148, 163, 184, 0.14)' : 'rgba(148, 163, 184, 0.22)',
+            tooltipBg: isDarkMode() ? 'rgba(15, 23, 42, 0.94)' : 'rgba(255, 255, 255, 0.96)',
+            tooltipBorder: isDarkMode() ? 'rgba(71, 85, 105, 0.9)' : 'rgba(203, 213, 225, 0.95)',
+            actual: isDarkMode() ? '#a78bfa' : '#7c3aed',
+            previous: isDarkMode() ? '#94a3b8' : '#94a3b8',
+            categoryColors: ['#10b981', '#06b6d4', '#f59e0b', '#8b5cf6', '#f43f5e'],
+        });
+
+        const destroyChart = (canvasId) => {
+            const existing = chartRegistry.get(canvasId);
+            if (existing) {
+                existing.destroy();
+                chartRegistry.delete(canvasId);
+            }
+        };
+
+        const renderSparkline = (ChartLib) => {
+            const canvas = document.getElementById('inteligenciaClientesSparkline');
+            if (!isVisible(canvas)) return;
+
+            const series = chartData.clientes_series || {};
+            const actual = Array.isArray(series.actual) ? series.actual.map((item) => Number(item || 0)) : [];
+            const previous = Array.isArray(series.anterior) ? series.anterior.map((item) => Number(item || 0)) : [];
+            const labels = Array.isArray(series.etiquetas) && series.etiquetas.length
+                ? series.etiquetas.map((item, index) => item?.actual || `Día ${index + 1}`)
+                : actual.map((_, index) => `Día ${index + 1}`);
+            if (!actual.length) return;
+            const actualHasSinglePoint = actual.length === 1;
+            const previousSeries = previous.length ? previous : actual;
+            const previousHasSinglePoint = previousSeries.length === 1;
+
+            destroyChart(canvas.id);
+            const colors = palette();
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 64);
+            gradient.addColorStop(0, isDarkMode() ? 'rgba(167, 139, 250, 0.32)' : 'rgba(124, 58, 237, 0.22)');
+            gradient.addColorStop(1, 'rgba(124, 58, 237, 0)');
+
+            chartRegistry.set(canvas.id, new ChartLib(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Actual',
+                            data: actual,
+                            borderColor: colors.actual,
+                            backgroundColor: gradient,
+                            fill: true,
+                            borderWidth: 2.4,
+                            pointRadius: actualHasSinglePoint ? 4 : 0,
+                            pointHoverRadius: actualHasSinglePoint ? 5 : 3,
+                            pointBackgroundColor: colors.actual,
+                            pointBorderWidth: 0,
+                            tension: 0.38,
+                        },
+                        {
+                            label: 'Anterior',
+                            data: previousSeries,
+                            borderColor: colors.previous,
+                            borderWidth: 1.8,
+                            borderDash: [5, 4],
+                            pointRadius: previousHasSinglePoint ? 4 : 0,
+                            pointHoverRadius: previousHasSinglePoint ? 5 : 3,
+                            pointBackgroundColor: colors.previous,
+                            pointBorderWidth: 0,
+                            fill: false,
+                            tension: 0.32,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: colors.tooltipBg,
+                            borderColor: colors.tooltipBorder,
+                            borderWidth: 1,
+                            titleColor: colors.text,
+                            bodyColor: colors.text,
+                            displayColors: false,
+                        },
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false, beginAtZero: true },
+                    },
+                    elements: {
+                        line: { capBezierPoints: true },
+                    },
+                },
+            }));
+        };
+
+        const renderTrendChart = (ChartLib) => {
+            const canvas = document.getElementById('inteligenciaVentasTrendChart');
+            if (!isVisible(canvas)) return;
+
+            const trend = Array.isArray(chartData.ventas_tendencia) ? chartData.ventas_tendencia : [];
+            if (!trend.length) return;
+
+            destroyChart(canvas.id);
+            const colors = palette();
+            const barColors = trend.map((item) => {
+                if (item.direccion === 'up') return '#10b981';
+                if (item.direccion === 'down') return '#f43f5e';
+                return isDarkMode() ? '#94a3b8' : '#94a3b8';
+            });
+
+            chartRegistry.set(canvas.id, new ChartLib(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: trend.map((item) => item.rango_label),
+                    datasets: [{
+                        label: 'Facturación',
+                        data: trend.map((item) => Number(item.facturacion || 0)),
+                        backgroundColor: barColors,
+                        borderRadius: 10,
+                        borderSkipped: false,
+                        maxBarThickness: 34,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: colors.tooltipBg,
+                            borderColor: colors.tooltipBorder,
+                            borderWidth: 1,
+                            titleColor: colors.text,
+                            bodyColor: colors.text,
+                            callbacks: {
+                                label: (context) => {
+                                    const item = trend[context.dataIndex] || {};
+                                    return [
+                                        `Facturación: ${formatMoney(item.facturacion)}`,
+                                        `Ventas: ${item.cantidad_ventas || 0}`,
+                                        `Variación: ${item.variacion_label || 'Sin dato'}`,
+                                    ];
+                                },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: colors.muted,
+                                maxRotation: 0,
+                                autoSkip: false,
+                                font: { size: 10 },
+                            },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: colors.grid, drawBorder: false },
+                            ticks: {
+                                color: colors.muted,
+                                callback: (value) => formatCompactMoney(value),
+                            },
+                        },
+                    },
+                },
+            }));
+        };
+
+        const renderActivationChart = (ChartLib) => {
+            const canvas = document.getElementById('inteligenciaActivacionChart');
+            if (!isVisible(canvas)) return;
+
+            const segments = Array.isArray(chartData.activacion_clientes) ? chartData.activacion_clientes : [];
+            if (!segments.length) return;
+
+            destroyChart(canvas.id);
+            const colors = palette();
+            const barColors = [
+                isDarkMode() ? '#fbbf24' : '#d97706',
+                isDarkMode() ? '#fb7185' : '#e11d48',
+                isDarkMode() ? '#38bdf8' : '#0284c7',
+            ];
+
+            chartRegistry.set(canvas.id, new ChartLib(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: segments.map((item) => item.label),
+                    datasets: [{
+                        data: segments.map((item) => Number(item.value || 0)),
+                        backgroundColor: barColors.slice(0, segments.length),
+                        borderRadius: 999,
+                        borderSkipped: false,
+                        barThickness: 12,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: colors.tooltipBg,
+                            borderColor: colors.tooltipBorder,
+                            borderWidth: 1,
+                            titleColor: colors.text,
+                            bodyColor: colors.text,
+                            displayColors: false,
+                            callbacks: {
+                                label: (context) => `${context.label}: ${currencyFormatter.format(Number(context.raw || 0))} cliente${Number(context.raw || 0) === 1 ? '' : 's'}`,
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { color: colors.grid, drawBorder: false },
+                            ticks: {
+                                color: colors.muted,
+                                precision: 0,
+                                font: { size: 10 },
+                            },
+                        },
+                        y: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: {
+                                color: colors.muted,
+                                font: { size: 10 },
+                            },
+                        },
+                    },
+                },
+            }));
+        };
+
+        const renderCategoryChart = (ChartLib) => {
+            const canvas = document.getElementById('inteligenciaCategoriasChart');
+            if (!isVisible(canvas)) return;
+
+            const categories = Array.isArray(chartData.ventas_categorias) ? chartData.ventas_categorias : [];
+            if (!categories.length) return;
+
+            destroyChart(canvas.id);
+            const colors = palette();
+
+            chartRegistry.set(canvas.id, new ChartLib(canvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: categories.map((item) => item.nombre),
+                    datasets: [{
+                        data: categories.map((item) => Number(item.facturacion || 0)),
+                        backgroundColor: colors.categoryColors.slice(0, categories.length),
+                        borderColor: isDarkMode() ? '#111827' : '#ffffff',
+                        borderWidth: 2,
+                        hoverOffset: 6,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    cutout: '62%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: colors.tooltipBg,
+                            borderColor: colors.tooltipBorder,
+                            borderWidth: 1,
+                            titleColor: colors.text,
+                            bodyColor: colors.text,
+                            callbacks: {
+                                label: (context) => {
+                                    const item = categories[context.dataIndex] || {};
+                                    return `${item.nombre}: ${item.participacion_label} · ${item.facturacion_label || formatMoney(item.facturacion)}`;
+                                },
+                            },
+                        },
+                    },
+                },
+            }));
+        };
+
+        const renderVisibleCharts = async () => {
+            if (!window.ensureChartJs) return;
+            let ChartLib;
+            try {
+                ChartLib = await window.ensureChartJs();
+            } catch (_) {
+                return;
+            }
+            if (!ChartLib) return;
+            renderSparkline(ChartLib);
+            renderActivationChart(ChartLib);
+            renderTrendChart(ChartLib);
+            renderCategoryChart(ChartLib);
+        };
+
+        const scheduleRender = () => {
+            if (renderTimer) window.clearTimeout(renderTimer);
+            renderTimer = window.setTimeout(() => {
+                renderVisibleCharts().catch(() => { });
+            }, 90);
+        };
+
+        root.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target.closest('[role="tab"]') : null;
+            if (!target) return;
+            scheduleRender();
+        });
+
+        window.addEventListener('resize', scheduleRender);
+        const themeObserver = new MutationObserver(scheduleRender);
+        themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class'],
+        });
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', scheduleRender, { once: true });
+        } else {
+            scheduleRender();
+        }
+    })();
+</script>

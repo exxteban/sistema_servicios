@@ -1,0 +1,512 @@
+<script>
+const createWhatsappPanel = function whatsappPanel() {
+    return {
+        pestanaActiva: 'asesor',
+        estadoAsesor: { online: false, conversaciones_activas: 0, max_conversaciones: 5 },
+        conversaciones: [],
+        cola: [],
+        conversacionActiva: null,
+        mensajes: [],
+        mostrandoNota: false,
+        textoNota: '',
+        notaScope: 'conversacion',
+        textoMensaje: '',
+        enviando: false,
+        pollInterval: null,
+        heartbeatInterval: null,
+        asesoresOnlineInterval: null,
+        modalDevolver: false,
+        destinoDevolver: 'cola_asesores',
+        devolviendo: false,
+        modalTransferir: false,
+        cargandoAsesores: false,
+        asesoresOnline: [],
+        idAsesorTransferir: '',
+        transfiriendo: false,
+        monitorCargado: false,
+        monitorCargando: false,
+        monitorConversaciones: [],
+        monitorConvActiva: null,
+        monitorMensajes: [],
+        monitorMensajesCargando: false,
+        monitorContexto: {},
+        monitorContextoAbierto: false,
+        monitorFiltroModo: 'todos',
+        monitorFiltroActiva: '',
+        monitorBusqueda: '',
+        monitorPagina: 1,
+        monitorPages: 1,
+        monitorTotal: 0,
+
+        get monitorConversacionesFiltradas() {
+            const q = this.monitorBusqueda.trim().toLowerCase();
+            if (!q) return this.monitorConversaciones;
+            return this.monitorConversaciones.filter(c =>
+                (c.nombre_contacto || '').toLowerCase().includes(q) ||
+                (c.telefono || '').toLowerCase().includes(q)
+            );
+        },
+
+        async init() {
+            await this.cargarConversaciones();
+            if (this.estadoAsesor && this.estadoAsesor.online) {
+                await this.sendHeartbeat();
+                if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 10000);
+            }
+            this.pollInterval = setInterval(() => this.cargarConversaciones(), 5000);
+        },
+
+        destroy() {
+            if (this.pollInterval) clearInterval(this.pollInterval);
+            if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+            if (this.asesoresOnlineInterval) clearInterval(this.asesoresOnlineInterval);
+        },
+
+        async fetchJson(url, opts = {}) {
+            try {
+                const resp = await fetch(url, {
+                    headers: { 'Content-Type': 'application/json' },
+                    ...opts
+                });
+                let data = null;
+                try { data = await resp.json(); } catch { data = null; }
+
+                if (!resp.ok) {
+                    const msg = (data && (data.mensaje || data.error)) ? (data.mensaje || data.error) : `Error HTTP ${resp.status}`;
+                    if (window.mostrarNotificacion) window.mostrarNotificacion(msg, 'error');
+                    return null;
+                }
+                if (data && data.error && window.mostrarNotificacion) {
+                    window.mostrarNotificacion(data.error, 'error');
+                }
+                return data;
+            } catch (e) {
+                console.error('WhatsApp API error:', e);
+                if (window.mostrarNotificacion) window.mostrarNotificacion('No se pudo contactar con el servidor.', 'error');
+                return null;
+            }
+        },
+
+        async cargarConversaciones() {
+            const data = await this.fetchJson('/whatsapp/asesor/conversaciones');
+            if (!data) return;
+            this.conversaciones = data.conversaciones || [];
+            this.cola = data.cola || [];
+            this.estadoAsesor = data.estado_asesor || this.estadoAsesor;
+            if (this.estadoAsesor && this.estadoAsesor.online) {
+                if (!this.heartbeatInterval) {
+                    await this.sendHeartbeat();
+                    this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 10000);
+                }
+            } else {
+                if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                this.heartbeatInterval = null;
+            }
+
+            if (this.conversacionActiva) {
+                const aunExiste = this.conversaciones.find(c => c.id_conversacion === this.conversacionActiva.id_conversacion);
+                if (aunExiste) {
+                    this.conversacionActiva.estado_asignacion = aunExiste.estado_asignacion;
+                    await this.cargarMensajes();
+                } else {
+                    this.conversacionActiva = null;
+                    this.mensajes = [];
+                }
+            }
+        },
+
+        async tomarConversacion(conv) {
+            if (!conv) return;
+            const data = await this.fetchJson(`/whatsapp/asesor/conversacion/${conv.id_conversacion}/tomar`, { method: 'POST' });
+            if (data && data.ok) {
+                await this.cargarConversaciones();
+                const tomada = this.conversaciones.find(c => c.id_conversacion === conv.id_conversacion);
+                if (tomada) {
+                    await this.seleccionarConversacion(tomada);
+                    this.$nextTick(() => {
+                        if (this.$refs.inputMensaje) this.$refs.inputMensaje.focus();
+                    });
+                }
+            } else if (data && data.error && window.mostrarNotificacion) {
+                window.mostrarNotificacion(data.error, 'error');
+            }
+        },
+
+        async seleccionarConversacion(conv) {
+            this.conversacionActiva = conv;
+            await this.cargarMensajes();
+            this.$nextTick(() => this.scrollToBottom());
+        },
+
+        async cargarMensajes() {
+            if (!this.conversacionActiva) return;
+            const data = await this.fetchJson(`/whatsapp/asesor/conversacion/${this.conversacionActiva.id_conversacion}/mensajes`);
+            if (!data) return;
+            const prevLen = this.mensajes.length;
+            const msgs = (data.mensajes || []).map(m => ({ ...m, es_nota: false }));
+            const notasConv = data.notas_conversacion || data.notas || [];
+            const notasContacto = data.notas_contacto || [];
+
+            const notasMsgs = [
+                ...(notasConv || []).map(n => ({
+                    id: `nota-conv-${n.id}`,
+                    es_nota: true,
+                    nota_scope: 'conversacion',
+                    contenido: n.contenido,
+                    autor: n.autor,
+                    created_at: n.created_at,
+                })),
+                ...(notasContacto || []).map(n => ({
+                    id: `nota-contacto-${n.id}`,
+                    es_nota: true,
+                    nota_scope: 'contacto',
+                    contenido: n.contenido,
+                    autor: n.autor,
+                    created_at: n.created_at,
+                })),
+            ];
+
+            this.mensajes = [...msgs, ...notasMsgs].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+            if (this.mensajes.length > prevLen) this.$nextTick(() => this.scrollToBottom());
+        },
+
+        scrollToBottom() {
+            const el = this.$refs.chatMessages;
+            if (el) el.scrollTop = el.scrollHeight;
+        },
+
+        abrirEnTab(url, title, iconClass) {
+            try {
+                if (window.appOpenTab) {
+                    window.appOpenTab(url, title || 'Cliente', iconClass || 'fas fa-user');
+                    return;
+                }
+            } catch { }
+            try {
+                window.location.href = url;
+            } catch { }
+        },
+
+        async abrirClienteDesdeChat() {
+            if (!this.conversacionActiva) return;
+
+            const telefono = (this.conversacionActiva.telefono || '').toString().trim();
+            const nombre = (this.conversacionActiva.nombre_contacto || '').toString().trim();
+
+            if (!telefono) {
+                const params = new URLSearchParams();
+                if (nombre) params.set('nombre', nombre);
+                const url = `/clientes/nuevo${params.toString() ? `?${params.toString()}` : ''}`;
+                this.abrirEnTab(url, 'Nuevo cliente', 'fas fa-user-plus');
+                return;
+            }
+
+            const data = await this.fetchJson(`/clientes/buscar_por_telefono_json?telefono=${encodeURIComponent(telefono)}`);
+            if (data && data.success && data.cliente && data.cliente.id_cliente) {
+                const url = `/clientes/${data.cliente.id_cliente}/editar`;
+                const titulo = data.cliente.nombre ? `Cliente: ${data.cliente.nombre}` : 'Cliente';
+                this.abrirEnTab(url, titulo, 'fas fa-user');
+                return;
+            }
+
+            const params = new URLSearchParams();
+            if (nombre) params.set('nombre', nombre);
+            if (telefono) params.set('telefono', telefono);
+            this.abrirEnTab(`/clientes/nuevo?${params.toString()}`, 'Nuevo cliente', 'fas fa-user-plus');
+        },
+
+        async toggleOnline() {
+            const nuevoEstado = !this.estadoAsesor.online;
+            const data = await this.fetchJson('/whatsapp/asesor/online', {
+                method: 'POST',
+                body: JSON.stringify({ online: nuevoEstado })
+            });
+            if (data && data.ok) {
+                this.estadoAsesor.online = data.online;
+                if (data.online) {
+                    await this.sendHeartbeat();
+                    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                    this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 10000);
+                } else {
+                    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                    this.heartbeatInterval = null;
+                }
+            } else if (data && data.error && window.mostrarNotificacion) {
+                window.mostrarNotificacion(data.error, 'error');
+            }
+        },
+
+        async sendHeartbeat() {
+            const data = await this.fetchJson('/whatsapp/asesor/heartbeat', {
+                method: 'POST',
+                body: JSON.stringify({})
+            });
+            if (data && data.ok && this.estadoAsesor) {
+                this.estadoAsesor.conversaciones_activas = data.conversaciones_activas ?? this.estadoAsesor.conversaciones_activas;
+            }
+        },
+
+        async aceptarConversacion() {
+            if (!this.conversacionActiva) return;
+            const data = await this.fetchJson(`/whatsapp/asesor/asignacion/${this.conversacionActiva.id_asignacion}/aceptar`, { method: 'POST' });
+            if (data && data.ok) {
+                this.conversacionActiva.estado_asignacion = 'activa';
+                await this.cargarConversaciones();
+                this.$nextTick(() => {
+                    if (this.$refs.inputMensaje) this.$refs.inputMensaje.focus();
+                });
+            } else if (data && data.error && window.mostrarNotificacion) {
+                window.mostrarNotificacion(data.error, 'error');
+            }
+        },
+
+        async devolverConversacion() {
+            if (!this.conversacionActiva) return;
+            this.abrirModalDevolver();
+        },
+
+        abrirModalDevolver() {
+            this.modalDevolver = true;
+            this.destinoDevolver = 'cola_asesores';
+            this.devolviendo = false;
+        },
+
+        cerrarModalDevolver() {
+            this.modalDevolver = false;
+            this.devolviendo = false;
+        },
+
+        async confirmarDevolucion() {
+            if (!this.conversacionActiva || this.devolviendo) return;
+            this.devolviendo = true;
+            const data = await this.fetchJson(`/whatsapp/asesor/asignacion/${this.conversacionActiva.id_asignacion}/devolver`, {
+                method: 'POST',
+                body: JSON.stringify({ destino: this.destinoDevolver })
+            });
+            this.devolviendo = false;
+            if (data && data.ok) {
+                this.cerrarModalDevolver();
+                this.conversacionActiva = null;
+                this.mensajes = [];
+                await this.cargarConversaciones();
+                if (window.mostrarNotificacion) {
+                    const msg = data.destino === 'pool_ia'
+                        ? 'Conversación enviada al pool IA.'
+                        : 'Conversación devuelta a la cola de asesores.';
+                    window.mostrarNotificacion(msg, 'success');
+                }
+            } else if (data && data.error && window.mostrarNotificacion) {
+                window.mostrarNotificacion(data.error, 'error');
+            }
+        },
+
+        async cerrarConversacion() {
+            if (!this.conversacionActiva) return;
+            if (!confirm('¿Cerrar esta conversación? El cliente volverá a modo bot.')) return;
+            const data = await this.fetchJson(`/whatsapp/asesor/asignacion/${this.conversacionActiva.id_asignacion}/cerrar`, { method: 'POST' });
+            if (data && data.ok) {
+                this.conversacionActiva = null;
+                this.mensajes = [];
+                await this.cargarConversaciones();
+            } else if (data && data.error && window.mostrarNotificacion) {
+                window.mostrarNotificacion(data.error, 'error');
+            }
+        },
+
+        async abrirModalTransferir() {
+            if (!this.conversacionActiva) return;
+            this.modalTransferir = true;
+            this.idAsesorTransferir = '';
+            await this.cargarAsesoresOnline();
+            if (this.asesoresOnlineInterval) clearInterval(this.asesoresOnlineInterval);
+            this.asesoresOnlineInterval = setInterval(() => {
+                if (this.modalTransferir && !this.transfiriendo) this.cargarAsesoresOnline();
+            }, 5000);
+        },
+
+        cerrarModalTransferir() {
+            this.modalTransferir = false;
+            this.idAsesorTransferir = '';
+            this.asesoresOnline = [];
+            this.cargandoAsesores = false;
+            this.transfiriendo = false;
+            if (this.asesoresOnlineInterval) clearInterval(this.asesoresOnlineInterval);
+            this.asesoresOnlineInterval = null;
+        },
+
+        async cargarAsesoresOnline() {
+            this.cargandoAsesores = true;
+            const data = await this.fetchJson('/whatsapp/asesor/asesores-online');
+            this.cargandoAsesores = false;
+            if (!data) return;
+            this.asesoresOnline = data.asesores || [];
+        },
+
+        async confirmarTransferencia() {
+            if (!this.conversacionActiva || !this.idAsesorTransferir || this.transfiriendo) return;
+
+            const idDestino = parseInt(this.idAsesorTransferir, 10);
+            const destino = this.asesoresOnline.find(a => a.id_usuario === idDestino);
+            const nombre = destino ? destino.nombre : `asesor #${idDestino}`;
+
+            if (!confirm(`¿Transferir esta conversación a ${nombre}?`)) return;
+
+            this.transfiriendo = true;
+            const data = await this.fetchJson(`/whatsapp/asesor/asignacion/${this.conversacionActiva.id_asignacion}/transferir`, {
+                method: 'POST',
+                body: JSON.stringify({ id_asesor: idDestino })
+            });
+            this.transfiriendo = false;
+
+            if (data && data.ok) {
+                this.cerrarModalTransferir();
+                this.conversacionActiva = null;
+                this.mensajes = [];
+                await this.cargarConversaciones();
+                if (window.mostrarNotificacion) {
+                    window.mostrarNotificacion(`Conversación transferida a ${data.nombre_asesor || nombre}.`, 'success');
+                }
+            } else if (data && data.error && window.mostrarNotificacion) {
+                window.mostrarNotificacion(data.error, 'error');
+            }
+        },
+
+        async enviarMensaje() {
+            if (!this.textoMensaje.trim() || !this.conversacionActiva || this.enviando) return;
+            this.enviando = true;
+            const texto = this.textoMensaje.trim();
+            this.textoMensaje = '';
+
+            const data = await this.fetchJson(`/whatsapp/asesor/conversacion/${this.conversacionActiva.id_conversacion}/responder`, {
+                method: 'POST',
+                body: JSON.stringify({ texto })
+            });
+
+            this.enviando = false;
+            if (data && data.ok) {
+                await this.cargarMensajes();
+                this.$nextTick(() => {
+                    this.scrollToBottom();
+                    if (this.$refs.inputMensaje) this.$refs.inputMensaje.focus();
+                });
+            } else {
+                this.textoMensaje = texto;
+                const msg = (data && data.error) ? data.error : 'No se pudo enviar el mensaje.';
+                if (window.mostrarNotificacion) window.mostrarNotificacion(msg, 'error');
+            }
+        },
+
+        async enviarNota() {
+            if (!this.textoNota.trim() || !this.conversacionActiva) return;
+            const contenido = this.textoNota.trim();
+            const scope = this.notaScope || 'conversacion';
+
+            const data = await this.fetchJson(`/whatsapp/asesor/conversacion/${this.conversacionActiva.id_conversacion}/notas`, {
+                method: 'POST',
+                body: JSON.stringify({ contenido, scope })
+            });
+
+            if (data && data.ok) {
+                this.textoNota = '';
+                this.mostrandoNota = false;
+                await this.cargarMensajes();
+                this.$nextTick(() => this.scrollToBottom());
+            }
+        },
+
+        async cargarMonitor() {
+            this.monitorCargando = true;
+            const params = new URLSearchParams({ page: this.monitorPagina });
+            if (this.monitorFiltroModo && this.monitorFiltroModo !== 'todos') params.set('modo', this.monitorFiltroModo);
+            if (this.monitorFiltroActiva !== '') params.set('activa', this.monitorFiltroActiva);
+
+            const data = await this.fetchJson(`/whatsapp/admin/ia_conversaciones?${params}`);
+            this.monitorCargando = false;
+            if (!data) return;
+            this.monitorConversaciones = data.conversaciones || [];
+            this.monitorTotal = data.total || 0;
+            this.monitorPages = data.pages || 1;
+            this.monitorCargado = true;
+        },
+
+        async seleccionarMonitorConv(conv) {
+            this.monitorConvActiva = conv;
+            this.monitorMensajes = [];
+            this.monitorContexto = {};
+            this.monitorContextoAbierto = false;
+            this.monitorMensajesCargando = true;
+
+            const data = await this.fetchJson(`/whatsapp/admin/ia_conversacion/${conv.id}/mensajes`);
+            this.monitorMensajesCargando = false;
+            if (!data) return;
+
+            this.monitorConvActiva = { ...conv, ...data.conversacion };
+            this.monitorMensajes = (data.mensajes || []).map(m => ({ ...m, _open: false }));
+            this.monitorContexto = data.contexto || {};
+
+            this.$nextTick(() => {
+                const el = this.$refs.monitorChatMessages;
+                if (el) el.scrollTop = el.scrollHeight;
+            });
+        },
+
+        getToolName(msg) {
+            if (!msg.tool_call) return 'tool';
+            const tc = msg.tool_call;
+            if (tc.tool_name) return tc.tool_name;
+            if (tc.raw_message && tc.raw_message.tool_calls && tc.raw_message.tool_calls[0]) {
+                return tc.raw_message.tool_calls[0].function?.name || 'tool_call';
+            }
+            if (tc.tool_call_id) return 'tool_result';
+            return 'tool';
+        },
+
+        formatToolCall(msg) {
+            if (!msg.tool_call) return '';
+            try {
+                return JSON.stringify(msg.tool_call, null, 2);
+            } catch {
+                return String(msg.tool_call);
+            }
+        },
+
+        parseServerDate(isoStr) {
+            if (!isoStr) return null;
+            const s = String(isoStr).trim();
+            if (!s) return null;
+            const hasTz = /[zZ]$/.test(s) || /[+-]\d\d:\d\d$/.test(s);
+            const d = new Date(hasTz ? s : `${s}Z`);
+            return isNaN(d.getTime()) ? null : d;
+        },
+
+        formatTime(isoStr) {
+            if (!isoStr) return '';
+            try {
+                const d = this.parseServerDate(isoStr);
+                if (!d) return '';
+                const now = new Date();
+                const isToday = d.toDateString() === now.toDateString();
+                if (isToday) {
+                    return d.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit', hour12: false });
+                }
+                return d.toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit' }) + ' ' +
+                    d.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit', hour12: false });
+            } catch {
+                return '';
+            }
+        }
+    };
+};
+
+var whatsappPanel = createWhatsappPanel;
+window.whatsappPanel = whatsappPanel;
+
+if (window.Alpine && typeof window.Alpine.data === 'function') {
+    window.Alpine.data('whatsappPanel', whatsappPanel);
+} else {
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('whatsappPanel', whatsappPanel);
+    }, { once: true });
+}
+</script>

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cierre Contable</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1cm;
+            @frame footer_frame {
+                -pdf-frame-content: footer_content;
+                bottom: 0cm;
+                margin-left: 1cm;
+                margin-right: 1cm;
+                height: 1cm;
+            }
+        }
+        
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            color: #333;
+        }
+        
+        h1 {
+            color: #059669; /* emerald-600 */
+            font-size: 16pt;
+            margin-bottom: 5px;
+        }
+        
+        .header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #059669;
+            padding-bottom: 10px;
+        }
+        
+        .periodo {
+            font-size: 10pt;
+            color: #666;
+        }
+        
+        .summary-box {
+            width: 32%;
+            display: inline-block;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #f9fafb;
+        }
+        
+        .summary-title {
+            font-size: 8pt;
+            color: #666;
+            text-transform: uppercase;
+        }
+        
+        .summary-value {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            table-layout: fixed; /* Enforce column widths */
+        }
+        
+        tr {
+            page-break-inside: avoid; /* Prevent rows from splitting */
+        }
+        
+        th {
+            background-color: #f3f4f6;
+            border-bottom: 2px solid #e5e7eb;
+            padding: 4px; /* Reduced padding */
+            text-align: left;
+            font-weight: bold;
+            font-size: 8pt; /* Smaller font */
+            color: #374151;
+            vertical-align: middle;
+            white-space: normal;
+            overflow: visible;
+            line-height: 1.2;
+        }
+        
+        td {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 4px; /* Reduced padding */
+            font-size: 8pt; /* Smaller font */
+            vertical-align: top; /* Top alignment prevents overlap */
+            word-wrap: break-word; /* Wrap long text */
+            overflow: hidden;
+        }
+        
+        td.col-detalle,
+        td.col-forma {
+            word-wrap: break-word;
+        }
+        .wrap {
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .section-title {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 5px;
+        }
+        
+        .total-row td {
+            font-weight: bold;
+            background-color: #f9fafb;
+            border-top: 2px solid #e5e7eb;
+        }
+
+        .positive { color: #2563eb; }
+        .negative { color: #ea580c; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Cierre Contable</h1>
+        <div class="periodo">
+            <strong>Período:</strong> {{ desde.strftime('%d/%m/%Y') if desde else '-' }} - {{ hasta.strftime('%d/%m/%Y') if hasta else '-' }}
+        </div>
+        <div class="periodo">
+            <strong>Generado:</strong> {{ now.strftime('%d/%m/%Y %H:%M') if now else '' }}
+        </div>
+    </div>
+
+    <!-- Resumen -->
+    <table style="width: 100%; border: none; margin-bottom: 20px;">
+        <tr style="border: none;">
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Ingresos Caja</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Egresos Caja</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Resultado Caja</div>
+                    <div class="summary-value {% if resultado_caja_mes >= 0 %}positive{% else %}negative{% endif %}">
+                        Gs. {{ "{:,.0f}".format(resultado_caja_mes).replace(",", ".") }}
+                    </div>
+                </div>
+            </td>
+        </tr>
+        <tr style="border: none;">
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Ventas Emitidas</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(ventas_emitidas).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Cobrado en Ventas</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(cobrado_en_ventas).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Cobros de Créditos</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(total_cobros_creditos).replace(",", ".") }}</div>
+                </div>
+            </td>
+        </tr>
+        <tr style="border: none;">
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Saldo Financiado</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(saldo_financiado_generado).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Interés Financiero</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(interes_financiero_generado).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Pagos Compras</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(total_pagos_compras).replace(",", ".") }}</div>
+                </div>
+            </td>
+        </tr>
+        <tr style="border: none;">
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Ganancia Neta</div>
+                    <div class="summary-value {% if ganancia_neta_mes >= 0 %}positive{% else %}negative{% endif %}">
+                        Gs. {{ "{:,.0f}".format(ganancia_neta_mes).replace(",", ".") }}
+                    </div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Gastos Corrientes</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(gastos_corrientes_mes).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Descuentos Manuales</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(descuentos_manuales_ventas).replace(",", ".") }}</div>
+                </div>
+            </td>
+        </tr>
+        <tr style="border: none;">
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Desc. Fidelización</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(descuentos_fidelizacion_ventas).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Saldo a Favor Usado</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(saldo_favor_fidelizacion_aplicado).replace(",", ".") }}</div>
+                </div>
+            </td>
+            <td style="width: 33%; border: none; padding: 5px;">
+                <div class="summary-box" style="width: 100%; margin: 0;">
+                    <div class="summary-title">Ingresos Manuales</div>
+                    <div class="summary-value">Gs. {{ "{:,.0f}".format(ingresos_manuales).replace(",", ".") }}</div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">Ajustes Comerciales No Caja</div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 75%;">Concepto</th>
+                <th class="text-right" style="width: 25%;">Monto</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in conceptos_no_caja %}
+            <tr>
+                <td>{{ row.concepto }}</td>
+                <td class="text-right">Gs. {{ "{:,.0f}".format(row.monto or 0).replace(",", ".") }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="2">Sin ajustes comerciales no caja en el período.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Resumen por Concepto -->
+    <div class="section-title">Flujo de Caja por Concepto</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Concepto</th>
+                <th class="text-right">Entrada</th>
+                <th class="text-right">Salida</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in conceptos %}
+            <tr>
+                <td>{{ row.concepto }}</td>
+                <td class="text-right">Gs. {{ "{:,.0f}".format(row.entrada or 0).replace(",", ".") }}</td>
+                <td class="text-right">Gs. {{ "{:,.0f}".format(row.salida or 0).replace(",", ".") }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td class="text-right">Totales</td>
+                <td class="text-right">Gs. {{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</td>
+                <td class="text-right">Gs. {{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Detalle -->
+    <div class="section-title" style="-pdf-keep-with-next: true;">Detalle Operativo y de Caja</div>
+    <table>
+        <colgroup>
+            <col width="11%">
+            <col width="9%">
+            <col width="14%">
+            <col width="30%">
+            <col width="12%">
+            <col width="12%">
+            <col width="12%">
+        </colgroup>
+        <thead>
+            <tr>
+                <th width="11%">Fecha</th>
+                <th width="9%">Tipo</th>
+                <th width="14%">Referencia</th>
+                <th class="col-detalle" width="30%">Detalle</th>
+                <th class="col-forma" width="12%">Forma Pago</th>
+                <th class="text-right" width="12%">Entrada</th>
+                <th class="text-right" width="12%">Salida</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in detalles %}
+            <tr>
+                <td>{{ d.fecha|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ d.concepto }}</td>
+                <td>{{ d.referencia }}</td>
+                <td class="col-detalle" style="width:30%"><div class="wrap">{{ d.detalle }}</div></td>
+                <td class="col-forma" style="width:12%"><div class="wrap">{{ d.forma_pago }}</div></td>
+                <td class="text-right" style="width:12%">
+                    {% if d.entrada %}
+                    Gs. {{ "{:,.0f}".format(d.entrada).replace(",", ".") }}
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td class="text-right" style="width:12%">
+                    {% if d.salida %}
+                    Gs. {{ "{:,.0f}".format(d.salida).replace(",", ".") }}
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+<div id="footer_content" style="text-align: right; font-size: 9pt; color: #666;">
+    Página <pdf:pagenumber /> de <pdf:pagecount />
+</div>
+</html>

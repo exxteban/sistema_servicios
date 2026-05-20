@@ -1,0 +1,851 @@
+<div x-data="posApp()" class="space-y-4">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            {% if solo_registro_vendedor %}
+            <i class="fas fa-clipboard-list text-amber-600 dark:text-amber-400 mr-2"></i>Registro Vendedor
+            {% else %}
+            <i class="fas fa-cash-register text-green-600 dark:text-green-400 mr-2"></i>Punto de Venta
+            {% endif %}
+        </h1>
+        <div class="flex items-center gap-3">
+            {% if sesion and sesion.caja %}
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+                Caja: <strong>{{ sesion.caja.nombre }}</strong>
+            </span>
+            {% elif solo_registro_vendedor %}
+            <span class="text-sm text-amber-600 dark:text-amber-300 font-semibold">
+                Registro sin caja abierta
+            </span>
+            {% endif %}
+            <span class="text-xs px-2 py-1 rounded-full font-semibold"
+                :class="isOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                x-text="isOnline ? 'Online' : 'Offline'"></span>
+            <button type="button" x-show="ventasPendientes.length > 0" @click="sincronizarVentasPendientes()"
+                class="rounded-full border border-blue-700 bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 dark:border-blue-500">
+                <span x-text="`Sincronizar (${ventasPendientes.length})`"></span>
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Panel Izquierdo: Búsqueda y Productos -->
+        <div class="lg:col-span-2 space-y-4">
+            <!-- Búsqueda -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+                <div class="relative">
+                    <input type="text" x-ref="inputBusqueda" x-model="busqueda"
+                        @input.debounce.300ms="buscarProductos()" @keydown.enter.prevent="agregarPorEnter()"
+                        placeholder="Buscar producto por código o nombre..."
+                        class="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-xl focus:border-blue-500 dark:focus:border-blue-400 focus:ring-0 text-lg transition-colors"
+                        autofocus>
+                    <i
+                        class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xl"></i>
+                </div>
+                <div x-show="puedeCrearProductoRapido" class="mt-3 flex justify-end" x-cloak>
+                    <button type="button" @click="abrirModalProductoRapido()"
+                        class="inline-flex items-center gap-2 rounded-lg border border-indigo-700 bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700 shadow-md shadow-indigo-600/20 dark:border-indigo-500">
+                        <i class="fas fa-plus"></i>
+                        Producto rápido
+                    </button>
+                </div>
+
+                <!-- Resultados de búsqueda -->
+                <div x-show="resultados.length > 0" x-cloak
+                    class="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg max-h-48 overflow-y-auto bg-white dark:bg-gray-800">
+                    <template x-for="producto in resultados" :key="producto.id">
+                        <div @click="agregarProducto(producto)"
+                            class="p-3 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 flex justify-between items-center transition-colors">
+                            <div>
+                                <span class="font-mono text-sm text-gray-500 dark:text-gray-400"
+                                    x-text="producto.codigo"></span>
+                                <span class="ml-2 text-gray-800 dark:text-white" x-text="producto.nombre"></span>
+                            </div>
+                            <div class="text-right">
+                                <template x-if="producto.precios_opciones && producto.precios_opciones.length > 0">
+                                    <span class="text-sm font-semibold text-blue-700 dark:text-blue-300"
+                                        x-text="`Opciones (${producto.precios_opciones.length})`"></span>
+                                </template>
+                                <template x-if="!producto.precios_opciones || producto.precios_opciones.length === 0">
+                                    <span class="font-bold text-green-600 dark:text-green-400"
+                                        x-text="'₲ ' + formatNumber(producto.precio)"></span>
+                                </template>
+                                <span class="text-sm text-gray-400 ml-2" x-text="'Stock: ' + producto.stock"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Tabla de Items -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                                Producto</th>
+                            <th
+                                class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300 w-24">
+                                Cant.</th>
+                            <th
+                                class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300 w-32">
+                                Precio</th>
+                            <th
+                                class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300 w-36">
+                                Subtotal</th>
+                            <th class="px-4 py-3 w-16"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <template x-for="(item, index) in carrito" :key="index">
+                            <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                                :class="item.stock_warning ? 'bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500' : (item.low_stock_warning ? 'bg-amber-50 dark:bg-yellow-900/20 border-l-4 border-amber-600' : (item.green_stock_hint ? 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500' : ''))">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        <i x-show="item.stock_warning"
+                                            class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+                                        <i x-show="!item.stock_warning && item.low_stock_warning"
+                                            class="fas fa-exclamation-circle text-amber-600 dark:text-yellow-400"></i>
+                                        <i x-show="!item.stock_warning && !item.low_stock_warning && item.green_stock_hint"
+                                            class="fas fa-check-circle text-green-600 dark:text-green-400"></i>
+                                        <div>
+                                            <span class="font-mono text-xs text-gray-400" x-text="item.codigo"></span>
+                                            <span class="ml-1 text-gray-800 dark:text-white"
+                                                x-text="item.nombre"></span>
+                                            <div x-show="item.precio_opcion_id"
+                                                class="text-xs text-blue-700 dark:text-blue-300 font-semibold mt-1">
+                                                Importe rápido
+                                            </div>
+                                            <div x-show="item.stock_warning"
+                                                class="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">
+                                                <span x-show="item.stock_disponible <= 0">⚠ Sin stock disponible</span>
+                                                <span
+                                                    x-show="item.stock_disponible > 0 && item.cantidad > item.stock_disponible">
+                                                    ⚠ Solo <span x-text="item.stock_disponible"></span> disponibles
+                                                </span>
+                                            </div>
+                                            <div x-show="!item.es_servicio" class="text-xs font-semibold mt-1"
+                                                :class="item.stock_warning ? 'text-red-600 dark:text-red-400' : (item.low_stock_warning ? 'text-amber-700 dark:text-yellow-400' : (item.green_stock_hint ? 'text-green-700 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'))">
+                                                Stock: <span x-text="item.stock_disponible"></span> | En stock restante:
+                                                <span x-text="item.stock_restante"></span><span
+                                                    x-show="item.stock_minimo !== undefined && item.stock_minimo !== null">
+                                                    (mín: <span x-text="item.stock_minimo"></span>)
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <input type="number" x-model.number="item.cantidad"
+                                        @input="validarStockItem(item); actualizarTotal()" min="1"
+                                        class="w-full text-center border rounded-lg py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                                        :class="item.stock_warning ? 'border-red-500 bg-red-50 dark:bg-red-900/30' : (item.low_stock_warning ? 'border-amber-600 bg-amber-50 dark:bg-yellow-900/30' : (item.green_stock_hint ? 'border-green-500 bg-green-50 dark:bg-green-900/30' : 'border-gray-300 dark:border-gray-600'))">
+                                </td>
+                                <td class="px-4 py-3 text-right" x-text="'₲ ' + formatNumber(item.precio)"></td>
+                                <td class="px-4 py-3 text-right font-semibold"
+                                    x-text="'₲ ' + formatNumber(item.precio * item.cantidad)"></td>
+                                <td class="px-4 py-3 text-center">
+                                    <button @click="eliminarItem(index)"
+                                        class="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-red-600 transition hover:bg-red-100 hover:text-red-700 dark:border-red-800/50 dark:bg-transparent dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="carrito.length === 0">
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                                <i class="fas fa-shopping-cart text-4xl mb-2"></i>
+                                <p>Agregue productos para comenzar</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel Derecho: Totales y Pago -->
+        <div class="space-y-4">
+            <!-- Cliente con Búsqueda -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-3 transition-colors duration-300">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cliente</label>
+                    <span x-show="usaPrecioMayorista()"
+                        class="px-2 py-0.5 text-xs font-bold rounded-full bg-purple-600 text-white animate-pulse">
+                        <i class="fas fa-tags mr-1"></i>PRECIO MAYORISTA
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-2 mb-2">
+                    <button type="button" @click="togglePrecioMayorista()"
+                        class="pos-client-toggle"
+                        data-variant="mayorista"
+                        :data-active="usaPrecioMayorista() ? 'true' : 'false'"
+                        :aria-pressed="usaPrecioMayorista() ? 'true' : 'false'">
+                        <div class="pos-client-toggle__content">
+                            <div class="pos-client-toggle__icon">
+                                <i class="fas fa-tags text-xs"></i>
+                            </div>
+                            <div class="pos-client-toggle__text">
+                                <span class="pos-client-toggle__title">
+                                    Precio Mayorista
+                                </span>
+                                <span class="pos-client-toggle__subtitle"
+                                    x-text="estadoPrecioMayoristaTexto()">
+                                </span>
+                            </div>
+                        </div>
+                        <span class="pos-client-toggle__switch" aria-hidden="true">
+                            <span class="pos-client-toggle__knob"></span>
+                        </span>
+                    </button>
+
+                    <button type="button" @click="toggleAlertaClienteFiel()"
+                        class="pos-client-toggle"
+                        data-variant="fiel"
+                        :data-active="alertaClienteFielActiva ? 'true' : 'false'"
+                        :aria-pressed="alertaClienteFielActiva ? 'true' : 'false'">
+                        <div class="pos-client-toggle__content">
+                            <div class="pos-client-toggle__icon">
+                                <i class="fas fa-star text-xs"></i>
+                            </div>
+                            <div class="pos-client-toggle__text">
+                                <span class="pos-client-toggle__title">
+                                    Alerta Cliente Fiel
+                                </span>
+                                <span class="pos-client-toggle__subtitle"
+                                    x-text="alertaClienteFielActiva ? 'Muestra historial de compras' : 'Click para activar'">
+                                </span>
+                            </div>
+                        </div>
+                        <span class="pos-client-toggle__switch" aria-hidden="true">
+                            <span class="pos-client-toggle__knob"></span>
+                        </span>
+                    </button>
+                </div>
+
+                <div class="flex gap-2">
+                    <div class="relative flex-1" @click.away="mostrarResultadosClientes = false">
+                        <div class="flex items-center rounded-lg border-2 border-gray-300 bg-gray-50 px-3 py-2 cursor-pointer transition-colors dark:border-gray-700 dark:bg-gray-900/50"
+                            @click="mostrarResultadosClientes = !mostrarResultadosClientes; $nextTick(() => $refs.inputCliente.focus())">
+                            <i class="fas fa-user text-gray-400 dark:text-gray-500 mr-2"></i>
+                            <div class="flex-1">
+                                <span x-show="!clienteSeleccionado" class="text-gray-500 dark:text-gray-400">Seleccionar
+                                    Cliente...</span>
+                                <div x-show="clienteSeleccionado" class="flex flex-col">
+                                    <span class="font-semibold text-gray-800 dark:text-white"
+                                        x-text="clienteSeleccionado ? clienteSeleccionado.nombre : ''"></span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400"
+                                        x-text="clienteSeleccionado ? (clienteSeleccionado.ruc_ci || 'Sin RUC/CI') : ''"></span>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-down text-gray-400 dark:text-gray-500 text-xs"></i>
+                        </div>
+
+                        <!-- Dropdown de búsqueda -->
+                        <div x-show="mostrarResultadosClientes"
+                            class="absolute z-10 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col"
+                            style="display: none;">
+
+                            <div class="p-2 border-b dark:border-gray-700">
+                                <input type="text" x-ref="inputCliente" x-model="busquedaCliente"
+                                    @input.debounce.300ms="buscarClientes(busquedaCliente)"
+                                    class="w-full border dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500 dark:focus:border-blue-400"
+                                    placeholder="Filtrar por nombre o RUC...">
+                            </div>
+
+                            <div class="overflow-y-auto flex-1">
+                                <!-- Resultados de búsqueda -->
+                                <template x-for="cliente in clientesEncontrados" :key="cliente.id_cliente">
+                                    <div @click="seleccionarCliente(cliente); mostrarResultadosClientes = false; busquedaCliente = ''"
+                                        class="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer border-b dark:border-gray-700 last:border-0 transition-colors">
+                                        <div class="font-medium text-sm text-gray-800 dark:text-white"
+                                            x-text="cliente.nombre"></div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                                            <span x-text="cliente.ruc_ci || 'Sin RUC'"></span>
+                                            <span x-show="cliente.telefono" x-text="' - ' + cliente.telefono"></span>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <div x-show="clientesEncontrados.length === 0 && busquedaCliente.length > 0"
+                                    class="p-3 text-center text-gray-500 dark:text-gray-400 text-sm">
+                                    No se encontraron clientes
+                                </div>
+                                <div x-show="clientesEncontrados.length === 0 && busquedaCliente.length === 0"
+                                    class="p-3 text-center text-gray-400 dark:text-gray-500 text-xs">
+                                    Escriba para buscar...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 items-center">
+                        <button type="button" @click="editarCliente()"
+                            x-show="clienteSeleccionado && clienteSeleccionado.id_cliente != 1"
+                            class="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-700 bg-amber-600 text-white transition shadow-md shadow-amber-600/20 hover:bg-amber-700 dark:border-amber-500"
+                            title="Editar Cliente">
+                            <i class="fas fa-pencil-alt"></i>
+                        </button>
+                        <button type="button" @click="verHistorialCliente()"
+                            x-show="clienteSeleccionado && clienteSeleccionado.id_cliente != 1"
+                            class="flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-700 bg-indigo-600 text-white transition shadow-md shadow-indigo-600/20 hover:bg-indigo-700 dark:border-indigo-500"
+                            title="Ver Historial de Compras">
+                            <i class="fas fa-history"></i>
+                        </button>
+                        <button type="button" @click="abrirModalCliente()"
+                            class="flex h-9 w-9 items-center justify-center rounded-xl border border-blue-700 bg-blue-600 text-white transition shadow-md shadow-blue-600/20 hover:bg-blue-700 dark:border-blue-500"
+                            title="Nuevo Cliente">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div x-show="alertaClienteFielActiva && clienteFielResumen.cargando" x-cloak
+                    class="mt-2 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200 dark:shadow-none"
+                    style="display: none;">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Buscando historial del cliente...</span>
+                </div>
+
+                <div x-show="alertaClienteFielActiva && !clienteFielResumen.cargando && Number(clienteFielResumen.cantidadCompras || 0) > 0" x-cloak
+                    class="mt-2 flex items-start justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 shadow-sm dark:border-amber-700 dark:bg-amber-900/20 dark:shadow-none"
+                    style="display: none;">
+                    <div class="flex items-start gap-2">
+                        <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
+                            <i class="fas fa-star text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                                Historial del cliente
+                            </div>
+                            <div class="text-xs text-amber-700 dark:text-amber-300"
+                                x-text="`Este cliente registra ${clienteFielResumen.cantidadCompras} ${clienteFielResumen.cantidadCompras === 1 ? 'compra completada' : 'compras completadas'}. Este aviso no libera beneficios por si solo.`">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" @click="verHistorialCliente()"
+                        class="whitespace-nowrap rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-50 dark:border-amber-700 dark:bg-transparent dark:text-amber-300 dark:hover:bg-amber-900/20">
+                        Ver historial
+                    </button>
+                </div>
+
+                <div x-show="esClienteMayorista()" x-cloak
+                    class="mt-2 flex items-start gap-2 rounded-lg border border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 px-3 py-2"
+                    style="display: none;">
+                    <div class="w-7 h-7 rounded-full bg-purple-500 text-white flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-tags text-xs"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-semibold text-purple-800 dark:text-purple-200">
+                            Cliente mayorista detectado
+                        </div>
+                        <div class="text-xs text-purple-700 dark:text-purple-300" x-text="alertaPrecioMayoristaTexto()"></div>
+                    </div>
+                </div>
+
+                {% if ventas_credito_activo %}
+                {% include "ventas/pos_html/ui_pos_alerta_credito_cliente.html" %}
+                {% endif %}
+
+                {% include "ventas/pos_html/ui_pos_beneficios_fidelizacion.html" %}
+
+                {% if not ocultar_selector_vendedor_pos %}
+                <div class="mt-2.5">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Vendedor / Cajero *
+                    </label>
+                    <select x-model.number="vendedorId"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400">
+                        <option value="">Seleccionar vendedor/cajero...</option>
+                        <template x-for="usuario in vendedoresCajeros" :key="usuario.id_usuario">
+                            <option :value="usuario.id_usuario"
+                                x-text="`${usuario.nombre_completo} (${usuario.rol || 'Sin rol'})`"></option>
+                        </template>
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Totales -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 space-y-3 transition-colors duration-300">
+                <div class="flex justify-between text-gray-600 dark:text-gray-300">
+                    <span>Subtotal:</span>
+                    <span x-text="'₲ ' + formatNumber(subtotal)"></span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 dark:text-gray-300">Descuento:</span>
+                    <input type="number" x-model.number="descuento" @change="actualizarTotal()"
+                        class="w-24 rounded-lg border border-gray-300 bg-white px-2 py-1 text-right text-gray-800 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400"
+                        min="0">
+                </div>
+                <hr class="dark:border-gray-700">
+                <div class="flex justify-between text-2xl font-bold text-green-600 dark:text-green-400">
+                    <span>TOTAL:</span>
+                    <span x-text="'₲ ' + formatNumber(total)"></span>
+                </div>
+            </div>
+
+            {% include "ventas/pos_html/ui_pos_pagos.html" %}
+
+            {% if false and not solo_registro_vendedor %}
+            <!-- Pagos Múltiples -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 space-y-3 transition-colors duration-300">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-semibold text-gray-700 dark:text-gray-200">Pagos</h3>
+                    <span class="text-sm"
+                        :class="saldoPendiente > 0 ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-green-600 dark:text-green-400 font-semibold'">
+                        <span x-show="saldoPendiente > 0">Falta: ₲ <span
+                                x-text="formatNumber(saldoPendiente)"></span></span>
+                        <span x-show="saldoPendiente <= 0 && total > 0">✓ Completo</span>
+                    </span>
+                </div>
+
+                <!-- Lista de pagos agregados -->
+                <div class="space-y-2 max-h-40 overflow-y-auto">
+                    <template x-for="(pago, index) in pagos" :key="index">
+                        <div
+                            class="flex items-center gap-2 bg-gray-50 dark:bg-gray-700/50 p-2 rounded-lg transition-colors">
+                            <span class="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200"
+                                x-text="pago.nombre"></span>
+                            <input type="number" x-model.number="pago.monto"
+                                @input="manejarInputMontoPago(index)"
+                                :max="montoMaximoEditablePago(index)"
+                                class="w-28 text-right border dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded px-2 py-1 text-sm focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none"
+                                min="0" step="1000">
+                            <button @click="eliminarPago(index)"
+                                class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </template>
+                    <div x-show="pagos.length === 0" class="text-center text-gray-400 dark:text-gray-500 text-sm py-2">
+                        Agregue métodos de pago
+                    </div>
+                </div>
+
+                <!-- Agregar nuevo pago -->
+                <div class="border-t dark:border-gray-700 pt-3">
+                    <label class="block text-sm text-gray-600 dark:text-gray-400 mb-2">Agregar Pago</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        {% for metodo in metodos_pago %}
+                        <button @click='agregarPago({{ metodo.id_metodo_pago }}, {{ metodo.nombre|tojson }})'
+                            :disabled="saldoPendiente <= 0"
+                            class="py-2 px-2 rounded-lg text-xs font-medium transition bg-blue-500 text-white hover:bg-blue-600 shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                            {{ metodo.nombre }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Botón rápido: Pagar todo en efectivo -->
+                <button @click="pagarTodoEfectivo()" x-show="pagos.length === 0 && total > 0"
+                    class="w-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 py-2 rounded-lg text-sm font-medium hover:bg-green-200 dark:hover:bg-green-900/50 transition">
+                    <i class="fas fa-money-bill-wave mr-1"></i> Pagar Todo en Efectivo
+                </button>
+
+                <!-- Resumen de pagos -->
+                <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg space-y-1">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600 dark:text-gray-400">Total a Pagar:</span>
+                        <span class="font-semibold text-gray-800 dark:text-white"
+                            x-text="'₲ ' + formatNumber(total)"></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600 dark:text-gray-400">Total Pagado:</span>
+                        <span class="font-semibold"
+                            :class="totalPagado >= total ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'"
+                            x-text="'₲ ' + formatNumber(totalPagado)"></span>
+                    </div>
+                    <div x-show="vuelto > 0"
+                        class="flex justify-between text-sm pt-2 border-t border-blue-200 dark:border-blue-800">
+                        <span class="text-gray-600 dark:text-gray-400">Vuelto:</span>
+                        <span class="font-bold text-amber-700 dark:text-amber-300"
+                            x-text="'₲ ' + formatNumber(vuelto)"></span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Botones -->
+            <div class="space-y-2">
+                <button @click="enviarVentaACaja()"
+                    x-show="cajaFlujoEnviadoActivo && puedeEnviarCajaVenta && !reparacionId && (soloRegistroVendedor || debeEnviarACajaAntesDeCobrar())"
+                    :disabled="carrito.length === 0 || procesando || enviandoCaja || (requiereSeleccionVendedor() && !vendedorId)"
+                    class="w-full py-3 rounded-xl font-bold transition-all shadow-md disabled:cursor-not-allowed border
+                           text-white border-amber-700 shadow-amber-600/30
+                           bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800
+                           disabled:from-amber-200 disabled:to-amber-200 disabled:text-amber-500 disabled:border-amber-300 disabled:shadow-none
+                           dark:disabled:from-amber-900/80 dark:disabled:to-amber-900/80 dark:disabled:text-amber-500/70 dark:disabled:border-amber-800">
+                    <i class="fas fa-share-square mr-2"></i>
+                    <span
+                        x-text="enviandoCaja ? 'Enviando...' : (soloRegistroVendedor ? 'Registrar y Enviar al Cajero' : 'Enviar a Caja')"></span>
+                </button>
+
+                <div x-show="debeEnviarACajaAntesDeCobrar()" x-cloak
+                    class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 shadow-sm dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-100 dark:shadow-none">
+                    El cobro final debe hacerlo un cajero desde caja.
+                    <span x-show="!puedeEnviarCajaVenta" class="block mt-1 font-semibold">
+                        Tu usuario no tiene permiso para enviar pendientes a caja.
+                    </span>
+                </div>
+
+                {% if not solo_registro_vendedor %}
+                <button @click="procesarVenta()"
+                    x-show="!debeEnviarACajaAntesDeCobrar()"
+                    :disabled="carrito.length === 0 || procesando || !puedeConfirmarVentaActual()"
+                    class="w-full py-4 rounded-xl font-bold text-lg transition-all shadow-md disabled:cursor-not-allowed border
+                           text-white border-green-600 shadow-green-500/30
+                           bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700
+                           disabled:from-green-200 disabled:to-green-200 disabled:text-green-500 disabled:border-green-300 disabled:shadow-none
+                           dark:disabled:from-green-900/80 dark:disabled:to-green-900/80 dark:disabled:text-green-500/70 dark:disabled:border-green-800">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    <span x-text="procesando ? 'Procesando...' : (esVentaCredito() ? 'REGISTRAR CREDITO' : 'COBRAR')"></span>
+                </button>
+                {% endif %}
+
+                <button @click="limpiarVenta()"
+                    :disabled="procesando || enviandoCaja"
+                    class="w-full py-3 rounded-xl font-bold transition-all shadow-sm border
+                           bg-red-50 hover:bg-red-100 text-red-700 border-red-300 disabled:opacity-60 disabled:cursor-not-allowed
+                           dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 dark:border-red-800/50">
+                    <i class="fas fa-times mr-2"></i> Cancelar Venta
+                </button>
+
+                {% if not solo_registro_vendedor %}
+                <!-- Botón Reimprimir Último Ticket -->
+                <button x-show="ultimaVentaId" @click="reimprimirUltimoTicket()"
+                    class="w-full py-3 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center gap-2 border
+                           bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-blue-700 hover:from-blue-600 hover:to-indigo-700 shadow-blue-500/20 dark:border-blue-500">
+                    <i class="fas fa-redo-alt"></i>
+                    <span>Reimprimir Último Ticket</span>
+                    <span class="text-xs opacity-75" x-text="'#' + ultimaVentaId"></span>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nuevo Producto Rápido -->
+    <div x-show="mostrarModalProductoRapido" x-cloak
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        @click.self="cerrarModalProductoRapido()">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+            <div class="bg-indigo-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-cube"></i>
+                    Producto rápido
+                </h3>
+                <button @click="cerrarModalProductoRapido()"
+                    class="rounded-lg border border-white/30 px-2 py-1 text-white transition hover:bg-white/10 hover:text-indigo-100">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                    Crea un producto para sobre pedido sin salir del POS.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre *</label>
+                        <input type="text" x-ref="inputProductoRapidoNombre" x-model="productoRapidoForm.nombre"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2 focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none"
+                            placeholder="Ej: Placard 2,40 x 2,20 melamina blanca">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código</label>
+                        <input type="text" x-model="productoRapidoForm.codigo"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2 focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none"
+                            placeholder="Opcional (si vacío, se genera)">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precio venta *</label>
+                        <input type="number" min="1" step="1000" x-model.number="productoRapidoForm.precio_venta"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2 focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none"
+                            placeholder="0">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoría *</label>
+                        <select x-model.number="productoRapidoForm.id_categoria"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2 focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none">
+                            <option value="">Seleccionar...</option>
+                            <template x-for="categoria in categoriasProductoRapido" :key="categoria.id_categoria">
+                                <option :value="categoria.id_categoria" x-text="categoria.nombre"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stock mínimo</label>
+                        <input type="number" min="0" step="1" x-model.number="productoRapidoForm.stock_minimo"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2 focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none">
+                    </div>
+                </div>
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" x-model="productoRapidoForm.sobre_pedido"
+                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    Marcar como sobre pedido (prefijo SP- en código)
+                </label>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="cerrarModalProductoRapido()"
+                        :disabled="guardandoProductoRapido"
+                        class="flex-1 rounded-lg border border-gray-300 bg-gray-100 py-2.5 font-medium text-gray-700 transition hover:bg-gray-200 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                        Cancelar
+                    </button>
+                    <button type="button" @click="guardarProductoRapido()"
+                        :disabled="guardandoProductoRapido"
+                        class="flex-1 rounded-lg border border-indigo-700 bg-indigo-600 py-2.5 font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60 dark:border-indigo-500">
+                        <span x-show="!guardandoProductoRapido">Crear y agregar</span>
+                        <span x-show="guardandoProductoRapido">Guardando...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de selección de importe -->
+    <div x-show="mostrarModalPrecioOpciones" x-cloak
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        @click.self="cerrarModalPrecioOpciones()">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div class="bg-blue-600 text-white px-6 py-4">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-list"></i>
+                    Seleccionar importe
+                </h3>
+            </div>
+            <div class="p-6">
+                <div class="text-gray-700 mb-4">
+                    <div class="font-semibold" x-text="productoPrecioOpciones ? productoPrecioOpciones.nombre : ''">
+                    </div>
+                    <div class="text-xs text-gray-500"
+                        x-text="productoPrecioOpciones ? productoPrecioOpciones.codigo : ''"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <template x-for="op in preciosOpcionesActuales" :key="op.id">
+                        <button type="button" @click="confirmarPrecioOpcion(op)"
+                            class="rounded-lg border border-green-300 bg-green-50 px-3 py-3 font-bold text-green-800 transition hover:bg-green-100 dark:border-green-800/50 dark:bg-green-900/20 dark:text-green-300 dark:hover:bg-green-900/30">
+                            <span x-text="'₲ ' + formatNumber(op.precio)"></span>
+                        </button>
+                    </template>
+                </div>
+                <button type="button" @click="cerrarModalPrecioOpciones()"
+                    class="mt-4 w-full rounded-lg border border-gray-300 bg-gray-100 py-3 font-medium text-gray-700 transition hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación de Stock -->
+    <div x-show="mostrarModalStock" x-cloak
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        @click.self="mostrarModalStock = false">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div class="bg-red-500 text-white px-6 py-4">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Advertencia de Stock
+                </h3>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-4">Los siguientes productos tienen problemas de stock:</p>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 max-h-48 overflow-y-auto">
+                    <template x-for="item in itemsConWarning" :key="item.id_producto">
+                        <div class="mb-3 pb-3 border-b border-red-200 last:border-0 last:mb-0 last:pb-0">
+                            <div class="font-semibold text-red-800" x-text="item.nombre"></div>
+                            <div class="text-sm text-red-600 mt-1">
+                                <span x-show="item.stock_disponible <= 0">
+                                    Sin stock disponible - Solicitado: <span x-text="item.cantidad"></span>
+                                </span>
+                                <span x-show="item.stock_disponible > 0 && item.cantidad > item.stock_disponible">
+                                    Stock: <span x-text="item.stock_disponible"></span> - Solicitado: <span
+                                        x-text="item.cantidad"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <p class="text-sm text-gray-600 mb-6">
+                    ¿Desea continuar con la venta de todos modos? El stock puede quedar en negativo.
+                </p>
+                <div class="flex gap-3">
+                    <button @click="mostrarModalStock = false"
+                        class="flex-1 rounded-lg border border-gray-300 bg-gray-100 py-3 font-medium text-gray-700 transition hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                        <i class="fas fa-times mr-2"></i>Cancelar
+                    </button>
+                    <button @click="confirmarVenta()"
+                        class="flex-1 rounded-lg border border-red-700 bg-red-600 py-3 font-medium text-white transition hover:bg-red-700 dark:border-red-500">
+                        <i class="fas fa-check mr-2"></i>Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Vista Previa de Venta (ANTES de registrar) -->
+    <div x-show="mostrarModalVistaPrevia" x-cloak
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div
+            class="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col h-[90vh] max-h-[calc(100vh-2rem)]">
+            <div class="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-file-invoice"></i>
+                    Vista previa de venta
+                </h3>
+                <button @click="cancelarVistaPrevia()"
+                    class="rounded-lg border border-white/30 px-2 py-1 text-white transition hover:bg-white/10 hover:text-blue-100">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 flex flex-col gap-4 flex-1 min-h-0">
+                <div class="text-gray-800">
+                    <div class="font-semibold">Confirme los datos antes de registrar</div>
+                    <div x-show="vuelto > 0" class="text-sm text-gray-700 mt-1">
+                        Vuelto a entregar: <span class="font-bold text-amber-700"
+                            x-text="'₲ ' + formatNumber(vuelto)"></span>
+                    </div>
+                </div>
+
+                <!-- Vista previa generada localmente -->
+                <div class="border border-gray-200 rounded-lg overflow-hidden bg-white flex-1 min-h-0">
+                    <iframe x-ref="ticketPreviewFrame" :srcdoc="ticketPreviewHtml" class="w-full h-full pointer-events-none"
+                        title="Vista previa del ticket"></iframe>
+                </div>
+
+                <div class="pt-2 flex gap-3 relative z-10 shrink-0">
+                    <button type="button" @click.prevent="cancelarVistaPrevia()"
+                        class="flex-1 rounded-lg border border-gray-300 bg-gray-100 py-3 font-medium text-gray-700 transition hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                        <i class="fas fa-arrow-left mr-2"></i>Volver a editar
+                    </button>
+                    <button type="button" @click.prevent="confirmarYProcesarVenta()"
+                        class="flex-1 rounded-lg border border-green-700 bg-green-600 py-3 font-medium text-white transition hover:bg-green-700 dark:border-green-500"
+                        :disabled="confirmandoVenta">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        <span x-text="confirmandoVenta ? 'Procesando...' : 'Confirmar compra e imprimir'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="mostrarModalVentaPendiente" x-cloak
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 overflow-y-auto p-4">
+        <div
+            class="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[calc(100vh-2rem)]">
+            <div class="bg-amber-700 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-wifi"></i>
+                    Venta pendiente
+                </h3>
+            </div>
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                <div class="text-gray-800">
+                    <div class="font-semibold"
+                        x-text="ventaPendienteActual ? `Venta offline (${ventaPendienteActual.client_request_id})` : 'Venta offline'">
+                    </div>
+                    <div class="text-sm text-gray-700 mt-1">
+                        Guardada localmente. Se sincroniza cuando vuelva la conexión.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <iframe x-ref="ticketOfflineFrame" x-bind:srcdoc="offlineTicketHtml || ''"
+                        class="w-full h-[60vh] min-h-[24rem]" title="Vista previa del ticket provisional"></iframe>
+                </div>
+
+                <div class="pt-2 flex gap-3">
+                    <button @click="imprimirTicketProvisional()"
+                        class="flex-1 rounded-lg border border-amber-800 bg-amber-700 py-2 text-white transition hover:bg-amber-800 dark:border-amber-500">
+                        Imprimir provisional
+                    </button>
+                    <button @click="aceptarVentaPendiente()"
+                        class="flex-1 rounded-lg border border-gray-300 bg-gray-100 py-2 text-gray-800 transition hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                        Aceptar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nuevo Cliente -->
+    <div x-show="mostrarModalCliente" x-cloak
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        @click.self="cerrarModalCliente()">
+        <div
+            class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transition-colors duration-300">
+            <div class="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-bold" x-text="modoEdicion ? 'Editar Cliente' : 'Nuevo Cliente'">Nuevo Cliente
+                </h3>
+                <button @click="cerrarModalCliente()"
+                    class="rounded-lg border border-white/30 px-2 py-1 text-white transition hover:bg-white/10 hover:text-blue-100">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre Completo
+                        *</label>
+                    <input type="text" x-model="nuevoCliente.nombre"
+                        class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">RUC / CI</label>
+                        <input type="text" x-model="nuevoCliente.ruc_ci"
+                            class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Teléfono</label>
+                        <input type="text" x-model="nuevoCliente.telefono"
+                            class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white transition-colors">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <input type="email" x-model="nuevoCliente.email"
+                        class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white transition-colors">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
+                        <select x-model="nuevoCliente.tipo"
+                            class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white transition-colors">
+                            <option value="minorista">Minorista</option>
+                            <option value="mayorista">Mayorista</option>
+                            <option value="empresa">Empresa</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Límite de
+                            Crédito</label>
+                        <input type="number" x-model.number="nuevoCliente.limite_credito"
+                            class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white transition-colors"
+                            min="0">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dirección</label>
+                    <textarea x-model="nuevoCliente.direccion" rows="2"
+                        class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white transition-colors"></textarea>
+                </div>
+
+                <div class="pt-2 flex gap-3">
+                    <button @click="cerrarModalCliente()"
+                        class="flex-1 rounded-lg border border-gray-300 bg-gray-100 py-2 text-gray-700 transition-colors hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
+                        Cancelar
+                    </button>
+                    <button @click="guardarCliente()" :disabled="!nuevoCliente.nombre"
+                        class="flex-1 rounded-lg border border-blue-700 bg-blue-600 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50 dark:border-blue-500">
+                        Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Modal Historial de Compras (CRM) -->
+    <div x-show="mostrarModalHistorial" x-cloak
+        class="fixed inset-0 bg-black/70 flex items-center justify-center p-6 backdrop-blur-sm" style="z-index: 9999;"
+        @click.self="mostrarModalHistorial = false">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl overflow-hidden flex flex-col"
+            style="width: 500px; max-width: 90vw; max-height: 450px;">

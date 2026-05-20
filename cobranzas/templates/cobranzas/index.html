@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Cobranzas{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Cobranzas</h1>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ resumen.mensaje }}</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Cuentas abiertas</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ resumen.cuentas_abiertas }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Cuentas vencidas</div>
+            <div class="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">{{ resumen.cuentas_vencidas }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Saldo pendiente</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">₲ {{ "{:,.0f}".format(resumen.saldo_total).replace(",", ".") }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total de cuentas</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ resumen.total_cuentas }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Monto ya cobrado</div>
+            <div class="mt-2 text-2xl font-bold text-green-600 dark:text-green-400">₲ {{ "{:,.0f}".format(resumen.cobrado_total).replace(",", ".") }}</div>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+            <input
+                type="text"
+                name="q"
+                value="{{ listado['busqueda'] }}"
+                placeholder="Buscar por cliente, RUC/CI, cuenta, venta o cliente ID"
+                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40"
+            >
+            <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                <i class="fas fa-search mr-2"></i>Buscar
+            </button>
+        </form>
+
+        <div class="flex flex-wrap gap-2">
+            {% for estado, label in [('abiertas', 'Abiertas'), ('pendientes', 'Pendientes'), ('vencidas', 'Vencidas'), ('pagadas', 'Pagadas'), ('todas', 'Todas')] %}
+            <a href="{{ url_for('cobranzas.index', estado=estado, q=listado['busqueda']) }}"
+               class="inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold transition {% if listado['filtro_estado'] == estado %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600{% endif %}">
+                {{ label }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+        {% if listado['items'] %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold">Cuenta</th>
+                        <th class="px-4 py-3 text-left font-semibold">Cliente</th>
+                        <th class="px-4 py-3 text-left font-semibold">Venta</th>
+                        <th class="px-4 py-3 text-left font-semibold">Vencimiento</th>
+                        <th class="px-4 py-3 text-right font-semibold">Total</th>
+                        <th class="px-4 py-3 text-right font-semibold">Cobrado</th>
+                        <th class="px-4 py-3 text-right font-semibold">Saldo</th>
+                        <th class="px-4 py-3 text-left font-semibold">Estado</th>
+                        <th class="px-4 py-3 text-right font-semibold">Accion</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for item in listado['items'] %}
+                    <tr>
+                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">#{{ item.cuenta.id_cuenta_cobrar }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            <div class="font-medium">
+                                {% if item.cliente %}
+                                <a href="{{ url_for('cobranzas_clientes.detalle_cliente', id_cliente=item.cliente.id_cliente) }}" class="hover:text-indigo-600 dark:hover:text-indigo-400">
+                                    {{ item.cliente.nombre }}
+                                </a>
+                                {% else %}
+                                    {{ 'Cliente #' ~ item.cuenta.id_cliente }}
+                                {% endif %}
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ item.cliente.ruc_ci if item.cliente and item.cliente.ruc_ci else ('ID ' ~ item.cuenta.id_cliente) }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">#{{ item.cuenta.id_venta }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            {% if item.cuenta.fecha_vencimiento %}
+                                {{ item.cuenta.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                                {% if item.esta_vencida %}
+                                <div class="text-xs text-red-600 dark:text-red-400">{{ item.dias_vencido }} dia(s) vencido(s)</div>
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-200">₲ {{ "{:,.0f}".format(item.monto_total).replace(",", ".") }}</td>
+                        <td class="px-4 py-3 text-right text-green-700 dark:text-green-400 font-medium">₲ {{ "{:,.0f}".format(item.monto_cobrado).replace(",", ".") }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">₲ {{ "{:,.0f}".format(item.saldo_pendiente).replace(",", ".") }}</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ item.estado_classes }}">{{ item.estado_label }}</span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <a href="{{ url_for('cobranzas_cuentas.detalle_cuenta', id_cuenta=item.cuenta.id_cuenta_cobrar) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                Ver ficha
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-12 text-sm text-gray-500 dark:text-gray-400">
+            No se encontraron cuentas para el filtro actual.
+        </div>
+        {% endif %}
+    </div>
+
+    {% if listado['paginacion'].pages > 1 %}
+    <div class="flex items-center justify-between gap-3 text-sm">
+        <div class="text-gray-500 dark:text-gray-400">
+            Pagina {{ listado['paginacion'].page }} de {{ listado['paginacion'].pages }}
+        </div>
+        <div class="flex items-center gap-2">
+            {% if listado['paginacion'].has_prev %}
+            <a href="{{ url_for('cobranzas.index', page=listado['paginacion'].prev_num, estado=listado['filtro_estado'], q=listado['busqueda']) }}" class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">Anterior</a>
+            {% endif %}
+            {% if listado['paginacion'].has_next %}
+            <a href="{{ url_for('cobranzas.index', page=listado['paginacion'].next_num, estado=listado['filtro_estado'], q=listado['busqueda']) }}" class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">Siguiente</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

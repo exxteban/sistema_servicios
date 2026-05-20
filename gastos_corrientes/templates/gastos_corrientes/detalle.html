@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalle de gasto corriente{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+            <a href="{{ url_for('gastos_corrientes.index', periodo=request.args.get('periodo'), categoria=request.args.get('categoria'), estado=request.args.get('estado')) }}"
+                class="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                <i class="fas fa-arrow-left"></i>
+                Volver
+            </a>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl font-bold text-gray-900">{{ gasto.nombre }}</h1>
+                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {% if gasto.activo %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                    {% if gasto.activo %}Activo{% else %}Inactivo{% endif %}
+                </span>
+                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-700">
+                    {{ gasto.categoria.replace('_', ' ').title() }}
+                </span>
+            </div>
+            <p class="text-sm text-gray-500 mt-1">{{ gasto.descripcion or 'Sin descripción adicional.' }}</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% if current_user.es_admin() or current_user.tiene_permiso('editar_gastos_corrientes') %}
+            <form method="post" action="{{ url_for('gastos_corrientes.sincronizar_periodo') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="periodo" value="{{ periodo_actual }}">
+                <input type="hidden" name="categoria" value="{{ request.args.get('categoria') or '' }}">
+                <input type="hidden" name="estado" value="{{ request.args.get('estado') or '' }}">
+                <button type="submit"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-indigo-200 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors">
+                    <i class="fas fa-arrows-rotate"></i>
+                    Sincronizar período
+                </button>
+            </form>
+            {% endif %}
+            {% if current_user.es_admin() or current_user.tiene_permiso('registrar_pago_gasto_corriente') %}
+            <a href="{{ url_for('gastos_corrientes.nuevo_pago', id_gasto_corriente=gasto.id_gasto_corriente, periodo=request.args.get('periodo')) }}"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+                <i class="fas fa-cash-register"></i>
+                Registrar pago
+            </a>
+            {% endif %}
+            {% if current_user.es_admin() or current_user.tiene_permiso('editar_gastos_corrientes') %}
+            <a href="{{ url_for('gastos_corrientes.editar', id_gasto_corriente=gasto.id_gasto_corriente) }}"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-blue-200 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors">
+                <i class="fas fa-pen"></i>
+                Editar
+            </a>
+            <form method="post"
+                action="{{ url_for('gastos_corrientes.eliminar', id_gasto_corriente=gasto.id_gasto_corriente) }}"
+                onsubmit="return confirm('¿Eliminar este gasto? Si ya tuvo pagos reales el sistema lo bloqueará para proteger el historial.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="periodo" value="{{ request.args.get('periodo') or periodo_actual }}">
+                <input type="hidden" name="categoria" value="{{ request.args.get('categoria') or '' }}">
+                <input type="hidden" name="estado" value="{{ request.args.get('estado') or '' }}">
+                <input type="hidden" name="tab" value="listado">
+                <button type="submit"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-rose-200 text-sm font-semibold text-rose-700 hover:bg-rose-50 transition-colors">
+                    <i class="fas fa-trash"></i>
+                    Eliminar
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Estimado</p>
+            <p class="mt-2 text-2xl font-black text-gray-900">Gs. {{ '{:,.0f}'.format(gasto.monto_estimado_decimal()).replace(',', '.') }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Día de vencimiento</p>
+            <p class="mt-2 text-2xl font-black text-gray-900">{{ gasto.dia_vencimiento_int() }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Alerta</p>
+            <p class="mt-2 text-lg font-bold {% if gasto.alerta_activa %}text-blue-700{% else %}text-gray-700{% endif %}">
+                {% if gasto.alerta_activa %}Activa · {{ gasto.dias_anticipacion_alerta_int() }} día(s){% else %}Desactivada{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Historial de pagos</h2>
+                <p class="text-sm text-gray-500">Cada pago conserva su trazabilidad con caja y anulación.</p>
+            </div>
+            <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ historial|length }} registros</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-xs">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Período</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Vencimiento</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Pago</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Monto</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Caja</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Adjunto</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Estado</th>
+                        <th class="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for pago in historial %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 align-top text-sm text-gray-700">{{ pago.periodo }}</td>
+                        <td class="px-4 py-3 align-top text-sm text-gray-700">{{ pago.fecha_vencimiento.strftime('%d/%m/%Y') if pago.fecha_vencimiento else '-' }}</td>
+                        <td class="px-4 py-3 align-top text-sm text-gray-700">{{ pago.fecha_pago.strftime('%d/%m/%Y') if pago.fecha_pago else '-' }}</td>
+                        <td class="px-4 py-3 align-top text-sm font-semibold text-gray-900 whitespace-nowrap">Gs. {{ '{:,.0f}'.format(pago.monto_pagado_decimal()).replace(',', '.') }}</td>
+                        <td class="px-4 py-3 align-top text-sm text-gray-700">
+                            {% if pago.pagado_desde_caja %}
+                            Sí{% if pago.id_movimiento_caja %} · mov. #{{ pago.id_movimiento_caja }}{% endif %}
+                            {% else %}
+                            No
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 align-top text-sm text-gray-700">
+                            {% if pago.tiene_comprobante_adjunto() %}
+                            <a href="{{ url_for('gastos_corrientes.ver_comprobante_pago', id_pago=pago.id_pago_gasto_corriente) }}"
+                                target="_blank" rel="noopener"
+                                class="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 transition-colors">
+                                <i class="fas fa-paperclip"></i>
+                                Ver adjunto
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 align-top">
+                            {% if pago.esta_anulado() %}
+                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-rose-100 text-rose-700">Anulado</span>
+                            {% elif (pago.estado or '').strip().lower() == 'pagado' %}
+                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-sky-100 text-sky-700">Pagado</span>
+                            {% else %}
+                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-700">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 align-top">
+                            <div class="flex justify-end gap-2">
+                                {% if (current_user.es_admin() or current_user.tiene_permiso('anular_pago_gasto_corriente')) and (pago.estado or '').strip().lower() == 'pagado' %}
+                                <form method="post" action="{{ url_for('gastos_corrientes.anular_pago', id_pago=pago.id_pago_gasto_corriente) }}"
+                                    class="flex flex-col items-end gap-2"
+                                    onsubmit="return confirm('¿Anular este pago? Si impactó caja se generará una reversa.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="text" name="motivo_anulacion" maxlength="255"
+                                        placeholder="Motivo de anulación"
+                                        class="w-48 rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] text-gray-700 focus:border-rose-500 focus:ring-rose-500">
+                                    <button type="submit"
+                                        class="px-2.5 py-1.5 rounded-lg border border-rose-200 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 transition-colors">
+                                        Anular
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-12 text-center">
+                            <div class="mx-auto max-w-md">
+                                <div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 text-xl">
+                                    <i class="fas fa-receipt"></i>
+                                </div>
+                                <h3 class="mt-4 text-lg font-semibold text-gray-900">Todavía no hay pagos</h3>
+                                <p class="mt-2 text-sm text-gray-500">Registra el primer pago para que aparezca el historial.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

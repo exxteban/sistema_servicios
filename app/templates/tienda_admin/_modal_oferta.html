@@ -1,0 +1,39 @@
+<!-- Modal de Precio Anterior para Oferta -->
+<div id="modalPrecioOferta" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-oferta-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 transition-opacity backdrop-blur-sm opacity-0" id="modalOfertaBackdrop"></div>
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95 sm:my-8 sm:w-full sm:max-w-md border border-gray-100 dark:border-gray-700" id="modalOfertaPanel">
+                <div class="bg-white dark:bg-gray-800 px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fas fa-tags text-red-600 dark:text-red-400"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-lg font-semibold leading-6 text-gray-900 dark:text-white" id="modal-oferta-title">Activar Oferta Especial</h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                    Ingresa el precio anterior del producto. Este se mostrará tachado junto al precio actual para resaltar el descuento.
+                                </p>
+                                <div class="mt-4">
+                                    <label for="precio_anterior_input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Precio Anterior (Opcional)</label>
+                                    <div class="mt-1 relative rounded-md shadow-sm">
+                                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                            <span class="text-gray-500 dark:text-gray-400 sm:text-sm">₲</span>
+                                        </div>
+                                        <input type="number" name="precio_anterior_input" id="precio_anterior_input" class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white pl-8 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm" placeholder="Ej: 150000">
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Solo números, sin puntos ni comas.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 rounded-b-2xl border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" id="btnConfirmarOferta" class="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto transition-colors">Activar Oferta</button>
+                    <button type="button" onclick="cerrarModalOferta()" class="mt-3 inline-flex w-full justify-center rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 sm:mt-0 sm:w-auto transition-colors">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

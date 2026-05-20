@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+
+{% block title %}Contabilidad{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="contabilidadReportApp()" @keydown.escape.window="cerrarDetalleModal()">
+    <script id="contabilidad-detalle-modal-data" type="application/json">{{ detalle_modal|tojson }}</script>
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-calculator text-emerald-600 dark:text-emerald-400 mr-2"></i>Cierre Contable
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Resumen de ingresos y egresos por período
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('caja.contabilidad_pdf', desde=desde.isoformat() if desde else '', hasta=hasta.isoformat() if hasta else '') }}" target="_blank"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition border border-emerald-700 flex items-center">
+                <i class="fas fa-file-pdf mr-2"></i><span>Generar PDF</span>
+            </a>
+            <a href="{{ url_for('caja.cierres_listar') }}" data-permiso="ver_caja"
+                data-tab-url="{{ url_for('caja.cierres_listar') }}" data-tab-title="Cierres de Caja"
+                data-tab-icon="fas fa-file-invoice-dollar"
+                class="app-tab-link bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition">
+                <i class="fas fa-file-invoice-dollar mr-2"></i>Cierres
+            </a>
+            <a href="{{ url_for('caja.contabilidad_imprimir', desde=desde.isoformat() if desde else '', hasta=hasta.isoformat() if hasta else '', partial=1, include_css=1) }}"
+                target="_blank" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                <i class="fas fa-print mr-2"></i>Imprimir
+            </a>
+        </div>
+    </div>
+
+    <div id="pdf-report-content">
+        <form method="GET" action="{{ url_for('caja.contabilidad') }}" data-html2canvas-ignore="true"
+            class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Desde</label>
+                    <input type="date" name="desde" value="{{ desde.isoformat() if desde else '' }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Hasta</label>
+                    <input type="date" name="hasta" value="{{ hasta.isoformat() if hasta else '' }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit"
+                        class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg font-semibold transition">
+                        <i class="fas fa-filter mr-2"></i>Filtrar
+                    </button>
+                    <a href="{{ url_for('caja.contabilidad') }}"
+                        class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-lg font-semibold transition">
+                        <i class="fas fa-rotate-left"></i>
+                    </a>
+                </div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    <span class="font-medium">Período:</span>
+                    {{ desde.strftime('%d/%m/%Y') if desde else '-' }} - {{ hasta.strftime('%d/%m/%Y') if hasta else '-'
+                    }}
+                </div>
+            </div>
+        </form>
+
+        <div class="mb-4 text-sm text-gray-500 dark:text-gray-400" id="pdf-periodo-label">
+            <span class="font-bold">Período del Reporte:</span>
+            {{ desde.strftime('%d/%m/%Y') if desde else '-' }} - {{ hasta.strftime('%d/%m/%Y') if hasta else '-' }}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-4 xl:max-w-[1180px] mx-auto">
+            <div
+                class="{% if resultado_caja_mes >= 0 %}bg-gray-900 border border-gray-800{% else %}bg-gradient-to-br from-orange-500 to-orange-600{% endif %} rounded-xl shadow-md p-4 text-white min-h-[128px]">
+                <div class="max-w-[14.5rem]">
+                    <p class="{% if resultado_caja_mes >= 0 %}text-gray-200{% else %}text-orange-100{% endif %} text-sm">Resultado Caja</p>
+                    <p class="text-[1.75rem] lg:text-[1.85rem] xl:text-[1.95rem] font-bold mt-1 leading-tight">₲ {{ "{:,.0f}".format(resultado_caja_mes).replace(",", ".") }}</p>
+                    <p class="{% if resultado_caja_mes >= 0 %}text-gray-200{% else %}text-orange-100{% endif %} text-xs mt-2 leading-snug">
+                        Flujo real del período, incluyendo movimientos manuales.
+                    </p>
+                </div>
+            </div>
+            <div
+                class="bg-gradient-to-br {% if ganancia_neta_mes >= 0 %}from-blue-500 to-blue-600{% else %}from-rose-500 to-rose-600{% endif %} rounded-xl shadow-md p-4 text-white min-h-[128px]">
+                <div class="max-w-[14.5rem]">
+                    <p class="{% if ganancia_neta_mes >= 0 %}text-white/90{% else %}text-rose-100{% endif %} text-sm">Ganancia Neta</p>
+                    <p class="text-[1.75rem] lg:text-[1.85rem] xl:text-[1.95rem] font-bold mt-1 leading-tight">₲ {{ "{:,.0f}".format(ganancia_neta_mes).replace(",", ".") }}</p>
+                    <p class="{% if ganancia_neta_mes >= 0 %}text-white/80{% else %}text-rose-100{% endif %} text-xs mt-2 leading-snug">
+                        Excluye ingresos manuales y descuenta gastos corrientes del mes.
+                    </p>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-md p-4 text-white min-h-[128px]">
+                <button type="button" @click="abrirDetalleModal('ingresos')"
+                    class="w-full h-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-white/70">
+                    <div class="max-w-[14.5rem]">
+                        <p class="text-white/90 text-sm">Ingresos Caja</p>
+                        <p class="text-[1.75rem] lg:text-[1.85rem] xl:text-[1.95rem] font-bold mt-1 leading-tight">₲ {{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</p>
+                        <p class="text-white/80 text-xs mt-2 leading-snug">Ventas + cobros + ajustes + reversas.</p>
+                        <p class="text-white/80 text-[11px] mt-2 font-semibold uppercase tracking-wide">Click para ver detalle</p>
+                    </div>
+                </button>
+            </div>
+            <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-md p-4 text-white min-h-[128px]">
+                <button type="button" @click="abrirDetalleModal('egresos')"
+                    class="w-full h-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-white/70">
+                    <div class="max-w-[14.5rem]">
+                        <p class="text-red-100 text-sm">Egresos Caja</p>
+                        <p class="text-[1.75rem] lg:text-[1.85rem] xl:text-[1.95rem] font-bold mt-1 leading-tight">₲ {{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</p>
+                        <p class="text-red-100 text-xs mt-2 leading-snug">Compras + egresos + anulaciones del período.</p>
+                        <p class="text-red-100 text-[11px] mt-2 font-semibold uppercase tracking-wide">Click para ver detalle</p>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-3 lg:gap-4 xl:max-w-[1380px] mx-auto">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Ventas Emitidas</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(ventas_emitidas).replace(",", ".") }}</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Cobrado en Ventas</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(cobrado_en_ventas).replace(",", ".") }}</p>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Solo incluye pagos registrados al momento de la venta.</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Saldo Financiado</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(saldo_financiado_generado).replace(",", ".") }}</p>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Monto enviado a cuenta por cobrar en ventas a credito.</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Cobros de Créditos</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(total_cobros_creditos).replace(",", ".") }}</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Interés Financiero</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(interes_financiero_generado).replace(",", ".") }}</p>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Se genera solo en planes de cuotas con interes.</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Pagos de Compras</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(total_pagos_compras).replace(",", ".") }}</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Gastos Corrientes</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(gastos_corrientes_mes).replace(",", ".") }}</p>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">
+                        {% if gastos_corrientes_fuera_caja > 0 %}
+                        Incluye ₲ {{ "{:,.0f}".format(gastos_corrientes_fuera_caja).replace(",", ".") }} pagados fuera de caja.
+                        {% else %}
+                        Todos los gastos del período impactaron desde caja.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Descuentos Manuales</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-amber-600 dark:text-amber-400 mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(descuentos_manuales_ventas).replace(",", ".") }}</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Desc. Fidelización</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-emerald-600 dark:text-emerald-400 mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(descuentos_fidelizacion_ventas).replace(",", ".") }}</p>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Incluye saldo a favor y beneficios aplicados.</p>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="max-w-[11.5rem] pr-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Saldo a Favor Usado</p>
+                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-cyan-600 dark:text-cyan-400 mt-1 leading-tight">₲ {{
+                        "{:,.0f}".format(saldo_favor_fidelizacion_aplicado).replace(",", ".") }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden mt-6">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="font-semibold text-gray-700 dark:text-gray-200">Ajustes Comerciales No Caja</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for row in conceptos_no_caja %}
+                        <tr>
+                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ row.concepto }}</td>
+                            <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(row.monto or 0).replace(",", ".") }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="2" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">Sin ajustes comerciales no caja en el período.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl px-4 py-3 text-sm text-blue-900 dark:text-blue-100 space-y-1">
+            <p>
+                <span class="font-semibold">Lectura del informe:</span>
+                Resultado Caja usa cobros reales (incluye movimientos manuales). Ganancia Neta mide rendimiento operativo del mes.
+            </p>
+            {% if resultado_caja_mes >= 0 and ganancia_neta_mes < 0 %}
+            <p>
+                Hay caja positiva, pero la operación del mes dio pérdida. Puede ocurrir por cobros de créditos o ingresos manuales
+                (por ejemplo, inicio de caja) que aumentan caja, pero no cuentan como ganancia operativa.
+            </p>
+            {% elif resultado_caja_mes < 0 and ganancia_neta_mes >= 0 %}
+            <p>
+                La operación del mes es rentable, pero la caja quedó negativa por salidas de efectivo del período (pagos, compras o
+                gastos) mayores a los cobros en caja.
+            </p>
+            {% elif resultado_caja_mes >= 0 and ganancia_neta_mes >= 0 %}
+            <p>
+                Escenario saludable: hubo liquidez positiva y también rentabilidad operativa.
+            </p>
+            {% else %}
+            <p>
+                Señal de alerta: hubo salida neta de caja y además pérdida operativa en el período.
+            </p>
+            {% endif %}
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="font-semibold text-gray-700 dark:text-gray-200">Flujo de Caja por Concepto</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Entrada</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Salida</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for row in conceptos %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ row.concepto }}</td>
+                            <td
+                                class="px-4 py-3 text-right {% if row.entrada > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-gray-800 dark:text-gray-100{% endif %}">
+                                ₲ {{ "{:,.0f}".format(row.entrada or 0).replace(",", ".") }}
+                            </td>
+                            <td
+                                class="px-4 py-3 text-right {% if row.salida > 0 %}text-red-600 dark:text-red-400{% else %}text-gray-800 dark:text-gray-100{% endif %}">
+                                ₲ {{ "{:,.0f}".format(row.salida or 0).replace(",", ".") }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if conceptos|length == 0 %}
+                        <tr>
+                            <td colspan="3" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                                No hay movimientos en el período seleccionado.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                    <tfoot class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <td class="px-4 py-3 text-right font-bold text-gray-800 dark:text-gray-100">Totales</td>
+                            <td class="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                                <button type="button" @click="abrirDetalleModal('ingresos')"
+                                    class="inline-flex items-center gap-2 rounded-md px-2 py-1 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
+                                    <span>₲ {{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</span>
+                                    <i class="fas fa-up-right-from-square text-xs"></i>
+                                </button>
+                            </td>
+                            <td class="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400">
+                                <button type="button" @click="abrirDetalleModal('egresos')"
+                                    class="inline-flex items-center gap-2 rounded-md px-2 py-1 hover:bg-red-50 dark:hover:bg-red-900/20 focus:outline-none focus:ring-2 focus:ring-red-500/40">
+                                    <span>₲ {{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</span>
+                                    <i class="fas fa-up-right-from-square text-xs"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <h2 class="font-semibold text-gray-700 dark:text-gray-200">Detalle Operativo y de Caja</h2>
+                <span class="text-sm text-gray-500 dark:text-gray-400">{{ detalles|length }} registros</span>
+            </div>
+            <div class="overflow-x-auto max-h-96">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+                        <tr>
+                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Tipo</th>
+                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Referencia
+                            </th>
+                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Detalle
+                            </th>
+                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Forma de Pago
+                            </th>
+                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Entrada</th>
+                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Salida</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for d in detalles %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                            <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ d.fecha|local_strftime('%d/%m/%Y
+                                %H:%M') }}</td>
+                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ d.concepto }}</td>
+                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ d.referencia }}</td>
+                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ d.detalle }}</td>
+                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ d.forma_pago }}</td>
+                            <td
+                                class="px-4 py-3 text-right {% if d.entrada > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-gray-800 dark:text-gray-100{% endif %}">
+                                ₲ {{ "{:,.0f}".format(d.entrada or 0).replace(",", ".") }}
+                            </td>
+                            <td
+                                class="px-4 py-3 text-right {% if d.salida > 0 %}text-red-600 dark:text-red-400{% else %}text-gray-800 dark:text-gray-100{% endif %}">
+                                ₲ {{ "{:,.0f}".format(d.salida or 0).replace(",", ".") }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if detalles|length == 0 %}
+                        <tr>
+                            <td colspan="7" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                                No hay movimientos en el período seleccionado.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="detalleModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="fixed inset-0 bg-gray-900/60" @click="cerrarDetalleModal()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div x-show="detalleModalOpen" x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                class="relative w-full max-w-6xl rounded-2xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="detalleModalTitulo"></h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Período filtrado: {{ desde.strftime('%d/%m/%Y') if desde else '-' }} - {{ hasta.strftime('%d/%m/%Y') if hasta else '-' }}
+                        </p>
+                    </div>
+                    <button type="button" @click="cerrarDetalleModal()"
+                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400/40 rounded-lg p-2">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Total</p>
+                        <p class="mt-1 text-2xl font-bold"
+                            :class="detalleModalTipo === 'ingresos' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
+                            x-text="'₲ ' + formatMoney(detalleModalTotal)"></p>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Registros</p>
+                        <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white" x-text="detalleModalCount"></p>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo</p>
+                        <p class="mt-1 text-sm font-semibold"
+                            :class="detalleModalTipo === 'ingresos' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
+                            x-text="detalleModalTipo === 'ingresos' ? 'Entradas del período' : 'Salidas del período'"></p>
+                    </div>
+                </div>
+
+                <div class="max-h-[70vh] overflow-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Referencia</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Detalle</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Forma de Pago</th>
+                                <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <template x-for="(item, index) in detalleModalItems" :key="`${detalleModalTipo}-${index}`">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300" x-text="item.fecha || '-'"></td>
+                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100" x-text="item.concepto || '-'"></td>
+                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100" x-text="item.referencia || '-'"></td>
+                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100" x-text="item.detalle || '-'"></td>
+                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100" x-text="item.forma_pago || '-'"></td>
+                                    <td class="px-4 py-3 text-right font-semibold"
+                                        :class="detalleModalTipo === 'ingresos' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
+                                        x-text="'₲ ' + formatMoney(item.monto)"></td>
+                                </tr>
+                            </template>
+                            <tr x-show="!detalleModalItems.length">
+                                <td colspan="6" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                                    No hay registros para este total con el filtro actual.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                    <button type="button" @click="cerrarDetalleModal()"
+                        class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function contabilidadReportApp() {
+        let payload = {};
+        try {
+            const raw = document.getElementById('contabilidad-detalle-modal-data')?.textContent || '{}';
+            payload = JSON.parse(raw);
+        } catch (error) {
+            payload = {};
+        }
+        return {
+            detalleFuente: payload || {},
+            detalleModalOpen: false,
+            detalleModalTipo: 'ingresos',
+            detalleModalTitulo: '',
+            detalleModalItems: [],
+            detalleModalTotal: 0,
+            detalleModalCount: 0,
+            formatMoney(value) {
+                const number = Number(value || 0);
+                return new Intl.NumberFormat('es-PY').format(Number.isFinite(number) ? number : 0);
+            },
+            abrirDetalleModal(tipo) {
+                const modalTipo = tipo === 'egresos' ? 'egresos' : 'ingresos';
+                const payload = this.detalleFuente?.[modalTipo] || {};
+                this.detalleModalTipo = modalTipo;
+                this.detalleModalTitulo = modalTipo === 'ingresos' ? 'Detalle de Ingresos Caja' : 'Detalle de Egresos Caja';
+                this.detalleModalItems = Array.isArray(payload.items) ? payload.items : [];
+                this.detalleModalTotal = Number(payload.total || 0);
+                this.detalleModalCount = Number(payload.count || this.detalleModalItems.length || 0);
+                this.detalleModalOpen = true;
+            },
+            cerrarDetalleModal() {
+                this.detalleModalOpen = false;
+            }
+        }
+    }
+</script>
+{% endblock %}

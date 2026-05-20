@@ -1,0 +1,2835 @@
+/* =========================================
+   Demo contact badge animation
+   ========================================= */
+@keyframes pulse-subtle {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+    50%       { opacity: 0.88; box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.18); }
+}
+
+/* =========================================
+   Top Navigation Bar — crm-topnav
+   ========================================= */
+.crm-topnav {
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+    border-bottom: 1px solid rgba(30, 58, 138, 0.8);
+    z-index: 12110;
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.08) inset,
+        0 4px 24px rgba(29, 78, 216, 0.55),
+        0 1px 3px rgba(0,0,0,0.3);
+}
+
+.crm-topnav__brand {
+    flex: 1 1 18rem;
+    min-width: 0;
+}
+
+.crm-topnav__brand-link,
+.crm-topnav__brand-copy {
+    min-width: 0;
+}
+
+.crm-topnav__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    row-gap: 0.5rem;
+}
+
+/* Logo icon container */
+.crm-logo-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.625rem;
+    background: linear-gradient(145deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 100%);
+    border: 1px solid rgba(255,255,255,0.28);
+    box-shadow:
+        0 2px 8px rgba(0,0,0,0.25),
+        0 0 0 1px rgba(255,255,255,0.06) inset,
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+#app-logo-link:hover .crm-logo-icon {
+    box-shadow:
+        0 4px 16px rgba(0,0,0,0.3),
+        0 0 0 1px rgba(255,255,255,0.1) inset,
+        inset 0 1px 0 rgba(255,255,255,0.35);
+    border-color: rgba(255,255,255,0.45);
+    transform: translateY(-1px);
+}
+
+/* Brand name pill (tenant name) */
+.crm-brand-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 0.1rem 0.65rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgba(255,255,255,0.9);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+/* Nav pills (Agenda, Asistente IA) */
+.crm-nav-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: 0.5rem;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.92);
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.crm-nav-pill:hover {
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.3);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.18);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+/* Icon-only nav button (dark mode toggle, bell, etc.) */
+.crm-nav-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: rgba(255,255,255,0.8);
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.crm-nav-icon-btn:hover {
+    background: rgba(255,255,255,0.16);
+    border-color: rgba(255,255,255,0.28);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+    color: #fff;
+}
+
+/* Logout button */
+.crm-logout-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.4rem 0.875rem;
+    border-radius: 0.5rem;
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    box-shadow:
+        0 2px 8px rgba(220, 38, 38, 0.5),
+        0 1px 3px rgba(0,0,0,0.25),
+        inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.crm-logout-btn:hover {
+    background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
+    box-shadow:
+        0 4px 16px rgba(220, 38, 38, 0.6),
+        0 2px 6px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(255,255,255,0.25);
+    transform: translateY(-1px);
+}
+
+.crm-logout-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(220, 38, 38, 0.4);
+}
+
+@media (max-width: 1100px) {
+    .crm-topnav__inner {
+        height: auto;
+        min-height: 3.5rem;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.75rem;
+        padding: 0.55rem 0;
+    }
+
+    .crm-topnav__brand {
+        flex-basis: 100%;
+        padding-right: 0;
+    }
+
+    .crm-topnav__actions {
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .crm-topnav__clock,
+    .crm-topnav__user,
+    .crm-topnav__separator {
+        display: none !important;
+    }
+
+    .crm-topnav__action-label,
+    .crm-topnav__logout-label {
+        display: none !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .crm-topnav__brand-link {
+        gap: 0.65rem;
+    }
+
+    .crm-topnav__title-row {
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.1rem 0.45rem;
+    }
+
+    .crm-topnav__title-main {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .crm-topnav__title-secondary {
+        display: block !important;
+        width: 100%;
+        font-size: 0.67rem;
+        letter-spacing: 0.16em;
+        white-space: normal;
+    }
+
+    .crm-brand-pill {
+        max-width: 100%;
+    }
+
+    .crm-topnav__actions {
+        justify-content: space-between;
+    }
+
+    .crm-nav-pill,
+    .crm-logout-btn {
+        padding-left: 0.7rem;
+        padding-right: 0.7rem;
+    }
+}
+
+/* =========================================
+   CSS Custom Variables - Dark Mode Palette
+   ========================================= */
+:root {
+    --bg-base: #f3f4f6;
+    --bg-surface: #ffffff;
+    --bg-elevated: #f9fafb;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --border-color: rgba(0, 0, 0, 0.08);
+}
+
+.dark {
+    --bg-base: #0f1117;
+    --bg-surface: #1a1d27;
+    --bg-elevated: #21253a;
+    --bg-chat: #131620;
+    --bg-panel: #1a1d27;
+    --bg-sidebar: #111318;
+    --bg-input: #252836;
+    --bg-input-focus: #2d3148;
+    --text-primary: #e8eaf0;
+    --text-secondary: #8b90a0;
+    --text-muted: #555c72;
+    --border-color: rgba(255, 255, 255, 0.06);
+    --border-subtle: rgba(255, 255, 255, 0.04);
+    --accent-teal: #2dd4bf;
+    --accent-blue: #60a5fa;
+    --msg-outgoing-asesor: rgba(20, 184, 166, 0.18);
+    --msg-outgoing-bot: rgba(59, 130, 246, 0.15);
+    --msg-incoming: rgba(255, 255, 255, 0.05);
+}
+
+/* =========================================
+   Light Mode - CRM Overrides
+   ========================================= */
+
+/* Sub-nav bar - light mode */
+html:not(.dark) .crm-subnav {
+    background-color: #ffffff !important;
+    border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+    backdrop-filter: none !important;
+}
+
+/* Sub-nav bar - dark mode (restore) */
+.dark .crm-subnav {
+    background-color: #161923 !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Sub-nav links - light mode */
+html:not(.dark) .crm-subnav a {
+    color: #4b5563 !important;
+}
+
+html:not(.dark) .crm-subnav a:hover {
+    color: #111827 !important;
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Active sub-nav link - light mode */
+html:not(.dark) .crm-subnav a.text-teal-300,
+html:not(.dark) .crm-subnav a.bg-teal-500\/20 {
+    color: #0d9488 !important;
+    background-color: rgba(13, 148, 136, 0.1) !important;
+}
+
+/* Search input in subnav - light mode */
+html:not(.dark) .crm-subnav input[type="text"] {
+    background-color: #f3f4f6 !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+    color: #111827 !important;
+}
+
+html:not(.dark) .crm-subnav input[type="text"]::placeholder {
+    color: #9ca3af !important;
+}
+
+html:not(.dark) .crm-subnav input[type="text"]:focus {
+    background-color: #ffffff !important;
+    border-color: rgba(13, 148, 136, 0.5) !important;
+}
+
+html:not(.dark) .crm-subnav .fa-search {
+    color: #9ca3af !important;
+}
+
+/* Search results dropdown - light mode */
+html:not(.dark) .crm-subnav [x-show] {
+    background-color: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not(.dark) .crm-subnav [x-show] a {
+    color: #374151 !important;
+}
+
+html:not(.dark) .crm-subnav [x-show] a:hover {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Bandeja - filter button group + Monitor IA incoming bubble */
+html:not(.dark) .bg-gray-800\/60 {
+    background-color: #e5e7eb !important;
+    color: #111827 !important;
+}
+
+/* Bandeja - filter buttons inactive state */
+html:not(.dark) .bg-gray-800\/60 button.text-gray-400 {
+    color: #6b7280 !important;
+}
+
+/* Bandeja - select (etiquetas) */
+html:not(.dark) select.bg-gray-700\/50,
+html:not(.dark) select.text-gray-200 {
+    background-color: #f3f4f6 !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+    color: #374151 !important;
+}
+
+/* Bandeja - "Solo activas" label */
+html:not(.dark) label.text-gray-400 {
+    color: #6b7280 !important;
+}
+
+/* Bandeja - checkbox */
+html:not(.dark) input[type="checkbox"].bg-gray-700 {
+    background-color: #ffffff !important;
+    border-color: #d1d5db !important;
+}
+
+/* Bandeja - conversation card */
+html:not(.dark) .bg-gray-800\/50 {
+    background-color: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+html:not(.dark) .bg-gray-800\/50:hover,
+html:not(.dark) .hover\:bg-gray-700\/60:hover {
+    background-color: #f0fdf9 !important;
+    border-color: rgba(13, 148, 136, 0.3) !important;
+}
+
+/* Conversation card - name text */
+html:not(.dark) .text-gray-100 {
+    color: #111827 !important;
+}
+
+/* Conversation card - last message text */
+html:not(.dark) .bg-gray-800\/50 .text-gray-400,
+html:not(.dark) .bg-gray-800\/50 p.text-gray-400 {
+    color: #6b7280 !important;
+}
+
+/* Conversation card - timestamp */
+html:not(.dark) .text-gray-500 {
+    color: #9ca3af !important;
+}
+
+/* Pagination buttons */
+html:not(.dark) .bg-gray-700\/50 {
+    background-color: #e5e7eb !important;
+    color: #374151 !important;
+}
+
+html:not(.dark) .hover\:bg-gray-600\/50:hover {
+    background-color: #d1d5db !important;
+}
+
+/* ---- Filter buttons: selected state text visibility ---- */
+/* "Todas" selected: teal-300 text is invisible on light bg → use dark teal */
+html:not(.dark) .bg-teal-500\/30 {
+    background-color: rgba(13, 148, 136, 0.18) !important;
+    color: #0f766e !important;
+}
+
+/* "Bot" selected: blue-300 text invisible on light bg */
+html:not(.dark) .bg-blue-500\/30 {
+    background-color: rgba(59, 130, 246, 0.18) !important;
+    color: #1d4ed8 !important;
+}
+
+/* "Pendientes" selected: yellow-300 invisible on light bg */
+html:not(.dark) .bg-yellow-500\/30 {
+    background-color: rgba(234, 179, 8, 0.18) !important;
+    color: #92400e !important;
+}
+
+/* "Asesor" selected: green-300 invisible on light bg */
+html:not(.dark) .bg-green-500\/30 {
+    background-color: rgba(34, 197, 94, 0.18) !important;
+    color: #166534 !important;
+}
+
+/* Filter button inactive text */
+html:not(.dark) .bg-gray-800\/60 button {
+    color: #4b5563 !important;
+}
+
+/* ---- Page titles (text-gray-200 used as heading) ---- */
+html:not(.dark) h1.text-gray-200,
+html:not(.dark) h2.text-gray-200 {
+    color: #111827 !important;
+}
+
+/* ---- Section headings (text-gray-300) ---- */
+html:not(.dark) h2.text-gray-300,
+html:not(.dark) h3.text-gray-300 {
+    color: #374151 !important;
+}
+
+/* ---- Dashboard KPI cards ---- */
+html:not(.dark) .text-teal-300 {
+    color: #0d9488 !important;
+}
+
+html:not(.dark) .text-blue-300 {
+    color: #1d4ed8 !important;
+}
+
+html:not(.dark) .text-purple-300 {
+    color: #7c3aed !important;
+}
+
+html:not(.dark) .text-green-300 {
+    color: #166534 !important;
+}
+
+/* ---- Monitor IA: robot icon area - soften blue ---- */
+html:not(.dark) .bg-blue-500\/15 {
+    background-color: rgba(99, 102, 241, 0.1) !important;
+}
+
+html:not(.dark) .text-blue-400 {
+    color: #6366f1 !important;
+}
+
+/* Monitor IA panels */
+html:not(.dark) .bg-gray-800\/40 {
+    background-color: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html:not(.dark) .bg-gray-900\/30 {
+    background-color: #f9fafb !important;
+}
+
+html:not(.dark) .bg-gray-900\/20 {
+    background-color: #f3f4f6 !important;
+}
+
+/* Monitor IA: active filter pills */
+html:not(.dark) .bg-blue-500\/20 {
+    background-color: rgba(99, 102, 241, 0.12) !important;
+}
+
+html:not(.dark) .bg-emerald-500\/20 {
+    background-color: rgba(16, 185, 129, 0.12) !important;
+}
+
+html:not(.dark) .bg-emerald-500\/15 {
+    background-color: rgba(16, 185, 129, 0.1) !important;
+}
+
+html:not(.dark) .bg-yellow-500\/20 {
+    background-color: rgba(234, 179, 8, 0.12) !important;
+}
+
+html:not(.dark) .bg-yellow-500\/15 {
+    background-color: rgba(234, 179, 8, 0.1) !important;
+}
+
+html:not(.dark) .bg-purple-500\/15 {
+    background-color: rgba(168, 85, 247, 0.1) !important;
+}
+
+/* Monitor IA: conversation list item selected + outgoing bot bubble */
+html:not(.dark) .bg-blue-500\/10 {
+    background-color: rgba(99, 102, 241, 0.09) !important;
+    color: #312e81 !important;
+}
+
+/* Monitor IA: chat bubbles (outgoing asesor) */
+html:not(.dark) .bg-emerald-500\/10 {
+    background-color: rgba(16, 185, 129, 0.1) !important;
+    color: #064e3b !important;
+}
+
+/* Monitor IA: text-blue-100 / text-emerald-100 in light mode */
+html:not(.dark) .text-blue-100 {
+    color: #312e81 !important;
+}
+
+html:not(.dark) .text-emerald-100 {
+    color: #064e3b !important;
+}
+
+html:not(.dark) .text-emerald-300 {
+    color: #065f46 !important;
+}
+
+html:not(.dark) .text-yellow-300 {
+    color: #92400e !important;
+}
+
+html:not(.dark) .text-yellow-400 {
+    color: #b45309 !important;
+}
+
+/* Config form background + Dashboard table header */
+html:not(.dark) .bg-gray-700\/30 {
+    background-color: #f3f4f6 !important;
+}
+
+html:not(.dark) table thead th.text-gray-500 {
+    color: #6b7280 !important;
+}
+
+html:not(.dark) table tbody td.text-gray-200 {
+    color: #111827 !important;
+}
+
+html:not(.dark) .hover\:bg-gray-700\/20:hover {
+    background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Dashboard: bar chart date labels */
+html:not(.dark) .text-gray-600 {
+    color: #9ca3af !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .bg-gray-900\/40 {
+    background-color: #e2e8f0 !important;
+    border-color: rgba(15, 23, 42, 0.14) !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .bg-gray-800\/50 {
+    background-color: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.12) !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08) !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .bg-gray-700\/20,
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .bg-gray-700\/30,
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .bg-gray-700\/40,
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .bg-gray-700\/50 {
+    background-color: #f8fafc !important;
+    border-color: rgba(148, 163, 184, 0.45) !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .text-gray-100,
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .text-gray-200 {
+    color: #0f172a !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .text-gray-300 {
+    color: #1f2937 !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .text-gray-400 {
+    color: #475569 !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .text-gray-500 {
+    color: #334155 !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .text-teal-300 {
+    color: #0f766e !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .text-cyan-300 {
+    color: #0e7490 !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] .text-amber-200 {
+    color: #92400e !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] input[type="text"],
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] input[type="number"],
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] textarea {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] input[type="text"]::placeholder,
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] input[type="number"]::placeholder,
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] textarea::placeholder {
+    color: #64748b !important;
+}
+
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] input[type="text"]:focus,
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] input[type="number"]:focus,
+html:not(.dark) body.crm-config-active [x-data="crmConfig()"] textarea:focus {
+    border-color: rgba(13, 148, 136, 0.55) !important;
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+}
+
+html:not(.dark) body.crm-config-active label:has(input[x-model="distribucion.timeout_no_aceptado.accion"][value="reasignar"]:checked),
+html:not(.dark) body.crm-config-active label:has(input[x-model="distribucion.timeout_sin_respuesta.accion"][value="reasignar"]:checked) {
+    background-color: rgba(20, 184, 166, 0.2) !important;
+    color: #0f766e !important;
+    border-color: rgba(13, 148, 136, 0.65) !important;
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.18), 0 8px 20px -12px rgba(13, 148, 136, 0.45) !important;
+}
+
+html:not(.dark) body.crm-config-active label:has(input[x-model="distribucion.timeout_no_aceptado.accion"][value="cola_general"]:checked),
+html:not(.dark) body.crm-config-active label:has(input[x-model="distribucion.timeout_sin_respuesta.accion"][value="cola_general"]:checked) {
+    background-color: rgba(245, 158, 11, 0.2) !important;
+    color: #92400e !important;
+    border-color: rgba(217, 119, 6, 0.62) !important;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2), 0 8px 20px -12px rgba(180, 83, 9, 0.45) !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left {
+    background-color: #f8fafc !important;
+    border-right-color: rgba(15, 23, 42, 0.14) !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .bg-gray-950\/30,
+html:not(.dark) [x-data="crmAsesor()"] .bg-gray-950\/20 {
+    background-color: #f1f5f9 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .bg-gray-900\/40,
+html:not(.dark) [x-data="crmAsesor()"] .bg-gray-900\/90 {
+    background-color: #e2e8f0 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .bg-gray-800\/40,
+html:not(.dark) [x-data="crmAsesor()"] .bg-gray-700\/50,
+html:not(.dark) [x-data="crmAsesor()"] .bg-white\/5 {
+    background-color: #ffffff !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .border-white\/10,
+html:not(.dark) [x-data="crmAsesor()"] .border-white\/8,
+html:not(.dark) [x-data="crmAsesor()"] .border-white\/5 {
+    border-color: rgba(148, 163, 184, 0.38) !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .text-gray-100 {
+    color: #0f172a !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .text-gray-500 {
+    color: #334155 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .text-gray-400 {
+    color: #475569 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .hover\:text-white:hover {
+    color: #0f172a !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .text-teal-300 {
+    color: #0f766e !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .text-green-300 {
+    color: #166534 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .text-yellow-300 {
+    color: #92400e !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .text-teal-50 {
+    color: #115e59 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .text-blue-100 {
+    color: #1e3a8a !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .bg-white\/6 {
+    background-color: #f8fafc !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .hover\:bg-gray-700\/50:hover,
+html:not(.dark) [x-data="crmAsesor()"] .hover\:bg-gray-600\/50:hover {
+    background-color: #ecfeff !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] textarea {
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] textarea::placeholder {
+    color: #64748b !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left .text-xs.font-medium.text-gray-100 {
+    color: #0b1220 !important;
+    font-weight: 600 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left .text-xs.text-gray-500.truncate {
+    color: #475569 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left .text-xs.text-gray-500.flex-shrink-0 {
+    color: #334155 !important;
+    font-weight: 600 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left .text-yellow-400,
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left .text-teal-400 {
+    color: #0f766e !important;
+    font-weight: 600 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left .rounded-xl.bg-teal-500\/20 {
+    background-color: rgba(13, 148, 136, 0.14) !important;
+    border-color: rgba(13, 148, 136, 0.42) !important;
+    box-shadow: 0 4px 12px -10px rgba(13, 148, 136, 0.42) !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left .bg-yellow-500\/20 {
+    background-color: rgba(245, 158, 11, 0.2) !important;
+    color: #92400e !important;
+    border: 1px solid rgba(217, 119, 6, 0.35) !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .crm-panel-left .bg-green-500\/20 {
+    background-color: rgba(34, 197, 94, 0.18) !important;
+    color: #166534 !important;
+    border: 1px solid rgba(22, 163, 74, 0.34) !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] #chat-messages .opacity-50 {
+    opacity: 0.72 !important;
+    color: #334155 !important;
+}
+
+html:not(.dark) [x-data="crmAsesor()"] .bg-teal-500\/15 .opacity-50,
+html:not(.dark) [x-data="crmAsesor()"] .bg-blue-500\/15 .opacity-50 {
+    color: rgba(15, 23, 42, 0.72) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) {
+    --crm-light-surface-0: #ffffff;
+    --crm-light-surface-1: #f8fafc;
+    --crm-light-surface-2: #f1f5f9;
+    --crm-light-surface-3: #e2e8f0;
+    --crm-light-border-soft: rgba(148, 163, 184, 0.38);
+    --crm-light-border-strong: rgba(15, 23, 42, 0.14);
+    --crm-light-text-main: #0f172a;
+    --crm-light-text-strong: #0b1220;
+    --crm-light-text-muted: #334155;
+    --crm-light-text-subtle: #475569;
+    --crm-light-accent-teal: #0f766e;
+    --crm-light-accent-blue: #1e3a8a;
+    --crm-light-accent-green: #166534;
+    --crm-light-accent-yellow: #92400e;
+    --crm-light-chat-meta: rgba(15, 23, 42, 0.72);
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) :is(.crm-panel-left, .crm-panel-right) {
+    background-color: var(--crm-light-surface-1) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .border-r.border-white\/10 {
+    border-right-color: var(--crm-light-border-strong) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .border-l.border-white\/10 {
+    border-left-color: var(--crm-light-border-strong) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .border-b.border-white\/10,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .border-t.border-white\/8,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .border.border-white\/10,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .border.border-white\/5 {
+    border-color: var(--crm-light-border-soft) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-gray-950\/30,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-gray-950\/20 {
+    background-color: var(--crm-light-surface-2) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-gray-900\/40,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-gray-900\/90,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-gray-900 {
+    background-color: var(--crm-light-surface-3) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-gray-800\/40,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-gray-700\/50,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-white\/5 {
+    background-color: var(--crm-light-surface-0) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-gray-100,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-gray-200 {
+    color: var(--crm-light-text-main) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-gray-500 {
+    color: var(--crm-light-text-muted) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-gray-400 {
+    color: var(--crm-light-text-subtle) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-teal-300 {
+    color: var(--crm-light-accent-teal) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-blue-100,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-blue-300 {
+    color: var(--crm-light-accent-blue) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-green-300 {
+    color: var(--crm-light-accent-green) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-yellow-300 {
+    color: var(--crm-light-accent-yellow) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-teal-50 {
+    color: #115e59 !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-teal-500\/20 {
+    background-color: rgba(13, 148, 136, 0.14) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-blue-500\/20,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-blue-500\/15 {
+    background-color: rgba(59, 130, 246, 0.16) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-green-500\/20,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-green-500\/15 {
+    background-color: rgba(34, 197, 94, 0.18) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-yellow-500\/20,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-yellow-500\/15,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-yellow-500\/10,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-yellow-500\/5 {
+    background-color: rgba(245, 158, 11, 0.2) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .bg-red-500\/15 {
+    background-color: rgba(239, 68, 68, 0.14) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .hover\:bg-gray-700\/50:hover,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .hover\:bg-gray-600\/50:hover {
+    background-color: #ecfeff !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-xs.font-medium.text-gray-100,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-sm.font-semibold.text-gray-100 {
+    color: var(--crm-light-text-strong) !important;
+    font-weight: 600 !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-xs.opacity-50,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) .text-xs.opacity-40 {
+    opacity: 1 !important;
+    color: var(--crm-light-chat-meta) !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) textarea,
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) select {
+    color: var(--crm-light-text-main) !important;
+    border-color: #cbd5e1 !important;
+}
+
+html:not(.dark) :is([x-data="crmAsesor()"], [x-data^="crmDetalle("]) textarea::placeholder {
+    color: #64748b !important;
+}
+
+/* =========================================
+   Modern Scrollbar Styles
+   ========================================= */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background-color: #2d3148;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background-color: #3d4260;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.dark * {
+    scrollbar-color: #2d3148 transparent;
+}
+
+/* =========================================
+   Global Dark Mode - Base Surfaces
+   ========================================= */
+.dark body {
+    background-color: var(--bg-base) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Cards / panels */
+.dark .bg-white {
+    background-color: var(--bg-surface) !important;
+}
+
+.dark .bg-gray-50 {
+    background-color: var(--bg-elevated) !important;
+}
+
+.dark .bg-gray-100 {
+    background-color: #1e2130 !important;
+}
+
+.dark .bg-gray-200 {
+    background-color: #252836 !important;
+}
+
+/* Text */
+.dark .text-gray-900 {
+    color: #e8eaf0 !important;
+}
+
+.dark .text-gray-800 {
+    color: #d1d5e0 !important;
+}
+
+.dark .text-gray-700 {
+    color: #b0b6c8 !important;
+}
+
+.dark .text-gray-600 {
+    color: #8b90a0 !important;
+}
+
+.dark .text-gray-500 {
+    color: #6b7280 !important;
+}
+
+/* Borders */
+.dark .border-gray-200 {
+    border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.dark .border-gray-300 {
+    border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+.dark .divide-gray-200>*+* {
+    border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* =========================================
+   Global Dark Mode - Buttons (no outlines)
+   ========================================= */
+.dark button,
+.dark a[role="button"],
+.dark input[type="button"],
+.dark input[type="submit"],
+.dark input[type="reset"] {
+    border: none !important;
+    outline: none !important;
+}
+
+.dark button:focus,
+.dark a[role="button"]:focus,
+.dark button:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Preserve ring/focus for accessibility only on keyboard nav */
+.dark button:focus-visible {
+    box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.5) !important;
+}
+
+/* Remove default browser button borders globally */
+button {
+    border: none;
+}
+
+button:focus {
+    outline: none;
+}
+
+button:focus-visible {
+    outline: 2px solid rgba(45, 212, 191, 0.6);
+    outline-offset: 2px;
+}
+
+/* =========================================
+   POS - Client Toggle Cards
+   ========================================= */
+.pos-client-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 4.2rem;
+    padding: 0.65rem 0.85rem;
+    border: 2px solid #93c5fd;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 24px rgba(148, 163, 184, 0.16);
+    transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.pos-client-toggle:hover {
+    transform: translateY(-1px);
+}
+
+.pos-client-toggle__content {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pos-client-toggle__icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pos-client-toggle__text {
+    min-width: 0;
+    flex: 1;
+    text-align: left;
+}
+
+.pos-client-toggle__title {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.pos-client-toggle__subtitle {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.72rem;
+    line-height: 1.2;
+}
+
+.pos-client-toggle__switch {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.pos-client-toggle__knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+    transition: transform 0.18s ease;
+}
+
+.pos-client-toggle[data-active="true"] .pos-client-toggle__knob {
+    transform: translateX(20px);
+}
+
+@media (min-width: 1024px) and (max-width: 1535px) {
+    .pos-client-toggle {
+        gap: 7px;
+        min-height: 3.5rem;
+        padding: 0.45rem 0.55rem;
+        border-radius: 15px;
+    }
+
+    .pos-client-toggle__content {
+        gap: 7px;
+    }
+
+    .pos-client-toggle__icon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .pos-client-toggle__title {
+        font-size: 0.76rem;
+        line-height: 1.05;
+        white-space: normal;
+    }
+
+    .pos-client-toggle__subtitle {
+        font-size: 0.64rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .pos-client-toggle__switch {
+        width: 38px;
+        height: 22px;
+    }
+
+    .pos-client-toggle__knob {
+        width: 16px;
+        height: 16px;
+    }
+
+    .pos-client-toggle[data-active="true"] .pos-client-toggle__knob {
+        transform: translateX(16px);
+    }
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="false"] {
+    border-color: #94a3b8;
+    background: #e2e8f0;
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="false"]:hover {
+    border-color: #64748b;
+    background: #cbd5e1;
+    box-shadow: 0 12px 28px rgba(100, 116, 139, 0.22);
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="false"] .pos-client-toggle__icon {
+    background: #334155;
+    color: #ffffff;
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="false"] .pos-client-toggle__title {
+    color: #0f172a;
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="false"] .pos-client-toggle__subtitle {
+    color: #475569;
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="false"] .pos-client-toggle__switch {
+    background: #64748b;
+    border-color: #475569;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="true"] {
+    border-color: #334155;
+    background: #334155;
+    box-shadow: 0 14px 30px rgba(51, 65, 85, 0.28);
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="true"]:hover {
+    border-color: #1e293b;
+    background: #1e293b;
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="true"] .pos-client-toggle__icon {
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="true"] .pos-client-toggle__title {
+    color: #ffffff;
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="true"] .pos-client-toggle__subtitle {
+    color: #cbd5e1;
+}
+
+.pos-client-toggle[data-variant="mayorista"][data-active="true"] .pos-client-toggle__switch {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="false"] {
+    border-color: #93c5fd;
+    background: #ffffff;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="false"]:hover {
+    border-color: #60a5fa;
+    background: #eff6ff;
+    box-shadow: 0 12px 28px rgba(96, 165, 250, 0.16);
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="false"] .pos-client-toggle__icon {
+    background: #1d4ed8;
+    color: #ffffff;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="false"] .pos-client-toggle__title {
+    color: #0f172a;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="false"] .pos-client-toggle__subtitle {
+    color: #475569;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="false"] .pos-client-toggle__switch {
+    background: #bfdbfe;
+    border-color: #60a5fa;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="true"] {
+    border-color: #fcd34d;
+    background: #fef3c7;
+    box-shadow: 0 14px 30px rgba(245, 158, 11, 0.18);
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="true"]:hover {
+    border-color: #f59e0b;
+    background: #fde68a;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="true"] .pos-client-toggle__icon {
+    background: #f59e0b;
+    color: #ffffff;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="true"] .pos-client-toggle__title {
+    color: #92400e;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="true"] .pos-client-toggle__subtitle {
+    color: #c2410c;
+}
+
+.pos-client-toggle[data-variant="fiel"][data-active="true"] .pos-client-toggle__switch {
+    background: #f59e0b;
+    border-color: #d97706;
+}
+
+.dark .pos-client-toggle[data-variant="mayorista"][data-active="false"] {
+    border-color: #475569;
+    background: #1f2937;
+}
+
+.dark .pos-client-toggle[data-variant="mayorista"][data-active="false"] .pos-client-toggle__title {
+    color: #f8fafc;
+}
+
+.dark .pos-client-toggle[data-variant="mayorista"][data-active="false"] .pos-client-toggle__subtitle {
+    color: #cbd5e1;
+}
+
+.dark .pos-client-toggle[data-variant="fiel"][data-active="false"] {
+    border-color: #3b82f6;
+    background: #0f172a;
+}
+
+.dark .pos-client-toggle[data-variant="fiel"][data-active="false"] .pos-client-toggle__title {
+    color: #f8fafc;
+}
+
+.dark .pos-client-toggle[data-variant="fiel"][data-active="false"] .pos-client-toggle__subtitle {
+    color: #cbd5e1;
+}
+
+/* =========================================
+   CRM Chat Area - Distinct Background
+   ========================================= */
+.dark #chat-messages {
+    background-color: var(--bg-chat, #131620) !important;
+}
+
+/* Chat message bubbles - improved contrast */
+.dark .chat-bubble-incoming {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    color: #dde1ec !important;
+}
+
+.dark .chat-bubble-outgoing-asesor {
+    background-color: rgba(20, 184, 166, 0.2) !important;
+    color: #a7f3d0 !important;
+}
+
+.dark .chat-bubble-outgoing-bot {
+    background-color: rgba(59, 130, 246, 0.18) !important;
+    color: #bfdbfe !important;
+}
+
+/* CRM sub-nav bar */
+.dark .crm-subnav {
+    background-color: #161923 !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* CRM left/right panels */
+.dark .crm-panel-left,
+.dark .crm-panel-right {
+    background-color: #1a1d27 !important;
+}
+
+/* =========================================
+   Global Dark Mode - Tables
+   ========================================= */
+.dark table thead {
+    background-color: #1e2130 !important;
+}
+
+.dark table thead th {
+    color: #9ca3af !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark table tbody tr {
+    border-bottom-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.dark table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark table tbody td {
+    color: #d1d5e0 !important;
+}
+
+/* =========================================
+   Global Dark Mode - Modals / Dropdowns
+   ========================================= */
+.dark .modal-content,
+.dark [class*="modal"]>div,
+.dark [x-show][class*="bg-white"] {
+    background-color: var(--bg-surface) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* =========================================
+   Global Dark Mode - Inputs/Selects
+   ========================================= */
+.dark input[type="text"],
+.dark input[type="password"],
+.dark input[type="email"],
+.dark input[type="number"],
+.dark input[type="search"],
+.dark input[type="tel"],
+.dark input[type="url"],
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"],
+.dark input[type="month"],
+.dark input[type="week"],
+.dark input[type="color"],
+.dark textarea,
+.dark select {
+    background-color: var(--bg-input, #252836) !important;
+    color: var(--text-primary, #e8eaf0) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark select option,
+.dark optgroup {
+    background-color: #252836 !important;
+    color: #e8eaf0 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+    color: #555c72 !important;
+    opacity: 1;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #252836 inset !important;
+    -webkit-text-fill-color: #e8eaf0 !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+.dark input[type="text"]:focus,
+.dark input[type="password"]:focus,
+.dark input[type="email"]:focus,
+.dark input[type="number"]:focus,
+.dark input[type="search"]:focus,
+.dark input[type="tel"]:focus,
+.dark input[type="url"]:focus,
+.dark input[type="date"]:focus,
+.dark input[type="time"]:focus,
+.dark input[type="datetime-local"]:focus,
+.dark input[type="month"]:focus,
+.dark input[type="week"]:focus,
+.dark input[type="color"]:focus,
+.dark textarea:focus,
+.dark select:focus {
+    background-color: var(--bg-input-focus, #2d3148) !important;
+    border-color: rgba(45, 212, 191, 0.4) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.25) !important;
+}
+
+/* =========================================
+   Sidebar Styles
+   ========================================= */
+.sidebar-link {
+    --accent-rgb: 59, 130, 246;
+    transition: background-color 220ms cubic-bezier(.2, .8, .2, 1), box-shadow 220ms cubic-bezier(.2, .8, .2, 1), transform 220ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.sidebar-link i {
+    transition: transform 220ms cubic-bezier(.2, .8, .2, 1), color 220ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.sidebar-link:hover {
+    background-color: rgba(var(--accent-rgb), 0.22);
+    box-shadow: 0 10px 24px -12px rgba(var(--accent-rgb), 0.6);
+    transform: translateY(-1px);
+}
+
+.sidebar-link:hover i {
+    color: rgba(var(--accent-rgb), 1);
+    transform: scale(1.12);
+}
+
+.sidebar-link:active {
+    transform: translateY(0);
+}
+
+.sidebar-link:focus-visible {
+    outline: 2px solid rgba(var(--accent-rgb), 0.7);
+    outline-offset: 2px;
+}
+
+/* =========================================
+   WhatsApp Notification Animations
+   ========================================= */
+@keyframes whatsapp-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.6);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 18px 6px rgba(37, 211, 102, 0.3);
+        transform: scale(1.05);
+    }
+}
+
+@keyframes whatsapp-icon-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        transform: scale(1.15);
+    }
+}
+
+.whatsapp-pending-animation {
+    animation: whatsapp-pulse 1.5s ease-in-out infinite;
+    background-color: rgba(37, 211, 102, 0.12) !important;
+}
+
+.whatsapp-pending-animation i {
+    animation: whatsapp-icon-pulse 1.5s ease-in-out infinite;
+    color: #25d366 !important;
+}
+
+.whatsapp-notification-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    background-color: #ef4444;
+    border-radius: 50%;
+    animation: pulse-badge 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.3);
+        opacity: 0.8;
+    }
+}
+
+/* =========================================
+   Agenda Notification Animations
+   ========================================= */
+@keyframes agenda-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.42), 0 0 0 0 rgba(245, 158, 11, 0.18);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 16px 4px rgba(99, 102, 241, 0.3), 0 0 28px 8px rgba(245, 158, 11, 0.18);
+        transform: scale(1.06);
+    }
+}
+
+@keyframes agenda-icon-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.82;
+        transform: scale(1.14);
+    }
+}
+
+.agenda-pending-animation {
+    animation: agenda-pulse 1.4s ease-in-out infinite;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(245, 158, 11, 0.14)) !important;
+}
+
+.agenda-pending-animation i {
+    animation: agenda-icon-pulse 1.4s ease-in-out infinite;
+    color: #c4b5fd !important;
+}
+
+.agenda-notification-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 1.05rem;
+    height: 1.05rem;
+    padding: 0 0.2rem;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse-badge 1.35s ease-in-out infinite;
+}
+
+/* =========================================
+   Agenda Rows - Neon Alert State
+   ========================================= */
+.agenda-list-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+
+.agenda-activity-row>td {
+    position: relative;
+    overflow: visible;
+    background-clip: padding-box;
+    transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.agenda-activity-row.agenda-alert-row--warning>td {
+    background-color: rgba(245, 158, 11, 0.035) !important;
+    border-top: 1px solid rgba(245, 158, 11, 0.18) !important;
+    border-bottom: 1px solid rgba(245, 158, 11, 0.18) !important;
+    box-shadow: inset 0 1px 0 rgba(251, 191, 36, 0.14), inset 0 -1px 0 rgba(251, 191, 36, 0.12) !important;
+}
+
+.agenda-activity-row.agenda-alert-row--overdue>td {
+    background-color: rgba(239, 68, 68, 0.04) !important;
+    border-top: 1px solid rgba(239, 68, 68, 0.2) !important;
+    border-bottom: 1px solid rgba(239, 68, 68, 0.2) !important;
+    box-shadow: inset 0 1px 0 rgba(248, 113, 113, 0.16), inset 0 -1px 0 rgba(248, 113, 113, 0.14) !important;
+}
+
+@keyframes agenda-neon-core-warning {
+
+    0%,
+    100% {
+        box-shadow:
+            inset 0 1px 0 rgba(251, 191, 36, 0.14),
+            inset 0 -1px 0 rgba(251, 191, 36, 0.1),
+            0 0 10px -9px rgba(245, 158, 11, 0.18);
+    }
+
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(253, 224, 71, 0.32),
+            inset 0 -1px 0 rgba(251, 191, 36, 0.26),
+            0 0 18px -9px rgba(245, 158, 11, 0.34);
+    }
+}
+
+@keyframes agenda-neon-core-overdue {
+
+    0%,
+    100% {
+        box-shadow:
+            inset 0 1px 0 rgba(248, 113, 113, 0.14),
+            inset 0 -1px 0 rgba(248, 113, 113, 0.1),
+            0 0 10px -9px rgba(239, 68, 68, 0.2);
+    }
+
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(252, 165, 165, 0.34),
+            inset 0 -1px 0 rgba(248, 113, 113, 0.28),
+            0 0 18px -9px rgba(239, 68, 68, 0.36);
+    }
+}
+
+@keyframes agenda-neon-edge-left-warning {
+
+    0%,
+    100% {
+        box-shadow: inset 8px 0 12px -10px rgba(251, 191, 36, 0.52), -8px 0 18px -14px rgba(245, 158, 11, 0.34);
+    }
+
+    50% {
+        box-shadow: inset 10px 0 16px -10px rgba(253, 224, 71, 0.78), -10px 0 24px -14px rgba(245, 158, 11, 0.52);
+    }
+}
+
+@keyframes agenda-neon-edge-right-warning {
+
+    0%,
+    100% {
+        box-shadow: inset -8px 0 12px -10px rgba(251, 191, 36, 0.52), 8px 0 18px -14px rgba(245, 158, 11, 0.34);
+    }
+
+    50% {
+        box-shadow: inset -10px 0 16px -10px rgba(253, 224, 71, 0.78), 10px 0 24px -14px rgba(245, 158, 11, 0.52);
+    }
+}
+
+@keyframes agenda-neon-edge-left-overdue {
+
+    0%,
+    100% {
+        box-shadow: inset 8px 0 12px -10px rgba(248, 113, 113, 0.5), -8px 0 18px -14px rgba(239, 68, 68, 0.34);
+    }
+
+    50% {
+        box-shadow: inset 10px 0 16px -10px rgba(252, 165, 165, 0.76), -10px 0 24px -14px rgba(239, 68, 68, 0.5);
+    }
+}
+
+@keyframes agenda-neon-edge-right-overdue {
+
+    0%,
+    100% {
+        box-shadow: inset -8px 0 12px -10px rgba(248, 113, 113, 0.5), 8px 0 18px -14px rgba(239, 68, 68, 0.34);
+    }
+
+    50% {
+        box-shadow: inset -10px 0 16px -10px rgba(252, 165, 165, 0.76), 10px 0 24px -14px rgba(239, 68, 68, 0.5);
+    }
+}
+
+.agenda-activity-row.agenda-alert-row--warning>td:first-child {
+    border-left: 2px solid rgba(245, 158, 11, 0.36);
+    animation:
+        agenda-neon-edge-left-warning 1.8s ease-in-out infinite,
+        agenda-neon-core-warning 1.8s ease-in-out infinite;
+    z-index: 1;
+}
+
+.agenda-activity-row.agenda-alert-row--warning>td:not(:first-child):not(:last-child) {
+    animation: agenda-neon-core-warning 1.8s ease-in-out infinite;
+}
+
+.agenda-activity-row.agenda-alert-row--warning>td:last-child {
+    border-right: 2px solid rgba(245, 158, 11, 0.36);
+    animation:
+        agenda-neon-edge-right-warning 1.8s ease-in-out infinite,
+        agenda-neon-core-warning 1.8s ease-in-out infinite;
+    z-index: 1;
+}
+
+.agenda-activity-row.agenda-alert-row--overdue>td:first-child {
+    border-left: 2px solid rgba(239, 68, 68, 0.38);
+    animation:
+        agenda-neon-edge-left-overdue 1.75s ease-in-out infinite,
+        agenda-neon-core-overdue 1.75s ease-in-out infinite;
+    z-index: 1;
+}
+
+.agenda-activity-row.agenda-alert-row--overdue>td:not(:first-child):not(:last-child) {
+    animation: agenda-neon-core-overdue 1.75s ease-in-out infinite;
+}
+
+.agenda-activity-row.agenda-alert-row--overdue>td:last-child {
+    border-right: 2px solid rgba(239, 68, 68, 0.38);
+    animation:
+        agenda-neon-edge-right-overdue 1.75s ease-in-out infinite,
+        agenda-neon-core-overdue 1.75s ease-in-out infinite;
+    z-index: 1;
+}
+
+.dark .agenda-activity-row.agenda-alert-row--warning>td {
+    background-color: rgba(245, 158, 11, 0.055) !important;
+}
+
+.dark .agenda-activity-row.agenda-alert-row--overdue>td {
+    background-color: rgba(239, 68, 68, 0.055) !important;
+}
+
+/* =========================================
+   Responsive Tables
+   ========================================= */
+@media (max-width: 640px) {
+
+    #partial-content table,
+    #app-tab-panels table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+        width: max-content;
+    }
+}
+
+/* =========================================
+   Dark Mode - Badge / Pill improvements
+   ========================================= */
+.dark .badge,
+.dark [class*="rounded-full"][class*="bg-gray"] {
+    border: none !important;
+}
+
+/* =========================================
+   Dark Mode - Card / Panel shadows
+   ========================================= */
+.dark .shadow,
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* =========================================
+   Dark Mode - Hover states on list items
+   ========================================= */
+.dark .hover\:bg-gray-50:hover {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* =========================================
+   CRM Specific - Improved message bubbles
+   ========================================= */
+.dark .crm-msg-tool {
+    background-color: rgba(99, 102, 241, 0.1) !important;
+    border: 1px solid rgba(99, 102, 241, 0.2) !important;
+    color: #a5b4fc !important;
+    font-size: 0.7rem;
+    border-radius: 0.5rem;
+    padding: 0.15rem 0.5rem;
+    display: inline-block;
+    margin-left: auto;
+}
+
+label:has(input[x-model="distribucion.timeout_no_aceptado.accion"][value="reasignar"]),
+label:has(input[x-model="distribucion.timeout_no_aceptado.accion"][value="cola_general"]),
+label:has(input[x-model="distribucion.timeout_sin_respuesta.accion"][value="reasignar"]),
+label:has(input[x-model="distribucion.timeout_sin_respuesta.accion"][value="cola_general"]) {
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+label:has(input[x-model="distribucion.timeout_no_aceptado.accion"][value="reasignar"]:checked),
+label:has(input[x-model="distribucion.timeout_sin_respuesta.accion"][value="reasignar"]:checked) {
+    background-color: rgba(20, 184, 166, 0.3) !important;
+    color: #cffafe !important;
+    border-color: rgba(94, 234, 212, 0.9) !important;
+    box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.38), 0 8px 20px -12px rgba(45, 212, 191, 0.9) !important;
+    transform: translateY(-1px);
+}
+
+label:has(input[x-model="distribucion.timeout_no_aceptado.accion"][value="cola_general"]:checked),
+label:has(input[x-model="distribucion.timeout_sin_respuesta.accion"][value="cola_general"]:checked) {
+    background-color: rgba(245, 158, 11, 0.32) !important;
+    color: #fffbeb !important;
+    border-color: rgba(252, 211, 77, 0.9) !important;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.38), 0 8px 20px -12px rgba(251, 191, 36, 0.9) !important;
+    transform: translateY(-1px);
+}
+
+label:has(input[x-model="distribucion.timeout_no_aceptado.accion"]):active,
+label:has(input[x-model="distribucion.timeout_sin_respuesta.accion"]):active {
+    transform: scale(0.98);
+}
+
+/* =========================================
+   App Toast Notifications
+   ========================================= */
+.app-toast-host {
+    position: fixed;
+    top: max(5rem, calc(env(safe-area-inset-top, 0px) + 1rem));
+    right: max(1rem, calc(env(safe-area-inset-right, 0px) + 1rem));
+    z-index: 12000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+    width: min(calc(100vw - 2rem), 24rem);
+    pointer-events: none;
+}
+
+.app-toast {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding: 0.95rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.32);
+    backdrop-filter: blur(14px);
+    color: #fff;
+    pointer-events: auto;
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.98);
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.app-toast.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+}
+
+.app-toast.is-leaving {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0) scale(0.98);
+}
+
+.app-toast--success {
+    background: linear-gradient(135deg, rgba(22, 163, 74, 0.96), rgba(21, 128, 61, 0.92));
+}
+
+.app-toast--error {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.96), rgba(185, 28, 28, 0.92));
+}
+
+.app-toast--info {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.96), rgba(29, 78, 216, 0.92));
+}
+
+.app-toast--warning {
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.98), rgba(180, 83, 9, 0.94));
+}
+
+.app-toast__icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    margin-top: 0.1rem;
+    flex: 0 0 auto;
+}
+
+.app-toast__body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.app-toast__message {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: pre-line;
+    word-break: break-word;
+}
+
+.app-toast__close {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 1.35rem;
+    line-height: 1;
+    padding: 0;
+    margin: -0.1rem 0 0;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.app-toast__close:hover {
+    color: #fff;
+}
+
+.app-toast__close:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 3px;
+    border-radius: 0.35rem;
+}
+
+@media (max-width: 767px) {
+    .app-toast-host {
+        top: max(4.25rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+        right: max(0.75rem, calc(env(safe-area-inset-right, 0px) + 0.75rem));
+        left: max(0.75rem, calc(env(safe-area-inset-left, 0px) + 0.75rem));
+        width: auto;
+    }
+}
+
+/* =========================================
+   Agenda Summary Banner
+   ========================================= */
+.app-agenda-summary-host {
+    position: fixed;
+    top: calc(var(--app-shell-topbar-height) + 0.75rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    z-index: 11990;
+    width: min(calc(100vw - 2rem), 42rem);
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.app-agenda-summary-host[hidden] {
+    display: none !important;
+}
+
+.app-agenda-summary-host:not(.is-visible),
+.app-agenda-summary-host:not(.is-visible) .app-agenda-summary {
+    pointer-events: none !important;
+}
+
+.app-agenda-summary-host.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.app-agenda-summary {
+    width: auto;
+    max-width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.75rem 1rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(252, 211, 77, 0.34);
+    background: rgba(17, 24, 39, 0.92);
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(12px);
+    color: #fde68a;
+    pointer-events: auto;
+}
+
+.app-agenda-summary__icon {
+    flex: 0 0 auto;
+    color: #fcd34d;
+    font-size: 0.95rem;
+}
+
+.app-agenda-summary__text {
+    min-width: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fef3c7;
+    white-space: nowrap;
+}
+
+.app-agenda-summary__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.app-agenda-summary__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.app-agenda-summary__badge[hidden] {
+    display: none !important;
+}
+
+.app-agenda-summary__badge--overdue {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fecaca;
+}
+
+.app-agenda-summary__badge--alert {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fde68a;
+}
+
+/* =========================================
+   Gastos Corrientes Summary Banner
+   ========================================= */
+.app-gastos-summary-host {
+    position: fixed;
+    top: calc(var(--app-shell-topbar-height) + 0.75rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    z-index: 11990;
+    width: min(calc(100vw - 2rem), 42rem);
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.app-gastos-summary-host[hidden] {
+    display: none !important;
+}
+
+.app-gastos-summary-host:not(.is-visible),
+.app-gastos-summary-host:not(.is-visible) .app-gastos-summary {
+    pointer-events: none !important;
+}
+
+.app-gastos-summary-host.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.app-gastos-summary {
+    width: auto;
+    max-width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.78rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(45, 212, 191, 0.34);
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(15, 118, 110, 0.92));
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(12px);
+    color: #ccfbf1;
+    pointer-events: auto;
+}
+
+.app-gastos-summary__icon {
+    flex: 0 0 auto;
+    color: #99f6e4;
+    font-size: 0.95rem;
+}
+
+.app-gastos-summary__text {
+    min-width: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #f0fdfa;
+    white-space: nowrap;
+}
+
+.app-gastos-summary__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.app-gastos-summary__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22rem 0.55rem;
+    border-radius: 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.app-gastos-summary__badge[hidden] {
+    display: none !important;
+}
+
+.app-gastos-summary__badge--overdue {
+    background: rgba(251, 146, 60, 0.2);
+    color: #ffedd5;
+}
+
+.app-gastos-summary__badge--alert {
+    background: rgba(34, 197, 94, 0.2);
+    color: #dcfce7;
+}
+
+@media (max-width: 767px) {
+    .app-agenda-summary-host {
+        top: calc(var(--app-shell-topbar-height) + 0.5rem);
+        width: calc(100vw - 1rem);
+    }
+
+    .app-agenda-summary {
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 1rem;
+        padding: 0.75rem 0.9rem;
+    }
+
+    .app-agenda-summary__text {
+        white-space: normal;
+    }
+
+    .app-gastos-summary-host {
+        top: calc(var(--app-shell-topbar-height) + 0.5rem);
+        width: calc(100vw - 1rem);
+    }
+
+    .app-gastos-summary {
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 1rem;
+        padding: 0.75rem 0.9rem;
+    }
+
+    .app-gastos-summary__text {
+        white-space: normal;
+    }
+}
+
+/* =========================================
+   Agenda Live Alerts
+   ========================================= */
+.app-agenda-live-alert-host {
+    position: fixed;
+    top: calc(var(--app-shell-topbar-height) + 4.25rem);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 11985;
+    width: min(calc(100vw - 2rem), 20rem);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+    pointer-events: none;
+}
+
+.app-agenda-live-alert-host[hidden] {
+    display: none !important;
+}
+
+.app-agenda-live-alert {
+    display: block;
+    padding: 0.85rem 0.95rem 0.9rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        radial-gradient(circle at top left, rgba(251, 191, 36, 0.18), transparent 58%),
+        rgba(17, 24, 39, 0.96);
+    box-shadow: 0 20px 42px rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(14px);
+    color: #f8fafc;
+    pointer-events: auto;
+    text-decoration: none;
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.98);
+    transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.app-agenda-live-alert:hover {
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.34);
+}
+
+.app-agenda-live-alert.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+}
+
+.app-agenda-live-alert.is-leaving {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0) scale(0.98);
+}
+
+.app-agenda-live-alert--pinned {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+}
+
+.app-agenda-live-alert--warning {
+    border-color: rgba(245, 158, 11, 0.28);
+}
+
+.app-agenda-live-alert--overdue {
+    border-color: rgba(239, 68, 68, 0.32);
+    background:
+        radial-gradient(circle at top left, rgba(248, 113, 113, 0.18), transparent 58%),
+        rgba(17, 24, 39, 0.96);
+}
+
+.app-agenda-live-alert__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.app-agenda-live-alert__title {
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 0.98rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #f8fafc;
+    word-break: break-word;
+}
+
+.app-agenda-live-alert__meta {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.app-agenda-live-alert__badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.52rem;
+    border-radius: 9999px;
+    background: rgba(245, 158, 11, 0.16);
+    color: #fcd34d;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.app-agenda-live-alert--overdue .app-agenda-live-alert__badge {
+    background: rgba(239, 68, 68, 0.16);
+    color: #fda4af;
+}
+
+.app-agenda-live-alert__close {
+    flex: 0 0 auto;
+    width: 1.7rem;
+    height: 1.7rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(226, 232, 240, 0.82);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.app-agenda-live-alert__close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff7ed;
+    transform: scale(1.04);
+}
+
+.app-agenda-live-alert__close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+    border-color: rgba(245, 158, 11, 0.38);
+}
+
+.app-agenda-live-alert--overdue .app-agenda-live-alert__close:focus-visible {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.34);
+}
+
+.app-agenda-live-alert__subtitle {
+    margin-top: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.25;
+    color: rgba(226, 232, 240, 0.9);
+}
+
+.app-agenda-live-alert__detail {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    color: rgba(251, 191, 36, 0.9);
+}
+
+.app-agenda-live-alert--overdue .app-agenda-live-alert__detail {
+    color: rgba(253, 186, 186, 0.92);
+}
+
+@media (max-width: 767px) {
+    .app-agenda-live-alert-host {
+        top: max(8rem, calc(env(safe-area-inset-top, 0px) + 4.1rem));
+        width: calc(100vw - 1rem);
+    }
+}
+
+.dark [data-inteligencia-root] [role="tab"][aria-selected="true"] {
+    background-color: rgba(30, 41, 59, 0.9) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(96, 165, 250, 0.45) !important;
+}
+
+.dark [data-inteligencia-root] [role="tab"][aria-selected="true"] p {
+    color: rgba(203, 213, 225, 0.92) !important;
+}
+
+.dark [data-inteligencia-root] [role="tab"][aria-selected="true"] .inline-flex.rounded-full {
+    background-color: rgba(15, 23, 42, 0.85) !important;
+    color: #dbeafe !important;
+}
+
+/* =========================================
+   Dark Mode - Control de Empleados
+   ========================================= */
+
+/* --- Alert / Banner backgrounds --- */
+.dark .bg-blue-50 {
+    background-color: rgba(30, 58, 138, 0.22) !important;
+}
+
+.dark .bg-blue-50\/40 {
+    background-color: rgba(30, 58, 138, 0.15) !important;
+}
+
+.dark .bg-amber-50 {
+    background-color: rgba(120, 53, 15, 0.22) !important;
+}
+
+.dark .bg-amber-50\/40 {
+    background-color: rgba(120, 53, 15, 0.15) !important;
+}
+
+.dark .bg-green-50 {
+    background-color: rgba(20, 83, 45, 0.22) !important;
+}
+
+.dark .bg-red-50 {
+    background-color: rgba(127, 29, 29, 0.22) !important;
+}
+
+.dark .bg-yellow-50 {
+    background-color: rgba(113, 63, 18, 0.22) !important;
+}
+
+.dark .bg-slate-50 {
+    background-color: rgba(30, 41, 59, 0.35) !important;
+}
+
+.dark .bg-slate-50\/60 {
+    background-color: rgba(30, 41, 59, 0.35) !important;
+}
+
+/* --- Alert / Banner borders --- */
+.dark .border-blue-100 {
+    border-color: rgba(59, 130, 246, 0.22) !important;
+}
+
+.dark .border-blue-200 {
+    border-color: rgba(59, 130, 246, 0.28) !important;
+}
+
+.dark .border-amber-100 {
+    border-color: rgba(245, 158, 11, 0.22) !important;
+}
+
+.dark .border-amber-200 {
+    border-color: rgba(245, 158, 11, 0.28) !important;
+}
+
+.dark .border-green-100 {
+    border-color: rgba(34, 197, 94, 0.22) !important;
+}
+
+.dark .border-green-200 {
+    border-color: rgba(34, 197, 94, 0.28) !important;
+}
+
+.dark .border-red-100 {
+    border-color: rgba(239, 68, 68, 0.22) !important;
+}
+
+.dark .border-red-200 {
+    border-color: rgba(239, 68, 68, 0.28) !important;
+}
+
+.dark .border-yellow-200 {
+    border-color: rgba(234, 179, 8, 0.28) !important;
+}
+
+.dark .border-slate-100 {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+.dark .border-slate-200 {
+    border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.dark .border-rose-200 {
+    border-color: rgba(244, 63, 94, 0.28) !important;
+}
+
+.dark .border-emerald-200 {
+    border-color: rgba(16, 185, 129, 0.28) !important;
+}
+
+.dark .border-violet-200 {
+    border-color: rgba(139, 92, 246, 0.28) !important;
+}
+
+.dark .border-indigo-200 {
+    border-color: rgba(99, 102, 241, 0.28) !important;
+}
+
+.dark .border-sky-200 {
+    border-color: rgba(14, 165, 233, 0.28) !important;
+}
+
+/* --- Alert / Banner text colors --- */
+.dark .text-blue-800 {
+    color: #93c5fd !important;
+}
+
+.dark .text-blue-900 {
+    color: #bfdbfe !important;
+}
+
+.dark .text-blue-700 {
+    color: #60a5fa !important;
+}
+
+.dark .text-amber-800 {
+    color: #fcd34d !important;
+}
+
+.dark .text-amber-900 {
+    color: #fde68a !important;
+}
+
+.dark .text-amber-700 {
+    color: #fbbf24 !important;
+}
+
+.dark .text-green-800 {
+    color: #86efac !important;
+}
+
+.dark .text-green-900 {
+    color: #bbf7d0 !important;
+}
+
+.dark .text-green-700 {
+    color: #4ade80 !important;
+}
+
+.dark .text-green-600 {
+    color: #4ade80 !important;
+}
+
+.dark .text-red-800 {
+    color: #fca5a5 !important;
+}
+
+.dark .text-red-900 {
+    color: #fecaca !important;
+}
+
+.dark .text-red-700 {
+    color: #f87171 !important;
+}
+
+.dark .text-red-600 {
+    color: #f87171 !important;
+}
+
+.dark .text-yellow-800 {
+    color: #fde047 !important;
+}
+
+.dark .text-slate-800 {
+    color: #cbd5e1 !important;
+}
+
+.dark .text-slate-700 {
+    color: #94a3b8 !important;
+}
+
+.dark .text-slate-600 {
+    color: #94a3b8 !important;
+}
+
+.dark .text-slate-500 {
+    color: #64748b !important;
+}
+
+.dark .text-slate-400 {
+    color: #64748b !important;
+}
+
+/* --- Badge / Pill backgrounds --- */
+.dark .bg-green-100 {
+    background-color: rgba(22, 163, 74, 0.18) !important;
+}
+
+.dark .bg-emerald-100 {
+    background-color: rgba(16, 185, 129, 0.18) !important;
+}
+
+.dark .bg-gray-100 {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark .bg-blue-100 {
+    background-color: rgba(37, 99, 235, 0.18) !important;
+}
+
+.dark .bg-amber-100 {
+    background-color: rgba(217, 119, 6, 0.18) !important;
+}
+
+.dark .bg-red-100 {
+    background-color: rgba(220, 38, 38, 0.18) !important;
+}
+
+.dark .bg-slate-100 {
+    background-color: rgba(71, 85, 105, 0.22) !important;
+}
+
+.dark .bg-rose-100 {
+    background-color: rgba(225, 29, 72, 0.18) !important;
+}
+
+/* --- Badge / Pill text colors --- */
+.dark .text-green-700 {
+    color: #4ade80 !important;
+}
+
+.dark .text-emerald-700 {
+    color: #34d399 !important;
+}
+
+.dark .text-gray-600 {
+    color: #9ca3af !important;
+}
+
+.dark .text-blue-700 {
+    color: #60a5fa !important;
+}
+
+.dark .text-amber-700 {
+    color: #fbbf24 !important;
+}
+
+.dark .text-red-700 {
+    color: #f87171 !important;
+}
+
+.dark .text-slate-600 {
+    color: #94a3b8 !important;
+}
+
+.dark .text-rose-700 {
+    color: #fb7185 !important;
+}
+
+/* --- Hover states for light colored backgrounds --- */
+.dark .hover\:bg-gray-50:hover {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark .hover\:bg-blue-50:hover {
+    background-color: rgba(30, 58, 138, 0.18) !important;
+}
+
+.dark .hover\:bg-red-50:hover {
+    background-color: rgba(127, 29, 29, 0.18) !important;
+}
+
+.dark .hover\:bg-amber-50:hover {
+    background-color: rgba(120, 53, 15, 0.18) !important;
+}
+
+.dark .hover\:bg-green-50:hover {
+    background-color: rgba(20, 83, 45, 0.18) !important;
+}
+
+.dark .hover\:bg-violet-50:hover {
+    background-color: rgba(76, 29, 149, 0.18) !important;
+}
+
+.dark .hover\:bg-indigo-50:hover {
+    background-color: rgba(30, 27, 75, 0.18) !important;
+}
+
+.dark .hover\:bg-sky-50:hover {
+    background-color: rgba(12, 74, 110, 0.18) !important;
+}
+
+.dark .hover\:bg-emerald-50:hover {
+    background-color: rgba(6, 78, 59, 0.18) !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* --- Inputs focus rings that use blue --- */
+.dark .focus\:ring-blue-500:focus {
+    --tw-ring-color: rgba(59, 130, 246, 0.45) !important;
+}
+
+.dark .focus\:border-blue-500:focus {
+    border-color: rgba(59, 130, 246, 0.55) !important;
+}
+
+.dark .focus\:ring-amber-500:focus {
+    --tw-ring-color: rgba(245, 158, 11, 0.45) !important;
+}
+
+.dark .text-amber-600 {
+    color: #fbbf24 !important;
+}
+
+.dark .text-amber-500 {
+    color: #fbbf24 !important;
+}
+
+.dark .text-emerald-600 {
+    color: #34d399 !important;
+}
+
+.dark .text-rose-600 {
+    color: #fb7185 !important;
+}
+
+.dark .text-violet-700 {
+    color: #a78bfa !important;
+}
+
+.dark .text-indigo-700 {
+    color: #818cf8 !important;
+}
+
+.dark .text-sky-700 {
+    color: #38bdf8 !important;
+}
+
+.dark .text-emerald-800 {
+    color: #6ee7b7 !important;
+}
+
+.dark .text-rose-800 {
+    color: #fda4af !important;
+}
+
+/* --- Asistencia specific: radio label colors --- */
+.dark .text-green-700 {
+    color: #4ade80 !important;
+}
+
+.dark .text-red-700 {
+    color: #f87171 !important;
+}
+
+.dark .text-amber-700 {
+    color: #fbbf24 !important;
+}
+
+.dark .text-slate-600 {
+    color: #94a3b8 !important;
+}
+
+/* --- Ensure bg-gray-900 card in asistencia summary stays readable --- */
+.dark .bg-gray-900 .text-gray-300 {
+    color: #d1d5e0 !important;
+}
+
+/* --- Missing hover state --- */
+.dark .hover\:bg-gray-200:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* --- Yellow badge (pendiente de pago) --- */
+.dark .bg-yellow-100 {
+    background-color: rgba(234, 179, 8, 0.18) !important;
+}
+
+.dark .text-yellow-700 {
+    color: #fde047 !important;
+}
+
+.dark .text-yellow-600 {
+    color: #facc15 !important;
+}
+
+/* --- Extra border/divide utilities missing in dark mode --- */
+.dark .border-gray-100 {
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .divide-gray-100 > * + * {
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .text-red-500 {
+    color: #f87171 !important;
+}
+
+/* --- Tab icon badges (inactive state) --- */
+.dark .bg-violet-100 {
+    background-color: rgba(139, 92, 246, 0.18) !important;
+}
+
+.dark .text-violet-600 {
+    color: #a78bfa !important;
+}
+
+.dark .bg-indigo-100 {
+    background-color: rgba(99, 102, 241, 0.18) !important;
+}
+
+.dark .text-indigo-600 {
+    color: #818cf8 !important;
+}
+
+.dark .bg-sky-100 {
+    background-color: rgba(14, 165, 233, 0.18) !important;
+}
+
+.dark .text-sky-600 {
+    color: #38bdf8 !important;
+}
+
+/* --- Editing state ring/border for ausencias --- */
+.dark .border-blue-300 {
+    border-color: rgba(59, 130, 246, 0.45) !important;
+}
+
+.dark .ring-blue-100 {
+    --tw-ring-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+.dark .text-blue-600 {
+    color: #60a5fa !important;
+}
+
+.dark .hover\:text-amber-700:hover {
+    color: #fbbf24 !important;
+}
+
+.dark .hover\:text-blue-700:hover {
+    color: #93c5fd !important;
+}

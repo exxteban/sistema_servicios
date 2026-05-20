@@ -1,0 +1,208 @@
+{# _tab_semana.html — Tab "Esta semana": mapa diario + formulario + config + plantillas rápidas #}
+{% from 'flujo_caja/_macros.html' import gs, tarjeta_dia %}
+{% set puede_gestionar = current_user.es_admin() or current_user.tiene_permiso('gestionar_flujo_caja') %}
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+
+    {# ── Columna izquierda: mapa diario + acceso rápido a movimientos ── #}
+    <div class="xl:col-span-2 space-y-5">
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="mb-5 flex items-center justify-between">
+                <h2 class="text-xl font-black text-slate-900 dark:text-white">Mapa diario</h2>
+                <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold
+                        {% if ctx.semana.estado == 'cerrada' %}bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300
+                        {% else %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400{% endif %}">
+                        <span class="h-2 w-2 rounded-full {% if ctx.semana.estado == 'cerrada' %}bg-slate-400{% else %}bg-emerald-500{% endif %}"></span>
+                        {{ ctx.semana.estado|title }}
+                    </span>
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 dark:border-slate-700 dark:text-slate-500">
+                        <i class="far fa-calendar text-sm"></i>
+                    </span>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                {% for dia in ctx.dias %}{{ tarjeta_dia(dia, ctx) }}{% endfor %}
+            </div>
+
+            {% if ctx.semana.notas %}
+            <p class="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                <i class="fas fa-note-sticky mr-1"></i>{{ ctx.semana.notas }}
+            </p>
+            {% endif %}
+        </div>
+
+        {# Acceso rápido al tab de movimientos #}
+        <a href="{{ url_for('flujo_caja.index', semana=ctx.semana.fecha_inicio.isoformat(), tab='movimientos') }}"
+           class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:bg-slate-50 transition-colors dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                    <i class="fas fa-list-ul text-sm text-slate-500 dark:text-slate-400"></i>
+                </div>
+                <div>
+                    <p class="font-bold text-slate-900 dark:text-white">Movimientos de la semana</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ ctx.resumen.cantidad_movimientos }} movimiento{% if ctx.resumen.cantidad_movimientos != 1 %}s{% endif %} cargado{% if ctx.resumen.cantidad_movimientos != 1 %}s{% endif %}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="hidden sm:block text-sm font-bold text-emerald-600 dark:text-emerald-400">+{{ gs(ctx.resumen.total_ingresos) }}</span>
+                <span class="hidden sm:block text-sm font-bold text-rose-600 dark:text-rose-400">-{{ gs(ctx.resumen.total_egresos) }}</span>
+                <i class="fas fa-chevron-right text-xs text-slate-400 dark:text-slate-500"></i>
+            </div>
+        </a>
+    </div>
+
+    {# ── Columna derecha: formulario + config semana + plantillas rápidas ── #}
+    <div class="space-y-5">
+
+        {% if puede_gestionar %}
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h2 class="mb-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500 text-white text-xs"><i class="fas fa-plus"></i></span>
+                Agregar movimiento
+            </h2>
+            <form method="post" action="{{ url_for('flujo_caja.agregar_movimiento') }}" class="space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="semana" value="{{ ctx.semana.fecha_inicio.isoformat() }}">
+                <div class="grid grid-cols-2 gap-2" id="tipo-selector">
+                    <button type="button" data-tipo="ingreso" onclick="seleccionarTipo('ingreso')"
+                        class="tipo-btn flex items-center justify-center gap-2 rounded-xl border-2 py-2.5 text-sm font-bold transition-all
+                               border-slate-300 bg-white text-slate-500
+                               dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400
+                               hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700
+                               dark:hover:border-emerald-500 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-400">
+                        <i class="fas fa-arrow-down text-xs"></i> Ingreso
+                    </button>
+                    <button type="button" data-tipo="egreso" onclick="seleccionarTipo('egreso')"
+                        class="tipo-btn flex items-center justify-center gap-2 rounded-xl border-2 py-2.5 text-sm font-bold transition-all
+                               border-rose-500 bg-rose-50 text-rose-700
+                               dark:border-rose-500 dark:bg-rose-900/30 dark:text-rose-400
+                               hover:border-rose-600 hover:bg-rose-100 hover:text-rose-800
+                               dark:hover:bg-rose-900/40">
+                        <i class="fas fa-arrow-up text-xs"></i> Egreso
+                    </button>
+                </div>
+                <input type="hidden" name="tipo" id="tipo-hidden" value="egreso">
+                <script>
+                function seleccionarTipo(tipo) {
+                    document.getElementById('tipo-hidden').value = tipo;
+                    var inactiveClasses = [
+                        'border-slate-300','bg-white','text-slate-500',
+                        'dark:border-slate-600','dark:bg-slate-800','dark:text-slate-400',
+                        'hover:border-emerald-400','hover:bg-emerald-50','hover:text-emerald-700',
+                        'dark:hover:border-emerald-500','dark:hover:bg-emerald-900/30','dark:hover:text-emerald-400',
+                        'hover:border-rose-400','hover:bg-rose-50','hover:text-rose-700',
+                        'dark:hover:border-rose-500','dark:hover:bg-rose-900/30','dark:hover:text-rose-400'
+                    ];
+                    var activeIngreso = [
+                        'border-emerald-500','bg-emerald-50','text-emerald-700',
+                        'dark:border-emerald-500','dark:bg-emerald-900/30','dark:text-emerald-400',
+                        'hover:border-emerald-600','hover:bg-emerald-100','hover:text-emerald-800',
+                        'dark:hover:bg-emerald-900/40'
+                    ];
+                    var activeEgreso = [
+                        'border-rose-500','bg-rose-50','text-rose-700',
+                        'dark:border-rose-500','dark:bg-rose-900/30','dark:text-rose-400',
+                        'hover:border-rose-600','hover:bg-rose-100','hover:text-rose-800',
+                        'dark:hover:bg-rose-900/40'
+                    ];
+                    document.querySelectorAll('.tipo-btn').forEach(function(btn) {
+                        var t = btn.getAttribute('data-tipo');
+                        if (t === tipo) {
+                            btn.classList.remove.apply(btn.classList, inactiveClasses);
+                            if (t === 'ingreso') {
+                                btn.classList.remove.apply(btn.classList, activeEgreso);
+                                btn.classList.add.apply(btn.classList, activeIngreso);
+                            } else {
+                                btn.classList.remove.apply(btn.classList, activeIngreso);
+                                btn.classList.add.apply(btn.classList, activeEgreso);
+                            }
+                        } else {
+                            btn.classList.remove.apply(btn.classList, activeIngreso);
+                            btn.classList.remove.apply(btn.classList, activeEgreso);
+                            btn.classList.add.apply(btn.classList, inactiveClasses);
+                        }
+                    });
+                }
+                </script>
+                <input type="text" name="concepto" placeholder="Concepto (ej: Pago proveedor, Cobro cliente)" required
+                       class="w-full rounded-xl border-2 border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 dark:focus:border-cyan-400">
+                <input type="number" name="monto_estimado" placeholder="Monto estimado" step="1" min="1" required
+                       class="w-full rounded-xl border-2 border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500 dark:focus:border-cyan-400">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Fecha</label>
+                        <input type="date" name="fecha" value="{{ ctx.semana.fecha_inicio.isoformat() }}" class="w-full rounded-xl border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Categoria</label>
+                        <select name="categoria" class="w-full rounded-xl border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white">{% for cat in ctx.categorias %}<option value="{{ cat.valor }}">{{ cat.label }}</option>{% endfor %}</select>
+                    </div>
+                </div>
+                <select name="estado" class="w-full rounded-xl border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white">{% for estado in ctx.estados %}<option value="{{ estado.valor }}">{{ estado.label }}</option>{% endfor %}</select>
+                <button type="submit" class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-700 active:scale-[0.98] transition-all dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400">
+                    <i class="fas fa-plus mr-2"></i>Agregar a la semana
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if puede_gestionar %}
+        <details class="group rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <summary class="flex cursor-pointer items-center justify-between px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 list-none">
+                <span class="flex items-center gap-2"><i class="fas fa-gear text-slate-400 dark:text-slate-500"></i>Configurar semana</span>
+                <i class="fas fa-chevron-down text-xs text-slate-400 transition-transform group-open:rotate-180"></i>
+            </summary>
+            <div class="border-t border-slate-100 px-5 pb-5 pt-4 dark:border-slate-700">
+                <form method="post" action="{{ url_for('flujo_caja.preparar_semana') }}" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Semana (lunes)</label>
+                        <input type="date" name="semana" value="{{ ctx.semana.fecha_inicio.isoformat() }}" class="w-full rounded-xl border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Saldo inicial</label>
+                        <input type="number" step="0.01" name="saldo_inicial" value="{{ '%.2f'|format(ctx.semana.saldo_inicial_estimado) }}" placeholder="0.00" class="w-full rounded-xl border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Nota de la semana</label>
+                        <input type="text" name="notas" value="{{ ctx.semana.notas or '' }}" placeholder="Ej: Semana de cierre de mes" class="w-full rounded-xl border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                    </div>
+                    <button type="submit" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">Guardar configuracion</button>
+                </form>
+            </div>
+        </details>
+        {% endif %}
+
+        {% if ctx.plantillas %}
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h2 class="mb-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fas fa-layer-group text-sm text-slate-400"></i>Plantillas rapidas
+            </h2>
+            <div class="space-y-2">
+                {% for plantilla in ctx.plantillas[:6] %}
+                <form method="post" action="{{ url_for('flujo_caja.aplicar_plantilla_route', id_plantilla=plantilla.id_flujo_plantilla) }}" class="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="semana" value="{{ ctx.semana.fecha_inicio.isoformat() }}">
+                    <div class="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center {% if plantilla.tipo == 'ingreso' %}bg-emerald-100 dark:bg-emerald-900/20{% else %}bg-rose-100 dark:bg-rose-900/20{% endif %}">
+                        <i class="fas {% if plantilla.tipo == 'ingreso' %}fa-arrow-down text-emerald-600 dark:text-emerald-400{% else %}fa-arrow-up text-rose-600 dark:text-rose-400{% endif %} text-xs"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{{ plantilla.nombre }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ gs(plantilla.monto_estimado) }}</p>
+                    </div>
+                    {% if puede_gestionar %}
+                    <button type="submit" class="flex-shrink-0 rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-cyan-50 hover:border-cyan-300 hover:text-cyan-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 transition-colors">Aplicar</button>
+                    {% endif %}
+                </form>
+                {% endfor %}
+                {% if ctx.plantillas|length > 6 %}
+                <a href="{{ url_for('flujo_caja.index', semana=ctx.semana.fecha_inicio.isoformat(), tab='plantillas') }}" class="block text-center text-xs font-semibold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 py-1">Ver todas las plantillas</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>

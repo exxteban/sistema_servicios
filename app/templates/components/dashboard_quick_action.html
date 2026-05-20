@@ -1,0 +1,51 @@
+{% macro quick_action_card(href, tab_url, tab_title, tab_icon, gradient, shadow, overlay, icon, label, title, badge, description, helper, accent_class, body_class, helper_class, icon_box_class='bg-white/12 dark:bg-white/7 ring-white/10 dark:ring-white/8', icon_class='text-white dark:text-slate-100', badge_bg_class='bg-white/10 dark:bg-white/6', badge_class='text-white dark:text-slate-100', title_class='text-white dark:text-slate-100') -%}
+<a href="{{ href }}" data-tab-url="{{ tab_url }}" data-tab-title="{{ tab_title }}" data-tab-icon="{{ tab_icon }}"
+    class="group relative overflow-hidden {{ gradient }} text-white rounded-xl border border-white/10 dark:border-white/5 p-2.5 2xl:p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-lg app-tab-link {{ shadow }} h-full min-h-[118px] sm:min-h-[112px] text-left flex flex-col justify-between gap-2">
+    <div class="absolute inset-0 {{ overlay }} opacity-90"></div>
+    <div class="relative flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-2.5">
+        <div class="flex items-start gap-3 min-w-0">
+            <div class="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl {{ icon_box_class }} backdrop-blur-sm">
+                <i class="{{ icon }} text-base sm:text-lg 2xl:text-xl {{ icon_class }}"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-[9px] sm:text-[10px] 2xl:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-semibold {{ accent_class }}">{{ label }}</p>
+                <p class="font-semibold text-[13px] sm:text-sm 2xl:text-base leading-tight {{ title_class }}">{{ title }}</p>
+            </div>
+        </div>
+        <span class="shrink-0 inline-flex items-center rounded-full {{ badge_bg_class }} px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-[10px] 2xl:text-[11px] font-semibold {{ badge_class }} ring-1 ring-white/8 backdrop-blur-sm">{{ badge }}</span>
+    </div>
+    <div class="relative space-y-1">
+        <p class="text-[11px] sm:text-xs 2xl:text-sm leading-snug {{ body_class }}">{{ description|safe }}</p>
+        <p class="text-[10px] sm:text-[11px] 2xl:text-xs leading-snug {{ helper_class }}">{{ helper|safe }}</p>
+    </div>
+</a>
+{%- endmacro %}
+
+{% macro status_banner(icon, label, title, message, gradient, border, overlay, icon_box_class, icon_class, label_class, title_class, message_class, badge='', badge_bg_class='bg-white/10', badge_class='text-white', action_href='', action_tab_url='', action_title='', action_icon='', action_text='', action_class='') -%}
+<div class="relative overflow-hidden rounded-xl border {{ border }} {{ gradient }} shadow-md p-2 2xl:p-2.5">
+    <div class="absolute inset-0 {{ overlay }} opacity-90"></div>
+    <div class="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-start gap-2 min-w-0">
+            <div class="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl {{ icon_box_class }} backdrop-blur-sm">
+                <i class="{{ icon }} text-sm sm:text-base 2xl:text-lg {{ icon_class }}"></i>
+            </div>
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <p class="text-[9px] sm:text-[10px] 2xl:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-semibold {{ label_class }}">{{ label }}</p>
+                    {% if badge %}
+                    <span class="inline-flex items-center rounded-full {{ badge_bg_class }} px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold {{ badge_class }} ring-1 ring-white/10 backdrop-blur-sm">{{ badge }}</span>
+                    {% endif %}
+                </div>
+                <p class="mt-0.5 font-semibold text-[12px] sm:text-[13px] 2xl:text-sm leading-tight {{ title_class }}">{{ title }}</p>
+                <p class="mt-0.5 text-[10px] sm:text-[11px] 2xl:text-xs leading-snug {{ message_class }}">{{ message }}</p>
+            </div>
+        </div>
+        {% if action_href %}
+        <a href="{{ action_href }}" data-tab-url="{{ action_tab_url }}" data-tab-title="{{ action_title }}" data-tab-icon="{{ action_icon }}"
+            class="app-tab-link inline-flex items-center justify-center rounded-lg px-3 py-2 text-[11px] sm:text-xs font-semibold transition shrink-0 {{ action_class }}">
+            {{ action_text }}
+        </a>
+        {% endif %}
+    </div>
+</div>
+{%- endmacro %}

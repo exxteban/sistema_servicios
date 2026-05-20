@@ -1,0 +1,238 @@
+let promocionProductosSeleccionados = [];
+let promocionBusquedaTimer = null;
+
+function promocionSlugActual() {
+    return document.querySelector('#formPromocion [name="slug_actual"]')?.value || '{{ tienda_config.slug if tienda_config else "" }}';
+}
+
+function promocionToDatetimeLocal(value) {
+    if (!value) return '';
+    return String(value).slice(0, 16);
+}
+
+function renderPromocionProductosSeleccionados() {
+    const container = document.getElementById('promocionProductosSeleccionados');
+    if (!container) return;
+
+    if (!promocionProductosSeleccionados.length) {
+        container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Todavía no agregaste productos.</p>';
+        return;
+    }
+
+    container.innerHTML = promocionProductosSeleccionados.map((product) => `
+        <span class="inline-flex items-center gap-2 rounded-full bg-rose-100 dark:bg-rose-900/30 px-3 py-1.5 text-sm font-medium text-rose-700 dark:text-rose-300">
+            ${product.codigo ? `<span class="font-mono text-xs">${product.codigo}</span>` : ''}
+            <span>${product.nombre}</span>
+            <button type="button" class="text-rose-600 dark:text-rose-300 hover:text-rose-800" onclick="quitarProductoPromocion(${product.id_producto})">
+                <i class="fas fa-times"></i>
+            </button>
+        </span>
+    `).join('');
+}
+
+function renderPromocionResultados(productos) {
+    const container = document.getElementById('promocionProductoResultados');
+    if (!container) return;
+
+    if (!productos.length) {
+        container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No se encontraron productos.</p>';
+        return;
+    }
+
+    container.innerHTML = productos.map((product) => {
+        const seleccionado = promocionProductosSeleccionados.some((item) => item.id_producto === product.id_producto);
+        return `
+            <button
+                type="button"
+                class="flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition ${
+                    seleccionado
+                        ? 'border-rose-300 bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20'
+                        : 'border-gray-200 bg-white hover:border-rose-300 hover:bg-rose-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-rose-700 dark:hover:bg-gray-800'
+                }"
+                onclick='agregarProductoPromocion(${JSON.stringify(product).replace(/'/g, '&#39;')})'>
+                <span>
+                    <span class="block text-sm font-semibold text-gray-900 dark:text-white">${product.nombre}</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400">${product.codigo || ''}</span>
+                </span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-200">₲ ${Number(product.precio_venta || 0).toLocaleString('es-PY')}</span>
+            </button>
+        `;
+    }).join('');
+}
+
+function agregarProductoPromocion(product) {
+    if (promocionProductosSeleccionados.some((item) => item.id_producto === product.id_producto)) {
+        return;
+    }
+    promocionProductosSeleccionados.push(product);
+    renderPromocionProductosSeleccionados();
+}
+
+function quitarProductoPromocion(productId) {
+    promocionProductosSeleccionados = promocionProductosSeleccionados.filter((item) => item.id_producto !== productId);
+    renderPromocionProductosSeleccionados();
+}
+
+async function buscarProductosPromocion(term = '') {
+    const slug = promocionSlugActual();
+    if (!slug) return;
+
+    const url = new URL('/api/tienda/admin/promociones/productos', window.location.origin);
+    url.searchParams.set('slug_actual', slug);
+    if (term) {
+        url.searchParams.set('q', term);
+    }
+
+    const res = await fetch(url.toString(), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    const data = await res.json();
+    if (!res.ok) {
+        throw new Error(data.error || 'No se pudo buscar productos');
+    }
+    renderPromocionResultados(data.productos || []);
+}
+
+function resetFormularioPromocion() {
+    const form = document.getElementById('formPromocion');
+    if (!form) return;
+    form.reset();
+    form.elements.promotion_id.value = '';
+    form.elements.tipo.value = 'porcentaje';
+    form.elements.activa.checked = true;
+    promocionProductosSeleccionados = [];
+    renderPromocionProductosSeleccionados();
+    renderPromocionResultados([]);
+    const title = document.getElementById('modal-promocion-title');
+    if (title) title.textContent = 'Nueva promoción';
+}
+
+async function abrirModalPromocion(prefill = null) {
+    const modal = document.getElementById('modalPromocion');
+    const form = document.getElementById('formPromocion');
+    if (!modal || !form) return;
+
+    resetFormularioPromocion();
+
+    if (prefill?.productos?.length) {
+        promocionProductosSeleccionados = prefill.productos.map((product) => ({
+            id_producto: Number(product.id_producto),
+            codigo: product.codigo || '',
+            nombre: product.nombre || '',
+            precio_venta: product.precio_venta || 0,
+        }));
+        renderPromocionProductosSeleccionados();
+    }
+
+    if (prefill?.id_promocion) {
+        form.elements.promotion_id.value = prefill.id_promocion;
+        form.elements.nombre.value = prefill.nombre || '';
+        form.elements.descripcion_corta.value = prefill.descripcion_corta || '';
+        form.elements.tipo.value = prefill.tipo || 'porcentaje';
+        form.elements.valor.value = prefill.valor ?? '';
+        form.elements.fecha_inicio.value = promocionToDatetimeLocal(prefill.fecha_inicio);
+        form.elements.fecha_fin.value = promocionToDatetimeLocal(prefill.fecha_fin);
+        form.elements.activa.checked = Boolean(prefill.activa);
+        promocionProductosSeleccionados = (prefill.productos || []).map((product) => ({
+            id_producto: Number(product.id_producto),
+            codigo: product.codigo || '',
+            nombre: product.nombre || '',
+            precio_venta: product.precio_venta || 0,
+        }));
+        renderPromocionProductosSeleccionados();
+        const title = document.getElementById('modal-promocion-title');
+        if (title) title.textContent = 'Editar promoción';
+    }
+
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        document.getElementById('modalPromocionBackdrop')?.classList.add('opacity-100');
+        document.getElementById('modalPromocionPanel')?.classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
+    }, 10);
+
+    await buscarProductosPromocion('');
+}
+
+function abrirModalPromocionDesdeJSON(rawPromotion) {
+    try {
+        const promotion = JSON.parse(rawPromotion);
+        abrirModalPromocion(promotion);
+    } catch (_error) {
+        alert('No se pudo cargar la promoción seleccionada.');
+    }
+}
+
+function abrirModalPromocionParaProducto(productId, productName) {
+    abrirModalPromocion({
+        productos: [{ id_producto: Number(productId), nombre: productName || '', codigo: '', precio_venta: 0 }],
+    });
+}
+
+function cerrarModalPromocion() {
+    document.getElementById('modalPromocionBackdrop')?.classList.remove('opacity-100');
+    document.getElementById('modalPromocionPanel')?.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+    setTimeout(() => {
+        document.getElementById('modalPromocion')?.classList.add('hidden');
+    }, 300);
+}
+
+async function guardarPromocion() {
+    const form = document.getElementById('formPromocion');
+    if (!form) return;
+
+    const promotionId = form.elements.promotion_id.value;
+    const payload = {
+        slug_actual: promocionSlugActual(),
+        nombre: form.elements.nombre.value,
+        descripcion_corta: form.elements.descripcion_corta.value,
+        tipo: form.elements.tipo.value,
+        valor: form.elements.valor.value,
+        fecha_inicio: form.elements.fecha_inicio.value,
+        fecha_fin: form.elements.fecha_fin.value,
+        activa: form.elements.activa.checked,
+        productos: promocionProductosSeleccionados.map((product) => product.id_producto),
+    };
+
+    const url = promotionId
+        ? `/api/tienda/admin/promociones/${promotionId}`
+        : '/api/tienda/admin/promociones';
+    const method = promotionId ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+        alert('No se pudo guardar la promoción: ' + (data.error || 'error'));
+        return;
+    }
+    location.reload();
+}
+
+async function eliminarPromocion(promotionId) {
+    if (!confirm('¿Eliminar esta promoción?')) return;
+
+    const url = new URL(`/api/tienda/admin/promociones/${promotionId}`, window.location.origin);
+    url.searchParams.set('slug_actual', promocionSlugActual());
+    const res = await fetch(url.toString(), { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) {
+        alert('No se pudo eliminar la promoción: ' + (data.error || 'error'));
+        return;
+    }
+    location.reload();
+}
+
+document.getElementById('promocionProductoSearch')?.addEventListener('input', (event) => {
+    const term = (event.target.value || '').trim();
+    window.clearTimeout(promocionBusquedaTimer);
+    promocionBusquedaTimer = window.setTimeout(() => {
+        buscarProductosPromocion(term).catch((error) => {
+            alert(error.message || 'No se pudo buscar productos');
+        });
+    }, 250);
+});
+
+renderPromocionProductosSeleccionados();

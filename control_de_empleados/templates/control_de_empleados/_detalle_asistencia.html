@@ -1,0 +1,243 @@
+{# Tab de asistencia diaria: grilla lunes-domingo con tilde por día #}
+<div class="space-y-6">
+
+    {# KPIs del mes #}
+    <div class="ce-stats-grid ce-stats-grid--quad">
+        <article class="ce-kpi-card ce-kpi-card--green">
+            <div class="ce-kpi-header">
+                <div class="ce-kpi-copy">
+                    <p class="ce-kpi-eyebrow">Días presentes</p>
+                    <p class="ce-kpi-value ce-kpi-value--compact ce-kpi-value--green">{{ panel_asistencia.dias_presentes }}</p>
+                </div>
+                <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-check-circle"></i></span>
+            </div>
+            <p class="ce-kpi-meta">Días marcados como "Vino" en {{ periodo }}.</p>
+        </article>
+        <article class="ce-kpi-card ce-kpi-card--red">
+            <div class="ce-kpi-header">
+                <div class="ce-kpi-copy">
+                    <p class="ce-kpi-eyebrow">Días ausentes</p>
+                    <p class="ce-kpi-value ce-kpi-value--compact ce-kpi-value--red">{{ panel_asistencia.dias_ausentes }}</p>
+                </div>
+                <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-times-circle"></i></span>
+            </div>
+            <p class="ce-kpi-meta">Días marcados como "No vino".</p>
+        </article>
+        <article class="ce-kpi-card ce-kpi-card--amber">
+            <div class="ce-kpi-header">
+                <div class="ce-kpi-copy">
+                    <p class="ce-kpi-eyebrow">Medio día</p>
+                    <p class="ce-kpi-value ce-kpi-value--compact ce-kpi-value--amber">{{ panel_asistencia.dias_medio }}</p>
+                </div>
+                <span class="ce-kpi-icon" aria-hidden="true"><i class="fas fa-adjust"></i></span>
+            </div>
+            <p class="ce-kpi-meta">Descuento: 50% del valor diario.</p>
+        </article>
+        <article class="ce-kpi-card ce-kpi-card--total">
+            <div class="ce-kpi-header">
+                <div class="ce-kpi-copy">
+                    <p class="ce-kpi-eyebrow">Descuento total asistencia</p>
+                    <p class="ce-kpi-value">Gs. {{ '{:,.0f}'.format(panel_asistencia.descuento_total).replace(',', '.') }}</p>
+                </div>
+                <span class="ce-kpi-badge">Valor día: Gs. {{ '{:,.0f}'.format(panel_asistencia.valor_dia).replace(',', '.') }}</span>
+            </div>
+            <p class="ce-kpi-meta">
+                Sueldo base ÷ {{ panel_asistencia.dias_mes }} días del mes.
+                {% if panel_asistencia.dias_sin_registro > 0 %}
+                {{ panel_asistencia.dias_sin_registro }} día(s) sin registrar (se muestran como "Vino" por defecto).
+                {% endif %}
+            </p>
+        </article>
+    </div>
+
+    {# Acceso directo a configuración del empleado #}
+    <div class="flex justify-end">
+        <a href="{{ url_for('control_empleados.editar', id_empleado=empleado.id_empleado) }}"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
+            <i class="fas fa-user-cog text-gray-500"></i>
+            Configurar empleado (sueldo, cargo, etc.)
+        </a>
+    </div>
+
+    {# Aviso informativo #}
+    <div class="rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4 text-sm text-blue-800">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-info-circle mt-0.5 flex-shrink-0"></i>
+            <div>
+                <p class="font-semibold">¿Cómo funciona?</p>
+                <p class="mt-1">Marcá cada día de la semana: <strong>Vino</strong> (sin descuento), <strong>No vino</strong> (descuenta 1 día = Gs. {{ '{:,.0f}'.format(panel_asistencia.valor_dia).replace(',', '.') }}), <strong>Medio día</strong> (descuenta 50% = Gs. {{ '{:,.0f}'.format(panel_asistencia.valor_dia / 2).replace(',', '.') }}) o <strong>Feriado</strong> (sin descuento). El total se suma automáticamente al resumen salarial del mes.</p>
+            </div>
+        </div>
+    </div>
+
+    {# Grilla semanal #}
+    {% for semana in panel_asistencia.semanas %}
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-700">
+                Semana {{ semana.numero_semana }}
+                <span class="ml-2 text-xs font-normal text-gray-500">
+                    {{ semana.dias[0].fecha.strftime('%d/%m') }} – {{ semana.dias[-1].fecha.strftime('%d/%m') }}
+                </span>
+            </h3>
+            {% if puede_gestionar %}
+            <button type="submit" form="form_semana_{{ semana.numero_semana }}"
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors">
+                <i class="fas fa-save"></i>
+                Guardar semana
+            </button>
+            {% endif %}
+        </div>
+
+        {% if puede_gestionar %}
+        <form id="form_semana_{{ semana.numero_semana }}"
+              method="post"
+              action="{{ url_for('control_empleados.guardar_semana_asistencia', id_empleado=empleado.id_empleado) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="periodo" value="{{ periodo }}">
+        {% endif %}
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 w-28">Día</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 w-24">Fecha</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Asistencia</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Observaciones</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 w-32">Descuento</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50 bg-white">
+                    {% for dia in semana.dias %}
+                    {% set fecha_str = dia.fecha.strftime('%Y-%m-%d') %}
+                    <tr class="{% if dia.es_domingo %}bg-slate-50/60{% endif %} hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3">
+                            <span class="text-sm font-semibold {% if dia.es_domingo %}text-slate-500{% else %}text-gray-900{% endif %}">
+                                {{ dia.nombre_dia }}
+                            </span>
+                            {% if dia.es_domingo %}
+                            <span class="ml-1 text-xs text-slate-400">(dom)</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600">{{ dia.fecha.strftime('%d/%m') }}</td>
+                        <td class="px-4 py-3">
+                            {% if puede_gestionar %}
+                            <div class="flex flex-wrap gap-2">
+                                {% for valor, etiqueta in [('presente', 'Vino'), ('ausente', 'No vino'), ('medio_dia', 'Medio día'), ('feriado', 'Feriado')] %}
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                                    <input type="radio"
+                                           name="estado_{{ fecha_str }}"
+                                           value="{{ valor }}"
+                                           {% if dia.estado == valor %}checked{% endif %}
+                                           class="text-blue-600 focus:ring-blue-500 border-gray-300">
+                                    <span class="text-xs font-medium
+                                        {% if valor == 'presente' %}text-green-700
+                                        {% elif valor == 'ausente' %}text-red-700
+                                        {% elif valor == 'medio_dia' %}text-amber-700
+                                        {% else %}text-slate-600{% endif %}">
+                                        {{ etiqueta }}
+                                    </span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            {# Solo lectura #}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if dia.estado == 'presente' %}bg-green-100 text-green-700
+                                {% elif dia.estado == 'ausente' %}bg-red-100 text-red-700
+                                {% elif dia.estado == 'medio_dia' %}bg-amber-100 text-amber-700
+                                {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {% if dia.estado == 'presente' %}Vino
+                                {% elif dia.estado == 'ausente' %}No vino
+                                {% elif dia.estado == 'medio_dia' %}Medio día
+                                {% else %}Feriado{% endif %}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if puede_gestionar %}
+                            <input type="text"
+                                   name="obs_{{ fecha_str }}"
+                                   value="{{ dia.observaciones or '' }}"
+                                   placeholder="Opcional"
+                                   maxlength="160"
+                                   class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-700 focus:border-blue-400 focus:ring-blue-400">
+                            {% else %}
+                            <span class="text-xs text-gray-500">{{ dia.observaciones or '—' }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            {% if dia.descuento > 0 %}
+                            <span class="text-sm font-bold text-red-600">
+                                -Gs. {{ '{:,.0f}'.format(dia.descuento).replace(',', '.') }}
+                            </span>
+                            {% elif dia.id_asistencia %}
+                            <span class="text-xs text-green-600 font-medium">Sin descuento</span>
+                            {% else %}
+                            <span class="text-xs text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="bg-gray-50 border-t border-gray-200">
+                    <tr>
+                        <td colspan="4" class="px-4 py-2 text-xs font-semibold text-gray-500 text-right">
+                            Descuento de la semana:
+                        </td>
+                        <td class="px-4 py-2 text-right">
+                            {% set descuento_semana = semana.dias | sum(attribute='descuento') %}
+                            {% if descuento_semana > 0 %}
+                            <span class="text-sm font-bold text-red-600">
+                                -Gs. {{ '{:,.0f}'.format(descuento_semana).replace(',', '.') }}
+                            </span>
+                            {% else %}
+                            <span class="text-xs text-green-600 font-medium">Sin descuento</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        {% if puede_gestionar %}
+        </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {# Resumen final del mes #}
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <h3 class="text-base font-semibold text-gray-900 mb-4">Resumen del mes {{ periodo }}</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div class="rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-center">
+                <div class="text-2xl font-black text-green-700">{{ panel_asistencia.dias_presentes }}</div>
+                <div class="text-xs text-green-600 font-medium mt-1">Días presentes</div>
+            </div>
+            <div class="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-center">
+                <div class="text-2xl font-black text-red-700">{{ panel_asistencia.dias_ausentes }}</div>
+                <div class="text-xs text-red-600 font-medium mt-1">Días ausentes</div>
+            </div>
+            <div class="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 text-center">
+                <div class="text-2xl font-black text-amber-700">{{ panel_asistencia.dias_medio }}</div>
+                <div class="text-xs text-amber-600 font-medium mt-1">Medio día</div>
+            </div>
+            <div class="rounded-xl bg-gray-900 px-4 py-3 text-center">
+                <div class="text-xl font-black text-white">Gs. {{ '{:,.0f}'.format(panel_asistencia.descuento_total).replace(',', '.') }}</div>
+                <div class="text-xs text-gray-300 font-medium mt-1">Total a descontar</div>
+            </div>
+        </div>
+        {% if panel_asistencia.descuento_total > 0 %}
+        <div class="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            <i class="fas fa-check-circle mr-2 text-blue-600"></i>
+            Este descuento se aplica <strong>automáticamente</strong> al resumen salarial del mes. No hace falta registrar nada más.
+        </div>
+        {% else %}
+        <div class="mt-4 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <i class="fas fa-check-circle mr-2"></i>
+            Sin descuentos por asistencia en este período.
+        </div>
+        {% endif %}
+    </div>
+</div>

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Cobro en Caja - Cuenta #{{ contexto.cuenta.id_cuenta_cobrar }}{% endblock %}
+
+{% block content %}
+{% set item = contexto.cuenta_vista %}
+{% set metadata = contexto.metadata %}
+{% set proxima_cuota = contexto.proxima_cuota %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Cobro en caja</h1>
+                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                    Pendiente #{{ contexto.item.id }}
+                </span>
+            </div>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                Cliente: <span class="font-semibold">{{ metadata.cliente_nombre }}</span>
+                | Cuenta: <span class="font-semibold">#{{ contexto.cuenta.id_cuenta_cobrar }}</span>
+                | Venta: <span class="font-semibold">#{{ contexto.cuenta.id_venta }}</span>
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('caja.estado') }}" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left mr-2"></i>Volver a caja
+            </a>
+            <a href="{{ url_for('cobranzas_cuentas.detalle_cuenta', id_cuenta=contexto.cuenta.id_cuenta_cobrar) }}" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                <i class="fas fa-file-invoice-dollar mr-2"></i>Ver cuenta
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Saldo pendiente</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">&nbsp;&#8370; {{ "{:,.0f}".format(item.saldo_pendiente).replace(",", ".") }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Monto sugerido</div>
+            <div class="mt-2 text-2xl font-bold text-green-600 dark:text-green-400">&nbsp;&#8370; {{ "{:,.0f}".format(item.monto_sugerido_cobro).replace(",", ".") }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Caja activa</div>
+            <div class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ sesion_activa.caja.nombre }}</div>
+            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Sesion #{{ sesion_activa.id_sesion }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Procesar cobro</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">El medio de pago y la referencia se registran en el cobro del credito y, si corresponde, en caja.</p>
+
+            <form method="POST" action="{{ url_for('cobranzas_cobros.cobrar_cola_credito_html', cola_id=contexto.item.id) }}" class="mt-5 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto a cobrar</label>
+                        <input type="number" name="monto" min="1" max="{{ item.saldo_pendiente }}" step="any" value="{{ item.monto_sugerido_cobro }}" required
+                               class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Metodo de pago</label>
+                        <select name="id_metodo_pago" required
+                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40">
+                            {% for metodo in metodos_pago %}
+                            <option value="{{ metodo.id_metodo_pago }}" data-requiere-referencia="{{ '1' if metodo.requiere_referencia else '0' }}">{{ metodo.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" data-referencia-label>Referencia</label>
+                        <input type="text" name="referencia" placeholder="Transferencia, comprobante o recibo" data-referencia-input
+                               class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40">
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" data-referencia-ayuda>
+                            Completa la referencia si el medio de pago la requiere.
+                        </p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observaciones</label>
+                        <input type="text" name="observaciones" placeholder="Nota opcional del cobro"
+                               class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-900/40">
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-100">
+                    {% if proxima_cuota %}
+                    Sugerencia actual: cobrar la cuota <span class="font-semibold">#{{ proxima_cuota.numero_cuota }}</span>
+                    por <span class="font-semibold">&#8370; {{ "{:,.0f}".format(proxima_cuota.saldo_pendiente).replace(",", ".") }}</span>.
+                    {% else %}
+                    No hay una cuota puntual sugerida; el cobro se imputara sobre el saldo pendiente de la cuenta.
+                    {% endif %}
+                </div>
+
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                        Saldo actual de la cuenta: <span class="font-semibold text-gray-800 dark:text-gray-200">&#8370; {{ "{:,.0f}".format(item.saldo_pendiente).replace(",", ".") }}</span>
+                    </p>
+                    <button type="submit" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition">
+                        <i class="fas fa-cash-register mr-2"></i>Confirmar cobro
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Trazabilidad</h2>
+                <dl class="mt-4 space-y-3 text-sm">
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Cliente</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">{{ metadata.cliente_nombre }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Cuenta por cobrar</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">#{{ contexto.cuenta.id_cuenta_cobrar }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Venta origen</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">#{{ contexto.cuenta.id_venta }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Pendiente de caja</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">#{{ contexto.item.id }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            {% if proxima_cuota %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Proxima cuota</h2>
+                <dl class="mt-4 space-y-3 text-sm">
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Numero</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">#{{ proxima_cuota.numero_cuota }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Vencimiento</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">
+                            {% if proxima_cuota.fecha_vencimiento %}
+                            {{ proxima_cuota.fecha_vencimiento }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Saldo pendiente</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">&#8370; {{ "{:,.0f}".format(proxima_cuota.saldo_pendiente).replace(",", ".") }}</dd>
+                    </div>
+                </dl>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script>
+    (function () {
+        var form = document.querySelector('form[action*="/cola-cobro/"][action*="/cobrar"]');
+        if (!form) {
+            return;
+        }
+        var selectMetodo = form.querySelector('select[name="id_metodo_pago"]');
+        var inputReferencia = form.querySelector('[data-referencia-input]');
+        var labelReferencia = form.querySelector('[data-referencia-label]');
+        var ayudaReferencia = form.querySelector('[data-referencia-ayuda]');
+        if (!selectMetodo || !inputReferencia) {
+            return;
+        }
+
+        function sincronizarReferenciaRequerida() {
+            var opcion = selectMetodo.options[selectMetodo.selectedIndex];
+            var requiereReferencia = !!(opcion && opcion.dataset && opcion.dataset.requiereReferencia === '1');
+            inputReferencia.required = requiereReferencia;
+            inputReferencia.placeholder = requiereReferencia
+                ? 'Obligatoria para este metodo'
+                : 'Transferencia, comprobante o recibo';
+            if (labelReferencia) {
+                labelReferencia.textContent = requiereReferencia ? 'Referencia obligatoria' : 'Referencia';
+            }
+            if (ayudaReferencia) {
+                ayudaReferencia.textContent = requiereReferencia
+                    ? 'Este metodo requiere una referencia para registrar el cobro.'
+                    : 'Completa la referencia si el medio de pago la requiere.';
+            }
+        }
+
+        selectMetodo.addEventListener('change', sincronizarReferenciaRequerida);
+        sincronizarReferenciaRequerida();
+    })();
+</script>
+{% endblock %}

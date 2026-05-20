@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Productos con Stock Bajo{% endblock %}
+{% block content %}
+<div class="space-y-6" x-data="{ showChart: true }">
+    <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 mr-2"></i>Productos con Stock Bajo
+    </h1>
+
+    {% if productos %}
+    <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 text-center">
+        <p class="text-red-600 dark:text-red-400 font-semibold">{{ productos|length }} productos necesitan reposición
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Toggle Button -->
+    <div class="flex justify-end">
+        <button @click="showChart = !showChart"
+            class="px-4 py-2 rounded-lg bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg">
+            <i class="fas" :class="showChart ? 'fa-table' : 'fa-chart-bar'"></i>
+            <span x-text="showChart ? 'Mostrar Detalle' : 'Mostrar Gráfico'"></span>
+        </button>
+    </div>
+
+    <!-- Chart View -->
+    <div x-show="showChart" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100"
+        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 transform scale-100"
+        x-transition:leave-end="opacity-0 transform scale-95"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-colors duration-300">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+            <i class="fas fa-chart-bar text-red-600 dark:text-red-400 mr-2"></i>Estado de Stock Crítico
+        </h2>
+        <div class="relative" style="height: 450px;">
+            <canvas id="stockChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Table View -->
+    <div x-show="!showChart" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100"
+        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 transform scale-100"
+        x-transition:leave-end="opacity-0 transform scale-95"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transition-colors duration-300">
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Código</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Producto</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Stock
+                        Actual</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Stock
+                        Mínimo</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Faltante
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for producto in productos %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                    <td class="px-4 py-3 font-mono text-sm text-gray-800 dark:text-gray-100">{{ producto.codigo }}</td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ producto.nombre }}</td>
+                    <td class="px-4 py-3 text-center"><span
+                            class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-1 rounded-full">{{
+                            producto.stock_actual }}</span></td>
+                    <td class="px-4 py-3 text-center text-gray-600 dark:text-gray-300">{{ producto.stock_minimo }}</td>
+                    <td class="px-4 py-3 text-center font-semibold text-red-600 dark:text-red-400">{{
+                        producto.stock_minimo -
+                        producto.stock_actual }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-4 py-8 text-center text-green-600 dark:text-green-400"><i
+                            class="fas fa-check-circle mr-2"></i>Todos los productos tienen stock suficiente</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        async function initStockBajoChart() {
+        const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+        const ctx = scope.querySelector('#stockChart');
+        if (!ctx) return;
+        try { if (window.ensureChartJs) await window.ensureChartJs(); } catch { return; }
+        if (!window.Chart) return;
+
+        const existingChart = Chart.getChart(ctx);
+        if (existingChart) existingChart.destroy();
+
+        const isDark = document.documentElement.classList.contains('dark');
+
+        const labels = [{% for p in productos %}{{ p.nombre | tojson }}{% if not loop.last %}, {% endif %}{% endfor %}];
+        const faltantes = [{% for p in productos %}{{ p.stock_minimo - p.stock_actual }}{% if not loop.last %}, {% endif %}{% endfor %}];
+        const stockActual = [{% for p in productos %}{{ p.stock_actual }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
+    const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, isDark ? 'rgba(239, 68, 68, 0.8)' : 'rgba(239, 68, 68, 0.9)');
+    gradient.addColorStop(1, isDark ? 'rgba(185, 28, 28, 0.8)' : 'rgba(220, 38, 38, 0.9)');
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels.slice(0, 20),
+            datasets: [
+                {
+                    label: 'Stock Actual',
+                    data: stockActual.slice(0, 20),
+                    backgroundColor: isDark ? 'rgba(251, 146, 60, 0.7)' : 'rgba(251, 146, 60, 0.8)',
+                    borderColor: isDark ? 'rgb(251, 146, 60)' : 'rgb(234, 88, 12)',
+                    borderWidth: 2,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Faltante',
+                    data: faltantes.slice(0, 20),
+                    backgroundColor: gradient,
+                    borderColor: isDark ? 'rgb(239, 68, 68)' : 'rgb(220, 38, 38)',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        color: isDark ? '#f3f4f6' : '#111827',
+                        padding: 15,
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                    titleColor: isDark ? '#f3f4f6' : '#111827',
+                    bodyColor: isDark ? '#f3f4f6' : '#111827',
+                    borderColor: isDark ? '#374151' : '#e5e7eb',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: true,
+                    callbacks: {
+                        label: function (context) {
+                            return context.dataset.label + ': ' + context.parsed.y + ' unidades';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    stacked: false,
+                    grid: {
+                        color: isDark ? 'rgba(75, 85, 99, 0.2)' : 'rgba(209, 213, 219, 0.5)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: isDark ? '#9ca3af' : '#6b7280',
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: isDark ? '#9ca3af' : '#6b7280',
+                        font: {
+                            size: 10
+                        },
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            }
+        }
+    });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initStockBajoChart, { once: true });
+        } else {
+            initStockBajoChart();
+        }
+    })();
+</script>
+{% endblock %}

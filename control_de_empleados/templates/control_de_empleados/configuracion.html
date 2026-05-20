@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuración de Recibos RRHH{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Configuración de Recibos</h1>
+            <p class="mt-1 text-sm text-gray-500">Configura el membrete y datos de tu empresa para los recibos de pago.</p>
+        </div>
+        <div>
+            <div class="flex flex-col gap-3 sm:flex-row">
+                <a href="{{ url_for('control_empleados.feriados') }}"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-blue-200 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors">
+                    <i class="fas fa-calendar-day"></i>
+                    Feriados
+                </a>
+                <a href="{{ url_for('control_empleados.index') }}"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver al listado
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <form method="post" action="{{ url_for('control_empleados.configuracion') }}" class="p-6 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="space-y-4">
+                <div id="descuento-llegadas-tardias" class="rounded-2xl border border-blue-100 bg-blue-50 p-4 scroll-mt-24">
+                    <h2 class="text-base font-semibold text-blue-900">Descuento automático por llegada tardía</h2>
+                    <p class="mt-1 text-sm text-blue-800">
+                        La regla se aplica automáticamente a cada llegada tardía registrada dentro del mes.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="llegada_tardia_descuento_desde" class="block text-sm font-semibold text-gray-700 mb-2">Descontar desde la tardanza N°</label>
+                        <input type="number" id="llegada_tardia_descuento_desde" name="llegada_tardia_descuento_desde"
+                            min="1" step="1" value="{{ config.llegadas_tardias.desde }}"
+                            class="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-blue-500">
+                        <p class="mt-1 text-xs text-gray-500">Ejemplo: si pones 3, la 1.ª y 2.ª solo cuentan; desde la 3.ª empieza el descuento.</p>
+                    </div>
+
+                    <div>
+                        <label for="llegada_tardia_descuento_monto" class="block text-sm font-semibold text-gray-700 mb-2">Monto a descontar por tardanza</label>
+                        <input type="number" id="llegada_tardia_descuento_monto" name="llegada_tardia_descuento_monto"
+                            min="0" step="1" value="{{ '{:,.0f}'.format(config.llegadas_tardias.monto).replace(',', '') if config.llegadas_tardias.monto else '0' }}"
+                            class="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-blue-500">
+                        <p class="mt-1 text-xs text-gray-500">Si el monto es 0, las tardanzas se cuentan pero no generan descuento automático.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-2"></div>
+
+                <div>
+                    <label for="empresa_nombre" class="block text-sm font-semibold text-gray-700 mb-2">Nombre de la Empresa</label>
+                    <input type="text" id="empresa_nombre" name="empresa_nombre" value="{{ config.nombre }}" 
+                        placeholder="Ej: Mi Empresa S.A."
+                        class="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-blue-500">
+                    <p class="mt-1 text-xs text-gray-500">Aparecerá como título principal en el membrete del recibo.</p>
+                </div>
+
+                <div>
+                    <label for="empresa_ruc" class="block text-sm font-semibold text-gray-700 mb-2">RUC / Documento</label>
+                    <input type="text" id="empresa_ruc" name="empresa_ruc" value="{{ config.ruc }}" 
+                        placeholder="Ej: 80000000-1"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label for="empresa_direccion" class="block text-sm font-semibold text-gray-700 mb-2">Dirección / Sucursal</label>
+                    <input type="text" id="empresa_direccion" name="empresa_direccion" value="{{ config.direccion }}" 
+                        placeholder="Ej: Av. Principal 123"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-4 border-t border-gray-100">
+                <button type="submit" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-save"></i>
+                    Guardar Configuración
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

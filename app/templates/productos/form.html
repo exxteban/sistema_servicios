@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block title %}{% if producto %}Editar{% else %}Nuevo{% endif %} Producto{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i
+                    class="fas fa-{% if producto %}edit{% else %}plus-circle{% endif %} text-blue-600 dark:text-blue-400 mr-2"></i>
+                {% if producto %}Editar Producto{% else %}Nuevo Producto{% endif %}
+            </h1>
+            <div class="flex justify-end gap-3">
+                <a href="{{ url_for('productos.listar') }}"
+                    class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 transition">
+                    Cancelar
+                </a>
+                <button type="submit" form="productoForm"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-save mr-2"></i>Guardar
+                </button>
+            </div>
+        </div>
+
+        <form method="POST"
+            action="{{ url_for('productos.editar', id=producto.id_producto) if producto else url_for('productos.nuevo') }}"
+            class="space-y-6" x-data="{ usarNuevaCategoria: false, esServicio: {% if request.method == 'POST' %}{% if request.form.get('es_servicio') %}true{% else %}false{% endif %}{% elif producto and producto.es_servicio %}true{% else %}false{% endif %}, usarPreciosOpciones: {% if precios_opciones_text %}true{% else %}false{% endif %} }"
+            id="productoForm" x-ref="productoForm"
+            data-product-code-lookup-url="{{ url_for('productos.sugerencias_codigos') }}"
+            data-product-current-id="{{ producto.id_producto if producto else '' }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <!-- Información Básica -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código *</label>
+                    <input type="text" name="codigo" required autocomplete="off" maxlength="50"
+                        value="{{ request.form.get('codigo', producto.codigo if producto else '') }}"
+                        data-product-code-input
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                        placeholder="Ej: TERM001">
+                    <div data-product-code-alert class="mt-2 hidden rounded-lg border px-3 py-2 text-sm"></div>
+                    <div data-product-code-results class="mt-2 hidden overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"></div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código de barras</label>
+                        <input type="text" name="codigo_barras" maxlength="50" value="{{ request.form.get('codigo_barras', producto.codigo_barras if producto else '') }}"
+                            @keydown.enter.prevent="$refs.productoForm && ($refs.productoForm.requestSubmit ? $refs.productoForm.requestSubmit() : $refs.productoForm.submit())"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                            placeholder="Ej: 7891234567890">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-end justify-between gap-3">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoría
+                            *</label>
+                        <button type="button"
+                            class="text-sm text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                            @click="usarNuevaCategoria = !usarNuevaCategoria">
+                            <span x-show="!usarNuevaCategoria">Nueva categoría</span>
+                            <span x-show="usarNuevaCategoria" x-cloak>Elegir existente</span>
+                        </button>
+                    </div>
+                    <select name="id_categoria" x-bind:required="!usarNuevaCategoria"
+                        x-bind:disabled="usarNuevaCategoria"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                        <option value="">Seleccione...</option>
+                        {% for cat in categorias %}
+                        <option value="{{ cat.id_categoria }}" {% if request.form.get('id_categoria', '') == (cat.id_categoria|string) or (not request.form.get('id_categoria') and producto and producto.id_categoria==cat.id_categoria) %}selected{% endif %}>
+                            {{ cat.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="mt-3 space-y-3" x-show="usarNuevaCategoria" x-cloak>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre de la
+                                nueva categoría *</label>
+                            <input type="text" name="nueva_categoria_nombre" x-bind:required="usarNuevaCategoria"
+                                value="{{ request.form.get('nueva_categoria_nombre', '') }}"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                                placeholder="Ej: Vasos térmicos">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
+                            <input type="text" name="nueva_categoria_descripcion"
+                                value="{{ request.form.get('nueva_categoria_descripcion', '') }}"
+                                class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                                placeholder="Opcional">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del Producto
+                    *</label>
+                <input type="text" name="nombre" required maxlength="200" value="{{ request.form.get('nombre', producto.nombre if producto else '') }}"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                    placeholder="Ej: Termo Stanley Classic 1L">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
+                <textarea name="descripcion" rows="3"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                    placeholder="Descripción detallada del producto...">{{ request.form.get('descripcion', producto.descripcion if producto else '') }}</textarea>
+            </div>
+
+            <!-- Características -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Marca</label>
+                    <input type="text" name="marca" maxlength="100" value="{{ request.form.get('marca', producto.marca if producto else '') }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Modelo</label>
+                    <input type="text" name="modelo" maxlength="100" value="{{ request.form.get('modelo', producto.modelo if producto else '') }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Color</label>
+                    <input type="text" name="color" maxlength="50" value="{{ request.form.get('color', producto.color if producto else '') }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Capacidad</label>
+                    <input type="text" name="capacidad" maxlength="50" value="{{ request.form.get('capacidad', producto.capacidad if producto else '') }}"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                        placeholder="Ej: 1L">
+                </div>
+            </div>
+
+            <!-- Precios -->
+            <div class="bg-gray-50 dark:bg-gray-700/40 p-4 rounded-lg transition-colors duration-300">
+                <h3 class="font-semibold text-gray-700 dark:text-gray-200 mb-4">Precios</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precio de Compra</label>
+                        <input type="number" name="precio_compra" step="0.01"
+                            value="{{ request.form.get('precio_compra', producto.precio_compra if producto else 0) }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precio de Venta *</label>
+                        <input type="number" name="precio_venta" step="0.01" required
+                            value="{{ request.form.get('precio_venta', producto.precio_venta if producto else '') }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precio Mayorista</label>
+                        <input type="number" name="precio_mayorista" step="0.01"
+                            value="{{ request.form.get('precio_mayorista', producto.precio_mayorista if producto else '') }}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="usa_precios_opciones" value="1" x-model="usarPreciosOpciones"
+                            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        Precio con desplegable en POS
+                    </label>
+                    <div class="mt-3" x-show="usarPreciosOpciones" x-cloak>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Importes (uno por línea o separados por coma)</label>
+                        <textarea name="precios_opciones" rows="3"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                            placeholder="Ej: 5000&#10;10000&#10;20000">{{ precios_opciones_text }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stock e IVA -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">IVA</label>
+                    <select name="porcentaje_iva"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                        <option value="10" {% if request.form.get('porcentaje_iva', producto.porcentaje_iva if producto else 10)|string == '10' %}selected{% endif %}>10%
+                        </option>
+                        <option value="5" {% if request.form.get('porcentaje_iva', producto.porcentaje_iva if producto else 10)|string == '5' %}selected{% endif %}>5%
+                        </option>
+                        <option value="0" {% if request.form.get('porcentaje_iva', producto.porcentaje_iva if producto else 10)|string == '0' %}selected{% endif %}>Exenta
+                        </option>
+                    </select>
+                </div>
+                {% if not producto %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stock Inicial</label>
+                    <input type="number" name="stock_actual" value="0" x-bind:disabled="esServicio"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                {% endif %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stock Mínimo</label>
+                    <input type="number" name="stock_minimo" value="{{ request.form.get('stock_minimo', producto.stock_minimo if producto else 5) }}" x-bind:disabled="esServicio"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                </div>
+                <div class="md:col-span-3">
+                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="es_servicio" value="1" x-model="esServicio"
+                            class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        Es servicio (no controla stock)
+                    </label>
+                </div>
+            </div>
+
+            <!-- Configuración Tienda Online -->
+            <div class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg transition-colors duration-300 border border-indigo-100 dark:border-indigo-800/30" x-data="{ publicadoTienda: {% if request.method == 'POST' %}{% if request.form.get('publicado_tienda') %}true{% else %}false{% endif %}{% elif producto and producto.publicado_tienda %}true{% else %}false{% endif %} }">
+                <h3 class="font-semibold text-indigo-800 dark:text-indigo-300 mb-4 flex items-center gap-2">
+                    <i class="fas fa-store"></i> Tienda Online
+                </h3>
+                <div class="mb-4">
+                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="checkbox" name="publicado_tienda" value="1" x-model="publicadoTienda"
+                            class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 w-5 h-5">
+                        Publicar en Tienda Web
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Al activar esta opción, el producto será visible en el catálogo de tu tienda online.</p>
+                </div>
+                
+                <div x-show="publicadoTienda" x-transition.opacity.duration.300ms class="space-y-4 ml-7 pl-4 border-l-2 border-indigo-200 dark:border-indigo-800">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción Extendida (Tienda)</label>
+                        <textarea name="descripcion_tienda" rows="3"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none transition-colors"
+                            placeholder="Descripción detallada para los clientes de la tienda online...">{{ request.form.get('descripcion_tienda', producto.descripcion_tienda if producto else '') }}</textarea>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Si dejas esto en blanco, se usará la descripción principal.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones -->
+            <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <a href="{{ url_for('productos.listar') }}"
+                    class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 transition">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-save mr-2"></i>Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    function initProductCodeLookup(root) {
+        const scope = root || document;
+        const form = scope.querySelector('#productoForm[data-product-code-lookup-url]');
+        if (!form || form.dataset.productCodeReady === '1') return;
+
+        const input = form.querySelector('[data-product-code-input]');
+        const alertBox = form.querySelector('[data-product-code-alert]');
+        const resultsBox = form.querySelector('[data-product-code-results]');
+        const lookupUrl = form.dataset.productCodeLookupUrl;
+        const currentId = form.dataset.productCurrentId || '';
+        let timer = null;
+        let requestSeq = 0;
+
+        if (!input || !alertBox || !resultsBox || !lookupUrl) return;
+        form.dataset.productCodeReady = '1';
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, function (char) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+            });
+        }
+
+        function clearLookup() {
+            alertBox.className = 'mt-2 hidden rounded-lg border px-3 py-2 text-sm';
+            alertBox.textContent = '';
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+        }
+
+        function setAlert(product, suggestion) {
+            if (!product) {
+                alertBox.className = 'mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200';
+                alertBox.textContent = 'Codigo disponible.';
+                return;
+            }
+
+            alertBox.className = 'mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/25 dark:text-amber-100';
+            const status = product.activo ? 'activo' : 'inactivo/eliminado';
+            const suggestionHtml = suggestion
+                ? '<button type="button" class="ml-2 font-semibold text-blue-700 underline dark:text-blue-300" data-use-suggestion="' + escapeHtml(suggestion) + '">Usar ' + escapeHtml(suggestion) + '</button>'
+                : '';
+            alertBox.innerHTML = 'Ese codigo ya existe en <strong>' + escapeHtml(product.nombre) + '</strong> (' + status + ').' + suggestionHtml;
+        }
+
+        function renderResults(items) {
+            if (!items || !items.length) {
+                resultsBox.classList.add('hidden');
+                resultsBox.innerHTML = '';
+                return;
+            }
+
+            resultsBox.innerHTML = items.map(function (item) {
+                const statusClass = item.activo
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200'
+                    : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200';
+                const editLink = item.edit_url
+                    ? '<a class="text-xs font-semibold text-blue-700 hover:underline dark:text-blue-300" href="' + escapeHtml(item.edit_url) + '">Abrir</a>'
+                    : '';
+                return '<div class="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2 last:border-0 dark:border-gray-800">'
+                    + '<button type="button" class="min-w-0 text-left" data-use-code="' + escapeHtml(item.codigo) + '">'
+                    + '<span class="block truncate font-mono text-sm text-gray-900 dark:text-gray-100">' + escapeHtml(item.codigo) + '</span>'
+                    + '<span class="block truncate text-xs text-gray-500 dark:text-gray-400">' + escapeHtml(item.nombre) + '</span>'
+                    + '</button>'
+                    + '<div class="flex shrink-0 items-center gap-2">'
+                    + '<span class="rounded-full px-2 py-1 text-xs ' + statusClass + '">' + escapeHtml(item.estado) + '</span>'
+                    + editLink
+                    + '</div>'
+                    + '</div>';
+            }).join('');
+            resultsBox.classList.remove('hidden');
+        }
+
+        function lookupNow() {
+            const value = input.value.trim();
+            if (value.length < 2) {
+                clearLookup();
+                return;
+            }
+
+            const seq = ++requestSeq;
+            const params = new URLSearchParams({ q: value });
+            if (currentId) params.set('actual_id', currentId);
+
+            fetch(lookupUrl + '?' + params.toString(), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(function (response) { return response.ok ? response.json() : null; })
+                .then(function (data) {
+                    if (!data || seq !== requestSeq) return;
+                    setAlert(data.exacto, data.sugerencia);
+                    renderResults(data.items || []);
+                })
+                .catch(function () {
+                    if (seq === requestSeq) clearLookup();
+                });
+        }
+
+        function scheduleLookup() {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(lookupNow, 250);
+        }
+
+        input.addEventListener('input', scheduleLookup);
+        input.addEventListener('focus', lookupNow);
+        form.addEventListener('click', function (event) {
+            const suggestion = event.target.closest('[data-use-suggestion]');
+            const code = event.target.closest('[data-use-code]');
+            if (!suggestion && !code) return;
+            input.value = suggestion ? suggestion.dataset.useSuggestion : code.dataset.useCode;
+            input.focus();
+            lookupNow();
+        });
+    }
+
+    function boot() {
+        initProductCodeLookup(document);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+    window.initProductCodeLookup = initProductCodeLookup;
+})();
+</script>
+{% endblock %}

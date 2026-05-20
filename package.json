@@ -1,0 +1,22 @@
+{
+  "name": "sistemas_tock_inventario_ventas2",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "setup:test": "powershell -ExecutionPolicy Bypass -File .\\scripts\\setup_test_env.ps1",
+    "test": "powershell -ExecutionPolicy Bypass -File .\\scripts\\run_tests.ps1",
+    "test:backend": "powershell -ExecutionPolicy Bypass -File .\\scripts\\run_tests.ps1 -SkipFrontend",
+    "test:frontend": "npm --prefix .\\tienda_online run build",
+    "build:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/style.css --minify",
+    "watch:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/style.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "autoprefixer": "^10.4.23",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17"
+  }
+}

@@ -1,0 +1,471 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<div class="p-4 h-full flex flex-col gap-4" x-data="crmCalidad()">
+    <div class="flex items-center gap-3">
+        <h1 class="text-base font-semibold text-gray-200 flex items-center gap-2">
+            <i class="fas fa-star text-teal-400"></i> Calidad
+        </h1>
+        <div class="ml-auto flex items-center gap-2">
+            <a href="{{ url_for('crm.admin_config') }}"
+                class="px-3 py-1.5 rounded-lg bg-gray-700/50 text-sm text-gray-300 hover:bg-gray-600/50 transition-colors">
+                <i class="fas fa-cog mr-1"></i> Configurar
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-gray-800/50 border border-white/5 rounded-xl p-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
+            <button type="button" @click="switchTab('mensajes')"
+                class="px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                :class="activeTab === 'mensajes' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-gray-300 hover:bg-white/5 border border-transparent'">
+                <i class="fas fa-comment-dots"></i>
+                Calidad de mensajes
+            </button>
+            <button type="button" @click="switchTab('asesores')"
+                class="px-4 py-2.5 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                :class="activeTab === 'asesores' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-gray-300 hover:bg-white/5 border border-transparent'">
+                <i class="fas fa-user-clock"></i>
+                Asesores online
+            </button>
+        </div>
+    </div>
+
+    <div x-show="activeTab === 'mensajes'" class="contents">
+        <div class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex flex-col gap-3">
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Desde</label>
+                    <input type="date" x-model="desde"
+                        class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Hasta</label>
+                    <input type="date" x-model="hasta"
+                        class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Mensajes</label>
+                    <select x-model="modo"
+                        class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+                        <option value="asesor">Solo asesor</option>
+                        <option value="all">Todos</option>
+                        <option value="cliente">Solo cliente</option>
+                    </select>
+                </div>
+                <div class="lg:col-span-2 flex items-center gap-2">
+                    <button @click="buscar()" :disabled="cargando"
+                        class="px-4 py-2 rounded-lg bg-teal-500 text-white text-sm hover:bg-teal-400 transition-colors disabled:opacity-60 disabled:hover:bg-teal-500">
+                        <i class="fas fa-search mr-1"></i> Buscar
+                    </button>
+                    <button @click="limpiar()"
+                        class="px-3 py-2 rounded-lg bg-gray-700/50 text-gray-200 text-sm hover:bg-gray-700/70 transition-colors">
+                        Limpiar
+                    </button>
+                    <div class="ml-auto text-xs text-gray-500" x-text="resumen"></div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <template x-for="l in listas" :key="l.nombre">
+                    <button type="button" @click="toggleLista(l.nombre)"
+                        class="px-3 py-1.5 rounded-full border text-xs font-medium transition-colors" :style="chipStyle(l)"
+                        x-text="l.nombre"></button>
+                </template>
+                <div x-show="listas.length === 0" class="text-sm text-gray-500">No hay listas configuradas</div>
+            </div>
+        </div>
+
+        <div class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex-1 overflow-auto">
+            <div x-show="cargando" class="flex items-center justify-center py-8">
+                <i class="fas fa-spinner fa-spin text-teal-400"></i>
+            </div>
+            <div x-show="!cargando && resultados.length === 0" class="text-sm text-gray-500 text-center py-8">
+                Sin resultados
+            </div>
+
+            <div x-show="!cargando && resultados.length > 0" class="flex flex-col gap-3">
+                <template x-for="r in resultados" :key="r.id_mensaje">
+                    <div class="bg-gray-900/30 border border-white/5 rounded-xl p-3">
+                        <div class="flex items-center gap-2 text-xs text-gray-400">
+                            <a :href="detalleUrl(r.id_conversacion)" @click.prevent="navigate(r.id_conversacion)"
+                                class="text-teal-300 hover:text-teal-200 transition-colors font-semibold">
+                                Ver conversación
+                            </a>
+                            <span class="text-gray-600">·</span>
+                            <span x-text="formatFechaHora(r.created_at)"></span>
+                            <span class="text-gray-600">·</span>
+                            <span x-text="r.telefono || ''"></span>
+                            <span class="text-gray-600">·</span>
+                            <span x-text="r.remitente + ' / ' + r.direccion"></span>
+                            <div class="ml-auto flex flex-wrap gap-1 items-center justify-end">
+                                <span class="mr-2 text-xs font-bold"
+                                    :class="r.puntaje > 0 ? 'text-green-400' : (r.puntaje < 0 ? 'text-red-400' : 'text-gray-400')"
+                                    x-text="r.puntaje !== 0 ? (r.puntaje > 0 ? '+' : '') + r.puntaje + ' pts' : ''"></span>
+                                <template x-for="tag in matchedListas(r)" :key="tag.nombre">
+                                    <span class="px-2 py-0.5 rounded-full text-[11px] border flex items-center gap-1"
+                                        :style="`border-color:${tag.color}66; background:${tag.color}22; color:${tag.color}`">
+                                        <span x-text="tag.nombre"></span>
+                                        <span class="opacity-70 text-[10px]" x-show="tag.peso !== 0"
+                                            x-text="'(' + (tag.peso > 0 ? '+' : '') + tag.peso + ')'"></span>
+                                    </span>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-200 leading-relaxed whitespace-pre-wrap"
+                            x-html="highlight(r.contenido, r.matched)"></div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="activeTab === 'asesores'" class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex-1 overflow-auto">
+        <div class="flex flex-wrap items-center gap-3 mb-4">
+            <div class="px-3 py-2 rounded-lg bg-gray-700/40 border border-white/5 text-sm text-gray-300">
+                Online ahora:
+                <span class="font-semibold text-emerald-300 ml-1" x-text="totalAsesoresOnline"></span>
+            </div>
+            <div class="px-3 py-2 rounded-lg bg-gray-700/40 border border-white/5 text-sm text-gray-300">
+                Total asesores:
+                <span class="font-semibold text-gray-100 ml-1" x-text="asesores.length"></span>
+            </div>
+            <button @click="cargarAsesores()" :disabled="cargandoAsesores"
+                class="ml-auto px-3 py-2 rounded-lg bg-gray-700/50 text-gray-200 text-sm hover:bg-gray-700/70 transition-colors disabled:opacity-60">
+                <i class="fas fa-sync-alt mr-1" :class="cargandoAsesores ? 'fa-spin' : ''"></i> Actualizar
+            </button>
+        </div>
+
+        <div x-show="cargandoAsesores" class="flex items-center justify-center py-8">
+            <i class="fas fa-spinner fa-spin text-teal-400"></i>
+        </div>
+        <div x-show="!cargandoAsesores && asesoresOrdenados.length === 0" class="text-sm text-gray-500 text-center py-8">
+            Sin asesores para mostrar
+        </div>
+
+        <div x-show="!cargandoAsesores && asesoresOrdenados.length > 0" class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs uppercase tracking-wider text-gray-400 border-b border-white/10">
+                        <th class="py-2 pr-3">Asesor</th>
+                        <th class="py-2 pr-3">Estado</th>
+                        <th class="py-2 pr-3">Online hace</th>
+                        <th class="py-2 pr-3">Ingresó</th>
+                        <th class="py-2 pr-3">Último ping</th>
+                        <th class="py-2 pr-3 text-right">Carga</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="a in asesoresOrdenados" :key="a.id_usuario">
+                        <tr class="border-b border-white/5 text-gray-200">
+                            <td class="py-2.5 pr-3 font-medium" x-text="a.nombre"></td>
+                            <td class="py-2.5 pr-3">
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                                    :class="a.online ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-gray-700/50 text-gray-300 border border-white/10'"
+                                    x-text="a.online ? 'Online' : 'Offline'"></span>
+                            </td>
+                            <td class="py-2.5 pr-3 text-gray-300" x-text="duracionOnline(a)"></td>
+                            <td class="py-2.5 pr-3 text-gray-300" x-text="horaIngreso(a)"></td>
+                            <td class="py-2.5 pr-3 text-gray-400" x-text="tiempoDesdePing(a)"></td>
+                            <td class="py-2.5 pr-3 text-right text-gray-200">
+                                <span x-text="`${a.conversaciones_activas || 0}/${a.max_conversaciones || 0}`"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function crmCalidad() {
+        const today = new Date();
+        const toISO = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${dd}`;
+        };
+        const last7 = new Date(today.getTime());
+        last7.setDate(last7.getDate() - 7);
+
+        return {
+            listas: ({{ calidad_listas | tojson | safe }} || [])
+                .map(l => ({
+                    nombre: l.nombre || '',
+                    color: l.color || '#14B8A6',
+                    peso: l.peso || 0,
+                    terminos: Array.isArray(l.terminos) ? l.terminos : [],
+                }))
+                .filter(l => l.nombre),
+            seleccion: [],
+            desde: toISO(last7),
+            hasta: toISO(today),
+            modo: 'all',
+            cargando: false,
+            activeTab: 'mensajes',
+            resultados: [],
+            total: 0,
+            cargandoAsesores: false,
+            asesores: [],
+            _clockNow: Date.now(),
+            _inited: false,
+
+                                    get resumen() {
+        if (this.cargando) return 'Buscando...';
+        if (!this.resultados.length) return '';
+        const pts = this.resultados.reduce((acc, r) => acc + (r.puntaje || 0), 0);
+        return `${this.total} coincidencias | Puntaje total: ${pts}`;
+    },
+
+    get asesoresOrdenados() {
+        const lista = Array.isArray(this.asesores) ? [...this.asesores] : [];
+        lista.sort((a, b) => {
+            if (Boolean(a.online) !== Boolean(b.online)) return a.online ? -1 : 1;
+            const ta = a.conectado_desde ? new Date(a.conectado_desde).getTime() : 0;
+            const tb = b.conectado_desde ? new Date(b.conectado_desde).getTime() : 0;
+            if (ta !== tb) return ta - tb;
+            return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+        });
+        return lista;
+    },
+
+    get totalAsesoresOnline() {
+        return (this.asesores || []).filter(a => a.online).length;
+    },
+
+    switchTab(tab) {
+        this.activeTab = tab === 'asesores' ? 'asesores' : 'mensajes';
+        if (this.activeTab === 'asesores' && !this.asesores.length) this.cargarAsesores();
+    },
+
+    chipStyle(l) {
+        const active = (this.seleccion || []).includes(l.nombre);
+        const border = `${l.color}66`;
+        const bg = active ? `${l.color}33` : `#11182733`;
+        const fg = active ? l.color : '#9CA3AF';
+        return `border-color:${border}; background:${bg}; color:${fg}`;
+    },
+
+    toggleLista(nombre) {
+        const current = Array.isArray(this.seleccion) ? this.seleccion : [];
+        if (current.includes(nombre)) this.seleccion = current.filter(n => n !== nombre);
+        else this.seleccion = [...current, nombre];
+    },
+
+    async limpiar() {
+        if (this.cargando) return;
+        this.seleccion = [];
+        this.desde = toISO(last7);
+        this.hasta = toISO(today);
+        this.modo = 'all';
+        this.resultados = [];
+        this.total = 0;
+    },
+
+    async cargarAsesores() {
+        this.cargandoAsesores = true;
+        try {
+            const r = await fetch('/crm/api/admin/asesores');
+            const d = await r.json();
+            this.asesores = Array.isArray(d.asesores) ? d.asesores : [];
+        } catch (e) {
+            console.error(e);
+            this.asesores = [];
+        } finally {
+            this.cargandoAsesores = false;
+        }
+    },
+
+    _formatDuracion(ms) {
+        if (!Number.isFinite(ms) || ms <= 0) return '0 min';
+        const totalMin = Math.floor(ms / 60000);
+        const horas = Math.floor(totalMin / 60);
+        const minutos = totalMin % 60;
+        if (horas <= 0) return `${minutos} min`;
+        return `${horas}h ${String(minutos).padStart(2, '0')}m`;
+    },
+
+    duracionOnline(asesor) {
+        if (!asesor || !asesor.online || !asesor.conectado_desde) return '-';
+        const inicio = new Date(asesor.conectado_desde).getTime();
+        if (!Number.isFinite(inicio)) return '-';
+        return this._formatDuracion(this._clockNow - inicio);
+    },
+
+    horaIngreso(asesor) {
+        if (!asesor || !asesor.conectado_desde) return '-';
+        return this.formatFechaHora(asesor.conectado_desde);
+    },
+
+    tiempoDesdePing(asesor) {
+        if (!asesor || !asesor.ultimo_ping) return '-';
+        const ping = new Date(asesor.ultimo_ping).getTime();
+        if (!Number.isFinite(ping)) return '-';
+        return `hace ${this._formatDuracion(this._clockNow - ping)}`;
+    },
+
+        async buscar() {
+        this.cargando = true;
+        try {
+            const listas = Array.isArray(this.seleccion) ? this.seleccion : [];
+            const qs = new URLSearchParams();
+            qs.set('desde', this.desde || '');
+            qs.set('hasta', this.hasta || '');
+            qs.set('modo', this.modo || 'asesor');
+            if (listas.length) qs.set('listas', listas.join(','));
+            const r = await fetch(`/crm/api/admin/calidad/buscar?${qs.toString()}`);
+            const d = await r.json();
+            this.resultados = d.resultados || [];
+            this.total = d.total || 0;
+            this.listas = (d.listas || this.listas || []).map(l => ({
+                nombre: l.nombre || '',
+                color: l.color || '#14B8A6',
+                peso: l.peso || 0,
+                terminos: Array.isArray(l.terminos) ? l.terminos : [],
+            })).filter(l => l.nombre);
+        } catch (e) {
+            console.error(e);
+            this.resultados = [];
+            this.total = 0;
+        } finally {
+            this.cargando = false;
+        }
+    },
+
+    detalleUrl(idConv) {
+        return `/crm/bandeja/${idConv}`;
+    },
+
+    navigate(idConv) {
+        const st = {
+            desde: this.desde,
+            hasta: this.hasta,
+            modo: this.modo,
+            seleccion: Array.isArray(this.seleccion) ? this.seleccion : [],
+            resultados: this.resultados,
+            total: this.total,
+            listas: this.listas
+        };
+        sessionStorage.setItem('crmCalidadState', JSON.stringify(st));
+
+        const url = this.detalleUrl(idConv) + '?back=/crm/admin/calidad';
+        if (window.appNavigateActiveTab) window.appNavigateActiveTab(url);
+        else window.location.href = url;
+    },
+
+    matchedListas(r) {
+        const out = [];
+        const matched = r.matched || {};
+        for (const nombre of Object.keys(matched)) {
+            const l = (this.listas || []).find(x => x.nombre === nombre);
+            out.push({ nombre, color: l ? l.color : '#14B8A6', peso: l ? (l.peso || 0) : 0 });
+        }
+        return out;
+    },
+
+    escapeHtml(s) {
+        return String(s || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    },
+
+    escapeRegExp(s) {
+        return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    },
+
+    highlight(texto, matched) {
+        const base = this.escapeHtml(texto || '');
+        const entradas = [];
+        const m = matched || {};
+        for (const nombre of Object.keys(m)) {
+            const l = (this.listas || []).find(x => x.nombre === nombre);
+            const color = l ? l.color : '#14B8A6';
+            const terms = Array.isArray(m[nombre]) ? m[nombre] : [];
+            for (const t of terms) entradas.push({ t: String(t || ''), color });
+        }
+        entradas.sort((a, b) => (b.t.length || 0) - (a.t.length || 0));
+        let html = base;
+        for (const e of entradas) {
+            if (!e.t || e.t.length < 2) continue;
+            const re = new RegExp(`(^|\\b|\\s)(${this.escapeRegExp(e.t)})(\\b|\\s|$)`, 'gi');
+            html = html.replace(re, `$1<mark style="background:${e.color}33;color:#F9FAFB;padding:0 2px;border-radius:4px;">$2</mark>$3`);
+        }
+        return html;
+    },
+
+    formatFechaHora(iso) {
+        if (!iso) return '';
+        try {
+            const d = new Date(iso);
+            return d.toLocaleString('es-AR', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        } catch {
+            return String(iso);
+        }
+    },
+
+    init() {
+        if (this._inited) return;
+        this._inited = true;
+        setInterval(() => {
+            this._clockNow = Date.now();
+        }, 15000);
+        setInterval(() => {
+            if (this.activeTab === 'asesores') this.cargarAsesores();
+        }, 30000);
+        try {
+            const params = new URLSearchParams(window.location.search || '');
+            const auto = (params.get('auto') || '') === '1';
+            const listasParam = (params.get('listas') || '').trim();
+            const desdeParam = (params.get('desde') || '').trim();
+            const hastaParam = (params.get('hasta') || '').trim();
+            const modoParam = (params.get('modo') || '').trim();
+            const hasDeepLink = auto || !!listasParam || !!desdeParam || !!hastaParam;
+
+            if (hasDeepLink && listasParam) {
+                const pick = listasParam.split(',').map(s => s.trim()).filter(Boolean);
+                if (pick.length) this.seleccion = pick;
+            }
+            if (hasDeepLink && /^\d{4}-\d{2}-\d{2}$/.test(desdeParam)) this.desde = desdeParam;
+            if (hasDeepLink && /^\d{4}-\d{2}-\d{2}$/.test(hastaParam)) this.hasta = hastaParam;
+            if (hasDeepLink && modoParam && ['asesor', 'all', 'cliente'].includes(modoParam)) {
+                this.modo = modoParam;
+            }
+            if (hasDeepLink && auto) {
+                this.buscar();
+            }
+        } catch (e) { }
+
+        try {
+            const params = new URLSearchParams(window.location.search || '');
+            const auto = (params.get('auto') || '') === '1';
+            const listasParam = (params.get('listas') || '').trim();
+            const desdeParam = (params.get('desde') || '').trim();
+            const hastaParam = (params.get('hasta') || '').trim();
+            const hasDeepLink = auto || !!listasParam || !!desdeParam || !!hastaParam;
+            if (hasDeepLink) return;
+        } catch (e) { }
+
+        try {
+            const saved = sessionStorage.getItem('crmCalidadState');
+            if (saved) {
+                const st = JSON.parse(saved);
+                this.desde = st.desde || this.desde;
+                this.hasta = st.hasta || this.hasta;
+                this.modo = st.modo || this.modo;
+                if (st.seleccion) this.seleccion = Array.isArray(st.seleccion) ? st.seleccion : [];
+                this.resultados = st.resultados || [];
+                this.total = st.total || 0;
+                if (st.listas) this.listas = st.listas;
+                sessionStorage.removeItem('crmCalidadState');
+            }
+        } catch (e) { }
+    }
+    };
+}
+</script>
+{% endblock %}

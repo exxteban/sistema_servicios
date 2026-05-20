@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ 'Editar gasto corriente' if gasto else 'Nuevo gasto corriente' }}{% endblock %}
+
+{% block content %}
+{% set form_data = request.form if request.method == 'POST' else None %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200">
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">{{ 'Editar gasto corriente' if gasto else 'Nuevo gasto corriente' }}</h1>
+                    <p class="text-sm text-gray-500">Define el concepto, estimado mensual y cómo quieres vigilar el vencimiento.</p>
+                </div>
+                <a href="{{ url_for('gastos_corrientes.index') }}"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver
+                </a>
+            </div>
+        </div>
+
+        <form method="post"
+            action="{{ url_for('gastos_corrientes.editar', id_gasto_corriente=gasto.id_gasto_corriente) if gasto else url_for('gastos_corrientes.nuevo') }}"
+            class="p-6 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label for="nombre" class="block text-sm font-semibold text-gray-700 mb-2">Nombre</label>
+                    <input id="nombre" name="nombre" type="text" required
+                        value="{{ form_data.get('nombre', gasto.nombre if gasto else '') if form_data else (gasto.nombre if gasto else '') }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="categoria" class="block text-sm font-semibold text-gray-700 mb-2">Categoría</label>
+                    <select id="categoria" name="categoria"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                        {% for categoria in categorias %}
+                        <option value="{{ categoria.valor }}" {% if (form_data and form_data.get('categoria') == categoria.valor) or (not form_data and ((gasto and gasto.categoria == categoria.valor) or (not gasto and categoria.valor == 'servicios'))) %}selected{% endif %}>
+                            {{ categoria.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="monto_estimado" class="block text-sm font-semibold text-gray-700 mb-2">Monto estimado</label>
+                    <input id="monto_estimado" name="monto_estimado" type="number" min="1" step="1" required
+                        value="{{ form_data.get('monto_estimado', '{:.0f}'.format(gasto.monto_estimado) if gasto else '') if form_data else ('{:.0f}'.format(gasto.monto_estimado) if gasto else '') }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="dia_vencimiento" class="block text-sm font-semibold text-gray-700 mb-2">Día de vencimiento</label>
+                    <input id="dia_vencimiento" name="dia_vencimiento" type="number" min="1" max="31" required
+                        value="{{ form_data.get('dia_vencimiento', gasto.dia_vencimiento_int() if gasto else 10) if form_data else (gasto.dia_vencimiento_int() if gasto else 10) }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="md:col-span-2">
+                    <label for="descripcion" class="block text-sm font-semibold text-gray-700 mb-2">Descripción</label>
+                    <textarea id="descripcion" name="descripcion" rows="4"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">{{ form_data.get('descripcion', gasto.descripcion if gasto else '') if form_data else (gasto.descripcion if gasto else '') }}</textarea>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <label class="flex items-start gap-3 rounded-2xl border border-blue-100 p-4 bg-blue-50">
+                    <input id="alerta_activa" type="checkbox" name="alerta_activa" value="1"
+                        class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        {% if (form_data and form_data.get('alerta_activa')) or (not form_data and (gasto is none or gasto.alerta_activa)) %}checked{% endif %}>
+                    <div>
+                        <div class="text-sm font-semibold text-blue-900">Alerta visual activa</div>
+                        <div class="text-sm text-blue-700">El sistema marcará el gasto en verde antes del vencimiento y en rojo al vencer.</div>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 rounded-2xl border border-emerald-100 p-4 bg-emerald-50">
+                    <input type="checkbox" name="requiere_caja_por_defecto" value="1"
+                        class="mt-1 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                        {% if (form_data and form_data.get('requiere_caja_por_defecto')) or (not form_data and (gasto is none or gasto.requiere_caja_por_defecto)) %}checked{% endif %}>
+                    <div>
+                        <div class="text-sm font-semibold text-emerald-900">Marcar pago desde caja por defecto</div>
+                        <div class="text-sm text-emerald-700">Preselecciona la opción al registrar pagos de este gasto.</div>
+                    </div>
+                </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label for="dias_anticipacion_alerta" class="block text-sm font-semibold text-gray-700 mb-2">Días de anticipación</label>
+                    <input id="dias_anticipacion_alerta" name="dias_anticipacion_alerta" type="number" min="0" max="60"
+                        value="{{ form_data.get('dias_anticipacion_alerta', gasto.dias_anticipacion_alerta_int() if gasto else 3) if form_data else (gasto.dias_anticipacion_alerta_int() if gasto else 3) }}"
+                        class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <label class="flex items-center gap-3 rounded-2xl border border-gray-200 p-4 bg-gray-50">
+                    <input type="checkbox" name="activo" value="1"
+                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        {% if (form_data and form_data.get('activo')) or (not form_data and (gasto is none or gasto.activo)) %}checked{% endif %}>
+                    <div>
+                        <div class="text-sm font-semibold text-gray-900">Gasto activo</div>
+                        <div class="text-sm text-gray-500">Si lo desactivas, conserva historial pero deja de figurar como vigente.</div>
+                    </div>
+                </label>
+            </div>
+
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <a href="{{ url_for('gastos_corrientes.index') }}"
+                    class="inline-flex items-center justify-center px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-save"></i>
+                    Guardar gasto
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

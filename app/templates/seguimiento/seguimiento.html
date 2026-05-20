@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguimiento de
+
+        Reparación</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 25px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 16px;
+            margin: 15px 0;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .status-pendiente {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .status-diagnostico {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-espera_presupuesto {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-espera_repuesto {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-espera_cliente {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+
+        .status-en_proceso {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .status-listo {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-no_se_pudo {
+            background: #ffe4e6;
+            color: #9f1239;
+        }
+
+        .status-entregado {
+            background: #e9d5ff;
+            color: #6b21a8;
+        }
+
+        .status-cancelado {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .info-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            color: #111827;
+            font-weight: 500;
+        }
+
+        .countdown {
+            text-align: center;
+            margin: 25px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            border-radius: 15px;
+        }
+
+        .countdown-label {
+            font-size: 14px;
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+
+        .countdown-time {
+            font-size: 32px;
+            font-weight: bold;
+            color: #9a3412;
+            font-family: 'Courier New', monospace;
+        }
+
+        .timeline {
+            margin-top: 30px;
+        }
+
+        .timeline-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #111827;
+            margin-bottom: 15px;
+        }
+
+        .timeline-item {
+            display: flex;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .timeline-item:not(:last-child)::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 25px;
+            bottom: -15px;
+            width: 2px;
+            background: #e5e7eb;
+        }
+
+        .timeline-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            margin-right: 15px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .timeline-content {
+            flex: 1;
+        }
+
+        .timeline-estado {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .timeline-fecha {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+            font-size: 12px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .refresh-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            margin-right: 5px;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">{{ app_brand_name or 'RYJCELL' }}</div>
+            <p>Seguimiento de Reparación</p>
+        </div>
+
+        <div class="content">
+            <div style="text-align: center;">
+                <span class="status-badge status-{{ reparacion.estado }}" id="status-badge">
+                    <span id="status-text">{{ reparacion.estado_display }}</span>
+                </span>
+            </div>
+
+            <div class="info-section">
+                <div class="info-label">Equipo</div>
+                <div class="info-value">{{ reparacion.tipo_equipo }} - {{ reparacion.marca_modelo }}</div>
+            </div>
+
+            <div class="info-section">
+                <div class="info-label">Fecha de Ingreso</div>
+                <div class="info-value">{{ reparacion.fecha_ingreso|local_strftime('%d/%m/%Y %H:%M') }}</div>
+            </div>
+
+            {% if reparacion.fecha_estimada %}
+            <div class="info-section">
+                <div class="info-label">Fecha Estimada de Entrega</div>
+                <div class="info-value">
+                    {{ reparacion.fecha_estimada.strftime('%d/%m/%Y') }}{% if reparacion.fecha_estimada_hora %} {{ reparacion.fecha_estimada_hora.strftime('%H:%M') }}{% endif %}
+                </div>
+            </div>
+
+            <div class="countdown" id="countdown-section">
+                <div class="countdown-label">Tiempo estimado de entrega</div>
+                <div class="countdown-time" id="countdown-display">Calculando...</div>
+            </div>
+            {% endif %}
+
+            {% set costo_seguimiento = reparacion.costo_final_calculado if (reparacion.costo_final_calculado or 0) > 0 else reparacion.costo_estimado %}
+            {% if reparacion.mostrar_costo and costo_seguimiento %}
+            <div class="info-section">
+                <div class="info-label">Costo {{ 'Final' if (reparacion.costo_final_calculado or 0) > 0 else 'Estimado' }}</div>
+                <div class="info-value" style="font-size: 24px; color: #059669;">
+                    Gs {{ '{:,.0f}'.format(costo_seguimiento or 0).replace(',', '.') }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if reparacion.nota_cliente %}
+            <div class="info-section" style="border-left-color: #10b981;">
+                <div class="info-label">Nota</div>
+                <div class="info-value" id="nota-cliente">{{ reparacion.nota_cliente }}</div>
+            </div>
+            {% endif %}
+
+            {% if historial %}
+            <div class="timeline">
+                <div class="timeline-title">Historial</div>
+                {% for item in historial %}
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-estado">{{ item.estado_nuevo|replace('_', ' ')|title }}</div>
+                        <div class="timeline-fecha">{{ item.fecha_cambio|local_strftime('%d/%m/%Y %H:%M') }}</div>
+                        {% if item.nota %}
+                        <div style="font-size: 13px; color: #6b7280; margin-top: 3px;">{{ item.nota }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="footer">
+            <span class="refresh-indicator"></span> Actualización automática cada 10 segundos
+        </div>
+    </div>
+
+    <script>
+        const ESTADOS_DISPLAY = {
+            'pendiente': 'Pendiente',
+            'diagnostico': 'En Diagnóstico',
+            'espera_presupuesto': 'Esperando Presupuesto',
+            'espera_repuesto': 'Esperando Repuesto',
+            'espera_cliente': 'Esperando Aprobación',
+            'en_proceso': 'En Reparación',
+            'listo': '¡Listo para Retirar!',
+            'no_se_pudo': 'No se pudo reparar',
+            'entregado': 'Entregado',
+            'cancelado': 'Cancelado',
+            'antiguos': 'Antiguos'
+        };
+
+        // Countdown
+        {% if reparacion.fecha_estimada %}
+        function updateCountdown() {
+            const targetDate = new Date('{{ reparacion.fecha_estimada.isoformat() }}');
+            {% if reparacion.fecha_estimada_hora %}
+            const [hours, minutes] = '{{ reparacion.fecha_estimada_hora.isoformat() }}'.split(':');
+            targetDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            {% endif %}
+
+            const now = new Date();
+            const diff = targetDate - now;
+
+            if (diff <= 0) {
+                document.getElementById('countdown-display').textContent = '¡Ya está listo!';
+                return;
+            }
+
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hrs = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            let display = '';
+            if (days > 0) display += days + 'd ';
+            display += hrs + 'h ' + mins + 'm';
+
+            document.getElementById('countdown-display').textContent = display;
+        }
+
+        updateCountdown();
+        setInterval(updateCountdown, 60000); // Actualizar cada minuto
+        {% endif %}
+
+        // Polling para actualizar estado
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/seguimiento/api/{{ token }}');
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Actualizar estado
+                    const statusText = document.getElementById('status-text');
+                    const statusBadge = document.getElementById('status-badge');
+
+                    if (statusText && data.estado_display) {
+                        statusText.textContent = data.estado_display;
+                    }
+
+                    if (statusBadge && data.estado) {
+                        statusBadge.className = `status-badge status-${data.estado}`;
+                    }
+
+                    // Actualizar nota si cambió
+                    const notaElement = document.getElementById('nota-cliente');
+                    if (notaElement && data.nota_cliente) {
+                        notaElement.textContent = data.nota_cliente;
+                    }
+                }
+            } catch (error) {
+                console.error('Error al actualizar:', error);
+            }
+        }
+
+        // Actualizar estado inicial
+        fetchStatus();
+
+        // Polling cada 10 segundos
+        setInterval(fetchStatus, 10000);
+    </script>
+</body>
+
+</html>

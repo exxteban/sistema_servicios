@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Historial de Vendedores{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-users text-amber-600 dark:text-amber-400 mr-2"></i>Historial de Vendedores
+        </h1>
+        <a href="{{ url_for('reportes.index') }}"
+            class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+            Volver a Reportes
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+        <form id="historialVendedoresFiltros" method="GET"
+            action="{{ url_for('reportes.historial_vendedores') }}"
+            class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            {% if request.args.get('partial') %}
+            <input type="hidden" name="partial" value="{{ request.args.get('partial') }}">
+            {% endif %}
+            <input type="hidden" name="historial_page" value="{{ historial_pag.page if historial_pag else 1 }}">
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Desde</label>
+                <input type="date" name="desde" value="{{ desde.isoformat() }}"
+                    class="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Hasta</label>
+                <input type="date" name="hasta" value="{{ hasta.isoformat() }}"
+                    class="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Vendedor/Cajero</label>
+                <select name="id_vendedor"
+                    class="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+                    <option value="0">Todos</option>
+                    {% for usuario in vendedores %}
+                    <option value="{{ usuario.id_usuario }}" {% if id_vendedor and id_vendedor == usuario.id_usuario %}selected{% endif %}>
+                        {{ usuario.nombre_completo }}{% if usuario.rol %} ({{ usuario.rol.nombre }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit"
+                data-default-text="Filtrar"
+                class="h-10 bg-gray-800 dark:bg-gray-700 text-white px-4 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition-colors">
+                Filtrar
+            </button>
+        </form>
+    </div>
+
+    <div id="historialVendedoresResults">
+        {% include "reportes/_historial_vendedores_resultados.html" %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+    const form = document.getElementById('historialVendedoresFiltros');
+    const results = document.getElementById('historialVendedoresResults');
+    if (!form || !results || form.dataset.autofilterBound === '1') {
+        return;
+    }
+    form.dataset.autofilterBound = '1';
+
+    const inputDesde = form.querySelector('input[name="desde"]');
+    const inputHasta = form.querySelector('input[name="hasta"]');
+    const selectVendedor = form.querySelector('select[name="id_vendedor"]');
+    const inputPagina = form.querySelector('input[name="historial_page"]');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    let debounceTimer = null;
+    let activeController = null;
+    let requestNonce = 0;
+
+    const setLoading = (isLoading) => {
+        results.classList.toggle('opacity-60', isLoading);
+        if (submitBtn) {
+            submitBtn.disabled = isLoading;
+            submitBtn.textContent = isLoading ? 'Filtrando...' : (submitBtn.dataset.defaultText || 'Filtrar');
+        }
+    };
+
+    const buildRequestUrl = () => {
+        const endpoint = form.getAttribute('action') || window.location.pathname;
+        const url = new URL(endpoint, window.location.origin);
+        const params = new URLSearchParams(new FormData(form));
+        params.set('historial_ajax', '1');
+        url.search = params.toString();
+        return url;
+    };
+
+    const updateBrowserUrl = (urlWithAjax) => {
+        if (!window.history || !window.history.replaceState) {
+            return;
+        }
+        const visible = new URL(urlWithAjax.toString());
+        visible.searchParams.delete('historial_ajax');
+        const query = visible.searchParams.toString();
+        window.history.replaceState({}, '', `${visible.pathname}${query ? `?${query}` : ''}`);
+    };
+
+    const applyFilters = async (requestedUrl = null) => {
+        requestNonce += 1;
+        const currentNonce = requestNonce;
+
+        if (activeController) {
+            activeController.abort();
+        }
+        activeController = new AbortController();
+        const url = requestedUrl || buildRequestUrl();
+
+        setLoading(true);
+        try {
+            const response = await fetch(url.toString(), {
+                method: 'GET',
+                credentials: 'same-origin',
+                signal: activeController.signal,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'text/html'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`Error HTTP ${response.status}`);
+            }
+            const html = await response.text();
+            if (currentNonce !== requestNonce) {
+                return;
+            }
+            results.innerHTML = html;
+            updateBrowserUrl(url);
+            if (inputPagina) {
+                inputPagina.value = String(url.searchParams.get('historial_page') || '1');
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('No se pudo actualizar el historial de vendedores.', error);
+            }
+        } finally {
+            if (currentNonce === requestNonce) {
+                setLoading(false);
+            }
+        }
+    };
+
+    const scheduleApply = (delayMs) => {
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+        }
+        debounceTimer = setTimeout(() => {
+            applyFilters();
+        }, delayMs);
+    };
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (inputPagina) {
+            inputPagina.value = '1';
+        }
+        applyFilters();
+    });
+
+    if (selectVendedor) {
+        selectVendedor.addEventListener('change', () => {
+            if (inputPagina) {
+                inputPagina.value = '1';
+            }
+            applyFilters();
+        });
+    }
+    [inputDesde, inputHasta].forEach((input) => {
+        if (!input) {
+            return;
+        }
+        input.addEventListener('change', () => {
+            if (inputPagina) {
+                inputPagina.value = '1';
+            }
+            scheduleApply(120);
+        });
+        input.addEventListener('input', () => {
+            if (inputPagina) {
+                inputPagina.value = '1';
+            }
+            scheduleApply(280);
+        });
+    });
+
+    results.addEventListener('click', (event) => {
+        const link = event.target.closest('a[data-historial-page-link="1"]');
+        if (!link) {
+            return;
+        }
+        event.preventDefault();
+        const targetUrl = new URL(link.href, window.location.origin);
+        targetUrl.searchParams.set('historial_ajax', '1');
+        if (inputPagina) {
+            inputPagina.value = String(targetUrl.searchParams.get('historial_page') || '1');
+        }
+        applyFilters(targetUrl);
+    });
+})();
+</script>
+{% endblock %}

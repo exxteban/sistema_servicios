@@ -1,0 +1,948 @@
+-- ============================================
+-- SISTEMA DE INVENTARIO Y VENTAS V2 (ROBUSTO)
+-- Para termos, guampas, mates y accesorios
+-- Con soporte para KITS, REPUESTOS, CAJAS, IVA
+-- ============================================
+-- MEJORAS APLICADAS:
+-- 1. Cliente genérico "Consumidor Final" para ventas sin factura
+-- 2. Constraints UNIQUE en tablas de relación
+-- 3. Campos de auditoría (fecha_modificacion, modificado_por)
+-- 4. Política de stock para Kits clarificada
+-- 5. Tabla de configuración del sistema
+-- 6. Tabla de métodos de pago normalizados
+-- 7. Mejor manejo de estados y tipos
+-- ============================================
+
+-- ============================================
+-- TABLA DE CONFIGURACIÓN DEL SISTEMA
+-- ============================================
+CREATE TABLE configuracion (
+    clave VARCHAR(50) PRIMARY KEY,
+    valor TEXT NOT NULL,
+    descripcion TEXT,
+    fecha_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- TABLA DE USUARIOS
+-- ============================================
+CREATE TABLE usuarios (
+    id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL, -- Siempre guardar hash, nunca texto plano
+    nombre_completo VARCHAR(100) NOT NULL,
+    id_rol INTEGER NOT NULL DEFAULT 3, -- Rol por defecto: cajero
+    activo BOOLEAN DEFAULT 1,
+    ultimo_acceso DATETIME,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_rol) REFERENCES roles(id_rol)
+);
+
+-- ============================================
+-- SISTEMA DE ROLES Y PERMISOS
+-- ============================================
+CREATE TABLE roles (
+    id_rol INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre VARCHAR(50) UNIQUE NOT NULL,
+    descripcion TEXT,
+    nivel_jerarquia INTEGER NOT NULL DEFAULT 0, -- Mayor número = más privilegios
+    activo BOOLEAN DEFAULT 1,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE permisos (
+    id_permiso INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo VARCHAR(50) UNIQUE NOT NULL, -- 'anular_venta', 'editar_stock', 'ver_reportes'
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    modulo VARCHAR(50) NOT NULL, -- 'ventas', 'inventario', 'caja', 'reportes', 'configuracion'
+    requiere_autorizacion BOOLEAN DEFAULT 0, -- Si requiere código de admin
+    activo BOOLEAN DEFAULT 1
+);
+
+CREATE TABLE rol_permisos (
+    id_rol_permiso INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_rol INTEGER NOT NULL,
+    id_permiso INTEGER NOT NULL,
+    FOREIGN KEY (id_rol) REFERENCES roles(id_rol) ON DELETE CASCADE,
+    FOREIGN KEY (id_permiso) REFERENCES permisos(id_permiso) ON DELETE CASCADE,
+    UNIQUE(id_rol, id_permiso)
+);
+
+-- Permisos adicionales específicos por usuario (excepciones)
+CREATE TABLE usuario_permisos_adicionales (
+    id_usuario_permiso INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_usuario INTEGER NOT NULL,
+    id_permiso INTEGER NOT NULL,
+    concedido_por INTEGER NOT NULL, -- ID del admin que concedió el permiso
+    fecha_concesion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_expiracion DATETIME, -- NULL = permanente
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    FOREIGN KEY (id_permiso) REFERENCES permisos(id_permiso) ON DELETE CASCADE,
+    FOREIGN KEY (concedido_por) REFERENCES usuarios(id_usuario),
+    UNIQUE(id_usuario, id_permiso)
+);
+
+-- ============================================
+-- AUTORIZACIONES DE ADMINISTRADOR
+-- ============================================
+-- Para registrar cuando un cajero solicita y recibe autorización del admin
+CREATE TABLE autorizaciones (
+    id_autorizacion INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_usuario_solicitante INTEGER NOT NULL, -- Cajero que solicita
+    id_usuario_autorizador INTEGER NOT NULL, -- Admin que autoriza
+    id_permiso INTEGER NOT NULL, -- Qué permiso se autorizó
+    accion VARCHAR(100) NOT NULL, -- Descripción de la acción
+    referencia_tipo VARCHAR(30), -- 'venta', 'compra', 'ajuste_inventario'
+    referencia_id INTEGER, -- ID del registro afectado
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'aprobada', 'rechazada', 'expirada')),
+    fecha_solicitud DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_respuesta DATETIME,
+    observaciones TEXT,
+    ip_address VARCHAR(45), -- Para auditoría
+    FOREIGN KEY (id_usuario_solicitante) REFERENCES usuarios(id_usuario),
+    FOREIGN KEY (id_usuario_autorizador) REFERENCES usuarios(id_usuario),
+    FOREIGN KEY (id_permiso) REFERENCES permisos(id_permiso)
+);
+
+-- ============================================
+-- PREFERENCIAS DE USUARIO
+-- ============================================
+CREATE TABLE preferencias_usuario (
+    id_preferencia INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_usuario INTEGER NOT NULL,
+    clave VARCHAR(50) NOT NULL, -- 'tema', 'idioma', 'dashboard_rango_fecha'
+    valor TEXT NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    UNIQUE(id_usuario, clave)
+);
+
+-- ============================================
+-- TABLAS DE CAJA Y SESIONES
+-- ============================================
+CREATE TABLE cajas (
+    id_caja INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    ubicacion VARCHAR(100), -- "Local Principal", "Sucursal 2"
+    activa BOOLEAN DEFAULT 1,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE sesiones_caja (
+    id_sesion INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_caja INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL, -- Quién abrió la caja
+    fecha_apertura DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_cierre DATETIME,
+    monto_inicial DECIMAL(15,2) NOT NULL DEFAULT 0, -- Fondo fijo / Cambio inicial
+    monto_final_declarado DECIMAL(15,2), -- Lo que contó el cajero al cerrar
+    monto_final_sistema DECIMAL(15,2), -- Lo que el sistema calculó
+    diferencia DECIMAL(15,2), -- Sobrante (+) o Faltante (-)
+    estado VARCHAR(20) NOT NULL DEFAULT 'abierta' CHECK (estado IN ('abierta', 'cerrada', 'auditada')),
+    observaciones TEXT,
+    id_usuario_cierre INTEGER, -- Quién cerró (puede ser diferente al que abrió)
+    FOREIGN KEY (id_caja) REFERENCES cajas(id_caja),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+    FOREIGN KEY (id_usuario_cierre) REFERENCES usuarios(id_usuario)
+);
+
+CREATE TABLE movimientos_caja (
+    id_movimiento_caja INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_sesion_caja INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL, -- Quién realizó el movimiento
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('ingreso', 'egreso')),
+    monto DECIMAL(15,2) NOT NULL CHECK (monto > 0),
+    motivo VARCHAR(200) NOT NULL, -- "Reembolso Venta #44", "Pago proveedor"
+    referencia_tipo VARCHAR(50), -- 'devolucion', 'gasto', 'aporte', etc.
+    referencia_id INTEGER, -- ID de la devolución, etc.
+    fecha_movimiento DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_sesion_caja) REFERENCES sesiones_caja(id_sesion),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+-- ============================================
+-- MÉTODOS DE PAGO
+-- ============================================
+CREATE TABLE metodos_pago (
+    id_metodo_pago INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre VARCHAR(50) NOT NULL UNIQUE, -- Efectivo, Tarjeta Crédito, QR, Transferencia
+    requiere_referencia BOOLEAN DEFAULT 0, -- Si necesita # de operación
+    activo BOOLEAN DEFAULT 1,
+    orden_display INTEGER DEFAULT 0 -- Para ordenar en la UI
+);
+
+-- ============================================
+-- CATEGORÍAS DE PRODUCTOS
+-- ============================================
+CREATE TABLE categorias (
+    id_categoria INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
+    descripcion TEXT,
+    categoria_padre INTEGER, -- Para subcategorías (opcional)
+    activo BOOLEAN DEFAULT 1,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (categoria_padre) REFERENCES categorias(id_categoria)
+);
+
+-- ============================================
+-- PROVEEDORES
+-- ============================================
+CREATE TABLE proveedores (
+    id_proveedor INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre VARCHAR(200) NOT NULL,
+    ruc VARCHAR(50) UNIQUE, -- RUC único si se proporciona
+    telefono VARCHAR(50),
+    email VARCHAR(100),
+    direccion TEXT,
+    contacto_nombre VARCHAR(100),
+    contacto_telefono VARCHAR(50),
+    dias_credito INTEGER DEFAULT 0, -- Días de crédito que ofrece
+    notas TEXT,
+    activo BOOLEAN DEFAULT 1,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- PRODUCTOS
+-- ============================================
+CREATE TABLE productos (
+    id_producto INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo VARCHAR(50) UNIQUE NOT NULL, -- Código de barras o interno
+    codigo_proveedor VARCHAR(50), -- Código del proveedor (opcional)
+    nombre VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    id_categoria INTEGER NOT NULL,
+    id_proveedor_principal INTEGER, -- Proveedor habitual
+    marca VARCHAR(100),
+    modelo VARCHAR(100),
+    color VARCHAR(50),
+    capacidad VARCHAR(50), -- "500ml", "1L" para termos
+    
+    -- Precios
+    precio_compra DECIMAL(10,2) NOT NULL DEFAULT 0,
+    precio_venta DECIMAL(10,2) NOT NULL,
+    precio_mayorista DECIMAL(10,2), -- Precio especial para mayoristas
+    
+    -- Impuestos (Paraguay: 10%, 5%, Exenta)
+    porcentaje_iva INTEGER NOT NULL DEFAULT 10 CHECK (porcentaje_iva IN (0, 5, 10)),
+    
+    -- Stock
+    stock_actual INTEGER NOT NULL DEFAULT 0,
+    stock_minimo INTEGER NOT NULL DEFAULT 5,
+    stock_maximo INTEGER, -- Para alertas de sobrestock
+    
+    -- Tipo de producto
+    es_kit BOOLEAN DEFAULT 0, -- Es un combo/kit armado
+    kit_stock_propio BOOLEAN DEFAULT 0, -- Si es kit: ¿tiene stock propio o se calcula de componentes?
+    es_servicio BOOLEAN DEFAULT 0, -- Servicios no afectan stock
+    
+    -- Control
+    activo BOOLEAN DEFAULT 1,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    id_usuario_modificacion INTEGER,
+    
+    FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria),
+    FOREIGN KEY (id_proveedor_principal) REFERENCES proveedores(id_proveedor),
+    FOREIGN KEY (id_usuario_modificacion) REFERENCES usuarios(id_usuario)
+);
+
+-- ============================================
+-- PRODUCTOS COMPUESTOS (KITS/COMBOS)
+-- ============================================
+-- Ejemplo: Kit Matero = 1 Guampa + 1 Bombilla + 1 Bolsa Yerba
+CREATE TABLE productos_compuestos (
+    id_composicion INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_producto_kit INTEGER NOT NULL, 
+    id_producto_componente INTEGER NOT NULL, 
+    cantidad INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+    FOREIGN KEY (id_producto_kit) REFERENCES productos(id_producto),
+    FOREIGN KEY (id_producto_componente) REFERENCES productos(id_producto),
+    UNIQUE(id_producto_kit, id_producto_componente), -- Evitar duplicados
+    CHECK (id_producto_kit != id_producto_componente) -- No auto-referenciarse
+);
+
+-- ============================================
+-- RELACIÓN PRODUCTO-REPUESTO
+-- ============================================
+-- Ejemplo: Termo Stanley -> Tapón Stanley, Pico Stanley
+CREATE TABLE producto_repuestos (
+    id_relacion INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_producto_principal INTEGER NOT NULL, -- El producto que usa el repuesto
+    id_producto_repuesto INTEGER NOT NULL, -- El repuesto en sí
+    descripcion TEXT, -- "Tapón de silicona para modelo X"
+    activo BOOLEAN DEFAULT 1,
+    FOREIGN KEY (id_producto_principal) REFERENCES productos(id_producto),
+    FOREIGN KEY (id_producto_repuesto) REFERENCES productos(id_producto),
+    UNIQUE(id_producto_principal, id_producto_repuesto), -- Evitar duplicados
+    CHECK (id_producto_principal != id_producto_repuesto)
+);
+
+-- ============================================
+-- CLIENTES
+-- ============================================
+CREATE TABLE clientes (
+    id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre VARCHAR(200) NOT NULL,
+    ruc_ci VARCHAR(50), -- RUC o Cédula de Identidad
+    telefono VARCHAR(50),
+    email VARCHAR(100),
+    direccion TEXT,
+    tipo VARCHAR(20) NOT NULL DEFAULT 'minorista' CHECK (tipo IN ('minorista', 'mayorista', 'empresa')),
+    nivel_estrellas INTEGER NOT NULL DEFAULT 3 CHECK (nivel_estrellas BETWEEN 1 AND 5),
+    limite_credito DECIMAL(15,2) DEFAULT 0, -- Para ventas a crédito
+    saldo_pendiente DECIMAL(15,2) DEFAULT 0, -- Deuda actual
+    notas TEXT,
+    activo BOOLEAN DEFAULT 1,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- COMPRAS (INGRESO DE MERCADERÍA)
+-- ============================================
+CREATE TABLE compras (
+    id_compra INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_factura VARCHAR(50), -- Nro factura del proveedor
+    timbrado VARCHAR(20), -- Timbrado de la factura
+    id_proveedor INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL, -- Quién registró la compra
+    fecha_compra DATE NOT NULL DEFAULT (DATE('now')),
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_vencimiento DATE, -- Para control de crédito
+    
+    -- Totales
+    subtotal DECIMAL(15,2) NOT NULL DEFAULT 0,
+    total_iva_10 DECIMAL(15,2) DEFAULT 0,
+    total_iva_5 DECIMAL(15,2) DEFAULT 0,
+    total DECIMAL(15,2) NOT NULL,
+    
+    -- Estado
+    estado VARCHAR(20) NOT NULL DEFAULT 'completada' CHECK (estado IN ('pendiente', 'completada', 'anulada')),
+    tipo_compra VARCHAR(20) DEFAULT 'contado' CHECK (tipo_compra IN ('contado', 'credito')),
+    pagada BOOLEAN DEFAULT 0, -- Para compras a crédito
+    
+    observaciones TEXT,
+    
+    FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+CREATE TABLE detalle_compras (
+    id_detalle_compra INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_compra INTEGER NOT NULL,
+    id_producto INTEGER NOT NULL,
+    cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+    precio_unitario DECIMAL(15,2) NOT NULL, -- Costo unitario al momento de compra
+    porcentaje_iva INTEGER NOT NULL DEFAULT 10,
+    subtotal DECIMAL(15,2) NOT NULL,
+    FOREIGN KEY (id_compra) REFERENCES compras(id_compra) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
+);
+
+-- ============================================
+-- PAGOS DE COMPRAS
+-- ============================================
+CREATE TABLE pagos_compras (
+    id_pago_compra INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_compra INTEGER NOT NULL,
+    id_metodo_pago INTEGER NOT NULL,
+    id_sesion_caja INTEGER, -- NULL si el pago no se hace desde caja (ej: transferencia)
+    id_usuario INTEGER NOT NULL, -- Quién registró el pago
+    monto DECIMAL(15,2) NOT NULL CHECK (monto > 0),
+    referencia VARCHAR(100), -- Nro de cheque, transferencia, etc.
+    fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
+    observaciones TEXT,
+    FOREIGN KEY (id_compra) REFERENCES compras(id_compra) ON DELETE CASCADE,
+    FOREIGN KEY (id_metodo_pago) REFERENCES metodos_pago(id_metodo_pago),
+    FOREIGN KEY (id_sesion_caja) REFERENCES sesiones_caja(id_sesion),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+-- ============================================
+-- CUENTAS POR PAGAR (DEUDAS CON PROVEEDORES)
+-- ============================================
+CREATE TABLE cuentas_por_pagar (
+    id_cuenta_pagar INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_compra INTEGER NOT NULL,
+    id_proveedor INTEGER NOT NULL,
+    monto_total DECIMAL(15,2) NOT NULL,
+    monto_pagado DECIMAL(15,2) NOT NULL DEFAULT 0,
+    saldo_pendiente DECIMAL(15,2) NOT NULL,
+    fecha_vencimiento DATE,
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'pagada', 'vencida', 'cancelada')),
+    dias_vencido INTEGER DEFAULT 0, -- Calculado automáticamente
+    FOREIGN KEY (id_compra) REFERENCES compras(id_compra),
+    FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor)
+);
+
+-- ============================================
+-- VENTAS
+-- ============================================
+CREATE TABLE ventas (
+    id_venta INTEGER PRIMARY KEY AUTOINCREMENT,
+    
+    -- Numeración de comprobante
+    tipo_comprobante VARCHAR(20) NOT NULL DEFAULT 'ticket' CHECK (tipo_comprobante IN ('ticket', 'factura', 'nota_credito')),
+    numero_comprobante VARCHAR(50), -- Nro de factura si corresponde
+    timbrado VARCHAR(20), -- Timbrado de la factura
+    
+    -- Relaciones
+    id_cliente INTEGER NOT NULL, -- Siempre tiene cliente (ID=1 es Consumidor Final)
+    id_sesion_caja INTEGER NOT NULL,
+    
+    -- Fechas
+    fecha_venta DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Totales
+    subtotal DECIMAL(15,2) NOT NULL, -- Suma antes de descuento
+    descuento_porcentaje DECIMAL(5,2) DEFAULT 0,
+    descuento_monto DECIMAL(15,2) DEFAULT 0,
+    total_iva_10 DECIMAL(15,2) DEFAULT 0, -- IVA 10% incluido
+    total_iva_5 DECIMAL(15,2) DEFAULT 0, -- IVA 5% incluido
+    total_exenta DECIMAL(15,2) DEFAULT 0, -- Monto exento
+    total DECIMAL(15,2) NOT NULL, -- Monto final a pagar
+    
+    -- Estado
+    estado VARCHAR(20) NOT NULL DEFAULT 'completada' CHECK (estado IN ('pendiente', 'completada', 'anulada')),
+    
+    -- Para ventas a crédito
+    tipo_venta VARCHAR(20) DEFAULT 'contado' CHECK (tipo_venta IN ('contado', 'credito')),
+    saldo_pendiente DECIMAL(15,2) DEFAULT 0,
+    
+    observaciones TEXT,
+    
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente),
+    FOREIGN KEY (id_sesion_caja) REFERENCES sesiones_caja(id_sesion)
+);
+
+CREATE TABLE detalle_ventas (
+    id_detalle_venta INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_venta INTEGER NOT NULL,
+    id_producto INTEGER NOT NULL,
+    cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+    
+    -- Snapshot del precio al momento de venta
+    precio_unitario DECIMAL(15,2) NOT NULL,
+    precio_original DECIMAL(15,2) NOT NULL, -- Precio lista (para ver descuentos)
+    
+    -- Impuestos (snapshot)
+    porcentaje_iva INTEGER NOT NULL, -- 10, 5, 0
+    monto_iva DECIMAL(15,2) NOT NULL, -- IVA calculado de este ítem
+    
+    -- Totales
+    descuento_linea DECIMAL(15,2) DEFAULT 0, -- Descuento aplicado a esta línea
+    subtotal DECIMAL(15,2) NOT NULL,
+    
+    -- Para kits
+    es_kit BOOLEAN DEFAULT 0,
+    
+    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
+);
+
+-- ============================================
+-- PAGOS DE VENTAS (Split Payments)
+-- ============================================
+CREATE TABLE pagos_ventas (
+    id_pago INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_venta INTEGER NOT NULL,
+    id_metodo_pago INTEGER NOT NULL,
+    monto DECIMAL(15,2) NOT NULL CHECK (monto > 0),
+    referencia VARCHAR(100), -- Nro Boleta POS, Nro Transacción, etc.
+    fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta) ON DELETE CASCADE,
+    FOREIGN KEY (id_metodo_pago) REFERENCES metodos_pago(id_metodo_pago)
+);
+
+-- ============================================
+-- CUENTAS POR COBRAR (CRÉDITOS A CLIENTES)
+-- ============================================
+CREATE TABLE cuentas_por_cobrar (
+    id_cuenta_cobrar INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_venta INTEGER NOT NULL,
+    id_cliente INTEGER NOT NULL,
+    monto_total DECIMAL(15,2) NOT NULL,
+    monto_cobrado DECIMAL(15,2) NOT NULL DEFAULT 0,
+    saldo_pendiente DECIMAL(15,2) NOT NULL,
+    fecha_vencimiento DATE,
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'cobrada', 'vencida', 'cancelada')),
+    dias_vencido INTEGER DEFAULT 0,
+    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta),
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)
+);
+
+-- Pagos parciales de cuentas por cobrar
+CREATE TABLE pagos_cuentas_cobrar (
+    id_pago_cuenta INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_cuenta_cobrar INTEGER NOT NULL,
+    id_sesion_caja INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL,
+    monto DECIMAL(15,2) NOT NULL CHECK (monto > 0),
+    id_metodo_pago INTEGER NOT NULL,
+    referencia VARCHAR(100),
+    fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
+    observaciones TEXT,
+    FOREIGN KEY (id_cuenta_cobrar) REFERENCES cuentas_por_cobrar(id_cuenta_cobrar),
+    FOREIGN KEY (id_sesion_caja) REFERENCES sesiones_caja(id_sesion),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+    FOREIGN KEY (id_metodo_pago) REFERENCES metodos_pago(id_metodo_pago)
+);
+
+-- ============================================
+-- AUDITORÍA DE ACCIONES CRÍTICAS
+-- ============================================
+CREATE TABLE auditoria (
+    id_auditoria INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_usuario INTEGER NOT NULL, -- Quién realizó la acción
+    accion VARCHAR(50) NOT NULL, -- 'anular_venta', 'editar_stock', 'eliminar_producto', etc.
+    modulo VARCHAR(50) NOT NULL, -- 'ventas', 'inventario', 'caja', etc.
+    descripcion TEXT NOT NULL, -- Descripción detallada de la acción
+    referencia_tipo VARCHAR(30), -- 'venta', 'producto', 'compra', etc.
+    referencia_id INTEGER, -- ID del registro afectado
+    datos_anteriores TEXT, -- JSON con los datos antes del cambio
+    datos_nuevos TEXT, -- JSON con los datos después del cambio
+    id_autorizacion INTEGER, -- Si la acción requirió autorización
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    fecha_accion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+    FOREIGN KEY (id_autorizacion) REFERENCES autorizaciones(id_autorizacion)
+);
+
+-- ============================================
+-- DEVOLUCIONES / NOTAS DE CRÉDITO
+-- ============================================
+CREATE TABLE devoluciones (
+    id_devolucion INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_venta INTEGER NOT NULL, -- Venta original
+    id_usuario INTEGER NOT NULL, -- Quién procesa la devolución
+    id_sesion_caja INTEGER NOT NULL, -- Caja donde se procesa
+    
+    fecha_devolucion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Motivo
+    motivo VARCHAR(100) NOT NULL, -- "Producto dañado", "Cambio de opinión", "Error en cobro"
+    
+    -- Qué hacer con el stock
+    accion_stock VARCHAR(20) NOT NULL CHECK (accion_stock IN ('retorno_stock', 'descarte', 'ninguna')),
+    
+    -- Montos
+    monto_total DECIMAL(15,2) NOT NULL,
+    
+    -- Cómo se devuelve el dinero
+    metodo_reembolso VARCHAR(50) NOT NULL DEFAULT 'efectivo' CHECK (metodo_reembolso IN ('efectivo', 'credito_tienda', 'cambio_directo', 'tarjeta')),
+    
+    estado VARCHAR(20) DEFAULT 'completada' CHECK (estado IN ('pendiente', 'completada', 'anulada')),
+    observaciones TEXT,
+    
+    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+    FOREIGN KEY (id_sesion_caja) REFERENCES sesiones_caja(id_sesion)
+);
+
+CREATE TABLE detalle_devoluciones (
+    id_detalle_devolucion INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_devolucion INTEGER NOT NULL,
+    id_producto INTEGER NOT NULL,
+    id_detalle_venta_original INTEGER, -- Referencia al detalle de venta original
+    cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+    precio_unitario DECIMAL(15,2) NOT NULL, -- Precio al que se vendió
+    subtotal DECIMAL(15,2) NOT NULL,
+    FOREIGN KEY (id_devolucion) REFERENCES devoluciones(id_devolucion) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto),
+    FOREIGN KEY (id_detalle_venta_original) REFERENCES detalle_ventas(id_detalle_venta)
+);
+
+-- ============================================
+-- MOVIMIENTOS DE STOCK (AUDITORÍA)
+-- ============================================
+CREATE TABLE movimientos_stock (
+    id_movimiento INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_producto INTEGER NOT NULL,
+    id_usuario INTEGER, -- Responsable del movimiento
+    
+    tipo_movimiento VARCHAR(20) NOT NULL CHECK (tipo_movimiento IN ('entrada', 'salida', 'ajuste_positivo', 'ajuste_negativo')),
+    cantidad INTEGER NOT NULL CHECK (cantidad > 0), -- Siempre positivo, el tipo indica dirección
+    
+    stock_anterior INTEGER NOT NULL,
+    stock_nuevo INTEGER NOT NULL,
+    
+    -- Referencia al origen del movimiento
+    referencia_tipo VARCHAR(30), -- compra, venta, devolucion, ajuste_inventario, kit_armado, kit_desarmado
+    referencia_id INTEGER, -- ID de la compra, venta, etc.
+    
+    motivo TEXT, -- Descripción adicional
+    fecha_movimiento DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+-- ============================================
+-- AJUSTES DE INVENTARIO
+-- ============================================
+CREATE TABLE ajustes_inventario (
+    id_ajuste INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_usuario INTEGER NOT NULL,
+    fecha_ajuste DATETIME DEFAULT CURRENT_TIMESTAMP,
+    motivo VARCHAR(100) NOT NULL, -- "Inventario físico", "Rotura", "Pérdida"
+    observaciones TEXT,
+    estado VARCHAR(20) DEFAULT 'completado' CHECK (estado IN ('borrador', 'completado', 'anulado')),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+CREATE TABLE detalle_ajustes_inventario (
+    id_detalle_ajuste INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_ajuste INTEGER NOT NULL,
+    id_producto INTEGER NOT NULL,
+    stock_sistema INTEGER NOT NULL, -- Lo que dice el sistema
+    stock_fisico INTEGER NOT NULL, -- Lo que se contó
+    diferencia INTEGER NOT NULL, -- stock_fisico - stock_sistema
+    FOREIGN KEY (id_ajuste) REFERENCES ajustes_inventario(id_ajuste) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
+);
+
+-- ============================================
+-- COTIZACIONES / PRESUPUESTOS
+-- ============================================
+CREATE TABLE cotizaciones (
+    id_cotizacion INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_cotizacion VARCHAR(50) UNIQUE,
+    id_cliente INTEGER,
+    id_usuario INTEGER NOT NULL,
+    fecha_cotizacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_validez DATE, -- Hasta cuándo es válida
+    subtotal DECIMAL(15,2) NOT NULL,
+    descuento DECIMAL(15,2) DEFAULT 0,
+    total DECIMAL(15,2) NOT NULL,
+    estado VARCHAR(20) DEFAULT 'vigente' CHECK (estado IN ('vigente', 'aceptada', 'rechazada', 'vencida', 'convertida')),
+    id_venta_generada INTEGER, -- Si se convirtió en venta
+    observaciones TEXT,
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+    FOREIGN KEY (id_venta_generada) REFERENCES ventas(id_venta)
+);
+
+CREATE TABLE detalle_cotizaciones (
+    id_detalle_cotizacion INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_cotizacion INTEGER NOT NULL,
+    id_producto INTEGER NOT NULL,
+    cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+    precio_unitario DECIMAL(15,2) NOT NULL,
+    subtotal DECIMAL(15,2) NOT NULL,
+    FOREIGN KEY (id_cotizacion) REFERENCES cotizaciones(id_cotizacion) ON DELETE CASCADE,
+    FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
+);
+
+-- ============================================
+-- ÍNDICES PARA RENDIMIENTO
+-- ============================================
+CREATE INDEX idx_productos_categoria ON productos(id_categoria);
+CREATE INDEX idx_productos_codigo ON productos(codigo);
+CREATE INDEX idx_productos_activo ON productos(activo);
+CREATE INDEX idx_productos_nombre ON productos(nombre);
+
+CREATE INDEX idx_ventas_fecha ON ventas(fecha_venta);
+CREATE INDEX idx_ventas_sesion ON ventas(id_sesion_caja);
+CREATE INDEX idx_ventas_cliente ON ventas(id_cliente);
+CREATE INDEX idx_ventas_estado ON ventas(estado);
+
+CREATE INDEX idx_detalle_ventas_venta ON detalle_ventas(id_venta);
+CREATE INDEX idx_detalle_ventas_producto ON detalle_ventas(id_producto);
+
+CREATE INDEX idx_compras_proveedor ON compras(id_proveedor);
+CREATE INDEX idx_compras_fecha ON compras(fecha_compra);
+
+CREATE INDEX idx_movimientos_producto ON movimientos_stock(id_producto);
+CREATE INDEX idx_movimientos_fecha ON movimientos_stock(fecha_movimiento);
+
+CREATE INDEX idx_sesiones_usuario ON sesiones_caja(id_usuario);
+CREATE INDEX idx_sesiones_caja ON sesiones_caja(id_caja);
+CREATE INDEX idx_sesiones_estado ON sesiones_caja(estado);
+
+CREATE INDEX idx_pagos_venta ON pagos_ventas(id_venta);
+
+CREATE INDEX idx_clientes_ruc ON clientes(ruc_ci);
+CREATE INDEX idx_clientes_nombre ON clientes(nombre);
+
+CREATE INDEX idx_usuarios_username ON usuarios(username);
+CREATE INDEX idx_usuarios_rol ON usuarios(id_rol);
+CREATE INDEX idx_usuarios_activo ON usuarios(activo);
+
+CREATE INDEX idx_rol_permisos_rol ON rol_permisos(id_rol);
+CREATE INDEX idx_rol_permisos_permiso ON rol_permisos(id_permiso);
+
+CREATE INDEX idx_autorizaciones_solicitante ON autorizaciones(id_usuario_solicitante);
+CREATE INDEX idx_autorizaciones_autorizador ON autorizaciones(id_usuario_autorizador);
+CREATE INDEX idx_autorizaciones_estado ON autorizaciones(estado);
+CREATE INDEX idx_autorizaciones_fecha ON autorizaciones(fecha_solicitud);
+
+CREATE INDEX idx_auditoria_usuario ON auditoria(id_usuario);
+CREATE INDEX idx_auditoria_accion ON auditoria(accion);
+CREATE INDEX idx_auditoria_modulo ON auditoria(modulo);
+CREATE INDEX idx_auditoria_fecha ON auditoria(fecha_accion);
+CREATE INDEX idx_auditoria_referencia ON auditoria(referencia_tipo, referencia_id);
+
+CREATE INDEX idx_cuentas_cobrar_cliente ON cuentas_por_cobrar(id_cliente);
+CREATE INDEX idx_cuentas_cobrar_estado ON cuentas_por_cobrar(estado);
+CREATE INDEX idx_cuentas_cobrar_vencimiento ON cuentas_por_cobrar(fecha_vencimiento);
+
+CREATE INDEX idx_cuentas_pagar_proveedor ON cuentas_por_pagar(id_proveedor);
+CREATE INDEX idx_cuentas_pagar_estado ON cuentas_por_pagar(estado);
+CREATE INDEX idx_cuentas_pagar_vencimiento ON cuentas_por_pagar(fecha_vencimiento);
+
+CREATE INDEX idx_pagos_compras_compra ON pagos_compras(id_compra);
+CREATE INDEX idx_pagos_compras_fecha ON pagos_compras(fecha_pago);
+
+CREATE INDEX idx_preferencias_usuario ON preferencias_usuario(id_usuario);
+
+-- ============================================
+-- DATOS INICIALES (BOOTSTRAP)
+-- ============================================
+
+-- Configuración inicial del sistema
+INSERT INTO configuracion (clave, valor, descripcion) VALUES
+('nombre_empresa', 'Pablito''s Cell', 'Nombre de la empresa'),
+('ruc_empresa', '00000000-0', 'RUC de la empresa'),
+('direccion_empresa', 'Santa Rosa c/ 10 de Agosto', 'Dirección fiscal'),
+('telefono_empresa', '0984758819', 'Teléfono de contacto'),
+('moneda', 'PYG', 'Moneda del sistema (PYG, USD)'),
+('iva_incluido', '1', 'Si los precios incluyen IVA (1=sí, 0=no)'),
+('stock_negativo_permitido', '0', 'Permitir vender sin stock (1=sí, 0=no)'),
+('kit_stock_descontar_componentes', '1', 'Descontar stock de componentes al vender kit (1=sí, 0=no)');
+
+-- ============================================
+-- ROLES DEL SISTEMA
+-- ============================================
+INSERT INTO roles (id_rol, nombre, descripcion, nivel_jerarquia) VALUES
+(1, 'Administrador', 'Acceso total al sistema', 100),
+(2, 'Supervisor', 'Puede supervisar operaciones y generar reportes', 50),
+(3, 'Cajero', 'Operaciones básicas de venta y caja', 10);
+
+-- ============================================
+-- PERMISOS DEL SISTEMA
+-- ============================================
+-- Módulo: Ventas
+INSERT INTO permisos (codigo, nombre, descripcion, modulo, requiere_autorizacion) VALUES
+('crear_venta', 'Crear Venta', 'Permite realizar ventas', 'ventas', 0),
+('ver_ventas', 'Ver Ventas', 'Permite ver listado de ventas', 'ventas', 0),
+('ver_detalle_venta', 'Ver Detalle de Venta', 'Permite ver detalles de una venta', 'ventas', 0),
+('anular_venta', 'Anular Venta', 'Permite anular ventas completadas', 'ventas', 1),
+('editar_venta', 'Editar Venta', 'Permite modificar ventas', 'ventas', 1),
+('aplicar_descuento', 'Aplicar Descuento', 'Permite aplicar descuentos en ventas', 'ventas', 0),
+('aplicar_descuento_mayor', 'Aplicar Descuento Mayor al 10%', 'Permite descuentos superiores al 10%', 'ventas', 1),
+('venta_credito', 'Venta a Crédito', 'Permite realizar ventas a crédito', 'ventas', 0),
+('vender_sin_stock', 'Vender sin Stock', 'Permite completar venta con stock insuficiente (requiere autorización)', 'ventas', 1);
+
+-- Módulo: Inventario
+INSERT INTO permisos (codigo, nombre, descripcion, modulo, requiere_autorizacion) VALUES
+('ver_inventario', 'Ver Inventario', 'Permite ver el inventario', 'inventario', 0),
+('crear_producto', 'Crear Producto', 'Permite crear nuevos productos', 'inventario', 0),
+('editar_producto', 'Editar Producto', 'Permite modificar productos', 'inventario', 0),
+('eliminar_producto', 'Eliminar Producto', 'Permite eliminar productos', 'inventario', 1),
+('editar_stock', 'Editar Stock', 'Permite ajustar stock manualmente', 'inventario', 1),
+('editar_precios', 'Editar Precios', 'Permite modificar precios de productos', 'inventario', 1),
+('ver_costo_compra', 'Ver Costo de Compra', 'Permite ver precios de compra', 'inventario', 0);
+
+-- Módulo: Compras
+INSERT INTO permisos (codigo, nombre, descripcion, modulo, requiere_autorizacion) VALUES
+('crear_compra', 'Crear Compra', 'Permite registrar compras', 'compras', 0),
+('ver_compras', 'Ver Compras', 'Permite ver listado de compras', 'compras', 0),
+('anular_compra', 'Anular Compra', 'Permite anular compras', 'compras', 1),
+('pagar_compra', 'Pagar Compra', 'Permite registrar pagos a proveedores', 'compras', 0);
+
+-- Módulo: Caja
+INSERT INTO permisos (codigo, nombre, descripcion, modulo, requiere_autorizacion) VALUES
+('abrir_caja', 'Abrir Caja', 'Permite abrir sesión de caja', 'caja', 0),
+('cerrar_caja', 'Cerrar Caja', 'Permite cerrar sesión de caja', 'caja', 0),
+('ver_caja', 'Ver Caja', 'Permite ver estado de caja', 'caja', 0),
+('movimiento_caja', 'Movimiento de Caja', 'Permite ingresos/egresos de caja', 'caja', 0),
+('editar_cierre_caja', 'Editar Cierre de Caja', 'Permite modificar cierres de caja', 'caja', 1),
+('ver_otras_cajas', 'Ver Otras Cajas', 'Permite ver cajas de otros usuarios', 'caja', 0);
+
+-- Módulo: Clientes
+INSERT INTO permisos (codigo, nombre, descripcion, modulo, requiere_autorizacion) VALUES
+('crear_cliente', 'Crear Cliente', 'Permite crear nuevos clientes', 'clientes', 0),
+('editar_cliente', 'Editar Cliente', 'Permite modificar clientes', 'clientes', 0),
+('eliminar_cliente', 'Eliminar Cliente', 'Permite eliminar clientes', 'clientes', 1),
+('ver_clientes', 'Ver Clientes', 'Permite ver listado de clientes', 'clientes', 0);
+
+-- Módulo: Proveedores
+INSERT INTO permisos (codigo, nombre, descripcion, modulo, requiere_autorizacion) VALUES
+('crear_proveedor', 'Crear Proveedor', 'Permite crear proveedores', 'proveedores', 0),
+('editar_proveedor', 'Editar Proveedor', 'Permite modificar proveedores', 'proveedores', 0),
+('eliminar_proveedor', 'Eliminar Proveedor', 'Permite eliminar proveedores', 'proveedores', 1),
+('ver_proveedores', 'Ver Proveedores', 'Permite ver listado de proveedores', 'proveedores', 0);
+
+-- Módulo: Reportes
+INSERT INTO permisos (codigo, nombre, descripcion, modulo, requiere_autorizacion) VALUES
+('ver_reportes', 'Ver Reportes', 'Permite acceder a reportes', 'reportes', 0),
+('ver_reporte_ventas', 'Ver Reporte de Ventas', 'Permite ver reportes de ventas', 'reportes', 0),
+('ver_reporte_inventario', 'Ver Reporte de Inventario', 'Permite ver reportes de inventario', 'reportes', 0),
+('ver_reporte_financiero', 'Ver Reporte Financiero', 'Permite ver reportes financieros', 'reportes', 0),
+('exportar_reportes', 'Exportar Reportes', 'Permite exportar reportes a Excel/PDF', 'reportes', 0);
+
+-- Módulo: Configuración
+INSERT INTO permisos (codigo, nombre, descripcion, modulo, requiere_autorizacion) VALUES
+('ver_configuracion', 'Ver Configuración', 'Permite ver configuración del sistema', 'configuracion', 0),
+('editar_configuracion', 'Editar Configuración', 'Permite modificar configuración', 'configuracion', 1),
+('gestionar_usuarios', 'Gestionar Usuarios', 'Permite crear/editar usuarios', 'configuracion', 1),
+('gestionar_roles', 'Gestionar Roles', 'Permite administrar roles y permisos', 'configuracion', 1),
+('gestionar_cajas', 'Gestionar Cajas', 'Permite crear/editar cajas', 'caja', 1),
+('ver_auditoria', 'Ver Auditoría', 'Permite ver logs de auditoría', 'configuracion', 0),
+('crm_operar_como_asesor', 'CRM Operar como Asesor', 'Permite tomar y responder chats en el panel asesor CRM', 'crm', 0);
+
+-- ============================================
+-- ASIGNACIÓN DE PERMISOS A ROLES
+-- ============================================
+-- ADMINISTRADOR: Todos los permisos
+INSERT INTO rol_permisos (id_rol, id_permiso)
+SELECT 1, id_permiso FROM permisos WHERE activo = 1;
+
+-- SUPERVISOR: Permisos de lectura y operaciones normales, sin eliminaciones ni ediciones críticas
+INSERT INTO rol_permisos (id_rol, id_permiso)
+SELECT 2, id_permiso FROM permisos WHERE codigo IN (
+    'crear_venta', 'ver_ventas', 'ver_detalle_venta', 'aplicar_descuento', 'venta_credito', 'vender_sin_stock',
+    'ver_inventario', 'crear_producto', 'editar_producto', 'ver_costo_compra',
+    'crear_compra', 'ver_compras', 'pagar_compra',
+    'abrir_caja', 'cerrar_caja', 'ver_caja', 'movimiento_caja', 'ver_otras_cajas',
+    'crear_cliente', 'editar_cliente', 'ver_clientes',
+    'crear_proveedor', 'editar_proveedor', 'ver_proveedores',
+    'ver_reportes', 'ver_reporte_ventas', 'ver_reporte_inventario', 'ver_reporte_financiero', 'exportar_reportes',
+    'ver_configuracion', 'ver_auditoria', 'crm_operar_como_asesor'
+);
+
+-- CAJERO: Solo operaciones básicas de venta y caja
+INSERT INTO rol_permisos (id_rol, id_permiso)
+SELECT 3, id_permiso FROM permisos WHERE codigo IN (
+    'crear_venta', 'ver_ventas', 'ver_detalle_venta', 'aplicar_descuento', 'vender_sin_stock',
+    'ver_inventario',
+    'abrir_caja', 'cerrar_caja', 'ver_caja', 'movimiento_caja',
+    'crear_cliente', 'ver_clientes',
+    'ver_proveedores'
+);
+
+-- ============================================
+-- USUARIO ADMINISTRADOR POR DEFECTO
+-- ============================================
+-- IMPORTANTE: Cambiar la contraseña después del primer acceso
+-- Password por defecto: "admin123" (debe ser hasheado en la aplicación)
+INSERT INTO usuarios (username, password_hash, nombre_completo, id_rol) VALUES 
+('admin', 'cambiar_este_hash', 'Administrador del Sistema', 1);
+
+-- Caja principal
+INSERT INTO cajas (nombre, ubicacion) VALUES 
+('Caja Principal', 'Local Principal');
+
+-- Métodos de pago
+INSERT INTO metodos_pago (nombre, requiere_referencia, orden_display) VALUES 
+('Efectivo', 0, 1),
+('Tarjeta de Débito', 1, 2),
+('Tarjeta de Crédito', 1, 3),
+('Transferencia Bancaria', 1, 4),
+('QR / Billetera Digital', 1, 5),
+('Crédito Tienda', 0, 6);
+
+-- Cliente genérico para ventas sin factura (ID = 1)
+-- IMPORTANTE: Este cliente SIEMPRE debe existir
+INSERT INTO clientes (nombre, ruc_ci, tipo, activo) VALUES 
+('CONSUMIDOR FINAL', '00000000-0', 'minorista', 1);
+
+-- Categorías iniciales del rubro
+INSERT INTO categorias (nombre, descripcion) VALUES 
+('Termos', 'Termos de todo tipo y capacidad'),
+('Guampas', 'Guampas para tereré'),
+('Mates', 'Mates tradicionales y modernos'),
+('Bombillas', 'Bombillas de todos los materiales'),
+('Yerbas', 'Yerba mate y hierbas'),
+('Accesorios', 'Accesorios varios para mate y tereré'),
+('Repuestos', 'Repuestos para termos y productos'),
+('Kits y Combos', 'Kits armados y promociones');
+
+-- Proveedor de ejemplo
+INSERT INTO proveedores (nombre, ruc, telefono, notas) VALUES 
+('Proveedor Ejemplo', '80000000-1', '021-000000', 'Proveedor de ejemplo - modificar o eliminar');
+
+-- ============================================
+-- TRIGGERS PARA INTEGRIDAD
+-- ============================================
+
+-- Trigger para actualizar fecha_modificacion en productos
+CREATE TRIGGER tr_productos_fecha_modificacion
+AFTER UPDATE ON productos
+FOR EACH ROW
+BEGIN
+    UPDATE productos SET fecha_modificacion = CURRENT_TIMESTAMP WHERE id_producto = NEW.id_producto;
+END;
+
+-- Trigger para evitar eliminar el cliente Consumidor Final (ID=1)
+CREATE TRIGGER tr_proteger_consumidor_final
+BEFORE DELETE ON clientes
+FOR EACH ROW
+WHEN OLD.id_cliente = 1
+BEGIN
+    SELECT RAISE(ABORT, 'No se puede eliminar el cliente Consumidor Final');
+END;
+
+-- Trigger para evitar eliminar la Caja Principal (ID=1)
+CREATE TRIGGER tr_proteger_caja_principal
+BEFORE DELETE ON cajas
+FOR EACH ROW
+WHEN OLD.id_caja = 1
+BEGIN
+    SELECT RAISE(ABORT, 'No se puede eliminar la Caja Principal');
+END;
+
+-- ============================================
+-- VISTAS ÚTILES
+-- ============================================
+
+-- Vista de productos con stock bajo
+CREATE VIEW v_productos_stock_bajo AS
+SELECT 
+    p.id_producto,
+    p.codigo,
+    p.nombre,
+    c.nombre as categoria,
+    p.stock_actual,
+    p.stock_minimo,
+    (p.stock_minimo - p.stock_actual) as faltante
+FROM productos p
+JOIN categorias c ON p.id_categoria = c.id_categoria
+WHERE p.activo = 1 AND p.stock_actual < p.stock_minimo;
+
+-- Vista de ventas del día
+CREATE VIEW v_ventas_hoy AS
+SELECT 
+    v.id_venta,
+    v.numero_comprobante,
+    c.nombre as cliente,
+    v.total,
+    v.estado,
+    v.fecha_venta
+FROM ventas v
+JOIN clientes c ON v.id_cliente = c.id_cliente
+WHERE DATE(v.fecha_venta) = DATE('now') AND v.estado = 'completada';
+
+-- Vista de resumen de caja abierta
+CREATE VIEW v_resumen_caja_abierta AS
+SELECT 
+    s.id_sesion,
+    ca.nombre as caja,
+    u.nombre_completo as cajero,
+    s.fecha_apertura,
+    s.monto_inicial,
+    COALESCE(SUM(CASE WHEN mp.nombre = 'Efectivo' THEN pv.monto ELSE 0 END), 0) as total_efectivo_ventas,
+    COALESCE(SUM(CASE WHEN mp.nombre != 'Efectivo' THEN pv.monto ELSE 0 END), 0) as total_otros_metodos,
+    COUNT(DISTINCT v.id_venta) as cantidad_ventas
+FROM sesiones_caja s
+JOIN cajas ca ON s.id_caja = ca.id_caja
+JOIN usuarios u ON s.id_usuario = u.id_usuario
+LEFT JOIN ventas v ON v.id_sesion_caja = s.id_sesion AND v.estado = 'completada'
+LEFT JOIN pagos_ventas pv ON pv.id_venta = v.id_venta
+LEFT JOIN metodos_pago mp ON pv.id_metodo_pago = mp.id_metodo_pago
+WHERE s.estado = 'abierta'
+GROUP BY s.id_sesion;

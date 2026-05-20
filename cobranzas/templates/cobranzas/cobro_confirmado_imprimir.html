@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Cobro confirmado{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto mt-10 rounded-xl border border-green-200 bg-white p-6 shadow-sm dark:border-green-900/40 dark:bg-gray-800">
+    <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Cobro confirmado</h1>
+    <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+        Abriendo ticket de pago para impresión. Si no se abre automáticamente, usa el botón de abajo.
+    </p>
+    <div class="mt-5 flex flex-wrap items-center gap-2">
+        <a href="{{ ticket_url }}" target="_blank" rel="noopener"
+           class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+            <i class="fas fa-print mr-2"></i>Abrir ticket
+        </a>
+        <a href="{{ destino }}"
+           class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+            Volver a la cuenta
+        </a>
+    </div>
+</div>
+<script>
+    (function () {
+        var ticketUrl = {{ ticket_url|tojson }};
+        var destino = {{ destino|tojson }};
+        var ticketUrlConRetorno = ticketUrl;
+        try {
+            var ticketU = new URL(ticketUrl, window.location.origin);
+            ticketU.searchParams.set('return_to', destino);
+            ticketUrlConRetorno = ticketU.toString();
+        } catch (err) {
+            ticketUrlConRetorno = ticketUrl;
+        }
+        try {
+            window.history.replaceState({}, document.title, destino);
+        } catch (err) {
+            // Si no se puede reemplazar la URL, seguimos con el flujo normal.
+        }
+
+        var popup = null;
+        try {
+            popup = window.open(ticketUrlConRetorno, '_blank', 'noopener');
+        } catch (err) {
+            // Si el navegador bloquea popups, el usuario puede abrir manualmente.
+        }
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            window.location.replace(ticketUrlConRetorno);
+            return;
+        }
+        setTimeout(function () {
+            window.location.replace(destino);
+        }, 900);
+    })();
+</script>
+{% endblock %}

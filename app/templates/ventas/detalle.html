@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Venta #{{ venta.id_venta }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-receipt text-green-600 dark:text-green-400 mr-2"></i>Venta #{{ venta.id_venta }}
+        </h1>
+        <span
+            class="px-3 py-1 rounded-full text-sm {% if venta.estado == 'completada' %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300{% elif venta.estado == 'anulada' %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300{% endif %}">
+            {{ venta.estado.upper() }}
+        </span>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Fecha</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Cliente</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ venta.cliente.nombre }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Vendedor</p>
+                <p class="font-semibold text-gray-800 dark:text-white">
+                    {{ venta.vendedor.nombre_completo if venta.vendedor else (venta.sesion_caja.usuario.nombre_completo if venta.sesion_caja and venta.sesion_caja.usuario else 'Desconocido') }}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Comprobante</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ venta.tipo_comprobante }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Beneficio aplicado</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ venta.beneficio_fidelizacion_descripcion or 'Sin beneficio' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Tipo de venta</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ 'Credito' if (venta.tipo_venta or 'contado')|lower == 'credito' else 'Contado' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Estado de cobro</p>
+                <p class="font-semibold text-gray-800 dark:text-white">
+                    {{ 'Pagada' if estado_cobro == 'pagada' else ('Parcial' if estado_cobro == 'parcial' else 'Pendiente') }}
+                </p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Cobrado al momento</p>
+                <p class="font-semibold text-gray-800 dark:text-white">₲ {{ "{:,.0f}".format(total_pagado_inmediato or 0).replace(",", ".") }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Saldo pendiente</p>
+                <p class="font-semibold text-gray-800 dark:text-white">₲ {{ "{:,.0f}".format(saldo_pendiente_actual or 0).replace(",", ".") }}</p>
+            </div>
+        </div>
+
+        <table class="w-full mb-6">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-2 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Producto</th>
+                    <th class="px-4 py-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Cant.</th>
+                    <th class="px-4 py-2 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Precio</th>
+                    <th class="px-4 py-2 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for item in venta.detalles %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                    <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ item.producto.nombre }}</td>
+                    <td class="px-4 py-2 text-center text-gray-800 dark:text-gray-100">{{ item.cantidad }}</td>
+                    <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(item.precio_unitario).replace(",", ".") }}
+                    </td>
+                    <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(item.subtotal).replace(",", ".") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="bg-gray-50 dark:bg-gray-800/80">
+                    <td colspan="3" class="px-4 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">Subtotal:</td>
+                    <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(venta.subtotal).replace(",", ".") }}</td>
+                </tr>
+                {% if venta.descuento_manual_monto and venta.descuento_manual_monto > 0 %}
+                <tr class="bg-gray-50 dark:bg-gray-800/80">
+                    <td colspan="3" class="px-4 py-2 text-right font-semibold text-amber-600 dark:text-amber-400">Descuento manual:</td>
+                    <td class="px-4 py-2 text-right text-red-600 dark:text-red-400">-₲ {{
+                        "{:,.0f}".format(venta.descuento_manual_monto).replace(",", ".") }}</td>
+                </tr>
+                {% endif %}
+                {% if venta.descuento_fidelizacion_monto and venta.descuento_fidelizacion_monto > 0 %}
+                <tr class="bg-gray-50 dark:bg-gray-800/80">
+                    <td colspan="3" class="px-4 py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">Fidelización aplicada:</td>
+                    <td class="px-4 py-2 text-right text-emerald-600 dark:text-emerald-400">-₲ {{
+                        "{:,.0f}".format(venta.descuento_fidelizacion_monto).replace(",", ".") }}</td>
+                </tr>
+                {% if venta.beneficio_fidelizacion_descripcion %}
+                <tr class="bg-gray-50 dark:bg-gray-800/80">
+                    <td colspan="4" class="px-4 pb-2 text-right text-xs text-gray-500 dark:text-gray-400">{{ venta.beneficio_fidelizacion_descripcion }}</td>
+                </tr>
+                {% endif %}
+                {% elif venta.descuento_monto > 0 %}
+                <tr class="bg-gray-50 dark:bg-gray-800/80">
+                    <td colspan="3" class="px-4 py-2 text-right font-semibold text-red-600 dark:text-red-400">Descuento:</td>
+                    <td class="px-4 py-2 text-right text-red-600 dark:text-red-400">-₲ {{
+                        "{:,.0f}".format(venta.descuento_monto).replace(",", ".") }}</td>
+                </tr>
+                {% endif %}
+                <tr class="bg-green-50 dark:bg-green-900/30">
+                    <td colspan="3" class="px-4 py-2 text-right font-bold text-lg text-gray-800 dark:text-gray-100">TOTAL:</td>
+                    <td class="px-4 py-2 text-right font-bold text-lg text-green-600 dark:text-green-400">₲ {{
+                        "{:,.0f}".format(venta.total).replace(",", ".") }}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
+            <a href="{{ url_for('ventas.listar') }}" class="text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>Volver
+            </a>
+            {% if venta.estado == 'completada' %}
+            <form id="anularVentaForm" action="{{ url_for('ventas.anular', id=venta.id_venta) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="id_autorizacion" id="id_autorizacion">
+                <button type="button" data-permiso="anular_venta" onclick="anularVenta({{ venta.id_venta }})"
+                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
+                    <i class="fas fa-times mr-2"></i>Anular Venta
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function anularVenta(idVenta) {
+        if (!confirm('¿Anular esta venta? Se restaurará el stock.')) return;
+        await ejecutarConAutorizacion(
+            'anular_venta',
+            `Anular venta #${idVenta}`,
+            async (idAutorizacion) => {
+                const input = document.getElementById('id_autorizacion');
+                if (input) input.value = idAutorizacion || '';
+                document.getElementById('anularVentaForm').submit();
+            },
+            'venta',
+            idVenta
+        );
+    }
+</script>
+{% endblock %}

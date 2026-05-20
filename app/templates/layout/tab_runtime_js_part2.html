@@ -1,0 +1,551 @@
+                async function loadContent(targetUrl, options = {}) {
+                    const loadSeq = ++currentLoadSeq;
+                    const posPerfActive = isPosPerfTarget(targetUrl);
+                    // Si viene de popstate no hacemos pushState (el browser ya movió el historial)
+                    const skipPushState = options.skipPushState === true;
+
+                    if (currentAbortController) {
+                        try { currentAbortController.abort(); } catch { }
+                    }
+                    currentAbortController = new AbortController();
+
+                    ensureLoadingCover();
+
+                    try {
+                        const fetchUrl = new URL(targetUrl, window.location.origin);
+                        fetchUrl.searchParams.set('partial', '1');
+
+                        if (posPerfActive) {
+                            window.__posPerfTabLoadTiming = {
+                                target_url: fetchUrl.toString(),
+                                target_path: fetchUrl.pathname,
+                                started_at_epoch_ms: Date.now(),
+                                load_start_perf: performance.now()
+                            };
+                            markPosPerf('fetch_start_perf');
+                        }
+
+                        dlog('[TAB LOAD]', fetchUrl.toString());
+                        const response = await fetch(fetchUrl.toString(), {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            signal: currentAbortController.signal
+                        });
+                        if (posPerfActive) {
+                            markPosPerf('fetch_response_perf');
+                        }
+
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        const rawHtml = await response.text();
+                        if (posPerfActive) {
+                            markPosPerf('response_text_end_perf');
+                        }
+                        if (posPerfActive) {
+                            markPosPerf('extract_start_perf');
+                        }
+                        const payload = extractTabHtml(rawHtml);
+                        if (posPerfActive) {
+                            markPosPerf('extract_end_perf');
+                            window.__posPerfTabLoadTiming.response_status = response.status;
+                            window.__posPerfTabLoadTiming.response_url = response.url || '';
+                        }
+
+                        if (loadSeq !== currentLoadSeq) return;
+
+                        try {
+                            const currentKey = getKeyByTabId(tabId);
+                            if (currentKey) {
+                                const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                const resolved = normalizeKey((response && response.url) ? response.url : targetUrl);
+                                meta.url = resolved;
+                                tabMetaByKey.set(currentKey, meta);
+
+                                if (response && response.redirected && response.url) {
+                                    const redirectedKey = normalizeKey(response.url);
+                                    if (redirectedKey && redirectedKey !== currentKey) {
+                                        const existingId = tabIdsByKey.get(redirectedKey);
+                                        if (existingId && existingId !== tabId) {
+                                            try {
+                                                const existingLoader = tabLoadersById.get(existingId);
+                                                if (existingLoader) {
+                                                    setActiveTab(existingId);
+                                                    await existingLoader(response.url);
+                                                    closeTab(tabId);
+                                                    saveState();
+                                                    return;
+                                                }
+                                            } catch { }
+                                        }
+
+                                        if (!tabIdsByKey.has(redirectedKey)) {
+                                            tabIdsByKey.delete(currentKey);
+                                            tabMetaByKey.delete(currentKey);
+                                            tabIdsByKey.set(redirectedKey, tabId);
+                                            tabMetaByKey.set(redirectedKey, meta);
+                                        }
+                                    }
+                                }
+
+                                if (response && response.url && isDashboardUrl(response.url)) {
+                                    meta.title = 'Dashboard';
+                                    meta.iconClass = 'fas fa-tachometer-alt';
+                                    tabMetaByKey.set(getKeyByTabId(tabId) || currentKey, meta);
+                                    syncTabButtonMeta(tabId, meta);
+                                }
+                            }
+                        } catch { }
+
+                        await applyPayload(payload);
+
+                        // Actualizar document.title, pushState y historial interno de la tab
+                        try {
+                            const activeTabId = getActiveTabId();
+                            if (activeTabId === tabId) {
+                                const pageTitle = (payload.pageTitle || '').trim();
+                                const appTitle = window.__appBaseTitle || 'Sistema de Gestión Comercial';
+                                const fullTitle = pageTitle ? `${pageTitle} - ${appTitle}` : appTitle;
+                                document.title = fullTitle;
+
+                                // Guardar el título en el meta de la tab para que setActiveTab lo use
+                                const currentKey2 = getKeyByTabId(tabId);
+                                if (currentKey2) {
+                                    const meta2 = tabMetaByKey.get(currentKey2) || { url: currentKey2, title: '', iconClass: '' };
+                                    meta2.pageTitle = pageTitle;
+                                    if (!meta2.title) {
+                                        meta2.title = pageTitle;
+                                        syncTabButtonMeta(tabId, meta2);
+                                    }
+                                    tabMetaByKey.set(currentKey2, meta2);
+                                }
+
+                                // Registrar en historial interno de la tab
+                                const resolvedForHistory = normalizeKey((response && response.url) ? response.url : targetUrl);
+                                pushTabHistory(tabId, resolvedForHistory);
+
+                                // pushState: sincronizar la URL del browser con el contenido activo
+                                // Solo si no venimos de un popstate (para no crear loops)
+                                if (!skipPushState) {
+                                    try {
+                                        const resolvedUrl = normalizeKey((response && response.url) ? response.url : targetUrl);
+                                        const absUrl = new URL(resolvedUrl, window.location.origin).toString();
+                                        // No hacer pushState si la URL ya es la actual (evita duplicados)
+                                        const currentHref = window.location.pathname + (window.location.search || '');
+                                        const targetHref = new URL(absUrl).pathname + (new URL(absUrl).search || '');
+                                        if (normalizeKey(currentHref) !== normalizeKey(targetHref)) {
+                                            history.pushState(
+                                                { tabId, url: resolvedUrl, appNav: true },
+                                                fullTitle,
+                                                absUrl
+                                            );
+                                        } else {
+                                            history.replaceState(
+                                                { tabId, url: resolvedUrl, appNav: true },
+                                                fullTitle,
+                                                absUrl
+                                            );
+                                        }
+                                    } catch { }
+                                }
+                            }
+                        } catch { }
+
+                    } catch (error) {
+                        if (error && error.name === 'AbortError') return;
+                        if (loadSeq !== currentLoadSeq) return;
+                        console.error('Error loading tab:', error);
+                        removePanelContent();
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'app-tab-content flex flex-col items-center justify-center h-full text-red-500 gap-4';
+                        errorDiv.setAttribute('data-app-tab-content', '1');
+                        errorDiv.innerHTML = `
+                        <i class="fas fa-exclamation-circle text-4xl"></i>
+                        <p>Error al cargar el contenido.</p>
+                    `;
+                        panel.appendChild(errorDiv);
+                    } finally {
+                        if (loadSeq !== currentLoadSeq) return;
+                        removeLoadingCover();
+                    }
+                }
+
+                (async () => {
+                    await loadContent(url);
+                })();
+
+                panels.appendChild(panel);
+                tabPanelsById.set(tabId, panel);
+                tabLoadersById.set(tabId, loadContent);
+
+                if (activate) setActiveTab(tabId);
+                if (scroll) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+
+                saveState();
+
+                creatingTabs.delete(key);
+            }
+
+            window.appOpenTab = openTab;
+            window.appCloseActiveTab = function () {
+                try {
+                    const tabId = getActiveTabId();
+                    if (!tabId || tabId === principalTabId) return false;
+                    closeTab(tabId);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            };
+            window.appGoBack = function () {
+                try {
+                    window.history.back();
+                } catch { }
+            };
+
+            window.appNavigateActiveTab = async function (url) {
+                try {
+                    const tabId = getActiveTabId();
+                    if (!tabId || tabId === principalTabId) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    const loader = tabLoadersById.get(tabId);
+                    if (!loader) {
+                        window.location.href = url;
+                        return;
+                    }
+
+                    const currentKey = getKeyByTabId(tabId);
+                    if (currentKey) {
+                        const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                        meta.url = normalizeKey(url);
+                        tabMetaByKey.set(currentKey, meta);
+                    }
+
+                    await loader(url);
+                    saveState();
+                } catch (e) {
+                    window.location.href = url;
+                }
+            };
+
+            // Manejar el botón Atrás/Adelante del browser
+            window.addEventListener('popstate', async (e) => {
+                try {
+                    const state = e.state;
+
+                    // Estado con appNav: navegación interna registrada por nuestro sistema
+                    if (state && state.appNav && state.tabId && state.url) {
+                        const targetTabId = state.tabId;
+                        const targetUrl = state.url;
+
+                        // Activar la tab correcta si no está activa
+                        if (getActiveTabId() !== targetTabId) {
+                            setActiveTab(targetTabId);
+                        }
+
+                        // Cargar el contenido sin hacer pushState (el browser ya movió el historial)
+                        const loader = tabLoadersById.get(targetTabId);
+                        if (loader) {
+                            const currentKey = getKeyByTabId(targetTabId);
+                            if (currentKey) {
+                                const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                meta.url = normalizeKey(targetUrl);
+                                tabMetaByKey.set(currentKey, meta);
+                            }
+                            await loader(targetUrl, { skipPushState: true });
+                            saveState();
+                        }
+                        return;
+                    }
+
+                    // Estado sin appNav: usar historial interno de la tab activa como fallback
+                    const activeTabId = getActiveTabId();
+                    const prevUrl = popTabHistory(activeTabId);
+
+                    if (prevUrl) {
+                        const loader = tabLoadersById.get(activeTabId);
+                        if (loader) {
+                            const currentKey = getKeyByTabId(activeTabId);
+                            if (currentKey) {
+                                const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                meta.url = prevUrl;
+                                tabMetaByKey.set(currentKey, meta);
+                            }
+                            // Registrar el estado en el browser para que futuros popstate lo reconozcan
+                            try {
+                                const absUrl = new URL(prevUrl, window.location.origin).toString();
+                                history.replaceState(
+                                    { tabId: activeTabId, url: prevUrl, appNav: true },
+                                    document.title,
+                                    absUrl
+                                );
+                            } catch { }
+                            await loader(prevUrl, { skipPushState: true });
+                            saveState();
+                        } else if (activeTabId !== principalTabId) {
+                            closeTab(activeTabId);
+                        }
+                    } else if (activeTabId !== principalTabId) {
+                        // Sin historial interno: cerrar la tab y volver a la anterior
+                        closeTab(activeTabId);
+                    }
+                    // Si es la tab principal sin historial: no hacer nada
+                } catch { }
+            });
+
+            window.appReloadActiveTab = function (options = {}) {
+                try {
+                    const tabId = getActiveTabId();
+                    if (!tabId) return;
+
+                    const currentKey = getKeyByTabId(tabId);
+                    if (!currentKey) return;
+
+                    const meta = tabMetaByKey.get(currentKey);
+                    const currentUrl = (meta && meta.url) ? meta.url : currentKey;
+
+                    const url = new URL(currentUrl, window.location.origin);
+
+                    if (Object.prototype.hasOwnProperty.call(options, 'q')) {
+                        const q = (options.q || '').toString().trim();
+                        if (q) url.searchParams.set('q', q);
+                        else url.searchParams.delete('q');
+                    }
+
+                    for (const k of Array.from(url.searchParams.keys())) {
+                        if (k.endsWith('_page')) url.searchParams.delete(k);
+                    }
+
+                    const nextUrl = url.toString();
+
+                    if (tabId === principalTabId) {
+                        window.location.href = nextUrl;
+                        return;
+                    }
+
+                    const nextMeta = meta || { url: currentKey, title: '', iconClass: '' };
+                    nextMeta.url = nextUrl;
+                    tabMetaByKey.set(currentKey, nextMeta);
+
+                    const loader = tabLoadersById.get(tabId);
+                    if (loader) {
+                        Promise.resolve(loader(nextUrl)).finally(() => saveState());
+                    } else {
+                        window.location.href = nextUrl;
+                    }
+                } catch { }
+            };
+
+            let lastClickTime = 0;
+            let lastClickKey = null;
+            const CLICK_DEBOUNCE_MS = 300;
+
+            function handleAppTabLink(link, event, options = {}) {
+                if (!link) return;
+
+                const url = link.getAttribute('data-tab-url') || link.getAttribute('href');
+                if (!url) return;
+
+                const target = link.getAttribute('target');
+                if (target === '_blank') return;
+
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (typeof event.stopImmediatePropagation === 'function') {
+                        event.stopImmediatePropagation();
+                    }
+                }
+
+                const now = Date.now();
+                const key = normalizeKey(url);
+
+                if (options.markPointerHandled) {
+                    try { link.dataset.tabPointerHandledAt = String(now); } catch { }
+                    const menu = link.closest('[data-sidebar-menu]');
+                    const menuName = menu ? menu.getAttribute('data-sidebar-menu') : '';
+                    if (menuName) {
+                        try {
+                            menu.dispatchEvent(new CustomEvent('sidebar-menu-close-now', {
+                                detail: { name: menuName },
+                                bubbles: true
+                            }));
+                        } catch { }
+                    }
+                }
+
+                if (lastClickKey === key && (now - lastClickTime) < CLICK_DEBOUNCE_MS) {
+                    const existingId = tabIdsByKey.get(key);
+                    if (existingId) {
+                        setActiveTab(existingId);
+                    }
+                    return;
+                }
+
+                lastClickTime = now;
+                lastClickKey = key;
+                try {
+                    openTab(url, link.getAttribute('data-tab-title') || link.textContent.trim(), link.getAttribute('data-tab-icon'), { preferExistingByTitle: link.classList.contains('sidebar-link') });
+                } catch {
+                    window.location.href = url;
+                }
+            }
+
+            document.addEventListener('pointerdown', (e) => {
+                const targetEl = e.target instanceof Element ? e.target : null;
+                if (targetEl && targetEl.closest('[data-tab-ignore-click="1"]')) return;
+                const link = targetEl ? targetEl.closest('.app-tab-link') : null;
+                if (!link || !link.closest('[data-sidebar-menu]')) return;
+                handleAppTabLink(link, e, { markPointerHandled: true });
+            }, true);
+
+            document.addEventListener('click', (e) => {
+                const targetEl = e.target instanceof Element ? e.target : null;
+                if (targetEl && targetEl.closest('[data-tab-ignore-click="1"]')) return;
+                const link = targetEl ? targetEl.closest('.app-tab-link') : null;
+                if (!link) return;
+
+                const pointerHandledAt = Number(link.dataset.tabPointerHandledAt || 0);
+                if (pointerHandledAt && (Date.now() - pointerHandledAt) < 500) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof e.stopImmediatePropagation === 'function') {
+                        e.stopImmediatePropagation();
+                    }
+                    return;
+                }
+                handleAppTabLink(link, e);
+            }, true);
+
+            window.addEventListener('storage', (e) => {
+                if (e.key !== LOGOUT_BROADCAST_KEY) return;
+                clearUiState();
+                window.location.href = LOGIN_URL;
+            });
+
+            const logoutForm = document.getElementById('app-logout-form');
+            if (logoutForm) {
+                logoutForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    clearUiState();
+                    try { localStorage.setItem(LOGOUT_BROADCAST_KEY, String(Date.now())); } catch { }
+                    logoutForm.submit();
+                });
+            }
+
+            function shouldNavigateToDashboard() {
+                const dashboardPath = normalizePathname(new URL(DASHBOARD_URL, window.location.origin).pathname);
+                const currentPath = normalizePathname(window.location.pathname);
+                return currentPath !== dashboardPath;
+            }
+
+            function principalPanelShowsDashboard() {
+                const principalPanel = tabPanelsById.get(principalTabId);
+                if (!principalPanel) return false;
+                return principalPanel.getAttribute('data-page-is-dashboard') === '1';
+            }
+
+            function syncPrincipalTabLabel() {
+                if (!principalBtn || principalPanelShowsDashboard()) return;
+
+                const principalPanel = tabPanelsById.get(principalTabId);
+                if (!principalPanel) return;
+
+                const label = (principalPanel.getAttribute('data-page-title') || '').trim();
+                if (!label) return;
+
+                const labelEl = principalBtn.querySelector('span.whitespace-nowrap');
+                if (labelEl) {
+                    labelEl.textContent = label;
+                }
+            }
+
+            function isPrincipalTabVisible() {
+                const principalPanel = tabPanelsById.get(principalTabId);
+                return getActiveTabId() === principalTabId
+                    && Boolean(principalPanel)
+                    && principalPanel.hidden !== true
+                    && principalPanel.getAttribute('aria-hidden') !== 'true';
+            }
+
+            function navigateToDashboard() {
+                // Si el panel principal no muestra el dashboard (cargó otra página en él),
+                // o si la URL actual no es el dashboard → recarga completa.
+                if (!principalPanelShowsDashboard() || shouldNavigateToDashboard()) {
+                    try {
+                        setActiveTab(principalTabId);
+                        saveState();
+                    } catch { }
+                    window.location.assign(DASHBOARD_URL);
+                    return;
+                }
+
+                // El panel principal ya tiene el dashboard: solo activar la pestaña.
+                // setActiveTab es síncrono y suficiente; no hace falta re-verificar después.
+                setActiveTab(principalTabId);
+
+                // Scroll al botón para que sea visible si hay muchas pestañas
+                if (principalBtn) {
+                    principalBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                }
+            }
+
+            if (principalBtn) {
+                // Usar capture:true para que este handler gane sobre cualquier listener
+                // de burbuja que pudiera re-procesar el click como app-tab-link.
+                principalBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    navigateToDashboard();
+                }, true);
+            }
+
+            const homeLink = document.getElementById('sidebar-home-link');
+            if (homeLink) {
+                homeLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    navigateToDashboard();
+                }, true);
+            }
+
+            const logoLink = document.getElementById('app-logo-link');
+            if (logoLink) {
+                logoLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    navigateToDashboard();
+                }, true);
+            }
+
+            syncPrincipalTabLabel();
+
+            const currentRequestIsDashboard = isDashboardUrl(window.location.href);
+
+            if (currentRequestIsDashboard) {
+                restoreState();
+                setActiveTab(principalTabId);
+                saveState();
+            } else if (!restoreState()) {
+                setActiveTab(principalTabId);
+                saveState();
+            }
+
+            // Inicializar el estado del browser con la URL actual al arrancar.
+            // Esto permite que popstate funcione correctamente desde el primer momento.
+            try {
+                const initUrl = normalizeKey(window.location.href);
+                const initTitle = document.title;
+                const activeId = getActiveTabId();
+                // Solo hacer replaceState si no hay ya un estado appNav
+                if (!history.state || !history.state.appNav) {
+                    history.replaceState(
+                        { tabId: activeId, url: initUrl, appNav: true },
+                        initTitle,
+                        window.location.href
+                    );
+                }
+            } catch { }
+        })();

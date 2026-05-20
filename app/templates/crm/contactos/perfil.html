@@ -1,0 +1,246 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<div class="p-4 h-full flex flex-col gap-4" x-data="crmPerfil({{ contacto.id }})">
+
+    <!-- Header del contacto -->
+    <div class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex items-start gap-4">
+        <div class="w-14 h-14 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center text-xl font-bold flex-shrink-0">
+            {{ (contacto.nombre or contacto.telefono)[0].upper() }}
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+                <h1 class="text-lg font-semibold text-gray-100" x-text="nombre || '{{ contacto.nombre or contacto.telefono }}'"></h1>
+                {% if contacto.bloqueado %}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">bloqueado</span>
+                {% endif %}
+            </div>
+            <p class="text-sm text-gray-400">{{ contacto.telefono }}</p>
+            <p class="text-xs text-gray-500 mt-0.5">
+                {{ contacto.total_conversaciones }} conversaciones ·
+                Primer contacto: {{ contacto.primer_contacto.strftime('%d/%m/%Y') if contacto.primer_contacto else '—' }}
+            </p>
+            <!-- Etiquetas -->
+            <div class="flex flex-wrap gap-1 mt-2" id="etiquetas-container">
+                {% for et in contacto.etiquetas %}
+                <span class="text-xs px-2 py-0.5 rounded-full etiqueta-badge"
+                    style="background-color: {{ et.color }}22; color: {{ et.color }}"
+                    data-id="{{ et.id }}">
+                    {{ et.nombre }}
+                    <button @click="quitarEtiqueta({{ et.id }})" class="ml-1 opacity-60 hover:opacity-100">×</button>
+                </span>
+                {% endfor %}
+                <!-- Agregar etiqueta -->
+                <div class="relative" x-data="{ abierto: false }">
+                    <button @click="abierto = !abierto"
+                        class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-gray-400 hover:text-white hover:bg-white/20 transition-colors">
+                        + etiqueta
+                    </button>
+                    <div x-show="abierto" @click.outside="abierto = false"
+                        class="absolute top-full left-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 p-2"
+                        style="display:none">
+                        {% for et in etiquetas_disponibles %}
+                        <button @click="agregarEtiqueta({{ et.id }}); abierto = false"
+                            class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/10 text-sm text-gray-200 transition-colors text-left">
+                            <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ et.color }}"></span>
+                            {{ et.nombre }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Acciones -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+            <button @click="editandoNombre = !editandoNombre"
+                class="px-3 py-1.5 rounded-lg bg-gray-700/50 text-sm text-gray-300 hover:bg-gray-600/50 transition-colors">
+                <i class="fas fa-edit mr-1"></i> Editar
+            </button>
+        </div>
+    </div>
+
+    <!-- Editar nombre -->
+    <div x-show="editandoNombre" class="bg-gray-800/50 border border-teal-500/30 rounded-xl p-4 flex gap-3 items-end">
+        <div class="flex-1">
+            <label class="text-xs text-gray-400 mb-1 block">Nombre</label>
+            <input type="text" x-model="nombre"
+                class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+        </div>
+        <div class="flex-1">
+            <label class="text-xs text-gray-400 mb-1 block">Notas generales</label>
+            <input type="text" x-model="notasGenerales"
+                class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+        </div>
+        <button @click="guardarContacto()"
+            class="px-4 py-2 rounded-lg bg-teal-500 text-white text-sm font-medium hover:bg-teal-400 transition-colors">
+            Guardar
+        </button>
+        <button @click="editandoNombre = false"
+            class="px-3 py-2 rounded-lg bg-gray-700/50 text-sm text-gray-300 hover:bg-gray-600/50 transition-colors">
+            Cancelar
+        </button>
+    </div>
+
+    <!-- Contenido en dos columnas -->
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
+
+        <!-- Historial de conversaciones -->
+        <div class="lg:col-span-2 flex flex-col gap-3 overflow-auto">
+            <h2 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                <i class="fas fa-comments text-teal-400"></i> Conversaciones
+            </h2>
+            <div x-show="cargando" class="flex items-center justify-center py-8">
+                <i class="fas fa-spinner fa-spin text-teal-400"></i>
+            </div>
+            <div class="flex flex-col gap-2">
+                <template x-for="conv in conversaciones" :key="conv.id">
+                    <div class="bg-gray-800/50 border border-white/5 rounded-xl p-3 hover:border-teal-500/20 transition-colors">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs px-2 py-0.5 rounded-full"
+                                :class="{
+                                    'bg-blue-500/20 text-blue-300': conv.modo === 'bot',
+                                    'bg-green-500/20 text-green-300': conv.modo === 'asesor',
+                                    'bg-yellow-500/20 text-yellow-300': conv.modo === 'derivacion'
+                                }"
+                                x-text="conv.modo">
+                            </span>
+                            <span x-show="conv.activa" class="text-xs px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300">activa</span>
+                            <span class="text-xs text-gray-500 ml-auto" x-text="formatFecha(conv.inicio)"></span>
+                        </div>
+                        <p class="text-xs text-gray-400 truncate" x-text="conv.ultimo_mensaje || '—'"></p>
+                        <p class="text-xs text-gray-600 mt-0.5" x-text="conv.total_mensajes + ' mensajes'"></p>
+                    </div>
+                </template>
+                <div x-show="!cargando && conversaciones.length === 0" class="text-center text-gray-500 text-sm py-4">
+                    Sin conversaciones
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel lateral: notas -->
+        <div class="flex flex-col gap-3 overflow-auto">
+            <h2 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                <i class="fas fa-sticky-note text-yellow-400"></i> Notas internas
+            </h2>
+
+            <!-- Nueva nota -->
+            <div class="bg-gray-800/50 border border-white/5 rounded-xl p-3">
+                <textarea x-model="nuevaNota" rows="3"
+                    placeholder="Agregar nota interna..."
+                    class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-teal-500/50 resize-none"></textarea>
+                <button @click="agregarNota()"
+                    :disabled="!nuevaNota.trim()"
+                    class="mt-2 w-full px-3 py-1.5 rounded-lg bg-teal-500 text-white text-sm font-medium hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    Agregar nota
+                </button>
+            </div>
+
+            <!-- Lista de notas -->
+            <div class="flex flex-col gap-2">
+                <template x-for="nota in notas" :key="nota.id">
+                    <div class="bg-gray-800/50 border border-white/5 rounded-xl p-3 group">
+                        <p class="text-sm text-gray-200 whitespace-pre-wrap" x-text="nota.contenido"></p>
+                        <div class="flex items-center justify-between mt-2">
+                            <span class="text-xs text-gray-500" x-text="nota.autor + ' · ' + formatFecha(nota.created_at)"></span>
+                            <button @click="eliminarNota(nota.id)"
+                                class="text-xs text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-300 transition-all">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="notas.length === 0" class="text-center text-gray-500 text-xs py-2">
+                    Sin notas
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function crmPerfil(idContacto) {
+    return {
+        idContacto,
+        nombre: '{{ contacto.nombre or "" }}',
+        notasGenerales: '{{ contacto.notas_generales or "" }}',
+        editandoNombre: false,
+        cargando: true,
+        conversaciones: [],
+        notas: [],
+        nuevaNota: '',
+
+        async cargar() {
+            this.cargando = true;
+            try {
+                const r = await fetch(`/crm/api/contactos/${this.idContacto}`);
+                const d = await r.json();
+                this.conversaciones = d.conversaciones || [];
+                this.notas = d.notas || [];
+                this.nombre = d.contacto.nombre || '';
+            } catch(e) { console.error(e); }
+            finally { this.cargando = false; }
+        },
+
+        async guardarContacto() {
+            try {
+                await fetch(`/crm/api/contactos/${this.idContacto}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre: this.nombre, notas_generales: this.notasGenerales }),
+                });
+                this.editandoNombre = false;
+            } catch(e) { console.error(e); }
+        },
+
+        async agregarEtiqueta(idEtiqueta) {
+            try {
+                const r = await fetch(`/crm/api/contactos/${this.idContacto}/etiquetas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id_etiqueta: idEtiqueta }),
+                });
+                if (r.ok) location.reload();
+            } catch(e) { console.error(e); }
+        },
+
+        async quitarEtiqueta(idEtiqueta) {
+            try {
+                const r = await fetch(`/crm/api/contactos/${this.idContacto}/etiquetas/${idEtiqueta}`, { method: 'DELETE' });
+                if (r.ok) location.reload();
+            } catch(e) { console.error(e); }
+        },
+
+        async agregarNota() {
+            if (!this.nuevaNota.trim()) return;
+            try {
+                const r = await fetch(`/crm/api/contactos/${this.idContacto}/notas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contenido: this.nuevaNota }),
+                });
+                const d = await r.json();
+                if (d.ok) {
+                    this.notas.unshift(d.nota);
+                    this.nuevaNota = '';
+                }
+            } catch(e) { console.error(e); }
+        },
+
+        async eliminarNota(idNota) {
+            if (!confirm('¿Eliminar esta nota?')) return;
+            try {
+                await fetch(`/crm/api/contactos/${this.idContacto}/notas/${idNota}`, { method: 'DELETE' });
+                this.notas = this.notas.filter(n => n.id !== idNota);
+            } catch(e) { console.error(e); }
+        },
+
+        formatFecha(iso) {
+            if (!iso) return '';
+            return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+        },
+
+        init() { this.cargar(); }
+    };
+}
+</script>
+{% endblock %}

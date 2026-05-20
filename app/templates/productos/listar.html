@@ -1,0 +1,618 @@
+{% extends "base.html" %}
+
+{% block title %}Productos{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="productosApp()">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-box text-blue-600 dark:text-blue-400 mr-2"></i>Productos
+        </h1>
+        <a href="{{ url_for('productos.nuevo') }}" data-permiso="crear_producto"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition shadow-lg shadow-blue-600/30">
+            <i class="fas fa-plus mr-2"></i>Nuevo Producto
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
+        <div class="flex flex-wrap items-start gap-4">
+            <form x-ref="filtrosForm" method="GET" action="{{ url_for('productos.listar') }}" class="flex flex-wrap gap-4 flex-1">
+                <input type="hidden" name="page" value="1">
+                <input type="hidden" name="sort" value="{{ sort }}">
+                <input type="hidden" name="dir" value="{{ dir }}">
+                <div class="flex-1 min-w-64">
+                    <div class="relative flex items-center">
+                        <input type="text" name="buscar" x-model="busqueda" placeholder="Buscar por nombre, código o código de barras..."
+                            x-ref="searchInput" id="searchInput"
+                            @input.debounce.250ms="manejarInputBusqueda()"
+                            x-init="{% if buscar %}$nextTick(() => { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length); }){% endif %}"
+                            class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 pl-4 pr-9 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                        <button type="button" x-show="busqueda && busqueda.length > 0"
+                            @click.prevent.stop="limpiarBusqueda($refs.filtrosForm)"
+                            class="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                            tabindex="-1">
+                            <i class="fas fa-times-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                <label class="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+                    <input type="checkbox" x-model="autoBusquedaHabilitada" @change="guardarPreferenciaAutoBusqueda()" class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                    <span>Búsqueda automática</span>
+                </label>
+                <div class="w-48">
+                    <select name="categoria" x-model="categoriaSeleccionada" @change.prevent.stop="$nextTick(() => { const form = $refs.filtrosForm; if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); })"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                        <option value="">Todas las categorías</option>
+                        {% for cat in categorias %}
+                        <option value="{{ cat.id_categoria }}" {% if cat.id_categoria==categoria_id %}selected{% endif %}>
+                            {{ cat.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit"
+                    class="bg-gray-800 dark:bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition shadow-md">
+                    <i class="fas fa-search mr-2"></i>Buscar
+                </button>
+            </form>
+            <form x-show="categoriaSeleccionada" x-cloak method="POST"
+                x-bind:action="`{{ url_for('productos.listar') }}categorias/${categoriaSeleccionada}/eliminar`"
+                class="inline-flex" data-autorizacion-form="1" data-codigo-permiso="eliminar_producto"
+                data-accion="Eliminar categoría de productos"
+                data-confirm="¿Eliminar la categoría seleccionada? Solo se podrá si no tiene productos activos.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="id_autorizacion" value="">
+                <input type="hidden" name="next" value="{{ url_for('productos.listar', buscar=buscar or none, sort=sort, dir=dir) }}">
+                <button type="submit" data-permiso="eliminar_producto"
+                    class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    x-bind:disabled="!categoriaSeleccionada"
+                    title="Eliminar categoría seleccionada">
+                    <i class="fas fa-trash mr-2"></i>Categoría
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                {% set current_sort = sort or 'stock' %}
+                {% set current_dir = dir or 'asc' %}
+                {% set base_buscar = buscar or none %}
+                {% set base_categoria = categoria_id if categoria_id else none %}
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            {% set next_dir = 'desc' if current_sort == 'codigo' and current_dir == 'asc' else 'asc' %}
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='codigo', dir=next_dir) }}"
+                                class="inline-flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                <span>Código</span>
+                                {% if current_sort == 'codigo' %}
+                                <i class="fas {{ 'fa-sort-up' if current_dir == 'asc' else 'fa-sort-down' }}"></i>
+                                {% else %}
+                                <i class="fas fa-sort opacity-40"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            {% set next_dir = 'desc' if current_sort == 'producto' and current_dir == 'asc' else 'asc'
+                            %}
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='producto', dir=next_dir) }}"
+                                class="inline-flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                <span>Producto</span>
+                                {% if current_sort == 'producto' %}
+                                <i class="fas {{ 'fa-sort-up' if current_dir == 'asc' else 'fa-sort-down' }}"></i>
+                                {% else %}
+                                <i class="fas fa-sort opacity-40"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            {% set next_dir = 'desc' if current_sort == 'categoria' and current_dir == 'asc' else 'asc'
+                            %}
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='categoria', dir=next_dir) }}"
+                                class="inline-flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                <span>Categoría</span>
+                                {% if current_sort == 'categoria' %}
+                                <i class="fas {{ 'fa-sort-up' if current_dir == 'asc' else 'fa-sort-down' }}"></i>
+                                {% else %}
+                                <i class="fas fa-sort opacity-40"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            {% set next_dir = 'desc' if current_sort == 'precio' and current_dir == 'asc' else 'asc' %}
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='precio', dir=next_dir) }}"
+                                class="flex items-start justify-end gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                <div class="flex flex-col items-end leading-tight whitespace-normal">
+                                    <span>Precio</span>
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Mayorista</span>
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Minorista</span>
+                                </div>
+                                <span class="pt-0.5">
+                                    {% if current_sort == 'precio' %}
+                                    <i class="fas {{ 'fa-sort-up' if current_dir == 'asc' else 'fa-sort-down' }}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort opacity-40"></i>
+                                    {% endif %}
+                                </span>
+                            </a>
+                        </th>
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            {% set next_dir = 'desc' if current_sort == 'stock' and current_dir == 'asc' else 'asc' %}
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='stock', dir=next_dir) }}"
+                                class="inline-flex items-center justify-center gap-2 w-full hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                <span>Stock</span>
+                                {% if current_sort == 'stock' %}
+                                <i class="fas {{ 'fa-sort-up' if current_dir == 'asc' else 'fa-sort-down' }}"></i>
+                                {% else %}
+                                <i class="fas fa-sort opacity-40"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for producto in productos.items %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                        <td class="px-4 py-3 font-mono text-sm text-gray-800 dark:text-gray-200">{{ producto.codigo }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div>
+                                <span class="font-medium text-gray-800 dark:text-white">{{ producto.nombre }}</span>
+                                {% if producto.marca %}
+                                <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">{{ producto.marca }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ producto.categoria.nombre }}
+                        </td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">
+                            <div class="flex flex-col items-end leading-tight whitespace-nowrap">
+                                <span>
+                                    {% if producto.precio_mayorista is not none %}
+                                    ₲ {{ "{:,.0f}".format(producto.precio_mayorista).replace(",", ".") }}
+                                    {% else %}
+                                    —
+                                    {% endif %}
+                                </span>
+                                <span>₲ {{ "{:,.0f}".format(producto.precio_venta).replace(",", ".") }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if producto.es_servicio %}
+                            <span class="px-2 py-1 rounded-full text-sm bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-200">
+                                Servicio
+                            </span>
+                            {% else %}
+                            <span
+                                class="px-2 py-1 rounded-full text-sm {% if producto.stock_bajo %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300{% else %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300{% endif %}">
+                                {{ producto.stock_actual }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if current_user.tiene_permiso('ajuste_rapido_stock') and not producto.es_servicio %}
+                            <button
+                                @click='abrirModalAjuste({{ producto.id_producto }}, {{ producto.nombre|tojson }}, {{ producto.stock_actual }})'
+                                class="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300 mx-1 transition-colors"
+                                title="Ajuste rápido de stock">
+                                <i class="fas fa-bolt"></i>
+                            </button>
+                            {% endif %}
+                            {% if current_user.tiene_permiso('ver_inventario') %}
+                            <button
+                                @click='abrirModalHistorial({{ producto.id_producto }}, {{ producto.nombre|tojson }}, {{ producto.codigo|tojson }})'
+                                class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 mx-1 transition-colors"
+                                title="Historial de compras">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            {% endif %}
+                            <a href="{{ url_for('productos.editar', id=producto.id_producto) }}"
+                                data-permiso="editar_producto"
+                                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mx-1 transition-colors"
+                                title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button
+                                @click="togglePublicacionTienda({{ producto.id_producto }}, {{ 'true' if producto.publicado_tienda else 'false' }})"
+                                class="{{ 'text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300' if producto.publicado_tienda else 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' }} mx-1 transition-colors"
+                                title="{{ 'Quitar de Tienda' if producto.publicado_tienda else 'Publicar en Tienda' }}">
+                                <i class="fas fa-store"></i>
+                            </button>
+                            <form action="{{ url_for('productos.eliminar', id=producto.id_producto) }}" method="POST"
+                                class="inline" data-autorizacion-form="1" data-codigo-permiso="eliminar_producto"
+                                data-accion="Eliminar producto {{ producto.codigo }} - {{ producto.nombre }}"
+                                data-confirm="¿Eliminar este producto?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="id_autorizacion" value="">
+                                <button type="submit" data-permiso="eliminar_producto"
+                                    class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 mx-1 transition-colors"
+                                    title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                            No se encontraron productos
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if productos.pages > 1 %}
+    <div class="flex justify-center space-x-2">
+        {% if productos.has_prev %}
+        <a href="{{ url_for('productos.listar', page=productos.prev_num, buscar=buscar or none, categoria=(categoria_id if categoria_id else none), sort=sort, dir=dir) }}"
+            class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        {% endif %}
+
+        <span class="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg">
+            {{ productos.page }} / {{ productos.pages }}
+        </span>
+
+        {% if productos.has_next %}
+        <a href="{{ url_for('productos.listar', page=productos.next_num, buscar=buscar or none, categoria=(categoria_id if categoria_id else none), sort=sort, dir=dir) }}"
+            class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div x-show="modalAjuste.visible" x-cloak @click.self="cerrarModalAjuste()"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" @click.stop>
+            <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">
+                <i class="fas fa-bolt text-yellow-500 mr-2"></i>Ajuste Rápido de Stock
+            </h3>
+
+            <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Producto: <span class="font-semibold text-gray-800 dark:text-white"
+                        x-text="modalAjuste.nombre"></span>
+                </p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Stock actual: <span class="font-semibold text-gray-800 dark:text-white"
+                        x-text="modalAjuste.stockActual"></span>
+                </p>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Tipo de ajuste</label>
+                <div class="flex gap-4">
+                    <button type="button" @click="modalAjuste.tipo = 'entrada'"
+                        :class="modalAjuste.tipo === 'entrada' ? 'bg-green-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'"
+                        class="flex-1 py-2 rounded-lg transition-colors font-medium">
+                        <i class="fas fa-plus mr-1"></i> Entrada
+                    </button>
+                    <button type="button" @click="modalAjuste.tipo = 'salida'"
+                        :class="modalAjuste.tipo === 'salida' ? 'bg-red-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'"
+                        class="flex-1 py-2 rounded-lg transition-colors font-medium">
+                        <i class="fas fa-minus mr-1"></i> Salida
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cantidad -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Cantidad *</label>
+                <input type="number" x-model.number="modalAjuste.cantidad" min="1"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+            </div>
+
+            <!-- Motivo -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Motivo *</label>
+                <select x-model="modalAjuste.motivo"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    <option value="">Seleccione...</option>
+                    <option value="Compra recibida">Compra recibida</option>
+                    <option value="Devolución cliente">Devolución cliente</option>
+                    <option value="Merma">Merma</option>
+                    <option value="Robo/Pérdida">Robo/Pérdida</option>
+                    <option value="Corrección inventario">Corrección inventario</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </div>
+
+            <!-- Observaciones -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Observaciones</label>
+                <textarea x-model="modalAjuste.observaciones"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors resize-none"
+                    rows="2" placeholder="Información adicional (opcional)"></textarea>
+            </div>
+
+            <!-- Botones -->
+            <div class="flex justify-end gap-2">
+                <button type="button" @click="cerrarModalAjuste()"
+                    class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Cancelar
+                </button>
+                <button type="button" @click="guardarAjuste()" :disabled="guardando"
+                    :class="guardando ? 'opacity-50 cursor-not-allowed' : ''"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-save mr-1"></i>
+                    <span x-text="guardando ? 'Guardando...' : 'Guardar'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="modalHistorial.visible" x-cloak @click.self="cerrarModalHistorial()"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-5xl w-full mx-4 shadow-2xl" @click.stop>
+            <div class="flex items-start justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-white">
+                        <i class="fas fa-history text-green-600 dark:text-green-400 mr-2"></i>Historial de compras
+                    </h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        <span class="font-semibold text-gray-800 dark:text-white" x-text="modalHistorial.codigo"></span>
+                        <span class="mx-2">•</span>
+                        <span x-text="modalHistorial.nombre"></span>
+                    </p>
+                </div>
+                <button type="button" @click="cerrarModalHistorial()"
+                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div x-show="modalHistorial.cargando" class="text-center py-8">
+                <i class="fas fa-spinner fa-spin text-blue-500"></i>
+                <span class="ml-2 text-gray-600 dark:text-gray-400">Cargando...</span>
+            </div>
+
+            <div x-show="!modalHistorial.cargando && modalHistorial.error"
+                class="py-4 text-center text-red-600 dark:text-red-400" x-text="modalHistorial.error"></div>
+
+            <div x-show="!modalHistorial.cargando && !modalHistorial.error && modalHistorial.historial.length === 0"
+                class="py-4 text-center text-gray-500 dark:text-gray-400">
+                Este producto no tiene compras registradas.
+            </div>
+
+            <div x-show="!modalHistorial.cargando && !modalHistorial.error && modalHistorial.historial.length > 0"
+                class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th
+                                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                Compra</th>
+                            <th
+                                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                Fecha</th>
+                            <th
+                                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                Proveedor</th>
+                            <th
+                                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                Factura</th>
+                            <th
+                                class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                Cantidad</th>
+                            <th
+                                class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                Precio Unit.</th>
+                            <th
+                                class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        <template x-for="item in modalHistorial.historial"
+                            :key="item.id_compra + '-' + item.precio_unitario">
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td class="px-4 py-2 text-sm">
+                                    <a :href="`/compras/${item.id_compra}`" target="_blank"
+                                        class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+                                        <span x-text="`#${item.id_compra}`"></span>
+                                    </a>
+                                </td>
+                                <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100" x-text="item.fecha"></td>
+                                <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100" x-text="item.proveedor">
+                                </td>
+                                <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400" x-text="item.factura">
+                                </td>
+                                <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100 text-right"
+                                    x-text="item.cantidad"></td>
+                                <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100 text-right"
+                                    x-text="new Intl.NumberFormat('es-PY').format(item.precio_unitario)"></td>
+                                <td class="px-4 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 text-right"
+                                    x-text="new Intl.NumberFormat('es-PY').format(item.subtotal)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" @click="cerrarModalHistorial()"
+                    class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function productosApp() {
+        return {
+            modalAjuste: {
+                visible: false,
+                idProducto: null,
+                nombre: '',
+                stockActual: 0,
+                tipo: 'entrada',
+                cantidad: 1,
+                motivo: '',
+                observaciones: ''
+            },
+            modalHistorial: {
+                visible: false,
+                idProducto: null,
+                nombre: '',
+                codigo: '',
+                historial: [],
+                cargando: false,
+                error: ''
+            },
+            guardando: false,
+            busqueda: '{{ buscar|default("", true) }}',
+            categoriaSeleccionada: '{{ categoria_id if categoria_id else "" }}',
+            autoBusquedaHabilitada: true,
+
+            init() {
+                try {
+                    this.autoBusquedaHabilitada = window.localStorage.getItem('productos_auto_busqueda') !== 'false';
+                } catch (error) {}
+            },
+
+            guardarPreferenciaAutoBusqueda() {
+                try {
+                    window.localStorage.setItem('productos_auto_busqueda', this.autoBusquedaHabilitada ? 'true' : 'false');
+                } catch (error) {}
+            },
+
+            manejarInputBusqueda() {
+                if (!this.autoBusquedaHabilitada || !this.$refs.filtrosForm) return;
+                this.$refs.filtrosForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            },
+
+            limpiarBusqueda(form) {
+                this.busqueda = '';
+                this.$nextTick(() => {
+                    if (form) {
+                        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    }
+                });
+            },
+
+            abrirModalAjuste(id, nombre, stock) {
+                this.modalAjuste = {
+                    visible: true,
+                    idProducto: id,
+                    nombre: nombre,
+                    stockActual: stock,
+                    tipo: 'entrada',
+                    cantidad: 1,
+                    motivo: '',
+                    observaciones: ''
+                };
+            },
+
+            cerrarModalAjuste() {
+                this.modalAjuste.visible = false;
+            },
+
+            async abrirModalHistorial(id, nombre, codigo) {
+                this.modalHistorial = {
+                    visible: true,
+                    idProducto: id,
+                    nombre: nombre,
+                    codigo: codigo,
+                    historial: [],
+                    cargando: true,
+                    error: ''
+                };
+
+                try {
+                    const response = await fetch(`/productos/${id}/historial_compras`);
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        this.modalHistorial.error = data.error || 'No se pudo cargar el historial.';
+                        return;
+                    }
+
+                    this.modalHistorial.historial = Array.isArray(data.historial) ? data.historial : [];
+                } catch (error) {
+                    console.error('Error cargando historial:', error);
+                    this.modalHistorial.error = 'Error de conexión al cargar el historial.';
+                } finally {
+                    this.modalHistorial.cargando = false;
+                }
+            },
+
+            cerrarModalHistorial() {
+                this.modalHistorial.visible = false;
+            },
+
+            async togglePublicacionTienda(idProducto, publicadoActual) {
+                const response = await fetch(`/api/tienda/admin/producto/${idProducto}/publicar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ publicar: !publicadoActual })
+                });
+                if (!response.ok) {
+                    alert('No se pudo actualizar la publicación en tienda');
+                    return;
+                }
+                location.reload();
+            },
+
+            async guardarAjuste() {
+                if (!this.modalAjuste.motivo) {
+                    alert('Debe seleccionar un motivo');
+                    return;
+                }
+
+                if (this.modalAjuste.cantidad <= 0) {
+                    alert('La cantidad debe ser mayor a 0');
+                    return;
+                }
+
+                this.guardando = true;
+
+                try {
+                    const response = await fetch(`/productos/${this.modalAjuste.idProducto}/ajuste_rapido`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            tipo: this.modalAjuste.tipo,
+                            cantidad: this.modalAjuste.cantidad,
+                            motivo: this.modalAjuste.motivo,
+                            observaciones: this.modalAjuste.observaciones
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        // Mostrar mensaje de éxito
+                        const tipoTexto = this.modalAjuste.tipo === 'entrada' ? 'agregadas' : 'retiradas';
+                        alert(`✓ ${this.modalAjuste.cantidad} unidades ${tipoTexto}. Stock nuevo: ${data.stock_nuevo}`);
+
+                        // Recargar página para actualizar stock
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'No se pudo guardar el ajuste'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error de conexión al guardar el ajuste');
+                } finally {
+                    this.guardando = false;
+                }
+            }
+        }
+    }
+</script>
+{% endblock %}

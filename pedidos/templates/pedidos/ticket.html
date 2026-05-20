@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Comprobante {{ pedido.numero_pedido_display }}</title>
+    {% set paper_width_value = paper_width_mm if paper_width_mm in [48, 58, 80] else 58 %}
+    <style>
+        @page {
+            size: {{ paper_width_value }}mm auto;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: {{ paper_width_value }}mm;
+            max-width: {{ paper_width_value }}mm;
+            margin: 0;
+            padding: 0;
+            background: #fff !important;
+            color: #000 !important;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            line-height: 1.35;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            text-rendering: geometricPrecision;
+        }
+
+        body {
+            padding: 2mm {{ 4 if paper_width_value == 80 else 3 }}mm 3mm;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        td,
+        th {
+            padding: 1px 0;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .left {
+            text-align: left;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .small {
+            font-size: 10px;
+        }
+
+        .muted {
+            color: #333;
+        }
+
+        .ticket-preview-layout {
+            display: block;
+        }
+
+        .ticket-thermal-layout {
+            display: none;
+        }
+
+        .ticket-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin: 0 0 10px;
+        }
+
+        .ticket-actions a,
+        .ticket-actions button {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #111827;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font: inherit;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .ticket-actions .primary {
+            background: #111827;
+            color: #fff;
+            border-color: #111827;
+        }
+
+        .thermal-print {
+            margin: 0;
+            width: 100%;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            font-family: 'Lucida Console', 'Courier New', Courier, monospace;
+            font-size: {{ 10 if paper_width_value == 48 else 11 if paper_width_value == 58 else 12 }}px;
+            line-height: 1.25;
+            font-weight: 700;
+            padding: 2mm {{ 4 if paper_width_value == 80 else 3 }}mm 3mm;
+            text-rendering: geometricPrecision;
+        }
+
+        .sep {
+            border: none;
+            border-top: 1px dashed #000;
+            margin: 4px 0;
+            height: 0;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .header .nombre {
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .section-title {
+            margin-bottom: 2px;
+        }
+
+        .info-row td {
+            padding: 1px 0;
+        }
+
+        .info-label {
+            width: {{ 30 if paper_width_value == 80 else 35 }}%;
+        }
+
+        .info-value {
+            width: {{ 70 if paper_width_value == 80 else 65 }}%;
+        }
+
+        .col-item {
+            width: {{ 58 if paper_width_value == 80 else 50 }}%;
+        }
+
+        .col-cant {
+            width: {{ 12 if paper_width_value == 80 else 15 }}%;
+            text-align: right;
+        }
+
+        .col-total {
+            width: {{ 30 if paper_width_value == 80 else 35 }}%;
+            text-align: right;
+        }
+
+        @media print {
+            html,
+            body {
+                width: {{ paper_width_value }}mm !important;
+                max-width: {{ paper_width_value }}mm !important;
+                background: #fff !important;
+                color: #000 !important;
+            }
+
+            .ticket-preview-layout {
+                display: none !important;
+            }
+
+            .ticket-thermal-layout {
+                display: block !important;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% set thermal_width = 24 if paper_width_value == 48 else 32 if paper_width_value == 58 else 44 %}
+    {% set cliente_nombre = (pedido.cliente.nombre if pedido.cliente else ('Cliente #' ~ pedido.id_cliente))|thermal_safe %}
+    {% set usuario_nombre = (pedido.usuario_creacion.nombre_completo if pedido.usuario_creacion else ('Usuario #' ~ pedido.id_usuario_creacion))|thermal_safe %}
+    {% set venta_final = ('#' ~ pedido.venta_generada.id_venta) if pedido.venta_generada else '-' %}
+    {% macro thermal_center(text, width=32) -%}
+    {%- set value = ((text or '')|string)|trim -%}
+    {%- if not value -%}{%- elif value|length >= width -%}{{ value }}{%- else -%}{{ ' ' * ((width - value|length) // 2) }}{{ value }}{%- endif -%}
+    {%- endmacro %}
+    {% macro thermal_pair(left, right, width=32) -%}
+    {%- set left_value = ((left or '')|string)|trim -%}
+    {%- set right_value = ((right or '')|string)|trim -%}
+    {%- set remaining = width - left_value|length - right_value|length -%}
+    {%- if not left_value and not right_value -%}{%- elif remaining < 1 -%}{{ left_value }}
+{{ right_value }}{%- else -%}{{ left_value }}{{ ' ' * remaining }}{{ right_value }}{%- endif -%}
+    {%- endmacro %}
+    {% macro thermal_amount(value) -%}{{ moneda_simbolo }} {{ "{:,.0f}".format(value or 0).replace(",", ".") }}{%- endmacro %}
+
+    {% if not preview and not embedded %}
+    <div class="ticket-actions no-print">
+        {% if return_to %}
+        <a href="{{ return_to }}" class="primary">Volver</a>
+        {% endif %}
+        <button type="button" onclick="salirDeTicket()">{{ 'Cerrar ventana' if close_only else 'Salir' }}</button>
+    </div>
+    {% endif %}
+
+    <div class="ticket-preview-layout">
+        <div class="header">
+            {% if empresa.nombre %}
+            <div class="nombre">{{ empresa.nombre|thermal_safe }}</div>
+            {% endif %}
+            {% if empresa.ruc %}
+            <div class="small">RUC: {{ empresa.ruc|thermal_safe }}</div>
+            {% endif %}
+            {% if empresa.telefono %}
+            <div class="small">Tel: {{ empresa.telefono|thermal_safe }}</div>
+            {% endif %}
+            {% if empresa.direccion %}
+            <div class="small">{{ empresa.direccion|thermal_safe }}</div>
+            {% endif %}
+        </div>
+
+        <hr class="sep" />
+        <div class="center bold">COMPROBANTE DE PEDIDO</div>
+        <div class="center small">{{ pedido.numero_pedido_display }}</div>
+        <hr class="sep" />
+
+        <table>
+            <tr class="info-row">
+                <td class="info-label">Fecha:</td>
+                <td class="info-value">{{ pedido.fecha_creacion|local_strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Cliente:</td>
+                <td class="info-value">{{ cliente_nombre }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Estado:</td>
+                <td class="info-value">{{ pedido.estado_label|thermal_safe }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Creado por:</td>
+                <td class="info-value">{{ usuario_nombre }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Venta final:</td>
+                <td class="info-value">{{ venta_final }}</td>
+            </tr>
+        </table>
+
+        {% if pedido.observaciones %}
+        <hr class="sep" />
+        <div class="bold section-title">Observaciones</div>
+        <div>{{ pedido.observaciones|thermal_safe }}</div>
+        {% endif %}
+
+        <hr class="sep" />
+        <div class="bold section-title">Detalle del pedido</div>
+        <table>
+            <thead>
+                <tr>
+                    <th class="left col-item">Item</th>
+                    <th class="right col-cant">Cant</th>
+                    <th class="right col-total">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="col-item">
+                        {{ item.producto_nombre_snapshot|thermal_safe }}
+                        {% if item.producto_codigo_snapshot %}
+                        <div class="small muted">{{ item.producto_codigo_snapshot|thermal_safe }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="right col-cant">{{ item.cantidad }}</td>
+                    <td class="right col-total">{{ thermal_amount(item.subtotal or 0) }}</td>
+                </tr>
+                {% if item.observaciones %}
+                <tr>
+                    <td colspan="3" class="small muted">{{ item.observaciones|thermal_safe }}</td>
+                </tr>
+                {% endif %}
+                {% else %}
+                <tr>
+                    <td colspan="3">Sin items cargados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if pagos %}
+        <hr class="sep" />
+        <div class="bold section-title">Pagos registrados</div>
+        <table>
+            {% for pago in pagos %}
+            <tr>
+                <td class="left">
+                    {{ (pago.metodo.nombre if pago.metodo else 'Sin metodo')|thermal_safe }}
+                    <div class="small muted">
+                        {{ pago.fecha_pago|local_strftime('%d/%m/%Y %H:%M') }}
+                        {% if pago.referencia %} | {{ pago.referencia|thermal_safe }}{% endif %}
+                    </div>
+                </td>
+                <td class="right">{{ thermal_amount(pago.monto or 0) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        {% if pago_destacado %}
+        <hr class="sep" />
+        <div class="bold section-title">Cobro de esta operacion</div>
+        <table>
+            <tr class="info-row">
+                <td class="info-label">Monto pagado:</td>
+                <td class="info-value right">{{ thermal_amount(pago_destacado.monto or 0) }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Tipo:</td>
+                <td class="info-value">{{ pago_destacado.tipo_pago.replace('_', ' ').title() if pago_destacado.tipo_pago else '-' }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Metodo:</td>
+                <td class="info-value">{{ pago_destacado.metodo.nombre|thermal_safe if pago_destacado.metodo else '-' }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Fecha:</td>
+                <td class="info-value">{{ pago_destacado.fecha_pago|local_strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            {% if pago_destacado.referencia %}
+            <tr class="info-row">
+                <td class="info-label">Referencia:</td>
+                <td class="info-value">{{ pago_destacado.referencia|thermal_safe }}</td>
+            </tr>
+            {% endif %}
+            <tr class="info-row">
+                <td class="info-label">Saldo restante:</td>
+                <td class="info-value right bold">{{ thermal_amount(saldo_pendiente) }}</td>
+            </tr>
+        </table>
+        {% endif %}
+
+        <hr class="sep" />
+        <div class="bold section-title">Resumen de cobros</div>
+        <table>
+            {% for item in pagos_resumen %}
+            <tr>
+                <td class="left">{{ item.nombre|thermal_safe }} ({{ item.cantidad }})</td>
+                <td class="right">{{ thermal_amount(item.monto or 0) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+
+        <hr class="sep" />
+        <table>
+            <tr>
+                <td class="left">Subtotal</td>
+                <td class="right">{{ thermal_amount(subtotal) }}</td>
+            </tr>
+            {% if descuento > 0 %}
+            <tr>
+                <td class="left">Descuento</td>
+                <td class="right">- {{ thermal_amount(descuento) }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td class="left bold">Total pedido</td>
+                <td class="right bold">{{ thermal_amount(total) }}</td>
+            </tr>
+            <tr>
+                <td class="left">Total pagado</td>
+                <td class="right">{{ thermal_amount(total_pagado) }}</td>
+            </tr>
+            <tr>
+                <td class="left bold">Saldo pendiente</td>
+                <td class="right bold">{{ thermal_amount(saldo_pendiente) }}</td>
+            </tr>
+        </table>
+
+        <hr class="sep" />
+        <div class="center small">{{ footer_text|default('Gracias por su compra')|thermal_safe }}</div>
+    </div>
+
+    <div class="ticket-thermal-layout">
+        <pre class="thermal-print">{% if empresa.nombre %}{{ thermal_center(empresa.nombre|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.ruc %}{{ thermal_center('RUC: ' ~ empresa.ruc|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.telefono %}{{ thermal_center('Tel: ' ~ empresa.telefono|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.direccion %}{{ thermal_center(empresa.direccion|thermal_safe, thermal_width) }}
+{% endif %}{{ '-' * thermal_width }}
+{{ thermal_center('COMPROBANTE DE PEDIDO', thermal_width) }}
+{{ thermal_center(pedido.numero_pedido_display, thermal_width) }}
+{{ '-' * thermal_width }}
+{{ thermal_pair('Fecha:', pedido.fecha_creacion|local_strftime('%d/%m/%Y %H:%M'), thermal_width) }}
+Cliente:
+{{ cliente_nombre }}
+{{ thermal_pair('Estado:', pedido.estado_label|thermal_safe, thermal_width) }}
+Creado por:
+{{ usuario_nombre }}
+{{ thermal_pair('Venta final:', venta_final, thermal_width) }}
+{% if pedido.observaciones %}{{ '-' * thermal_width }}
+Observaciones:
+{{ pedido.observaciones|thermal_safe }}
+{% endif %}{{ '-' * thermal_width }}
+{{ thermal_pair('Item', 'Cant    Total', thermal_width) }}
+{% for item in items %}{{ item.producto_nombre_snapshot|thermal_safe }}
+{% if item.producto_codigo_snapshot %}{{ item.producto_codigo_snapshot|thermal_safe }}
+{% endif %}{{ thermal_pair('', item.cantidad ~ '  ' ~ thermal_amount(item.subtotal or 0), thermal_width) }}
+{% if item.observaciones %}{{ item.observaciones|thermal_safe }}
+{% endif %}{% else %}Sin items cargados.
+{% endfor %}{% if pagos %}{{ '-' * thermal_width }}
+Pagos registrados
+{% for pago in pagos %}{{ thermal_pair((pago.metodo.nombre if pago.metodo else 'Sin metodo')|thermal_safe, thermal_amount(pago.monto or 0), thermal_width) }}
+{{ pago.fecha_pago|local_strftime('%d/%m/%Y %H:%M') }}{% if pago.referencia %} | {{ pago.referencia|thermal_safe }}{% endif %}
+{% endfor %}{% if pago_destacado %}{{ '-' * thermal_width }}
+Cobro de esta operacion
+{{ thermal_pair('Monto pagado:', thermal_amount(pago_destacado.monto or 0), thermal_width) }}
+{{ thermal_pair('Tipo:', pago_destacado.tipo_pago.replace('_', ' ').title() if pago_destacado.tipo_pago else '-', thermal_width) }}
+{{ thermal_pair('Metodo:', pago_destacado.metodo.nombre|thermal_safe if pago_destacado.metodo else '-', thermal_width) }}
+{{ thermal_pair('Fecha:', pago_destacado.fecha_pago|local_strftime('%d/%m/%Y %H:%M'), thermal_width) }}
+{% if pago_destacado.referencia %}Referencia:
+{{ pago_destacado.referencia|thermal_safe }}
+{% endif %}{{ thermal_pair('Saldo restante:', thermal_amount(saldo_pendiente), thermal_width) }}
+{% endif %}{{ '-' * thermal_width }}
+Resumen de cobros
+{% for item in pagos_resumen %}{{ thermal_pair((item.nombre|thermal_safe) ~ ' (' ~ item.cantidad ~ ')', thermal_amount(item.monto or 0), thermal_width) }}
+{% endfor %}{% endif %}{{ '-' * thermal_width }}
+{{ thermal_pair('Subtotal', thermal_amount(subtotal), thermal_width) }}
+{% if descuento > 0 %}{{ thermal_pair('Descuento', '- ' ~ thermal_amount(descuento), thermal_width) }}
+{% endif %}{{ thermal_pair('Total pedido', thermal_amount(total), thermal_width) }}
+{{ thermal_pair('Total pagado', thermal_amount(total_pagado), thermal_width) }}
+{{ thermal_pair('Saldo pendiente', thermal_amount(saldo_pendiente), thermal_width) }}
+{{ '-' * thermal_width }}
+{{ footer_text|default('Gracias por su compra')|thermal_safe }}</pre>
+    </div>
+
+    <div style="height: 15mm;"></div>
+    <br /><br /><br />
+
+    {% if not preview and not embedded %}
+    <script>
+        var returnTo = {{ return_to|default('', true)|tojson }};
+        var closeOnly = {{ 1 if close_only else 0 }};
+        var salidaEjecutada = false;
+        var openerDisponible = !closeOnly && !!(window.opener && !window.opener.closed);
+
+        function volverVentanaPrincipal() {
+            if (!openerDisponible || !returnTo) {
+                return;
+            }
+            try {
+                window.opener.location.replace(returnTo);
+            } catch (e) {}
+        }
+
+        function salirDeTicket() {
+            if (salidaEjecutada) {
+                return;
+            }
+            salidaEjecutada = true;
+
+            if (!closeOnly) {
+                volverVentanaPrincipal();
+            }
+
+            if (openerDisponible) {
+                window.close();
+                return;
+            }
+            if (closeOnly) {
+                try {
+                    window.close();
+                } catch (e) {}
+                if (returnTo) {
+                    window.location.replace(returnTo);
+                }
+                return;
+            }
+            if (returnTo) {
+                window.location.replace(returnTo);
+                return;
+            }
+            window.close();
+        }
+
+        window.onload = function () {
+            if (!closeOnly) {
+                volverVentanaPrincipal();
+            }
+            setTimeout(function () {
+                window.print();
+            }, 400);
+        };
+        window.onafterprint = salirDeTicket;
+        setTimeout(salirDeTicket, 8000);
+    </script>
+    {% endif %}
+</body>
+</html>

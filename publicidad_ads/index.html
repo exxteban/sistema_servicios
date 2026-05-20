@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Comercial Todo-en-Uno | Ventas, Inventario, IA y más</title>
+<meta name="description" content="Gestiona ventas, inventario, compras, caja, empleados, gastos, reparaciones, reportes y asistente IA en un solo sistema.">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="landing-v2.css">
+<style>.mobile-menu{display:none}</style>
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-1052527593"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','AW-1052527593');</script>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a href="#inicio" class="brand"><span class="brand-dot"></span> Sistema Comercial</a>
+    <nav>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#inicio">Inicio</a></li>
+        <li><a href="#modulos">Módulos</a></li>
+        <li><a href="#funciones">Funciones</a></li>
+        <li><a href="#capturas">Capturas</a></li>
+        <li><a href="#ia">IA</a></li>
+        <li><a href="#inteligencia">Inteligencia Comercial</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ul>
+    </nav>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a class="cta-primary nav-cta" data-analytics-cta="nav_demo_whatsapp" href="https://wa.me/595961862624?text=Hola%2C%20quiero%20una%20demo" target="_blank" rel="noopener">Demo</a>
+      <button class="mobile-toggle" id="mobileToggle" aria-label="Menú" aria-expanded="false">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobileMenu" hidden>
+    <a href="#inicio">Inicio</a>
+    <a href="#modulos">Módulos</a>
+    <a href="#funciones">Funciones</a>
+    <a href="#capturas">Capturas</a>
+    <a href="#ia">IA</a>
+    <a href="#inteligencia">Inteligencia Comercial</a>
+    <a href="#contacto">Contacto</a>
+  </div>
+</header>
+
+<!-- DIFFERENTIALS CAROUSEL -->
+<section class="differentials-carousel" aria-label="Diferenciales del sistema">
+  <div class="container">
+    <div class="differentials-header">
+      <span class="differentials-eyebrow">Por qué elegirnos</span>
+      <h2>Diferenciales claros, sin letra chica</h2>
+    </div>
+
+    <div class="differentials-viewport" id="differentialsViewport">
+      <div class="differentials-track" id="differentialsTrack">
+        <article class="differentials-card">
+          <h3>Usuarios ilimitados sin costo extra</h3>
+          <p>Sumá vendedores, técnicos o cajeros sin pagar por usuario.</p>
+        </article>
+        <article class="differentials-card">
+          <h3>Sin costo oculto por activación de módulos</h3>
+          <p>Ventas, stock, caja, reparaciones e IA en un solo plan.</p>
+        </article>
+        <article class="differentials-card">
+          <h3>Ajustes según tu operación</h3>
+          <p>Adaptamos flujos y pantallas a tu forma de trabajo.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="differentials-controls">
+      <button type="button" class="differentials-nav" id="differentialsPrev" aria-label="Tarjeta anterior">‹</button>
+      <div class="differentials-dots" id="differentialsDots" aria-label="Seleccionar tarjeta"></div>
+      <button type="button" class="differentials-nav" id="differentialsNext" aria-label="Tarjeta siguiente">›</button>
+    </div>
+  </div>
+</section>
+
+<!-- HERO -->
+<section class="hero" id="inicio">
+  <div class="container hero-grid">
+    <div>
+      <div class="badge"><span class="badge-dot"></span> Gestión Comercial Integral</div>
+      <h1>Controlá tu negocio desde un solo lugar</h1>
+      <p class="lead">Ventas, stock, compras, caja, clientes, empleados, gastos, reparaciones, cobranzas, fidelización, reportes e IA. Todo conectado, simple y en tiempo real.</p>
+      <div class="hero-actions">
+        <a class="cta-primary" data-analytics-cta="hero_demo_whatsapp" href="https://wa.me/595961862624?text=Hola%2C%20quiero%20una%20demo" target="_blank" rel="noopener">Solicitar demo gratis</a>
+        <a class="cta-outline" href="#modulos">Ver módulos</a>
+        <a class="cta-outline" href="#capturas">Ver capturas</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-item"><span class="stat-num">24+</span><span class="stat-label">Módulos integrados</span></div>
+        <div class="stat-item"><span class="stat-num">IA</span><span class="stat-label">Asistente interno</span></div>
+        <div class="stat-item"><span class="stat-num">Web</span><span class="stat-label">Tienda online propia</span></div>
+      </div>
+    </div>
+    <aside class="hero-visual">
+      <div class="hero-glow"></div>
+      <div class="hero-card">
+        <h3>Ideal para</h3>
+        <ul class="hero-list">
+          <li>Tiendas de celulares, electrónica y accesorios</li>
+          <li>Talleres técnicos de celulares y equipos electrónicos</li>
+          <li>Negocios que venden a crédito y cobran cuotas</li>
+          <li>Equipos que necesitan control de ventas, stock y caja</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- MODULES GRID -->
+<section class="section" id="modulos">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Todo lo que incluye el sistema</h2>
+      <p>Más de 24 módulos conectados entre sí para que no pierdas tiempo pasando datos de un lado a otro.</p>
+    </div>
+
+    <!-- Operación diaria -->
+    <h3 class="module-group-title">Operación diaria</h3>
+    <div class="modules-grid" style="margin-bottom:28px;">
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+        <h3>Punto de Venta (POS)</h3>
+        <p>Ventas rápidas con escáner o búsqueda. Múltiples métodos de pago y tickets configurables.</p>
+        <ul class="module-list"><li>Venta directa, pedido y crédito</li><li>Descuentos y devoluciones</li><li>Envío a caja para cobro</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+        <h3>Pedidos</h3>
+        <p>Gestión completa de pedidos: alta, estados, pagos parciales, entrega y conversión a venta.</p>
+        <ul class="module-list"><li>Pagos parciales</li><li>Entrega y facturación</li><li>Integración con caja</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+        <h3>Caja y Tesorería</h3>
+        <p>Apertura, cierre y arqueo con cuadre automático. Cola de cobro y múltiples cajas.</p>
+        <ul class="module-list"><li>Cola de cobro en tiempo real</li><li>Múltiples puntos de cobro</li><li>Movimientos manuales</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <h3>Contabilidad</h3>
+        <p>Resumen de ingresos/egresos por método de pago e informes contables exportables.</p>
+        <ul class="module-list"><li>Ingresos vs egresos</li><li>Por método de pago</li><li>Exportación a PDF</li></ul>
+      </article>
+    </div>
+
+    <!-- Inventario y Logística -->
+    <h3 class="module-group-title">Inventario y Logística</h3>
+    <div class="modules-grid" style="margin-bottom:28px;">
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+        <h3>Productos e Inventario</h3>
+        <p>Stock en tiempo real con alertas de reposición, múltiples bodegas y códigos de barras.</p>
+        <ul class="module-list"><li>Stock mínimo y alertas</li><li>Categorías y marcas</li><li>Publicación en tienda web</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+        <h3>Compras y Proveedores</h3>
+        <p>Órdenes de compra, recepción de mercadería, cuentas por pagar y adjunto de facturas.</p>
+        <ul class="module-list"><li>Contado y crédito</li><li>Cuentas por pagar</li><li>Edición posterior</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <h3>Recepción de Usados</h3>
+        <p>Compra de productos usados a terceros con registro de documento e integración automática al stock.</p>
+        <ul class="module-list"><li>Ficha del vendedor</li><li>Documento escaneado</li><li>Ingreso directo a inventario</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+        <h3>Presupuestos Empresariales</h3>
+        <p>Generación de presupuestos formales con numeración automática, ítems y exportación a PDF.</p>
+        <ul class="module-list"><li>Numeración automática</li><li>Condiciones comerciales</li><li>Exportación a PDF</li></ul>
+      </article>
+    </div>
+
+    <!-- Clientes y Finanzas -->
+    <h3 class="module-group-title">Clientes y Finanzas</h3>
+    <div class="modules-grid" style="margin-bottom:28px;">
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <h3>Clientes y Directorio</h3>
+        <p>Ficha completa por cliente: compras, reparaciones, pedidos y contactos centralizados.</p>
+        <ul class="module-list"><li>Historial integrado</li><li>Búsqueda rápida</li><li>Datos de contacto</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <h3>Calificación de Clientes</h3>
+        <p>Scoring automático por comportamiento de pago y compras para identificar riesgos y oportunidades.</p>
+        <ul class="module-list"><li>Score por cliente</li><li>Segmentación de riesgo</li><li>Historial de calificaciones</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+        <h3>Fidelización</h3>
+        <p>Programa de puntos con recompensas, historial de canjes y resumen por cliente.</p>
+        <ul class="module-list"><li>Acumulación de puntos</li><li>Canjes y recompensas</li><li>Estado por cliente</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+        <h3>Cobranzas y Crédito</h3>
+        <p>Cuentas por cobrar, cobros parciales, cuotas de crédito y POS de cobranza con tickets.</p>
+        <ul class="module-list"><li>Cuotas y vencimientos</li><li>Cobros parciales</li><li>Alertas de mora</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <h3>Gastos Corrientes</h3>
+        <p>Registro de gastos fijos y variables con alertas de vencimiento y comparativos mensuales.</p>
+        <ul class="module-list"><li>Alertas de vencimiento</li><li>Historial de pagos</li><li>Exportación a PDF/CSV</li></ul>
+      </article>
+    </div>
+
+    <!-- Servicio Técnico -->
+    <h3 class="module-group-title">Servicio Técnico</h3>
+    <div class="modules-grid" style="margin-bottom:28px;">
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+        <h3>Reparaciones</h3>
+        <p>Ingreso de equipos, estados, presupuestos, piezas utilizadas y asignación a técnicos.</p>
+        <ul class="module-list"><li>Flujo de estados</li><li>Presupuesto y piezas</li><li>Acceso por técnico</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div>
+        <h3>Seguimiento Público</h3>
+        <p>URL única para que el cliente consulte el estado de su reparación sin iniciar sesión.</p>
+        <ul class="module-list"><li>Token seguro único</li><li>Sin autenticación</li><li>Registro de accesos</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+        <h3>Reportes Técnicos</h3>
+        <p>Reportes específicos del área de servicio: equipos, técnicos, tiempos y piezas.</p>
+        <ul class="module-list"><li>Por técnico</li><li>Tiempos de reparación</li><li>Ranking de fallas</li></ul>
+      </article>
+    </div>
+
+    <!-- Equipo y Planificación -->
+    <h3 class="module-group-title">Equipo y Planificación</h3>
+    <div class="modules-grid" style="margin-bottom:28px;">
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <h3>Control de Empleados</h3>
+        <p>Ficha del empleado, ausencias, llegadas tarde, movimientos salariales y cálculo de aguinaldo.</p>
+        <ul class="module-list"><li>Bonos, horas extra y descuentos</li><li>Adelantos y aguinaldo</li><li>Historial salarial</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        <h3>Agenda y Planificación</h3>
+        <p>Calendario de actividades con prioridades, recordatorios y alertas de vencimiento en el navbar.</p>
+        <ul class="module-list"><li>Prioridades y tipos</li><li>Alertas en tiempo real</li><li>Sincronización entre pestañas</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <h3>Usuarios, Roles y Permisos</h3>
+        <p>Gestión de usuarios con roles granulares, permisos por funcionalidad y modo demo.</p>
+        <ul class="module-list"><li>Roles personalizados</li><li>Permisos por acción</li><li>Modo demo</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>Autorizaciones en Tiempo Real</h3>
+        <p>Acciones críticas requieren validación de un administrador con sus credenciales.</p>
+        <ul class="module-list"><li>Anulaciones protegidas</li><li>Registro de quién autorizó</li><li>Auditoría automática</li></ul>
+      </article>
+    </div>
+
+    <!-- Inteligencia y Reportes -->
+    <h3 class="module-group-title">Inteligencia y Reportes</h3>
+    <div class="modules-grid" style="margin-bottom:28px;">
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+        <h3>Dashboard Principal</h3>
+        <p>KPIs en tiempo real: ventas del día, stock bajo, caja, agenda y gastos en un solo vistazo.</p>
+        <ul class="module-list"><li>Ventas hoy/semana/mes</li><li>Accesos rápidos</li><li>Preferencias por usuario</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></div>
+        <h3>Reportes Generales</h3>
+        <p>Reportes de ventas, inventario, reparaciones y rendimiento con filtros avanzados.</p>
+        <ul class="module-list"><li>Filtros por fecha y usuario</li><li>Ventas diarias detalladas</li><li>Exportación a Excel/PDF</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></div>
+        <h3>Inteligencia Comercial (BI)</h3>
+        <p>Análisis de rotación, rentabilidad, productos estancados y alertas de inventario.</p>
+        <ul class="module-list"><li>Rotación de productos</li><li>Rentabilidad por línea</li><li>Alertas de estancamiento</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+        <h3>Insights Diarios</h3>
+        <p>Alertas automáticas generadas por IA: top ventas, fallas frecuentes, clientes de mayor valor.</p>
+        <ul class="module-list"><li>Top productos vendidos</li><li>Fallas frecuentes</li><li>Enlaces directos a vistas</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/><path d="M5 15h14"/></svg></div>
+        <h3>Asistente IA</h3>
+        <p>Consultá en lenguaje natural sobre ventas, stock, reparaciones y clientes. Solo lectura, 100% seguro.</p>
+        <ul class="module-list"><li>Respuestas en segundos</li><li>Datos reales del sistema</li><li>Historial de consultas</li></ul>
+      </article>
+    </div>
+
+    <!-- Administración -->
+    <h3 class="module-group-title">Administración</h3>
+    <div class="modules-grid">
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M8 15l4-3 4 3"/></svg></div>
+        <h3>Auditoría Inmutable</h3>
+        <p>Registro completo de quién hizo qué, cuándo y qué cambió. Filtrable y detallado.</p>
+        <ul class="module-list"><li>Acciones críticas</li><li>Valores antes/después</li><li>Filtros por usuario y fecha</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.67 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+        <h3>Configuraciones Globales</h3>
+        <p>Activá o desactivá módulos según las necesidades de tu negocio sin tocar código.</p>
+        <ul class="module-list"><li>Activar/desactivar módulos</li><li>Settings clave-valor</li><li>Adaptable a cada negocio</li></ul>
+      </article>
+      <article class="module-card reveal">
+        <div class="module-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
+        <h3>Tienda Online</h3>
+        <p>Catálogo web propio para que tus clientes vean productos y te contacten directamente.</p>
+        <ul class="module-list"><li>Catálogo configurable</li><li>Promociones</li><li>Sin comisiones</li></ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- SHOWCASE SECTIONS -->
+<section class="section" id="funciones">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Conocé las funciones clave</h2>
+      <p>Diseñado para agilizar la operación diaria sin complicaciones.</p>
+    </div>
+
+    <div class="showcase reveal">
+      <div class="showcase-img"><img src="./imagenes/caja_datos.png" alt="Punto de Venta"></div>
+      <div class="showcase-body">
+        <h3>Punto de Venta ágil</h3>
+        <p>Registrá ventas en segundos, aplicá descuentos, gestioná devoluciones y emití comprobantes sin salir de la pantalla.</p>
+        <ul><li>Búsqueda rápida por nombre o código</li><li>Múltiples formas de pago</li><li>Control de cierres diarios</li></ul>
+      </div>
+    </div>
+
+    <div class="showcase reverse reveal">
+      <div class="showcase-img"><img src="./imagenes/menu_logistica.png" alt="Inventario y compras"></div>
+      <div class="showcase-body">
+        <h3>Inventario conectado a compras</h3>
+        <p>El stock se actualiza automáticamente con cada venta y compra. Alertas inteligentes para no quedarte sin productos.</p>
+        <ul><li>Stock por bodega y sucursal</li><li>Alertas de reposición</li><li>Historial de movimientos</li></ul>
+      </div>
+    </div>
+
+    <div class="showcase reveal">
+      <div class="showcase-img"><img src="./imagenes/menu_sistema.png" alt="Clientes"></div>
+      <div class="showcase-body">
+        <h3>Clientes, cobranzas y fidelización</h3>
+        <p>Ficha completa con historial de compras, saldos pendientes, programa de puntos y seguimiento de cobranzas.</p>
+        <ul><li>Cuentas por cobrar y cuotas</li><li>Programa de puntos</li><li>Calificación de riesgo</li></ul>
+      </div>
+    </div>
+
+    <div class="showcase reverse reveal">
+      <div class="showcase-img"><img src="./imagenes/contabilidad.png" alt="Caja y finanzas"></div>
+      <div class="showcase-body">
+        <h3>Caja, gastos y control financiero</h3>
+        <p>Apertura, cierre y arqueo de caja con trazabilidad completa. Gastos categorizados para conocer la salud del negocio.</p>
+        <ul><li>Cuadre automático</li><li>Múltiples cajeros y cajas</li><li>Gastos fijos y variables</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- IA SECTION -->
+<section class="section" id="ia">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Asistente IA</h2>
+      <p>Consultá tu negocio en lenguaje natural y obtené respuestas basadas en datos reales.</p>
+    </div>
+    <div class="showcase reverse reveal">
+      <div class="showcase-img"><img src="./imagenes/py_systems_IA_01.png" alt="Asistente IA - consultas"></div>
+      <div class="showcase-body">
+        <h3>Consultas en lenguaje natural</h3>
+        <p>Preguntá en español sobre ventas, stock, reparaciones y clientes. El asistente interpreta tu consulta y responde con datos reales del sistema.</p>
+        <ul><li>Respuestas en segundos</li><li>Datos reales del sistema</li><li>Historial de consultas</li></ul>
+      </div>
+    </div>
+    <div class="showcase reveal" style="margin-top:28px;">
+      <div class="showcase-img"><img src="./imagenes/py_systems_IA_02.png" alt="Asistente IA - modo seguro"></div>
+      <div class="showcase-body">
+        <h3>Modo seguro de solo lectura</h3>
+        <p>El asistente opera en modo de solo lectura, por lo que no puede modificar datos. Es 100% seguro para consultas del equipo.</p>
+        <ul><li>Sin riesgo de modificación</li><li>Acceso controlado</li><li>Consultas ilimitadas</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INTELIGENCIA COMERCIAL SECTION -->
+<section class="section" id="inteligencia">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Centro de Inteligencia Comercial</h2>
+      <p>Analizá tu negocio con métricas claras y alertas automáticas que te indican qué hacer.</p>
+    </div>
+    <div class="showcase reverse reveal">
+      <div class="showcase-img"><img src="./imagenes/inteligencia_1.png" alt="Prioridades y alertas"></div>
+      <div class="showcase-body">
+        <h3>Prioridades y alertas del día</h3>
+        <p>Un panel ejecutivo que destaca qué acciones impactan más en tus resultados hoy: stock crítico, clientes inactivos y oportunidades de venta.</p>
+        <ul><li>Prioridades diarias automáticas</li><li>Alertas de stock y cobranzas</li><li>Campañas sugeridas</li></ul>
+      </div>
+    </div>
+    <div class="showcase reveal" style="margin-top:28px;">
+      <div class="showcase-img"><img src="./imagenes/inteligencia_2.png" alt="Análisis de rotación"></div>
+      <div class="showcase-body">
+        <h3>Análisis de rotación y rentabilidad</h3>
+        <p>Identificá productos estancados, medí la rentabilidad por línea y tomá decisiones de compra con información precisa.</p>
+        <ul><li>Rotación de productos</li><li>Rentabilidad por línea</li><li>Alertas de estancamiento</li></ul>
+      </div>
+    </div>
+    <div class="showcase reverse reveal" style="margin-top:28px;">
+      <div class="showcase-img"><img src="./imagenes/inteligencia_3.png" alt="Insights diarios"></div>
+      <div class="showcase-body">
+        <h3>Insights diarios automáticos</h3>
+        <p>Alertas automáticas con el top de ventas, fallas frecuentes y clientes de mayor valor para que no pierdas oportunidades.</p>
+        <ul><li>Top productos vendidos</li><li>Fallas frecuentes</li><li>Enlaces directos a vistas</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIENDA ONLINE -->
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Tu catálogo web propio</h2>
+      <p>Una tienda online para que tus clientes vean productos y te contacten sin intermediarios ni comisiones.</p>
+    </div>
+    <div class="showcase reverse reveal">
+      <div class="showcase-img"><img src="./imagenes/captura_tienda_1.png" alt="Tienda online vista principal"></div>
+      <div class="showcase-body">
+        <h3>Tienda Online integrada</h3>
+        <p>Cada cliente puede tener su catálogo configurado con logo, colores, productos y botón directo a contacto.</p>
+        <ul><li>Diseño adaptable a tu marca</li><li>Productos con imágenes y precios</li><li>Promociones activas</li></ul>
+      </div>
+    </div>
+    <div class="gallery-grid" style="margin-top:22px;">
+      <figure class="gallery-item reveal"><img src="./imagenes/captura_tienda_2.png" alt="Tienda online - vista de producto"><figcaption class="gallery-caption">Vista de producto</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/captura_tienda_3.png" alt="Tienda online - contacto"><figcaption class="gallery-caption">Contacto directo</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/tienda_online_config.png" alt="Configuración de tienda"><figcaption class="gallery-caption">Configuración sencilla</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- SCREENSHOTS -->
+<section class="section" id="capturas">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>El sistema en acción</h2>
+      <p>Capturas reales del software en uso.</p>
+    </div>
+    <div class="gallery-grid">
+      <figure class="gallery-item reveal"><img src="./imagenes/dashboard_claro.png" alt="Dashboard claro"><figcaption class="gallery-caption">Dashboard claro</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/dashboard_oscuro.png.png" alt="Dashboard oscuro"><figcaption class="gallery-caption">Dashboard oscuro</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/menu_sistema.png" alt="Menú principal"><figcaption class="gallery-caption">Menú principal</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/menu_operaciones.png" alt="Menú operaciones"><figcaption class="gallery-caption">Menú de operaciones</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/menu_logistica.png" alt="Menú logística"><figcaption class="gallery-caption">Menú de logística</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/caja_datos.png" alt="Caja y movimientos"><figcaption class="gallery-caption">Caja y movimientos</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/contabilidad.png" alt="Contabilidad"><figcaption class="gallery-caption">Contabilidad</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/py_systems_IA_01.png" alt="Asistente IA"><figcaption class="gallery-caption">Asistente IA</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/py_systems_IA_02.png" alt="Asistente IA - vista adicional"><figcaption class="gallery-caption">Asistente IA (vista adicional)</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/inteligencia_1.png" alt="Centro de Inteligencia"><figcaption class="gallery-caption">Centro de Inteligencia</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/inteligencia_2.png" alt="Análisis de rotación"><figcaption class="gallery-caption">Análisis de rotación</figcaption></figure>
+      <figure class="gallery-item reveal"><img src="./imagenes/inteligencia_3.png" alt="Insights diarios"><figcaption class="gallery-caption">Insights diarios</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="section" id="contacto">
+  <div class="container">
+    <div class="contact-banner reveal">
+      <div>
+        <h3>¿Querés verlo en funcionamiento?</h3>
+        <p>Te muestro una demo personalizada y te doy precio sin compromiso.</p>
+      </div>
+      <a class="cta-primary" data-analytics-cta="footer_demo_whatsapp" href="https://wa.me/595961862624?text=Hola%2C%20quiero%20una%20demo%20del%20sistema" target="_blank" rel="noopener">Pedir demo por WhatsApp</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div>Sistema de gestión comercial con ventas, inventario, caja, clientes, empleados e IA.</div>
+    <div id="anio"></div>
+  </div>
+</footer>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" aria-hidden="true">
+  <div class="lightbox-panel" role="dialog" aria-modal="true" aria-label="Vista ampliada">
+    <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Cerrar">×</button>
+    <img class="lightbox-img" id="lightboxImg" src="" alt="">
+    <div class="lightbox-caption" id="lightboxCaption" hidden></div>
+  </div>
+</div>
+
+<script src="landing-v2.js"></script>
+</body>
+</html>

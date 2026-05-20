@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Historial IA{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto flex flex-col gap-4">
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-history text-blue-600 dark:text-blue-400 mr-2"></i>Historial IA
+            </h1>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                Consultas de solo lectura del asistente. Este historial no permite retomar conversaciones.
+            </p>
+        </div>
+        <a href="{{ url_for('asistente_ia.chat') }}"
+           class="inline-flex h-10 items-center gap-2 rounded-lg bg-gray-700 px-3 text-sm font-semibold text-white hover:bg-gray-800 transition">
+            <i class="fas fa-comments" aria-hidden="true"></i>
+            Chat
+        </a>
+    </div>
+
+    <section class="grid gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Historial de consultas</h2>
+                <span class="text-xs text-gray-500 dark:text-gray-400">Solo lectura</span>
+            </div>
+            <form id="ia-historial-filtros" class="mt-3 flex flex-col gap-2 md:flex-row">
+                <input id="ia-historial-q"
+                       type="search"
+                       class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                       placeholder="Buscar por usuario, pregunta o respuesta">
+                <input id="ia-historial-username"
+                       type="text"
+                       class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none md:w-44 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                       placeholder="Usuario">
+                <button type="submit"
+                        class="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 transition">
+                    Buscar
+                </button>
+            </form>
+            <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <p id="ia-historial-total">Sin resultados cargados</p>
+                <label class="inline-flex items-center gap-2">
+                    Mostrar
+                    <select id="ia-historial-per-page"
+                            class="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+            </div>
+            <div id="ia-historial-lista" class="mt-4 space-y-2">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Cargando historial...</p>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <button id="ia-historial-prev"
+                        type="button"
+                        class="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700">
+                    Anterior
+                </button>
+                <div id="ia-historial-pages" class="flex flex-wrap items-center justify-center gap-1"></div>
+                <button id="ia-historial-next"
+                        type="button"
+                        class="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700">
+                    Siguiente
+                </button>
+            </div>
+            <p id="ia-historial-page" class="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">Pagina 1</p>
+        </div>
+
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Detalle completo</h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Vista ampliada con pregunta, respuesta y metadatos completos.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="ia-historial-detalle-estado" class="text-xs text-gray-500 dark:text-gray-400">Sin seleccionar</span>
+                    <a id="ia-historial-detalle-link"
+                       href="#"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="hidden inline-flex h-9 items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50">
+                        <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
+                        Abrir en otra pestana
+                    </a>
+                </div>
+            </div>
+            <div id="ia-historial-detalle" class="mt-3 min-h-[32rem] space-y-3 text-sm text-gray-700 dark:text-gray-200">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Selecciona una consulta del historial para ver el contenido completo. Tambien puedes abrirla en una vista separada para leerla con mas espacio.
+                </p>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('js/asistente_ia/historial.js') }}"></script>
+{% endblock %}

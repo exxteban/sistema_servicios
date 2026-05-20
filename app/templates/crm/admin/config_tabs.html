@@ -1,0 +1,529 @@
+{% extends "crm/layout.html" %}
+
+{% block crm_content %}
+<div class="p-4 h-full flex flex-col gap-4" x-data="crmConfig()">
+
+    <div class="flex items-start gap-3">
+        <div>
+            <h1 class="text-base font-semibold text-gray-200 flex items-center gap-2">
+                <i class="fas fa-cog text-teal-400"></i> Configuración CRM
+            </h1>
+            <p class="text-xs text-gray-400 mt-1">Panel organizado por secciones para una gestión más clara.</p>
+        </div>
+        <div class="ml-auto flex gap-2">
+            <a href="{{ url_for('crm.admin_plantillas') }}"
+                class="px-3 py-1.5 rounded-lg bg-gray-700/50 text-sm text-gray-300 hover:bg-gray-600/50 transition-colors">
+                <i class="fas fa-bolt mr-1"></i> Plantillas
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-gray-900/40 border border-white/10 rounded-xl p-1.5 flex flex-wrap gap-1">
+        <button @click="activeTab = 'automatizacion'"
+            :class="activeTab === 'automatizacion' ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' : 'text-gray-400 border-transparent hover:text-gray-200 hover:bg-gray-800/60'"
+            class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors">
+            <i class="fas fa-robot mr-1.5"></i> Automatización
+        </button>
+        <button @click="activeTab = 'contexto_bot'"
+            :class="activeTab === 'contexto_bot' ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' : 'text-gray-400 border-transparent hover:text-gray-200 hover:bg-gray-800/60'"
+            class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors">
+            <i class="fas fa-comment-dots mr-1.5"></i> Contexto Bot
+        </button>
+        <button @click="activeTab = 'etiquetas'"
+            :class="activeTab === 'etiquetas' ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' : 'text-gray-400 border-transparent hover:text-gray-200 hover:bg-gray-800/60'"
+            class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors">
+            <i class="fas fa-tags mr-1.5"></i> Etiquetas
+        </button>
+        <button @click="activeTab = 'calidad'"
+            :class="activeTab === 'calidad' ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' : 'text-gray-400 border-transparent hover:text-gray-200 hover:bg-gray-800/60'"
+            class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors">
+            <i class="fas fa-star mr-1.5"></i> Calidad
+        </button>
+    </div>
+
+    <div class="flex-1 min-h-0 pr-1 space-y-4">
+        <div x-show="activeTab === 'automatizacion' || activeTab === 'contexto_bot'" class="space-y-4">
+
+    <!-- IA Global -->
+    <div x-show="activeTab === 'automatizacion'" class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-300">Inteligencia Artificial Global</h2>
+                <p class="text-xs text-gray-400 mt-1">Si lo desactivas, los mensajes entrantes no serán respondidos por
+                    la IA y quedarán en la bandeja unificada esperando atención 100% manual.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer ml-4">
+                <input type="checkbox" x-model="botGlobalEnabled" @change="toggleBotGlobal" class="sr-only peer">
+                <div
+                    class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500">
+                </div>
+                <span class="ml-3 text-sm font-medium" :class="botGlobalEnabled ? 'text-teal-400' : 'text-gray-400'"
+                    x-text="botGlobalEnabled ? 'Activado' : 'Desactivado'"></span>
+            </label>
+        </div>
+    </div>
+
+    <div x-show="activeTab === 'contexto_bot'" class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex flex-col gap-4">
+        <div class="flex items-start justify-between gap-4 border-b border-gray-700/50 pb-3">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-300">Contexto del Bot</h2>
+                <p class="text-xs text-gray-400 mt-1">Estos datos se comparten con el bot de WhatsApp y el bot web para responder con informacion real del negocio.</p>
+            </div>
+            <button @click="guardarBotContexto()"
+                class="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-400 text-white text-sm font-medium transition-colors w-full sm:w-auto">
+                <i class="fas fa-save mr-1"></i> Guardar Contexto
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for campo in bot_contexto_campos %}
+            <div class="{% if campo.multiline %}md:col-span-2{% endif %}">
+                <label class="block text-sm font-medium text-gray-300 mb-1">{{ campo.label }}</label>
+                {% if campo.multiline %}
+                <textarea x-model="botContexto.{{ campo.key }}" rows="3" placeholder="{{ campo.placeholder }}"
+                    class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-teal-500 resize-y"></textarea>
+                {% else %}
+                <input type="text" x-model="botContexto.{{ campo.key }}" placeholder="{{ campo.placeholder }}"
+                    class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-teal-500">
+                {% endif %}
+                <p class="text-[11px] text-gray-500 mt-1">{{ campo.help }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Distribución de Mensajes -->
+    <div x-show="activeTab === 'automatizacion'" class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex flex-col gap-4">
+        <div class="flex items-center justify-between border-b border-gray-700/50 pb-3">
+            <div>
+                <h2 class="text-sm font-semibold text-gray-300">Distribución de Mensajes a Asesores</h2>
+                <p class="text-xs text-gray-400 mt-1">Configura la asignación automática hacia los asesores conectados.
+                </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer ml-4">
+                <input type="checkbox" x-model="distribucion.enabled" class="sr-only peer">
+                <div
+                    class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500">
+                </div>
+                <span class="ml-3 text-sm font-medium" :class="distribucion.enabled ? 'text-teal-400' : 'text-gray-400'"
+                    x-text="distribucion.enabled ? 'Activada' : 'Desactivada'"></span>
+            </label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2"
+            :class="!distribucion.enabled ? 'opacity-50 pointer-events-none' : ''">
+
+            <div class="flex flex-col gap-3">
+                <label class="text-sm text-gray-300 font-medium">Método de Distribución</label>
+                <div class="space-y-2">
+                    <label
+                        class="flex items-start gap-3 p-3 rounded-lg border border-gray-700/50 cursor-pointer bg-gray-700/20 hover:bg-gray-700/40 transition-colors"
+                        :class="distribucion.metodo === 'least_busy' ? 'border-teal-500/50 ring-1 ring-teal-500/30' : ''">
+                        <input type="radio" value="least_busy" x-model="distribucion.metodo"
+                            class="mt-1 text-teal-500 bg-gray-600 border-gray-500 focus:ring-teal-500 focus:ring-2">
+                        <div>
+                            <span class="block text-sm font-medium text-gray-200">Menor Carga (Least Busy)</span>
+                            <span class="block text-xs text-gray-400 mt-1">Busca al asesor online que tenga la menor
+                                cantidad de conversaciones activas.</span>
+                        </div>
+                    </label>
+
+                    <label
+                        class="flex items-start gap-3 p-3 rounded-lg border border-gray-700/50 cursor-pointer bg-gray-700/20 hover:bg-gray-700/40 transition-colors"
+                        :class="distribucion.metodo === 'round_robin' ? 'border-teal-500/50 ring-1 ring-teal-500/30' : ''">
+                        <input type="radio" value="round_robin" x-model="distribucion.metodo"
+                            class="mt-1 text-teal-500 bg-gray-600 border-gray-500 focus:ring-teal-500 focus:ring-2">
+                        <div>
+                            <span class="block text-sm font-medium text-gray-200">Distribución Circular / Equitativa
+                                (Round Robin)</span>
+                            <span class="block text-xs text-gray-400 mt-1">Asigna rotativamente ignorando la carga,
+                                priorizando al que lleva más tiempo sin recibir chat.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Límite por Asesor</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" min="1" max="50" x-model.number="distribucion.max_conversaciones"
+                            class="bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white w-24 focus:outline-none focus:border-teal-500">
+                        <span class="text-xs text-gray-400">chats simultáneos máximos.</span>
+                    </div>
+                </div>
+
+                <div class="rounded-xl p-3 flex flex-col gap-3 border transition-all duration-200"
+                    :class="distribucion.heartbeat_auto_offline ? 'bg-violet-500/[0.06] border-violet-500/40' : 'bg-gray-700/20 border-gray-700/60'">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-medium text-gray-200">🫀 Heartbeat de Asesores</span>
+                            <p class="text-xs text-gray-400 mt-0.5">Controla cuándo se marca offline por falta de ping.</p>
+                        </div>
+                        <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+                            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-colors"
+                                :class="distribucion.heartbeat_auto_offline ? 'text-violet-300 border-violet-500/40 bg-violet-500/15' : 'text-gray-400 border-gray-600/70 bg-gray-700/40'"
+                                x-text="distribucion.heartbeat_auto_offline ? 'Activo' : 'Inactivo'"></span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" x-model="distribucion.heartbeat_auto_offline" class="sr-only peer">
+                                <div
+                                    class="w-11 h-6 bg-gray-600/80 border border-gray-500/70 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-violet-500/40 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-200 peer-checked:bg-violet-500 peer-checked:border-violet-300 peer-checked:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition-all duration-200">
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2"
+                        :class="!distribucion.heartbeat_auto_offline ? 'opacity-40 pointer-events-none' : ''">
+                        <input type="number" min="1" max="240" x-model.number="distribucion.heartbeat_timeout_minutos"
+                            class="bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white w-24 focus:outline-none focus:border-violet-500">
+                        <span class="text-xs text-gray-400">minutos sin heartbeat para pasar a offline.</span>
+                    </div>
+                </div>
+
+                <!-- Política A: chat no aceptado -->
+                <div class="rounded-xl p-3 flex flex-col gap-3 border transition-all duration-200"
+                    :class="distribucion.timeout_no_aceptado.enabled ? 'bg-teal-500/[0.06] border-teal-500/40' : 'bg-gray-700/20 border-gray-700/60'">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-medium text-gray-200">🕐 Chat no aceptado</span>
+                            <p class="text-xs text-gray-400 mt-0.5">El asesor recibió el chat pero no lo abrió.</p>
+                        </div>
+                        <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+                            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-colors"
+                                :class="distribucion.timeout_no_aceptado.enabled ? 'text-teal-300 border-teal-500/40 bg-teal-500/15' : 'text-gray-400 border-gray-600/70 bg-gray-700/40'"
+                                x-text="distribucion.timeout_no_aceptado.enabled ? 'Activo' : 'Inactivo'"></span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" x-model="distribucion.timeout_no_aceptado.enabled"
+                                    class="sr-only peer">
+                                <div
+                                    class="w-11 h-6 bg-gray-600/80 border border-gray-500/70 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-teal-500/40 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-200 peer-checked:bg-teal-500 peer-checked:border-teal-300 peer-checked:shadow-[0_0_0_3px_rgba(20,184,166,0.2)] transition-all duration-200">
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-2"
+                        :class="!distribucion.timeout_no_aceptado.enabled ? 'opacity-40 pointer-events-none' : ''">
+                        <div class="flex items-center gap-2">
+                            <input type="number" min="1" max="120"
+                                x-model.number="distribucion.timeout_no_aceptado.minutos"
+                                class="bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white w-20 focus:outline-none focus:border-teal-500">
+                            <span class="text-xs text-gray-400">minutos sin aceptar → acción:</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <label class="flex-1 flex items-center justify-center gap-1.5 cursor-pointer px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 bg-teal-500/25 text-teal-200 border-teal-400/70 ring-1 ring-teal-400/40 shadow-[0_0_0_1px_rgba(45,212,191,0.2)]">
+                                <input type="radio" value="reasignar" x-model="distribucion.timeout_no_aceptado.accion"
+                                    class="sr-only">
+                                🔄 Reasignar
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Política B: chat tomado sin respuesta -->
+                <div class="rounded-xl p-3 flex flex-col gap-3 border transition-all duration-200"
+                    :class="distribucion.timeout_sin_respuesta.enabled ? 'bg-cyan-500/[0.06] border-cyan-500/40' : 'bg-gray-700/20 border-gray-700/60'">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-medium text-gray-200">💬 Tomado sin respuesta</span>
+                            <p class="text-xs text-gray-400 mt-0.5">El asesor aceptó pero no escribió nada.</p>
+                        </div>
+                        <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+                            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md border transition-colors"
+                                :class="distribucion.timeout_sin_respuesta.enabled ? 'text-cyan-300 border-cyan-500/40 bg-cyan-500/15' : 'text-gray-400 border-gray-600/70 bg-gray-700/40'"
+                                x-text="distribucion.timeout_sin_respuesta.enabled ? 'Activo' : 'Inactivo'"></span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" x-model="distribucion.timeout_sin_respuesta.enabled"
+                                    class="sr-only peer">
+                                <div
+                                    class="w-11 h-6 bg-gray-600/80 border border-gray-500/70 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/40 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-200 peer-checked:bg-cyan-500 peer-checked:border-cyan-300 peer-checked:shadow-[0_0_0_3px_rgba(6,182,212,0.2)] transition-all duration-200">
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-2"
+                        :class="!distribucion.timeout_sin_respuesta.enabled ? 'opacity-40 pointer-events-none' : ''">
+                        <div class="flex items-center gap-2">
+                            <input type="number" min="1" max="480"
+                                x-model.number="distribucion.timeout_sin_respuesta.minutos"
+                                class="bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white w-20 focus:outline-none focus:border-teal-500">
+                            <span class="text-xs text-gray-400">minutos sin responder → acción:</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <label class="flex-1 flex items-center justify-center gap-1.5 cursor-pointer px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 bg-teal-500/25 text-teal-200 border-teal-400/70 ring-1 ring-teal-400/40 shadow-[0_0_0_1px_rgba(45,212,191,0.2)]">
+                                <input type="radio" value="reasignar"
+                                    x-model="distribucion.timeout_sin_respuesta.accion" class="sr-only">
+                                🔄 Reasignar
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-1">
+                    <button @click="guardarDistribucion()"
+                        class="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-400 text-white text-sm font-medium transition-colors w-full sm:w-auto">
+                        <i class="fas fa-save mr-1"></i> Guardar Distribución
+                    </button>
+                </div>
+            </div>
+    </div>
+
+
+        </div>
+        </div>
+
+        <div x-show="activeTab === 'etiquetas'" class="space-y-4">
+    <div class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-300">Etiquetas</h2>
+            <button @click="mostrarFormEtiqueta = !mostrarFormEtiqueta"
+                class="px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 text-xs hover:bg-teal-500/30 transition-colors">
+                <i class="fas fa-plus mr-1"></i> Nueva etiqueta
+            </button>
+        </div>
+
+        <!-- Formulario nueva etiqueta -->
+        <div x-show="mostrarFormEtiqueta" class="bg-gray-700/30 rounded-xl p-3 flex gap-3 items-end">
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Nombre</label>
+                <input type="text" x-model="nuevaEtiqueta.nombre"
+                    class="bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50 w-40">
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Color</label>
+                <input type="color" x-model="nuevaEtiqueta.color"
+                    class="w-10 h-8 rounded-lg border border-white/10 bg-transparent cursor-pointer">
+            </div>
+            <div class="flex-1">
+                <label class="text-xs text-gray-400 mb-1 block">Descripción</label>
+                <input type="text" x-model="nuevaEtiqueta.descripcion"
+                    class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+            </div>
+            <button @click="crearEtiqueta()"
+                class="px-4 py-1.5 rounded-lg bg-teal-500 text-white text-sm hover:bg-teal-400 transition-colors">
+                Crear
+            </button>
+        </div>
+
+        <!-- Lista de etiquetas -->
+        <div class="flex flex-wrap gap-2">
+            <template x-for="et in etiquetas" :key="et.id">
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border"
+                    :style="`background-color: ${et.color}22; border-color: ${et.color}44`">
+                    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        :style="`background-color: ${et.color}`"></span>
+                    <span class="text-sm font-medium" :style="`color: ${et.color}`" x-text="et.nombre"></span>
+                    <button @click="eliminarEtiqueta(et.id)"
+                        class="text-xs opacity-50 hover:opacity-100 transition-opacity ml-1"
+                        :style="`color: ${et.color}`">×</button>
+                </div>
+            </template>
+            <div x-show="etiquetas.length === 0" class="text-sm text-gray-500">Sin etiquetas configuradas</div>
+        </div>
+    </div>
+
+            </div>
+
+        <div x-show="activeTab === 'calidad'" class="space-y-4">
+            <div class="bg-gray-800/50 border border-white/5 rounded-xl p-4 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-gray-300">Calidad (palabras clave)</h2>
+                    <div class="flex items-center gap-2">
+                        <button @click="agregarListaCalidad()"
+                            class="px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-300 text-xs hover:bg-teal-500/30 transition-colors">
+                            <i class="fas fa-plus mr-1"></i> Nueva lista
+                        </button>
+                        <button @click="guardarCalidad()"
+                            class="px-3 py-1.5 rounded-lg bg-teal-500 text-white text-xs hover:bg-teal-400 transition-colors">
+                            <i class="fas fa-save mr-1"></i> Guardar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <template x-for="(l, idx) in calidadListas" :key="idx">
+                <div class="bg-gray-700/20 border border-white/5 rounded-xl p-3 flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                        <input type="text" x-model="l.nombre" placeholder="Nombre de lista"
+                            class="bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50 flex-1">
+                        <input type="number" x-model="l.peso" placeholder="Peso pts" title="Puntaje Ej: 5 o -10"
+                            class="w-20 bg-gray-700/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50">
+                        <input type="color" x-model="l.color"
+                            class="w-10 h-8 rounded-lg border border-white/10 bg-transparent cursor-pointer">
+                        <button @click="eliminarListaCalidad(idx)"
+                            class="px-2 py-1.5 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-700/70 transition-colors text-xs">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <textarea x-model="l._terminosText" rows="5" placeholder="Una palabra o frase por línea"
+                        class="w-full bg-gray-700/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-teal-500/50 resize-y"></textarea>
+                    <div class="text-[11px] text-gray-500 flex items-center justify-between">
+                        <span
+                            x-text="(l._terminosText || '').split('\n').filter(t => t.trim()).length + ' términos'"></span>
+                    </div>
+                </div>
+            </template>
+                </div>
+                <div x-show="calidadListas.length === 0" class="text-sm text-gray-500">Sin listas configuradas</div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    function crmConfig() {
+        return {
+            activeTab: 'automatizacion',
+            botGlobalEnabled: {{ bot_global_enabled | default(true) | tojson }},
+            botContexto: {{ bot_contexto | tojson }},
+            distribucion: {{ distribucion_config | tojson }},
+            etiquetas: {{ etiquetas | tojson }},
+    calidadListas: ({{ calidad_listas | tojson }} || []).map(l => ({
+        nombre: l.nombre || '',
+        color: l.color || '#14B8A6',
+        peso: l.peso || 0,
+        _terminosText: Array.isArray(l.terminos) ? l.terminos.join('\n') : (l.terminos || ''),
+    })),
+        mostrarFormEtiqueta: false,
+            nuevaEtiqueta: { nombre: '', color: '#14B8A6', descripcion: '' },
+
+        async toggleBotGlobal() {
+        try {
+            const r = await fetch('/crm/api/admin/bot_toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: this.botGlobalEnabled })
+            });
+            const d = await r.json();
+            if (!d.ok) {
+                alert(d.error || 'Error al cambiar la configuración');
+                this.botGlobalEnabled = !this.botGlobalEnabled;
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error de conexión');
+            this.botGlobalEnabled = !this.botGlobalEnabled;
+        }
+    },
+
+        async guardarBotContexto() {
+        try {
+            const r = await fetch('/crm/api/admin/bot_contexto', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.botContexto)
+            });
+            const d = await r.json();
+            if (!d.ok) {
+                alert(d.error || 'Error al guardar el contexto del bot');
+                return;
+            }
+            this.botContexto = d.contexto || {};
+            alert('Contexto del bot guardado correctamente');
+        } catch (e) {
+            console.error(e);
+            alert('Error de conexión');
+        }
+    },
+
+        async guardarDistribucion() {
+        try {
+            const r = await fetch('/crm/api/admin/distribucion_config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.distribucion)
+            });
+            const d = await r.json();
+            if (d.ok) {
+                if (d.config) {
+                    this.distribucion = d.config;
+                }
+                alert(`Configuración guardada: ${d.metodo_label || 'Método actualizado'}`);
+            } else {
+                alert(d.error || 'Error al guardar la distribución');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error de conexión');
+        }
+    },
+
+        async crearEtiqueta() {
+        if (!this.nuevaEtiqueta.nombre.trim()) return;
+        try {
+            const r = await fetch('/crm/api/admin/etiquetas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.nuevaEtiqueta),
+            });
+            const d = await r.json();
+            if (d.ok) {
+                this.etiquetas.push(d.etiqueta);
+                this.nuevaEtiqueta = { nombre: '', color: '#14B8A6', descripcion: '' };
+                this.mostrarFormEtiqueta = false;
+            } else {
+                alert(d.error || 'Error al crear etiqueta');
+            }
+        } catch (e) { console.error(e); }
+    },
+
+        async eliminarEtiqueta(id) {
+        if (!confirm('¿Eliminar esta etiqueta?')) return;
+        try {
+            await fetch(`/crm/api/admin/etiquetas/${id}`, { method: 'DELETE' });
+            this.etiquetas = this.etiquetas.filter(e => e.id !== id);
+        } catch (e) { console.error(e); }
+    },
+
+    agregarListaCalidad() {
+        const nueva = { nombre: '', color: '#14B8A6', peso: 0, _terminosText: '' };
+        const actual = Array.isArray(this.calidadListas) ? this.calidadListas : [];
+        this.calidadListas = [nueva, ...actual];
+        this.$nextTick(() => {
+            try {
+                const root = this.$root;
+                const scroller = root && root.closest('.app-tab-content');
+                if (scroller) scroller.scrollTop = 0;
+                else window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch { }
+        });
+    },
+
+    eliminarListaCalidad(idx) {
+        this.calidadListas.splice(idx, 1);
+    },
+
+        async guardarCalidad() {
+        try {
+            const listas = (this.calidadListas || []).map(l => ({
+                nombre: String(l.nombre || '').trim(),
+                color: String(l.color || '#14B8A6'),
+                peso: parseInt(l.peso || 0, 10) || 0,
+                terminos: String(l._terminosText || '')
+                    .split('\n')
+                    .map(t => t.trim())
+                    .filter(Boolean),
+            })).filter(l => l.nombre);
+
+            const r = await fetch('/crm/api/admin/calidad/config', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ listas }),
+            });
+            const d = await r.json();
+            if (!d.ok) {
+                alert(d.error || 'Error al guardar configuración');
+                return;
+            }
+            this.calidadListas = (d.listas || []).map(l => ({
+                nombre: l.nombre || '',
+                color: l.color || '#14B8A6',
+                peso: l.peso || 0,
+                _terminosText: Array.isArray(l.terminos) ? l.terminos.join('\n') : (l.terminos || ''),
+            }));
+        } catch (e) { console.error(e); alert('Error al guardar'); }
+    },
+    };
+}
+</script>
+{% endblock %}

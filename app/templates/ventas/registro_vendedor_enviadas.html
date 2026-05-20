@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Mis ventas enviadas{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-paper-plane text-sky-600 dark:text-sky-400 mr-2"></i>Mis ventas enviadas
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Seguimiento de operaciones enviadas a caja.
+            </p>
+        </div>
+        <a href="{{ url_for('ventas.registro_vendedor') }}"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Nuevo registro</span>
+        </a>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Pendiente</div>
+            <div class="text-2xl font-bold text-amber-600">{{ resumen_estado.get('pendiente', 0) }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">En proceso</div>
+            <div class="text-2xl font-bold text-blue-600">{{ resumen_estado.get('en_proceso', 0) }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Cobrado</div>
+            <div class="text-2xl font-bold text-green-600">{{ resumen_estado.get('cobrado', 0) }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Cancelado</div>
+            <div class="text-2xl font-bold text-red-600">{{ resumen_estado.get('cancelado', 0) }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div data-testid="metrica-enviadas" data-value="{{ metricas_vendedor.enviadas }}"
+            class="bg-white dark:bg-gray-800 rounded-xl shadow p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Enviadas</div>
+            <div class="text-2xl font-bold text-slate-700 dark:text-slate-100">{{ metricas_vendedor.enviadas }}</div>
+        </div>
+        <div data-testid="metrica-cobradas" data-value="{{ metricas_vendedor.cobradas }}"
+            class="bg-white dark:bg-gray-800 rounded-xl shadow p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Cobradas</div>
+            <div class="text-2xl font-bold text-green-600">{{ metricas_vendedor.cobradas }}</div>
+        </div>
+        <div data-testid="metrica-pendientes" data-value="{{ metricas_vendedor.pendientes }}"
+            class="bg-white dark:bg-gray-800 rounded-xl shadow p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Pendientes</div>
+            <div class="text-2xl font-bold text-amber-600">{{ metricas_vendedor.pendientes }}</div>
+        </div>
+        <div data-testid="metrica-tasa-cobro" data-value="{{ metricas_vendedor.tasa_cobro }}"
+            class="bg-white dark:bg-gray-800 rounded-xl shadow p-3">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">% Cobranza</div>
+            <div class="text-2xl font-bold text-sky-600">{{ "{:.1f}".format(metricas_vendedor.tasa_cobro) }}%</div>
+        </div>
+    </div>
+
+    <form method="GET" class="bg-white dark:bg-gray-800 rounded-xl shadow p-3 flex flex-col md:flex-row gap-3 md:items-end">
+        <div class="w-full md:w-64">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
+            <select name="estado"
+                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2">
+                <option value="" {% if not estado_filtro %}selected{% endif %}>Todos</option>
+                <option value="pendiente" {% if estado_filtro == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="en_proceso" {% if estado_filtro == 'en_proceso' %}selected{% endif %}>En proceso</option>
+                <option value="cobrado" {% if estado_filtro == 'cobrado' %}selected{% endif %}>Cobrado</option>
+                <option value="cancelado" {% if estado_filtro == 'cancelado' %}selected{% endif %}>Cancelado</option>
+            </select>
+        </div>
+        <div class="w-full md:w-72">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cliente</label>
+            <input type="text" name="cliente" value="{{ cliente_filtro or '' }}" placeholder="Nombre o ID cliente"
+                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2">
+        </div>
+        <div class="w-full md:w-52">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha desde</label>
+            <input type="date" name="fecha_desde" value="{{ fecha_desde_filtro or '' }}"
+                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2">
+        </div>
+        <div class="w-full md:w-52">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha hasta</label>
+            <input type="date" name="fecha_hasta" value="{{ fecha_hasta_filtro or '' }}"
+                class="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg px-3 py-2">
+        </div>
+        <div class="flex gap-2">
+            <button type="submit"
+                class="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition">Filtrar</button>
+            <a href="{{ url_for('ventas.registro_vendedor_enviadas') }}"
+                class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                Limpiar
+            </a>
+        </div>
+    </form>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-900/40">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">ID</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Cliente</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Estado</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                        <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Items</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Caja</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Venta</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Fecha envio</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for row in enviados_rows %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                        <td class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-200">#{{ row.id }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ row.cliente_nombre }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold {{ row.estado_badge_class }}">
+                                {{ row.estado_label }}
+                            </span>
+                            {% if row.cancelacion_motivo %}
+                            <div class="text-xs text-red-500 mt-1">{{ row.cancelacion_motivo }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-white">
+                            ₲ {{ "{:,.0f}".format(row.monto_total).replace(",", ".") }}
+                        </td>
+                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-200">{{ row.cantidad_items }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ row.cajero_nombre }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">
+                            {% if row.venta_id %}
+                            <a href="{{ url_for('ventas.detalle', id=row.venta_id) }}" class="text-sky-600 hover:underline">
+                                #{{ row.venta_id }}
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ row.fecha_envio_label or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+                            No hay operaciones enviadas con este filtro.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if enviados.pages > 1 %}
+    <div class="flex items-center justify-center gap-2">
+        {% if enviados.has_prev %}
+        <a href="{{ url_for('ventas.registro_vendedor_enviadas', page=enviados.prev_num, estado=estado_filtro, cliente=cliente_filtro, fecha_desde=fecha_desde_filtro, fecha_hasta=fecha_hasta_filtro) }}"
+            class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+            Anterior
+        </a>
+        {% endif %}
+        <span class="text-sm text-gray-600 dark:text-gray-300">
+            Pagina {{ enviados.page }} de {{ enviados.pages }}
+        </span>
+        {% if enviados.has_next %}
+        <a href="{{ url_for('ventas.registro_vendedor_enviadas', page=enviados.next_num, estado=estado_filtro, cliente=cliente_filtro, fecha_desde=fecha_desde_filtro, fecha_hasta=fecha_hasta_filtro) }}"
+            class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+            Siguiente
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

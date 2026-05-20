@@ -1,0 +1,466 @@
+{% extends "base.html" %}
+{% from "components/dashboard_quick_action.html" import quick_action_card, status_banner %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-3 2xl:space-y-5"
+    x-data="{
+        dashboardView: '{{ dashboard_view_preference }}',
+        showCierreModal: false,
+        cierreId: {{ cierre_id or 'null' }},
+        _iframeHooksInstalled: false,
+        inspectInfoText: '',
+        setDashboardView(view) {
+            this.dashboardView = view === 'new' ? 'new' : 'classic';
+            try {
+                fetch('{{ url_for('main.api_dashboard_preferencias') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ dashboard_view: this.dashboardView })
+                });
+            } catch (e) { }
+        },
+        debugEnabled() {
+            try {
+                const u = new URL(window.location.href);
+                if (u.searchParams.get('debug') === '1') return true;
+                return localStorage.getItem('debug_logs') === '1';
+            } catch (e) {
+                return false;
+            }
+        },
+        dlog(...args) {
+            if (!this.debugEnabled()) return;
+            try { console.log('[cierre-modal]', ...args); } catch (e) { }
+        },
+        limpiarCierreIdUrl() {
+            try {
+                const u = new URL(window.location.href);
+                if (!u.searchParams.has('cierre_id')) return;
+                u.searchParams.delete('cierre_id');
+                const qs = u.searchParams.toString();
+                const next = `${u.pathname}${qs ? `?${qs}` : ''}${u.hash || ''}`;
+                window.history.replaceState({}, document.title, next);
+            } catch (e) { }
+        },
+        cerrarCierreModal() {
+            this.showCierreModal = false;
+            this.cierreId = null;
+            this.limpiarCierreIdUrl();
+        },
+        inspectModal() {
+            if (!this.debugEnabled()) return;
+            try {
+                const modalRoot = document.querySelector('[data-cierre-modal-root]');
+                const overlay = document.querySelector('[data-cierre-modal-overlay]');
+                const panel = document.querySelector('[data-cierre-modal-panel]');
+                const iframe = document.querySelector('[data-cierre-modal-iframe]');
+
+                const info = {
+                    cierreId: this.cierreId,
+                    showCierreModal: this.showCierreModal,
+                    modalRoot: null,
+                    overlay: null,
+                    panel: null,
+                    iframe: null
+                };
+
+                if (modalRoot) {
+                    const cs = window.getComputedStyle(modalRoot);
+                    info.modalRoot = { display: cs.display, visibility: cs.visibility, zIndex: cs.zIndex };
+                }
+                if (overlay) {
+                    const cs = window.getComputedStyle(overlay);
+                    const r = overlay.getBoundingClientRect();
+                    info.overlay = { position: cs.position, display: cs.display, visibility: cs.visibility, zIndex: cs.zIndex, rect: { x: r.x, y: r.y, w: r.width, h: r.height } };
+                }
+                if (panel) {
+                    const cs = window.getComputedStyle(panel);
+                    const r = panel.getBoundingClientRect();
+                    info.panel = { position: cs.position, display: cs.display, visibility: cs.visibility, zIndex: cs.zIndex, rect: { x: r.x, y: r.y, w: r.width, h: r.height } };
+                }
+                if (iframe) {
+                    info.iframe = { attrSrc: iframe.getAttribute('src'), src: iframe.src };
+                    if (!this._iframeHooksInstalled) {
+                        this._iframeHooksInstalled = true;
+                        iframe.addEventListener('load', () => {
+                            this.dlog('iframe load', { src: iframe.src });
+                        }, { once: false });
+                        iframe.addEventListener('error', () => {
+                            this.dlog('iframe error', { src: iframe.src });
+                        }, { once: false });
+                    }
+                }
+
+                try {
+                    this.inspectInfoText = JSON.stringify(info, null, 2);
+                } catch (e) {
+                    this.inspectInfoText = String(info);
+                }
+                this.dlog('inspect', info);
+            } catch (e) {
+                this.dlog('inspect error', String(e));
+            }
+        },
+        init() {
+            this.dlog('init', { cierreId: this.cierreId });
+            try {
+                this.$watch('showCierreModal', (v) => {
+                    this.dlog('showCierreModal change', v);
+                    this.$nextTick(() => this.inspectModal());
+                });
+                this.$watch('cierreId', (v) => {
+                    this.dlog('cierreId change', v);
+                    this.$nextTick(() => this.inspectModal());
+                });
+            } catch (e) {
+                this.dlog('watch error', String(e));
+            }
+            if (this.cierreId) {
+                this.showCierreModal = true;
+                this.$nextTick(() => this.limpiarCierreIdUrl());
+            }
+            this.$nextTick(() => this.inspectModal());
+        }
+    }"
+    data-dashboard-range="{{ current_range }}" data-dashboard-desde="{{ date_from }}" data-dashboard-hasta="{{ date_to }}">
+    {% if current_user.modo_demo or ((current_user.username or '') | trim | lower in ['demo', 'demostracion', 'demostración']) %}
+    <div class="rounded-xl border border-amber-300/50 bg-amber-100/90 dark:bg-amber-900/25 px-4 py-3 text-sm font-semibold text-amber-900 dark:text-amber-100 shadow-sm">
+        <div class="flex flex-wrap items-center gap-3">
+            <span>Te interesa este sistema, contacta al 0961862624 Esteban Lezcano</span>
+            <a href="https://wa.me/595961862624?text=Hola%20Esteban%2C%20me%20interesa%20este%20sistema."
+                target="_blank" rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-500 transition">
+                <i class="fab fa-whatsapp"></i> WhatsApp
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-lg 2xl:text-xl font-bold text-slate-900 dark:text-white leading-tight">Dashboard</h1>
+            <p class="text-xs 2xl:text-sm text-slate-500 dark:text-slate-400">Resumen general de tu negocio</p>
+        </div>
+        <div class="inline-flex w-full sm:w-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-slate-950/90">
+            <button type="button" @click="setDashboardView('classic')"
+                class="flex-1 sm:flex-none rounded-md px-3 py-1.5 text-xs font-semibold transition"
+                :class="dashboardView === 'classic' ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-300/60 dark:bg-blue-400 dark:text-slate-950 dark:ring-blue-200/50' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'">
+                Vista clasica
+            </button>
+            <button type="button" @click="setDashboardView('new')"
+                class="flex-1 sm:flex-none rounded-md px-3 py-1.5 text-xs font-semibold transition"
+                :class="dashboardView === 'new' ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-300/60 dark:bg-blue-400 dark:text-slate-950 dark:ring-blue-200/50' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'">
+                Vista nueva
+            </button>
+        </div>
+    </div>
+
+    <div x-show="dashboardView === 'classic'" x-cloak class="space-y-3 2xl:space-y-5">
+    <!-- Estado de Caja -->
+    {% if can_crear_venta or can_ver_caja or can_abrir_caja %}
+    {% if sesion_caja %}
+    {{ status_banner(
+    'fas fa-check-circle', 'Caja', 'Caja abierta: ' ~ sesion_caja.caja.nombre, 'Desde ' ~ (sesion_caja.fecha_apertura|local_strftime('%d/%m/%Y %H:%M')),
+    'bg-gradient-to-br from-white via-green-50 to-emerald-100 dark:from-slate-900 dark:via-slate-800/95 dark:to-emerald-950/40',
+    'border-green-200/70 dark:border-green-400/12',
+    'bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.16),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.12),transparent_42%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(110,231,183,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.1),transparent_44%)]',
+    'bg-green-100/90 dark:bg-green-400/15 ring-1 ring-green-200 dark:ring-white/10',
+    'text-green-600 dark:text-green-300',
+    'text-green-600/80 dark:text-green-200/80',
+    'text-slate-900 dark:text-white',
+    'text-slate-600 dark:text-slate-300/75',
+    'Activa', 'bg-green-500/15', 'text-green-700 dark:text-green-200') }}
+    {% elif mostrar_alerta_sin_caja %}
+    {{ status_banner(
+    'fas fa-exclamation-triangle', 'Caja', 'No tiene caja abierta', 'Debe abrir una caja para realizar ventas',
+    'bg-gradient-to-br from-white via-amber-50 to-yellow-100 dark:from-slate-900 dark:via-slate-800/95 dark:to-yellow-950/38',
+    'border-amber-200/70 dark:border-yellow-400/12',
+    'bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.16),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(250,204,21,0.12),transparent_42%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(253,230,138,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.1),transparent_44%)]',
+    'bg-amber-100/90 dark:bg-yellow-400/15 ring-1 ring-amber-200 dark:ring-white/10',
+    'text-amber-600 dark:text-yellow-300',
+    'text-amber-600/80 dark:text-yellow-200/80',
+    'text-slate-900 dark:text-white',
+    'text-slate-600 dark:text-slate-300/75',
+    'Pendiente', 'bg-amber-500/15', 'text-amber-700 dark:text-yellow-200',
+    url_for('caja.abrir') if can_abrir_caja else '', url_for('caja.abrir') if can_abrir_caja else '', 'Abrir Caja', 'fas fa-wallet', 'Abrir caja', 'bg-white/75 hover:bg-white text-amber-700 dark:bg-white/10 dark:hover:bg-white/15 dark:text-yellow-200 ring-1 ring-amber-200/80 dark:ring-white/10 backdrop-blur-sm') }}
+    {% endif %}
+    {% endif %}
+
+    <!-- Estadísticas Rápidas -->
+    <div class="grid grid-cols-1 md:grid-cols-4 auto-rows-fr gap-3 2xl:gap-4">
+        <!-- Ventas del Día -->
+        {% if can_ver_reporte_ventas %}
+        <a href="{{ url_for('reportes.ventas_diarias') }}" data-tab-url="{{ url_for('reportes.ventas_diarias') }}" data-tab-title="Ventas Hoy" data-tab-icon="fas fa-shopping-cart" class="app-tab-link block group h-full">
+            <div class="relative overflow-hidden rounded-xl border border-blue-200/70 dark:border-blue-400/12 bg-gradient-to-br from-white via-blue-50 to-sky-100 dark:from-slate-900 dark:via-slate-800/95 dark:to-blue-950/42 shadow-md p-2 2xl:p-2.5 h-full transition group-hover:shadow-lg flex flex-col justify-between gap-1.5">
+                <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.12),transparent_42%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(147,197,253,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.1),transparent_44%)] opacity-90"></div>
+                <div class="relative flex items-start justify-between gap-2.5">
+                    <div>
+                        <p class="text-[10px] 2xl:text-[11px] uppercase tracking-[0.18em] font-semibold text-blue-600/80 dark:text-blue-200/80">Ventas</p>
+                        <p id="dashboard-ventas-hoy" class="mt-1 text-[1.85rem] 2xl:text-[2rem] font-bold text-slate-900 dark:text-white leading-none">{{ ventas_hoy }}</p>
+                        <p class="mt-1 text-xs text-slate-600 dark:text-slate-300/75">Operaciones registradas hoy</p>
+                    </div>
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100/90 dark:bg-blue-400/15 ring-1 ring-blue-200 dark:ring-white/10 backdrop-blur-sm transition group-hover:bg-blue-200 dark:group-hover:bg-blue-400/20">
+                        <i class="fas fa-shopping-cart text-blue-600 dark:text-blue-300 text-base 2xl:text-lg"></i>
+                    </div>
+                </div>
+                <div class="relative flex items-center justify-between text-[11px]">
+                    <span class="font-medium text-blue-700 dark:text-blue-200">Ver ventas del día</span>
+                    <i class="fas fa-arrow-right text-blue-500 dark:text-blue-300"></i>
+                </div>
+            </div>
+        </a>
+        {% endif %}
+
+        <!-- Total Ventas -->
+        {% if can_ver_ventas %}
+            <div class="relative overflow-hidden rounded-xl border border-green-200/70 dark:border-green-400/12 bg-gradient-to-br from-white via-green-50 to-emerald-100 dark:from-slate-900 dark:via-slate-800/95 dark:to-emerald-950/42 shadow-md p-2 2xl:p-2.5 h-full">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.16),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.12),transparent_42%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(167,243,208,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.1),transparent_44%)] opacity-90"></div>
+            <div class="relative flex flex-col justify-between gap-1.5 h-full">
+                <div class="flex justify-between items-start gap-2.5">
+                    <div>
+                        <p class="text-[10px] 2xl:text-[11px] uppercase tracking-[0.18em] font-semibold text-green-600/80 dark:text-green-200/80">Cobrado real</p>
+                        <p id="dashboard-total-vendido-label" class="mt-1 text-xs 2xl:text-sm text-slate-600 dark:text-slate-300/80">Cobrado real ({{ range_label }})</p>
+                    </div>
+                    <button
+                        onclick="event.preventDefault(); document.getElementById('range-menu').classList.toggle('hidden')"
+                        class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/80 hover:bg-white text-green-700 dark:bg-white/10 dark:hover:bg-white/15 dark:text-green-200 ring-1 ring-green-200/70 dark:ring-white/10 focus:outline-none backdrop-blur-sm">
+                        <i class="fas fa-filter text-xs"></i>
+                    </button>
+                </div>
+                <div class="relative">
+                    <div id="range-menu"
+                        class="hidden absolute right-0 top-0 mt-11 w-72 bg-white dark:bg-slate-800/95 rounded-md shadow-lg z-20 border border-gray-100 dark:border-white/10 py-1">
+                        <a href="{{ url_for('main.dashboard', range='hoy') }}"
+                            class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 {% if current_range == 'hoy' %}bg-gray-50 dark:bg-gray-600 font-bold{% endif %}">Hoy</a>
+                        <a href="{{ url_for('main.dashboard', range='semana') }}"
+                            class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 {% if current_range == 'semana' %}bg-gray-50 dark:bg-gray-600 font-bold{% endif %}">Esta Semana</a>
+                        <a href="{{ url_for('main.dashboard', range='mes') }}"
+                            class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 {% if current_range == 'mes' %}bg-gray-50 dark:bg-gray-600 font-bold{% endif %}">Este Mes</a>
+                        <div class="border-t border-gray-100 dark:border-gray-600 my-1"></div>
+                        <div class="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 {% if current_range == 'custom' %}font-bold{% endif %}">
+                            Personalizado
+                        </div>
+                        <form method="GET" action="{{ url_for('main.dashboard') }}" class="px-4 pb-3 space-y-2">
+                            <input type="hidden" name="range" value="custom">
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="date" name="desde" value="{{ custom_desde or date_from }}"
+                                    class="w-full border rounded-lg px-2 py-1 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700 text-sm">
+                                <input type="date" name="hasta" value="{{ custom_hasta or date_to }}"
+                                    class="w-full border rounded-lg px-2 py-1 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700 text-sm">
+                            </div>
+                            <button type="submit"
+                                class="w-full bg-gray-800 dark:bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-500 transition text-sm">
+                                Aplicar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <a href="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}" data-tab-url="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}" data-tab-title="Detalle de Ventas" data-tab-icon="fas fa-money-bill-wave" class="app-tab-link block group">
+                    <div class="flex items-start justify-between gap-2.5">
+                        <div>
+                            <p id="dashboard-total-vendido" class="text-[1.35rem] 2xl:text-2xl font-bold text-slate-900 dark:text-white leading-tight group-hover:text-green-700 dark:group-hover:text-green-300 transition">₲ {{ "{:,.0f}".format(total_cobrado_display).replace(",", ".") }}</p>
+                            <p id="dashboard-total-vendido-meta" class="mt-1 text-xs text-slate-600 dark:text-slate-300/75">Ventas cobradas: ₲ {{ "{:,.0f}".format(cobrado_en_ventas_display).replace(",", ".") }} | Creditos cobrados: ₲ {{ "{:,.0f}".format(cobrado_en_creditos_display).replace(",", ".") }} | Pedidos cobrados: ₲ {{ "{:,.0f}".format(cobrado_en_pedidos_display).replace(",", ".") }}</p>
+                        </div>
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-100/90 dark:bg-green-400/15 ring-1 ring-green-200 dark:ring-white/10 backdrop-blur-sm transition group-hover:bg-green-200 dark:group-hover:bg-green-400/20">
+                            <i class="fas fa-money-bill-wave text-green-600 dark:text-green-300 text-base 2xl:text-lg"></i>
+                        </div>
+                    </div>
+                    <div class="mt-1.5 flex items-center justify-between text-[11px]">
+                        <span class="font-medium text-green-700 dark:text-green-200">Ver detalle</span>
+                        <i class="fas fa-arrow-right text-green-500 dark:text-green-300"></i>
+                    </div>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Productos Registrados -->
+        {% if can_ver_inventario %}
+        <a href="{{ url_for('productos.listar') }}" data-tab-url="{{ url_for('productos.listar') }}"
+            data-tab-title="Productos" data-tab-icon="fas fa-box" class="app-tab-link block group h-full">
+            <div
+                class="relative overflow-hidden rounded-xl border border-purple-200/70 dark:border-purple-400/12 bg-gradient-to-br from-white via-purple-50 to-fuchsia-100 dark:from-slate-900 dark:via-slate-800/95 dark:to-purple-950/42 shadow-md p-2 2xl:p-2.5 h-full transition group-hover:shadow-lg flex flex-col justify-between gap-1.5">
+                <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.16),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(217,70,239,0.12),transparent_42%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(216,180,254,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(192,38,211,0.1),transparent_44%)] opacity-90"></div>
+                <div class="relative flex items-start justify-between gap-2.5">
+                    <div>
+                        <p class="text-[10px] 2xl:text-[11px] uppercase tracking-[0.18em] font-semibold text-purple-600/80 dark:text-purple-200/80">Inventario</p>
+                        <p class="mt-1 text-[1.85rem] 2xl:text-[2rem] font-bold text-slate-900 dark:text-white leading-none">{{ total_productos }}</p>
+                        <p class="mt-1 text-xs text-slate-600 dark:text-slate-300/75">Productos activos en catálogo</p>
+                    </div>
+                    <div
+                        class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100/90 dark:bg-purple-400/15 ring-1 ring-purple-200 dark:ring-white/10 backdrop-blur-sm group-hover:bg-purple-200 dark:group-hover:bg-purple-400/20 transition">
+                        <i class="fas fa-box text-purple-600 dark:text-purple-300 text-base 2xl:text-lg"></i>
+                    </div>
+                </div>
+                <div class="relative flex items-center justify-between text-[11px]">
+                    <span class="font-medium text-purple-700 dark:text-purple-200">Ver productos</span>
+                    <i class="fas fa-arrow-right text-purple-500 dark:text-purple-300"></i>
+                </div>
+            </div>
+        </a>
+        {% endif %}
+
+        <!-- Stock Bajo -->
+        {% if can_ver_inventario or can_ver_reporte_inventario %}
+        <div class="relative overflow-hidden rounded-xl border border-red-200/70 dark:border-red-400/12 bg-gradient-to-br from-white via-red-50 to-rose-100 dark:from-slate-900 dark:via-slate-800/95 dark:to-rose-950/42 shadow-md p-2 2xl:p-2.5 h-full">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(239,68,68,0.16),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(244,63,94,0.12),transparent_42%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(252,165,165,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(244,63,94,0.1),transparent_44%)] opacity-90"></div>
+            <div class="relative flex flex-col justify-between gap-1.5 h-full">
+                <div class="flex items-start justify-between gap-2.5">
+                    <div>
+                        <p class="text-[10px] 2xl:text-[11px] uppercase tracking-[0.18em] font-semibold text-red-600/80 dark:text-red-200/80">Alertas</p>
+                        <p class="mt-1 text-[1.85rem] 2xl:text-[2rem] font-bold {% if productos_stock_bajo > 0 %}text-red-700 dark:text-red-300{% else %}text-slate-900 dark:text-white{% endif %} leading-none">{{ productos_stock_bajo }}</p>
+                        <p class="mt-1 text-xs text-slate-600 dark:text-slate-300/75">Productos con stock bajo</p>
+                    </div>
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100/90 dark:bg-red-400/15 ring-1 ring-red-200 dark:ring-white/10 backdrop-blur-sm">
+                        <i class="fas fa-exclamation-circle text-red-600 dark:text-red-300 text-base 2xl:text-lg"></i>
+                    </div>
+                </div>
+                {% if can_ver_reporte_inventario and productos_stock_bajo > 0 %}
+                <a href="{{ url_for('reportes.stock_bajo') }}" data-tab-url="{{ url_for('reportes.stock_bajo') }}" data-tab-title="Stock Bajo" data-tab-icon="fas fa-exclamation-circle"
+                    class="app-tab-link relative inline-flex items-center justify-between rounded-lg bg-white/70 hover:bg-white text-red-700 dark:bg-white/10 dark:hover:bg-white/15 dark:text-red-200 px-3 py-1.5 text-[11px] font-semibold ring-1 ring-red-200/80 dark:ring-white/10 backdrop-blur-sm transition">
+                    Ver productos
+                    <i class="fas fa-arrow-right ml-2 text-[10px]"></i>
+                </a>
+                {% else %}
+                <div class="relative text-[11px] font-medium text-red-700/80 dark:text-red-200/80">
+                    {% if productos_stock_bajo > 0 %}Revisar reposición pendiente{% else %}Sin alertas críticas por ahora{% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Accesos Rápidos -->
+    {% include "components/dashboard_quick_actions_grid.html" %}
+    {% if can_ver_agenda %}
+    <div data-dashboard-agenda-root="1"
+        class="relative overflow-hidden rounded-xl border border-indigo-400/14 bg-gradient-to-br from-slate-900 via-slate-800/95 to-indigo-950/55 shadow-lg p-3 2xl:p-4">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(199,210,254,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(99,102,241,0.1),transparent_44%)] opacity-90"></div>
+        <div class="relative flex flex-col gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="flex items-start gap-3 min-w-0">
+                    <div class="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-white/8 ring-1 ring-white/8 backdrop-blur-sm">
+                        <i class="fas fa-calendar-check text-base sm:text-lg 2xl:text-xl text-indigo-200"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-[10px] 2xl:text-[11px] uppercase tracking-[0.18em] text-indigo-200/80 font-semibold">Agenda</p>
+                        <h2 id="dashboard-agenda-pendientes-hoy" class="text-sm sm:text-base 2xl:text-lg font-bold text-white leading-tight">
+                            {{ agenda_pendientes_hoy }} pendiente{% if agenda_pendientes_hoy != 1 %}s{% endif %}
+                        </h2>
+                        <p class="mt-1 text-[11px] text-indigo-100/75">Seguimiento del día y próximos vencimientos</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span id="dashboard-agenda-total" class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold bg-indigo-500/20 text-indigo-100 ring-1 ring-indigo-300/30 backdrop-blur-sm">
+                    Total: {{ agenda_total_pendientes }}
+                    </span>
+                    <span id="dashboard-agenda-vencidas" class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold bg-rose-500/20 text-rose-100 ring-1 ring-rose-300/30 backdrop-blur-sm">
+                    Vencidas: {{ agenda_vencidas }}
+                    </span>
+                    <a href="{{ url_for('agenda.dashboard') }}" data-tab-url="{{ url_for('agenda.dashboard') }}"
+                        data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
+                        class="app-tab-link inline-flex items-center rounded-lg bg-white/10 hover:bg-white/14 text-white px-3 py-1.5 transition text-xs font-semibold ring-1 ring-white/8 backdrop-blur-sm">
+                        Ver agenda
+                    </a>
+                </div>
+            </div>
+
+            <div id="dashboard-agenda-list"
+                data-agenda-list-url="{{ url_for('agenda.lista_actividades', estado='pendiente', desde=agenda_fecha_hoy_iso, hasta=agenda_fecha_hoy_iso) }}"
+                class="space-y-2">
+                {% for actividad in agenda_proximas_actividades %}
+                <a href="{{ url_for('agenda.lista_actividades', estado='pendiente', desde=agenda_fecha_hoy_iso, hasta=agenda_fecha_hoy_iso) }}"
+                    data-tab-url="{{ url_for('agenda.lista_actividades', estado='pendiente', desde=agenda_fecha_hoy_iso, hasta=agenda_fecha_hoy_iso) }}"
+                    data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
+                    class="app-tab-link flex items-start justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2.5 hover:bg-white/[0.07] transition">
+                    <div class="min-w-0">
+                        <p class="text-[13px] sm:text-sm font-semibold text-slate-100 truncate">{{ actividad.titulo }}</p>
+                        <p class="text-[11px] text-slate-300/80">
+                            {{ actividad.hora_label }} · {{ actividad.tipo_label }}
+                        </p>
+                    </div>
+                    <span
+                        class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold
+                        {% if actividad.prioridad == 'critica' %}bg-rose-500/20 text-rose-100 ring-1 ring-rose-300/30
+                        {% elif actividad.prioridad == 'alta' %}bg-orange-500/20 text-orange-100 ring-1 ring-orange-300/30
+                        {% elif actividad.prioridad == 'media' %}bg-sky-500/20 text-sky-100 ring-1 ring-sky-300/30
+                        {% else %}bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-300/30{% endif %}">
+                        {{ actividad.prioridad_label }}
+                    </span>
+                </a>
+                {% else %}
+                <div class="rounded-xl border border-dashed border-white/8 bg-white/[0.03] px-3 py-3 text-xs text-slate-300/75">
+                    No hay actividades pendientes para hoy.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    </div>
+
+    <div x-show="dashboardView === 'new'" x-cloak>
+        {% include "dashboard/_new_view.html" %}
+    </div>
+
+    {% if current_user.modo_demo or ((current_user.username or '') | trim | lower in ['demo', 'demostracion', 'demostración']) %}
+    <div class="pb-2 flex flex-wrap items-center justify-center gap-2 text-[11px] 2xl:text-xs font-medium text-amber-700 dark:text-amber-300">
+        <span>Te interesa este sistema, contacta al 0961862624 Esteban Lezcano</span>
+        <a href="https://wa.me/595961862624?text=Hola%20Esteban%2C%20me%20interesa%20este%20sistema."
+            target="_blank" rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 rounded-md bg-green-600 px-2 py-1 text-[10px] 2xl:text-[11px] font-semibold text-white hover:bg-green-500 transition">
+            <i class="fab fa-whatsapp"></i> WhatsApp
+        </a>
+    </div>
+    {% endif %}
+    <div class="pt-3 2xl:pt-5 border-t border-gray-200 dark:border-gray-700 text-center text-gray-400 dark:text-gray-500 text-xs 2xl:text-sm">
+        &copy; {{ now().year if now is defined else 2026 }} Sistema de Inventario y Ventas
+    </div>
+
+    <template x-teleport="body">
+        <div x-show="showCierreModal" data-cierre-modal-root
+            style="display: none;"
+            class="fixed inset-0 z-50"
+            aria-modal="true"
+            role="dialog">
+            <div class="fixed inset-0 transition-opacity z-0" style="z-index: 0;" aria-hidden="true" data-cierre-modal-overlay @click="cerrarCierreModal()">
+                <div class="absolute inset-0 bg-gray-900/70"></div>
+            </div>
+
+            <div class="relative z-10 min-h-full w-full p-2 sm:p-3 overflow-y-auto flex items-center justify-center">
+                <pre x-show="debugEnabled()" x-text="inspectInfoText" style="position: fixed; top: 8px; left: 8px; z-index: 9999; max-width: 45vw; max-height: 45vh; overflow: auto; background: rgba(0,0,0,0.85); color: #fff; font-size: 12px; padding: 8px; border-radius: 8px;"></pre>
+
+                <div data-cierre-modal-panel
+                    class="relative z-10 w-[98vw] max-w-7xl h-[96vh] bg-white dark:bg-gray-900 rounded-lg text-left overflow-hidden shadow-xl flex flex-col" style="z-index: 10;">
+                    <div class="flex justify-between items-center px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-none">
+                        <h3 class="text-sm sm:text-base font-semibold text-gray-900 dark:text-white leading-tight">
+                            Cierre de Caja <span x-text="cierreId ? ('#' + cierreId) : ''"></span>
+                        </h3>
+                        <button @click="cerrarCierreModal()"
+                            class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <div class="flex-1 min-h-0">
+                        <template x-if="cierreId">
+                            <iframe data-cierre-modal-iframe
+                                class="w-full h-full"
+                                :src="`{{ url_for('caja.cierre_detalle', id_sesion=0, embed=1) }}`.replace('0', cierreId)"
+                                frameborder="0"></iframe>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'dashboard/_refresh_totals_js.html' %}
+{% include 'dashboard/_new_view_js.html' %}
+{% endblock %}

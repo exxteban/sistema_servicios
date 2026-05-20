@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Historial de Técnicos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-screwdriver-wrench text-orange-600 dark:text-orange-400 mr-2"></i>Historial de Técnicos
+        </h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Controla quién tomó cada reparación, cuándo la finalizó, cuándo quedó lista para entrega, cuándo se entregó al cliente y cuánto generó.
+        </p>
+    </div>
+
+    <form method="GET" action="{{ url_for('reportes_tecnicos.historial_tecnicos') }}"
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+        <div>
+            <label for="desde" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Desde</label>
+            <input id="desde" name="desde" type="date" value="{{ desde.isoformat() }}"
+                class="w-full rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 px-2 py-1.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors">
+        </div>
+        <div>
+            <label for="hasta" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Hasta</label>
+            <input id="hasta" name="hasta" type="date" value="{{ hasta.isoformat() }}"
+                class="w-full rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 px-2 py-1.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors">
+        </div>
+        <div>
+            <label for="id_tecnico" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Técnico</label>
+            <select id="id_tecnico" name="id_tecnico"
+                class="w-full rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 px-2 py-1.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors">
+                <option value="0">Todos</option>
+                {% for tecnico in tecnicos %}
+                <option value="{{ tecnico.id_usuario }}" {% if id_tecnico == tecnico.id_usuario %}selected{% endif %}>
+                    {{ tecnico.nombre_completo }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="estado" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Estado</label>
+            <select id="estado" name="estado"
+                class="w-full rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 px-2 py-1.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-colors">
+                <option value="todas" {% if estado == 'todas' %}selected{% endif %}>Todas</option>
+                <option value="abiertas" {% if estado == 'abiertas' %}selected{% endif %}>Abiertas</option>
+                <option value="cerradas" {% if estado == 'cerradas' %}selected{% endif %}>Cerradas</option>
+            </select>
+        </div>
+        <div>
+            <button type="submit"
+                class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-1.5 px-4 rounded text-sm shadow-sm transition-colors flex items-center justify-center">
+                <i class="fas fa-filter mr-2"></i> Filtrar
+            </button>
+        </div>
+    </form>
+
+    {% include "reportes/_historial_tecnicos_resultados.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Cobro en Caja - {{ contexto.pedido.numero_pedido_display }}{% endblock %}
+
+{% block content %}
+{% set item = contexto.item %}
+{% set pedido = contexto.pedido %}
+{% set metadata = contexto.metadata %}
+{% set cobro_sugerido = metadata.cobro_sugerido or {} %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Cobro de pedido en caja</h1>
+                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                    Pendiente #{{ item.id }}
+                </span>
+            </div>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                Cliente: <span class="font-semibold">{{ metadata.cliente_nombre }}</span>
+                | Pedido: <span class="font-semibold">{{ metadata.numero_pedido }}</span>
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('caja.estado') }}" class="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left mr-2"></i>Volver a caja
+            </a>
+            <a href="{{ url_for('pedidos.detalle', id_pedido=pedido.id_pedido) }}" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                <i class="fas fa-clipboard-list mr-2"></i>Ver pedido
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total pedido</div>
+            <div class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(pedido.total or 0).replace(",", ".") }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total pagado</div>
+            <div class="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">Gs. {{ "{:,.0f}".format(pedido.total_pagado or 0).replace(",", ".") }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Saldo pendiente</div>
+            <div class="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">Gs. {{ "{:,.0f}".format(pedido.saldo_pendiente or 0).replace(",", ".") }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Caja activa</div>
+            <div class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ sesion_activa.caja.nombre }}</div>
+            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Sesion #{{ sesion_activa.id_sesion }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Procesar cobro</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">El cobro se registra en el pedido y, si es efectivo, tambien genera movimiento de caja.</p>
+
+            <form method="POST" action="{{ url_for('pedidos_caja.cobrar_cola_pedido_html', cola_id=item.id) }}" class="mt-5 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de pago</label>
+                        <select name="tipo_pago" required
+                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                            {% for tipo_pago in tipos_pago %}
+                            <option value="{{ tipo_pago }}" {% if cobro_sugerido.tipo_pago == tipo_pago %}selected{% endif %}>{{ tipo_pago.replace('_', ' ').title() }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Metodo de pago</label>
+                        <select name="id_metodo_pago" required
+                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                            {% for metodo in metodos_pago %}
+                            <option value="{{ metodo.id_metodo_pago }}" data-requiere-referencia="{{ '1' if metodo.requiere_referencia else '0' }}" {% if cobro_sugerido.id_metodo_pago and (cobro_sugerido.id_metodo_pago|string) == (metodo.id_metodo_pago|string) %}selected{% endif %}>{{ metodo.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto a cobrar</label>
+                        <input type="number" name="monto" min="1" max="{{ pedido.saldo_pendiente }}" step="any" value="{{ cobro_sugerido.monto or pedido.saldo_pendiente }}" required
+                               class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" data-referencia-label>Referencia</label>
+                        <input type="text" name="referencia" value="{{ cobro_sugerido.referencia or '' }}" placeholder="Transferencia, comprobante o recibo" data-referencia-input
+                               class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observaciones</label>
+                        <input type="text" name="observaciones" value="{{ cobro_sugerido.observaciones or '' }}" placeholder="Nota opcional del cobro"
+                               class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-100">
+                    El cobro fue enviado desde el pedido con estos datos sugeridos. Caja puede revisarlos antes de confirmar.
+                </div>
+
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                        Estado actual del pedido: <span class="font-semibold text-gray-800 dark:text-gray-200">{{ pedido.estado_label }}</span>
+                    </p>
+                    <button type="submit" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition">
+                        <i class="fas fa-cash-register mr-2"></i>Confirmar cobro
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Trazabilidad</h2>
+                <dl class="mt-4 space-y-3 text-sm">
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Cliente</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">{{ metadata.cliente_nombre }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Pedido</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">{{ metadata.numero_pedido }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Pendiente de caja</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">#{{ item.id }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Estado pedido</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">{{ pedido.estado_label }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Resumen financiero</h2>
+                <dl class="mt-4 space-y-3 text-sm">
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Total</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(metadata.total or 0).replace(",", ".") }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Pagado</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(metadata.total_pagado or 0).replace(",", ".") }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Saldo pendiente</dt>
+                        <dd class="font-semibold text-gray-900 dark:text-white">Gs. {{ "{:,.0f}".format(metadata.saldo_pendiente or 0).replace(",", ".") }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    (function () {
+        var form = document.querySelector('form[action*="/cola-cobro/"][action*="/cobrar"]');
+        if (!form) return;
+        var selectMetodo = form.querySelector('select[name="id_metodo_pago"]');
+        var inputReferencia = form.querySelector('[data-referencia-input]');
+        var labelReferencia = form.querySelector('[data-referencia-label]');
+        if (!selectMetodo || !inputReferencia) return;
+
+        function syncReferencia() {
+            var option = selectMetodo.options[selectMetodo.selectedIndex];
+            var required = !!(option && option.dataset && option.dataset.requiereReferencia === '1');
+            inputReferencia.required = required;
+            inputReferencia.placeholder = required ? 'Obligatoria para este metodo' : 'Transferencia, comprobante o recibo';
+            if (labelReferencia) {
+                labelReferencia.textContent = required ? 'Referencia obligatoria' : 'Referencia';
+            }
+        }
+
+        selectMetodo.addEventListener('change', syncReferencia);
+        syncReferencia();
+
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de Auditoría{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-clipboard-check text-slate-600 dark:text-slate-300 mr-2"></i>Detalle de Auditoría
+        </h1>
+        <a href="{{ url_for('auditoria.listar') }}"
+            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition text-sm dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100">
+            <i class="fas fa-arrow-left mr-2"></i>Volver
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 space-y-3 transition-colors duration-300">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Fecha</div>
+                <div class="font-mono text-gray-800 dark:text-gray-100">{{ registro.fecha_accion|local_strftime('%d/%m/%Y %H:%M:%S') if registro.fecha_accion else '' }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Usuario</div>
+                <div class="font-semibold text-gray-800 dark:text-gray-100">{{ registro.usuario.nombre_completo if registro.usuario else '-' }}</div>
+                <div class="text-gray-500 dark:text-gray-400 font-mono text-sm">{{ registro.usuario.username if registro.usuario else '' }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Autorización</div>
+                <div class="font-mono text-gray-800 dark:text-gray-100">{{ registro.id_autorizacion if registro.id_autorizacion else '-' }}</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Módulo</div>
+                <div class="font-mono text-gray-800 dark:text-gray-100">{{ registro.modulo }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Acción</div>
+                <div class="font-mono text-gray-800 dark:text-gray-100">{{ registro.accion }}</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Referencia</div>
+                <div class="font-mono text-gray-800 dark:text-gray-100">
+                    {% if referencia_display %}
+                    {{ referencia_display }}
+                    {% elif registro.referencia_tipo %}
+                    {{ registro.referencia_tipo }}{% if registro.referencia_id is not none %} #{{ registro.referencia_id }}{% endif %}
+                    {% else %}
+                    -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">Descripción</div>
+            <div class="text-gray-800 dark:text-gray-100">{{ registro.descripcion }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+            <div class="px-4 py-3 bg-gray-50 dark:bg-gray-700/70 border-b border-gray-200 dark:border-gray-700">
+                <div class="font-semibold text-gray-700 dark:text-gray-200">Datos anteriores</div>
+            </div>
+            <div class="p-4">
+                {% if datos_anteriores %}
+                <pre class="text-xs bg-gray-900 text-gray-100 p-3 rounded-lg overflow-auto">{{ datos_anteriores | tojson(indent=2) }}</pre>
+                {% else %}
+                <div class="text-gray-400 dark:text-gray-500 text-sm">-</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+            <div class="px-4 py-3 bg-gray-50 dark:bg-gray-700/70 border-b border-gray-200 dark:border-gray-700">
+                <div class="font-semibold text-gray-700 dark:text-gray-200">Datos nuevos</div>
+            </div>
+            <div class="p-4">
+                {% if datos_nuevos %}
+                <pre class="text-xs bg-gray-900 text-gray-100 p-3 rounded-lg overflow-auto">{{ datos_nuevos | tojson(indent=2) }}</pre>
+                {% else %}
+                <div class="text-gray-400 dark:text-gray-500 text-sm">-</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,2489 @@
+"""
+Rutas de Punto de Venta (POS)
+"""
+import re
+from datetime import datetime
+from time import perf_counter
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, render_template_string, current_app, abort
+from flask_login import login_required, current_user
+from decimal import Decimal
+from jinja2 import TemplateSyntaxError
+from app import db
+from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
+from app.models import (
+    Producto, Categoria, ProductoPrecioOpcion, Cliente, Venta, DetalleVenta, PagoVenta, Ticket,
+    MetodoPago, SesionCaja, MovimientoCaja, MovimientoStock, Configuracion, Permiso, Autorizacion, ColaCobro,
+    Devolucion, DetalleDevolucion, Reparacion, Usuario, Rol
+)
+from app.models.reparacion_seguimiento import ReparacionHistorialEstado
+from app.utils.helpers import caja_abierta_required, local_strftime, parse_iso_date, utc_bounds_for_local_dates
+from app.utils.auditoria_utils import registrar_auditoria
+from app.utils.permisos import validar_autorizacion
+
+ventas_bp = Blueprint('ventas', __name__)
+
+REPARACION_COSTO_BASE_CODIGO = 'SRV-REP-COSTO-BASE'
+REPARACION_COSTO_BASE_NOMBRE = 'Costo final reparación (base)'
+REPARACION_SERVICIOS_CATEGORIA = 'Servicios de Reparación'
+ROLES_VENDEDOR_CAJERO = {'vendedor', 'cajero'}
+CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS = 'pos_ocultar_selector_vendedor_cajero'
+CLAVE_CAJA_FLUJO_ENVIADO = 'caja_flujo_enviado_desde_vendedor'
+CLAVE_CAJA_EXIGIR_CAJERO = 'caja_exigir_cajero_para_cobro'
+
+
+def _is_truthy(v):
+    if v is True:
+        return True
+    if v in (None, False, 0, 0.0, ''):
+        return False
+    if isinstance(v, (int, float)):
+        return v != 0
+    s = str(v).strip().lower()
+    return s in ('1', 'true', 't', 'yes', 'y', 'si', 'sí', 'on')
+
+
+def _usuarios_vendedores_cajeros_activos():
+    return (
+        Usuario.query
+        .join(Rol, Usuario.id_rol == Rol.id_rol)
+        .filter(
+            Usuario.activo == True,
+            Rol.activo == True,
+            func.lower(Rol.nombre).in_(ROLES_VENDEDOR_CAJERO)
+        )
+        .order_by(Usuario.nombre_completo.asc())
+        .all()
+    )
+
+
+def _ocultar_selector_vendedor_pos():
+    # Compatibilidad: clave histórica usada como "mostrar selector".
+    # Desactivado => no mostrar selector y usar usuario actual.
+    mostrar_selector = Configuracion.obtener_bool(CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS, default=False)
+    return not mostrar_selector
+
+def _norm_nombre_metodo(nombre):
+    s = (nombre or '').strip().lower()
+    s = s.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ñ', 'n')
+    return ' '.join(s.split())
+
+def _es_metodo_credito_tienda(nombre):
+    n = _norm_nombre_metodo(nombre)
+    return n in {'credito tienda', 'venta a credito'}
+
+def _es_metodo_efectivo(nombre):
+    n = _norm_nombre_metodo(nombre)
+    return 'efectivo' in n
+
+
+def _buscar_cola_cobro_venta_activa_por_request_id(client_request_id):
+    client_request_id = (client_request_id or '').strip()
+    if not client_request_id:
+        return None
+
+    pendientes = (
+        ColaCobro.query
+        .filter(
+            ColaCobro.tipo_origen == 'venta',
+            ColaCobro.estado.in_(['pendiente', 'en_proceso'])
+        )
+        .order_by(ColaCobro.fecha_envio.desc())
+        .all()
+    )
+    for pendiente in pendientes:
+        metadata = pendiente.get_metadata()
+        if (metadata.get('client_request_id') or '').strip() == client_request_id:
+            return pendiente
+    return None
+
+
+def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
+    if not items:
+        raise ValueError('No hay productos en la venta')
+
+    subtotal = Decimal('0')
+    items_normalizados = []
+
+    for item in items:
+        try:
+            id_producto = int(item.get('id_producto'))
+        except Exception:
+            raise ValueError('Producto inválido')
+
+        producto = db.session.get(Producto, id_producto)
+        if not producto:
+            raise ValueError(f'Producto no encontrado: {id_producto}')
+
+        try:
+            cantidad = int(item.get('cantidad', 0))
+        except Exception:
+            raise ValueError(f'Cantidad inválida para producto {id_producto}')
+        if cantidad <= 0:
+            raise ValueError(f'Cantidad inválida para producto {id_producto}')
+
+        precio_original = Decimal(str(producto.precio_venta or 0))
+        precio = precio_original
+        precio_opcion_id = item.get('precio_opcion_id')
+
+        if precio_opcion_id not in (None, ''):
+            try:
+                precio_opcion_id = int(precio_opcion_id)
+            except Exception:
+                raise ValueError('precio_opcion_id inválido')
+            opcion = ProductoPrecioOpcion.query.filter_by(
+                id_opcion_precio=precio_opcion_id,
+                id_producto=producto.id_producto,
+                activo=True
+            ).first()
+            if not opcion:
+                raise ValueError('Opción de precio inválida para el producto')
+            try:
+                precio = Decimal(str(opcion.precio))
+            except Exception:
+                raise ValueError('Precio inválido en opción de precio')
+            if precio <= 0:
+                raise ValueError('Precio inválido en opción de precio')
+        elif (
+            producto.codigo == REPARACION_COSTO_BASE_CODIGO
+            and item.get('precio_manual')
+            and item.get('precio') is not None
+        ):
+            try:
+                precio = Decimal(str(item.get('precio')))
+            except Exception:
+                raise ValueError('Precio inválido para costo final de reparación')
+            if precio < 0:
+                raise ValueError('Precio inválido para costo final de reparación')
+        elif usar_precio_mayorista:
+            try:
+                if producto.precio_mayorista is not None:
+                    precio_may = Decimal(str(producto.precio_mayorista))
+                    if precio_may > 0:
+                        precio = precio_may
+            except Exception:
+                precio = precio_original
+
+        item_subtotal = precio * cantidad
+        subtotal += item_subtotal
+
+        try:
+            precio_mayorista = float(producto.precio_mayorista) if producto.precio_mayorista is not None else None
+        except Exception:
+            precio_mayorista = None
+
+        items_normalizados.append({
+            'id': int(producto.id_producto),
+            'codigo': (producto.codigo or '').strip(),
+            'nombre': (producto.nombre or '').strip(),
+            'precio': float(precio),
+            'precio_base': float(precio_original),
+            'precio_mayorista': precio_mayorista,
+            'cantidad': int(cantidad),
+            'es_servicio': bool(producto.es_servicio),
+            'stock': int(producto.stock_actual or 0),
+            'stock_minimo': int(producto.stock_minimo or 0),
+            'iva': int(producto.porcentaje_iva or 0),
+            'precio_manual': bool(item.get('precio_manual') is True),
+            'precio_opcion_id': int(precio_opcion_id) if precio_opcion_id not in (None, '') else None,
+        })
+
+    return items_normalizados, subtotal
+
+
+def _build_pos_data_from_cola_cobro(item_cola):
+    metadata = item_cola.get_metadata()
+    items_metadata = metadata.get('items') if isinstance(metadata.get('items'), list) else []
+    ids_productos = []
+    for item in items_metadata:
+        try:
+            ids_productos.append(int(item.get('id')))
+        except Exception:
+            continue
+
+    productos = {}
+    if ids_productos:
+        productos = {
+            int(p.id_producto): p
+            for p in Producto.query.filter(Producto.id_producto.in_(ids_productos)).all()
+        }
+
+    items = []
+    for item in items_metadata:
+        try:
+            id_producto = int(item.get('id'))
+        except Exception:
+            continue
+        producto = productos.get(id_producto)
+        stock_actual = int(getattr(producto, 'stock_actual', item.get('stock', 0)) or 0)
+        stock_minimo = int(getattr(producto, 'stock_minimo', item.get('stock_minimo', 0)) or 0)
+        es_servicio = bool(getattr(producto, 'es_servicio', item.get('es_servicio', False)))
+        iva = int(getattr(producto, 'porcentaje_iva', item.get('iva', 0)) or 0)
+
+        try:
+            precio_mayorista = float(getattr(producto, 'precio_mayorista', item.get('precio_mayorista')))
+        except Exception:
+            precio_mayorista = item.get('precio_mayorista')
+
+        items.append({
+            'id': id_producto,
+            'codigo': (item.get('codigo') or getattr(producto, 'codigo', '') or '').strip(),
+            'nombre': (item.get('nombre') or getattr(producto, 'nombre', '') or f'Producto #{id_producto}').strip(),
+            'precio': float(item.get('precio') or 0),
+            'precio_base': float(item.get('precio_base') or getattr(producto, 'precio_venta', 0) or 0),
+            'precio_mayorista': precio_mayorista,
+            'cantidad': int(item.get('cantidad') or 0),
+            'es_servicio': es_servicio,
+            'stock': stock_actual,
+            'stock_minimo': stock_minimo,
+            'iva': iva,
+            'precio_manual': bool(item.get('precio_manual') is True),
+            'precio_opcion_id': item.get('precio_opcion_id'),
+        })
+
+    reparacion_id = None
+    if item_cola.tipo_origen == 'reparacion':
+        try:
+            reparacion_id = int(metadata.get('reparacion_id') or item_cola.id_origen or 0) or None
+        except Exception:
+            reparacion_id = None
+
+    return {
+        'id': int(item_cola.id),
+        'tipo_origen': item_cola.tipo_origen,
+        'cliente_id': int(item_cola.id_cliente or 1),
+        'reparacion_id': reparacion_id,
+        'id_usuario_vendedor': int(metadata.get('id_usuario_vendedor') or item_cola.id_usuario_origen),
+        'descuento': float(metadata.get('descuento') or 0),
+        'observaciones': (metadata.get('observaciones') or '').strip(),
+        'items': items,
+    }
+
+
+def _build_venta_items_payload_from_pos_items(items_pos):
+    items_payload = []
+    for item_pos in items_pos or []:
+        try:
+            id_producto = int(item_pos['id'])
+            cantidad = int(item_pos.get('cantidad') or 0)
+        except Exception:
+            continue
+
+        items_payload.append({
+            'id_producto': id_producto,
+            'cantidad': cantidad,
+            'precio': float(item_pos.get('precio') or 0),
+            'precio_base': item_pos.get('precio_base'),
+            'precio_manual': bool(item_pos.get('precio_manual') is True),
+            'precio_opcion_id': item_pos.get('precio_opcion_id'),
+            'nombre': item_pos.get('nombre'),
+            'codigo': item_pos.get('codigo'),
+        })
+    return items_payload
+
+def _get_or_create_producto_costo_final_reparacion():
+    producto = Producto.query.filter_by(codigo=REPARACION_COSTO_BASE_CODIGO).first()
+    if producto:
+        return producto
+
+    categoria = Categoria.query.filter_by(nombre=REPARACION_SERVICIOS_CATEGORIA).first()
+    if not categoria:
+        categoria = Categoria(nombre=REPARACION_SERVICIOS_CATEGORIA, activo=True)
+        db.session.add(categoria)
+        db.session.flush()
+
+    producto = Producto(
+        codigo=REPARACION_COSTO_BASE_CODIGO,
+        nombre=REPARACION_COSTO_BASE_NOMBRE,
+        id_categoria=categoria.id_categoria,
+        precio_compra=0,
+        precio_venta=0,
+        porcentaje_iva=10,
+        stock_actual=0,
+        stock_minimo=0,
+        es_servicio=True,
+        activo=True,
+    )
+    db.session.add(producto)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        producto = Producto.query.filter_by(codigo=REPARACION_COSTO_BASE_CODIGO).first()
+        if producto:
+            return producto
+        raise
+    return producto
+
+def _enforce_ticket_light_background(html: str) -> str:
+    """
+    Sanitiza el HTML del ticket para asegurar compatibilidad con impresoras térmicas.
+    - Elimina display:flex que causa fragmentación del texto
+    - Fuerza fondo blanco y texto negro
+    - Aplica estilos compatibles con impresoras POS
+    """
+    css = (
+        "<style>"
+        "@page{size:58mm auto !important;margin:0 !important;}"
+        "html,body{background:#fff !important;color:#000 !important;margin:0 !important;padding:0 !important;}"
+        "body{width:58mm !important;max-width:58mm !important;padding:2mm !important;"
+        "font-family:'Courier New',Courier,monospace !important;font-size:11px !important;line-height:1.3 !important;}"
+        "*,*:before,*:after{box-sizing:border-box !important;}"
+        "div,span,td,th,p{word-break:normal !important;overflow-wrap:break-word !important;}"
+        # IMPORTANTE: Sobrescribir flexbox que causa problemas en impresoras térmicas
+        "[style*='flex'],[style*='display:flex'],[style*='display: flex']{display:block !important;}"
+        ".flex,.d-flex{display:block !important;}"
+        "</style>"
+    )
+    try:
+        if not html:
+            return html
+        
+        # Eliminar display:flex inline que causa problemas en impresoras térmicas
+        html = re.sub(r'display\s*:\s*flex\s*;?', 'display:block;', html, flags=re.IGNORECASE)
+        html = re.sub(r'justify-content\s*:\s*[^;]+;?', '', html, flags=re.IGNORECASE)
+        html = re.sub(r'gap\s*:\s*[^;]+;?', '', html, flags=re.IGNORECASE)
+        
+        if re.search(r"<head[^>]*>", html, flags=re.IGNORECASE):
+            return re.sub(r"(<head[^>]*>)", r"\1" + css, html, count=1, flags=re.IGNORECASE)
+        if re.search(r"<html[^>]*>", html, flags=re.IGNORECASE):
+            return re.sub(r"(<html[^>]*>)", r"\1<head>" + css + "</head>", html, count=1, flags=re.IGNORECASE)
+        return "<!doctype html><html><head>" + css + "</head><body>" + html + "</body></html>"
+    except Exception:
+        return html
+
+
+def _build_pagos_resumen(pagos):
+    resumen = {}
+
+    def _sort_key_for_pago(p):
+        try:
+            orden = int(p.metodo.orden_display) if getattr(p, 'metodo', None) and p.metodo.orden_display is not None else 999
+        except Exception:
+            orden = 999
+        try:
+            nombre = (p.metodo.nombre or '').strip().lower() if getattr(p, 'metodo', None) else ''
+        except Exception:
+            nombre = ''
+        return (orden, nombre)
+
+    pagos_ordenados = sorted(list(pagos or []), key=_sort_key_for_pago)
+    for pago in pagos_ordenados:
+        try:
+            nombre = (pago.metodo.nombre if pago.metodo else '') or 'Pago'
+            nombre = str(nombre).strip() or 'Pago'
+        except Exception:
+            nombre = 'Pago'
+        try:
+            monto = float(pago.monto or 0)
+        except Exception:
+            monto = 0.0
+        ref = None
+        try:
+            ref = (pago.referencia or '').strip() or None
+        except Exception:
+            ref = None
+
+        entry = resumen.get(nombre)
+        if not entry:
+            entry = {
+                'nombre': nombre,
+                'monto': 0.0,
+                'referencias': set(),
+                'orden': _sort_key_for_pago(pago)[0],
+            }
+            resumen[nombre] = entry
+        entry['monto'] += monto
+        if ref:
+            entry['referencias'].add(ref)
+
+    items = []
+    for entry in resumen.values():
+        refs = sorted(entry['referencias'])
+        items.append({
+            'nombre': entry['nombre'],
+            'monto': float(entry['monto']),
+            'referencias': refs,
+            'orden': entry['orden'],
+        })
+    items.sort(key=lambda x: (x['orden'], str(x['nombre']).lower()))
+    return items
+
+
+@ventas_bp.route('/')
+@login_required
+def listar():
+    """Lista de ventas"""
+    if not current_user.tiene_permiso('ver_ventas'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver ventas.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    page = request.args.get('page', 1, type=int)
+    
+    raw_desde = request.args.get('desde')
+    raw_hasta = request.args.get('hasta')
+    desde = parse_iso_date(raw_desde)
+    hasta = parse_iso_date(raw_hasta)
+    
+    query = Venta.query
+
+    # Si el usuario no puede ver otras cajas, filtrar solo sus propias ventas
+    puede_ver_otras_cajas = current_user.es_admin() or current_user.tiene_permiso('ver_otras_cajas')
+    if not puede_ver_otras_cajas:
+        mis_sesiones = (
+            db.session.query(SesionCaja.id_sesion)
+            .filter(SesionCaja.id_usuario == current_user.id_usuario)
+            .subquery()
+        )
+        query = query.filter(Venta.id_sesion_caja.in_(mis_sesiones))
+
+    if desde or hasta:
+        if not desde:
+            desde = hasta
+        if not hasta:
+            hasta = desde
+        if desde and hasta and desde > hasta:
+            desde, hasta = hasta, desde
+        start_utc, end_utc = utc_bounds_for_local_dates(desde, hasta)
+        query = query.filter(
+            Venta.fecha_venta >= start_utc,
+            Venta.fecha_venta < end_utc
+        )
+        
+    ventas = query.options(
+        joinedload(Venta.cliente),
+        joinedload(Venta.sesion_caja).joinedload(SesionCaja.usuario),
+        joinedload(Venta.vendedor),
+        joinedload(Venta.reparacion)
+    ).order_by(Venta.fecha_venta.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+
+    detalles_por_venta = {}
+    venta_ids = [v.id_venta for v in ventas.items]
+    if venta_ids:
+        obs_by_id = {v.id_venta: (v.observaciones or '').strip() for v in ventas.items}
+        for v in ventas.items:
+            txt = ''
+            rep = getattr(v, 'reparacion', None)
+            if rep is not None:
+                txt = (rep.solucion or rep.diagnostico_tecnico or rep.falla_reportada or '').strip()
+                txt = f"Reparación: {txt}" if txt else "Reparación"
+            detalles_por_venta[v.id_venta] = txt
+
+        rows = (
+            db.session.query(
+                DetalleVenta.id_venta,
+                Producto.nombre,
+                db.func.sum(DetalleVenta.cantidad).label('cantidad')
+            )
+            .join(Producto, Producto.id_producto == DetalleVenta.id_producto)
+            .filter(DetalleVenta.id_venta.in_(venta_ids))
+            .group_by(DetalleVenta.id_venta, Producto.nombre)
+            .order_by(DetalleVenta.id_venta.asc(), Producto.nombre.asc())
+            .all()
+        )
+
+        agrupado = {}
+        for id_venta, nombre, cantidad in rows:
+            if int(id_venta) not in agrupado:
+                agrupado[int(id_venta)] = []
+            try:
+                cant_int = int(cantidad or 0)
+            except Exception:
+                cant_int = 0
+            agrupado[int(id_venta)].append((nombre, cant_int))
+
+        for id_venta in venta_ids:
+            if detalles_por_venta.get(id_venta):
+                continue
+            partes = []
+            for nombre, cant_int in agrupado.get(int(id_venta), []):
+                if cant_int and cant_int != 1:
+                    partes.append(f"{nombre} x{cant_int}")
+                else:
+                    partes.append(f"{nombre}")
+            texto = ", ".join([p for p in partes if p]) or obs_by_id.get(id_venta, '')
+            detalles_por_venta[id_venta] = texto
+    
+    return render_template(
+        'ventas/listar.html',
+        ventas=ventas,
+        detalles_por_venta=detalles_por_venta,
+        desde=(desde.isoformat() if desde else (raw_desde or '')),
+        hasta=(hasta.isoformat() if hasta else (raw_hasta or ''))
+    )
+
+
+def _usuario_puede_tomar_cola_cobro():
+    return current_user.es_admin() or current_user.tiene_permiso('tomar_cola_cobro')
+
+
+def _modo_cobro_exclusivo_cajero_activo():
+    return (
+        Configuracion.obtener_bool(CLAVE_CAJA_FLUJO_ENVIADO, default=False)
+        and Configuracion.obtener_bool(CLAVE_CAJA_EXIGIR_CAJERO, default=False)
+    )
+
+
+@ventas_bp.app_context_processor
+def _inject_sidebar_ventas_flags():
+    if not getattr(current_user, 'is_authenticated', False):
+        return {
+            'sidebar_modo_cobro_exclusivo_cajero': False,
+            'sidebar_mostrar_pos': False,
+            'sidebar_mostrar_registro_vendedor': False,
+        }
+
+    puede_crear_venta = current_user.tiene_permiso('crear_venta')
+    modo_exclusivo = _modo_cobro_exclusivo_cajero_activo() if puede_crear_venta else False
+    puede_tomar_cola = _usuario_puede_tomar_cola_cobro() if puede_crear_venta else False
+
+    mostrar_registro_vendedor = bool(puede_crear_venta and modo_exclusivo and not puede_tomar_cola)
+    mostrar_pos = bool(puede_crear_venta and not mostrar_registro_vendedor)
+    return {
+        'sidebar_modo_cobro_exclusivo_cajero': bool(modo_exclusivo),
+        'sidebar_mostrar_pos': mostrar_pos,
+        'sidebar_mostrar_registro_vendedor': mostrar_registro_vendedor,
+    }
+
+
+def _render_pos_interface(sesion=None, solo_registro_vendedor=False):
+    if not current_user.tiene_permiso('crear_venta'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para acceder al POS.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    clientes = Cliente.query.filter_by(activo=True).order_by(Cliente.nombre).all()
+    metodos_pago = MetodoPago.query.filter_by(activo=True).order_by(MetodoPago.orden_display).all()
+    metodos_pago = [m for m in metodos_pago if not _es_metodo_credito_tienda(m.nombre)]
+    ocultar_selector_vendedor_pos = _ocultar_selector_vendedor_pos()
+    current_app.logger.info(
+        "POS config vendedor/cajero: raw=%s ocultar_selector=%s",
+        Configuracion.obtener(CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS, None),
+        ocultar_selector_vendedor_pos,
+    )
+    vendedores_cajeros = _usuarios_vendedores_cajeros_activos()
+    vendedor_default_id = None
+    if ocultar_selector_vendedor_pos:
+        vendedor_default_id = int(current_user.id_usuario)
+    elif any(int(u.id_usuario) == int(current_user.id_usuario) for u in vendedores_cajeros):
+        vendedor_default_id = int(current_user.id_usuario)
+    vendedores_cajeros_data = [
+        {
+            'id_usuario': int(u.id_usuario),
+            'nombre_completo': (u.nombre_completo or '').strip(),
+            'rol': ((u.rol.nombre if u.rol else '') or '').strip(),
+        }
+        for u in vendedores_cajeros
+    ]
+    if not vendedores_cajeros_data:
+        vendedores_cajeros_data = [{
+            'id_usuario': int(current_user.id_usuario),
+            'nombre_completo': (current_user.nombre_completo or '').strip(),
+            'rol': ((current_user.rol.nombre if getattr(current_user, 'rol', None) else '') or '').strip(),
+        }]
+        vendedor_default_id = int(current_user.id_usuario)
+
+    efectivo = next(
+        (
+            m for m in metodos_pago
+            if (m.nombre or '').strip().lower() == 'efectivo'
+        ),
+        None
+    )
+    fallback_metodo = metodos_pago[0] if metodos_pago else None
+    efectivo_id = int(getattr((efectivo or fallback_metodo), 'id_metodo_pago', 1) or 1)
+    efectivo_nombre = str(getattr((efectivo or fallback_metodo), 'nombre', 'Efectivo') or 'Efectivo')
+
+    empresa = {
+        'nombre': Configuracion.obtener('nombre_empresa', '') or '',
+        'ruc': Configuracion.obtener('ruc_empresa', '') or '',
+        'direccion': Configuracion.obtener('direccion_empresa', '') or '',
+        'telefono': Configuracion.obtener('telefono_empresa', '') or ''
+    }
+
+    caja_flujo_enviado_activo = Configuracion.obtener_bool(CLAVE_CAJA_FLUJO_ENVIADO, default=False)
+    caja_exigir_cajero_para_cobro = Configuracion.obtener_bool(CLAVE_CAJA_EXIGIR_CAJERO, default=False)
+    modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
+    puede_enviar_caja_venta = current_user.es_admin() or current_user.tiene_permiso('enviar_caja_venta')
+    puede_tomar_cola_cobro = _usuario_puede_tomar_cola_cobro()
+    puede_cobrar_pos_directo = (not modo_cobro_exclusivo_cajero) or puede_tomar_cola_cobro
+    if solo_registro_vendedor:
+        puede_cobrar_pos_directo = False
+
+    cola_cobro_data = None
+
+    # Lógica para precargar reparación
+    reparacion_id = None if solo_registro_vendedor else request.args.get('reparacion_id', type=int)
+    reparacion_token = request.args.get('rt')
+    reparacion_data = None
+    if reparacion_id:
+        reparacion = db.session.get(Reparacion, reparacion_id)
+        if reparacion:
+            detalles_cobrables = reparacion.detalles.filter_by(incluye_costo_final=True).all()
+            items = []
+
+            costo_final_base = float(reparacion.costo_final or 0)
+            if costo_final_base > 0:
+                producto_base = _get_or_create_producto_costo_final_reparacion()
+                solucion_txt = (reparacion.solucion or '').strip()
+                nombre_base = f"Solución: {solucion_txt}" if solucion_txt else producto_base.nombre
+                items.append({
+                    'id': producto_base.id_producto,
+                    'codigo': '',
+                    'nombre': nombre_base,
+                    'precio': costo_final_base,
+                    'precio_base': costo_final_base,
+                    'precio_mayorista': None,
+                    'cantidad': 1,
+                    'es_servicio': True,
+                    'stock': 0,
+                    'stock_minimo': 0,
+                    'iva': int(producto_base.porcentaje_iva or 10),
+                    'precio_manual': True,
+                })
+
+            for det in detalles_cobrables:
+                items.append({
+                    'id': det.id_producto,
+                    'codigo': det.producto.codigo if det.producto else '',
+                    'nombre': det.nombre_producto,
+                    'precio': float(det.precio_unitario),
+                    'precio_base': float(det.producto.precio_venta) if det.producto else float(det.precio_unitario),
+                    'precio_mayorista': float(det.producto.precio_mayorista) if det.producto and det.producto.precio_mayorista else None,
+                    'cantidad': det.cantidad,
+                    'es_servicio': det.es_servicio,
+                    'stock': det.producto.stock_actual if det.producto else 0,
+                    'stock_minimo': det.producto.stock_minimo if det.producto else 0,
+                    'iva': det.producto.porcentaje_iva if det.producto else 10
+                })
+
+            reparacion_data = {
+                'id': reparacion.id_reparacion,
+                'cliente_id': reparacion.cliente_id,
+                'id_usuario_vendedor': reparacion.id_usuario_vendedor,
+                'abono': float(reparacion.abono or 0),
+                'items': items
+            }
+
+            if (not vendedor_default_id) and (not ocultar_selector_vendedor_pos) and reparacion.id_usuario_vendedor and any(
+                int(v['id_usuario']) == int(reparacion.id_usuario_vendedor) for v in vendedores_cajeros_data
+            ):
+                vendedor_default_id = int(reparacion.id_usuario_vendedor)
+
+    cola_id = None if solo_registro_vendedor else request.args.get('cola_id', type=int)
+    if cola_id:
+        if not (current_user.es_admin() or current_user.tiene_permiso('tomar_cola_cobro')):
+            flash('No tiene permisos para tomar pendientes de cobro.', 'warning')
+        else:
+            from app.routes.caja.api import _asegurar_en_proceso
+
+            item_cola, error, _status = _asegurar_en_proceso(cola_id, commit=True)
+            if error:
+                mensaje_error = (error.get('error') or '').strip()
+                if mensaje_error != 'Este pendiente ya no está disponible':
+                    flash(mensaje_error or 'No se pudo abrir el pendiente de cobro.', 'warning')
+            else:
+                cola_cobro_data = _build_pos_data_from_cola_cobro(item_cola)
+
+    template_name = 'ventas/registro_vendedor.html' if solo_registro_vendedor else 'ventas/pos.html'
+    return render_template(template_name,
+        sesion=sesion,
+        clientes=clientes,
+        metodos_pago=metodos_pago,
+        efectivo_id=efectivo_id,
+        efectivo_nombre=efectivo_nombre,
+        empresa=empresa,
+        reparacion_data=reparacion_data,
+        reparacion_token=reparacion_token,
+        cola_cobro_data=cola_cobro_data,
+        vendedores_cajeros=vendedores_cajeros_data,
+        vendedor_default_id=vendedor_default_id,
+        ocultar_selector_vendedor_pos=ocultar_selector_vendedor_pos,
+        caja_flujo_enviado_activo=caja_flujo_enviado_activo,
+        caja_exigir_cajero_para_cobro=caja_exigir_cajero_para_cobro,
+        modo_cobro_exclusivo_cajero=modo_cobro_exclusivo_cajero,
+        puede_enviar_caja_venta=puede_enviar_caja_venta,
+        puede_cobrar_pos_directo=puede_cobrar_pos_directo,
+        solo_registro_vendedor=solo_registro_vendedor,
+    )
+
+
+@ventas_bp.route('/pos')
+@login_required
+def pos():
+    """Pantalla del Punto de Venta (cobro)."""
+    if not current_user.tiene_permiso('crear_venta'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para acceder al POS.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
+
+    # En modo exclusivo, vendedor sin permiso de caja entra al módulo de registro.
+    if modo_cobro_exclusivo_cajero and not _usuario_puede_tomar_cola_cobro():
+        return redirect(url_for('ventas.registro_vendedor'))
+
+    sesion = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta'
+    ).first()
+    if not sesion:
+        flash('Debe abrir una caja antes de realizar esta operación.', 'warning')
+        return redirect(url_for('caja.abrir'))
+
+    return _render_pos_interface(sesion=sesion, solo_registro_vendedor=False)
+
+
+@ventas_bp.route('/registro-vendedor')
+@login_required
+def registro_vendedor():
+    """Módulo simplificado de vendedor: registra y envía al cajero."""
+    if not current_user.tiene_permiso('crear_venta'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para registrar ventas.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
+
+    if not modo_cobro_exclusivo_cajero:
+        return redirect(url_for('ventas.pos'))
+
+    if _usuario_puede_tomar_cola_cobro():
+        return redirect(url_for('ventas.pos'))
+
+    return _render_pos_interface(sesion=None, solo_registro_vendedor=True)
+
+
+@ventas_bp.route('/registro-vendedor/enviadas')
+@login_required
+def registro_vendedor_enviadas():
+    if not current_user.tiene_permiso('crear_venta'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver tus ventas enviadas.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
+    if not modo_cobro_exclusivo_cajero:
+        flash('El modo vendedor -> cajero no está activo.', 'info')
+        return redirect(url_for('ventas.pos'))
+
+    estado_filtro = (request.args.get('estado') or '').strip().lower()
+    estados_validos = {'pendiente', 'en_proceso', 'cobrado', 'cancelado'}
+    if estado_filtro not in estados_validos:
+        estado_filtro = ''
+    cliente_filtro = (request.args.get('cliente') or '').strip()
+    fecha_desde = parse_iso_date(request.args.get('fecha_desde'))
+    fecha_hasta = parse_iso_date(request.args.get('fecha_hasta'))
+    if fecha_desde and not fecha_hasta:
+        fecha_hasta = fecha_desde
+    if fecha_hasta and not fecha_desde:
+        fecha_desde = fecha_hasta
+    if fecha_desde and fecha_hasta and fecha_desde > fecha_hasta:
+        fecha_desde, fecha_hasta = fecha_hasta, fecha_desde
+
+    page = request.args.get('page', 1, type=int)
+    query_base = (
+        ColaCobro.query
+        .filter(
+            ColaCobro.tipo_origen == 'venta',
+            ColaCobro.id_usuario_origen == current_user.id_usuario,
+        )
+    )
+
+    start_utc = None
+    end_utc = None
+    if fecha_desde and fecha_hasta:
+        start_utc, end_utc = utc_bounds_for_local_dates(fecha_desde, fecha_hasta)
+        query_base = query_base.filter(
+            ColaCobro.fecha_envio >= start_utc,
+            ColaCobro.fecha_envio < end_utc,
+        )
+
+    cliente_query_filter = None
+    if cliente_filtro:
+        cliente_term = cliente_filtro.lower()
+        cliente_query_filter = [func.lower(Cliente.nombre).like(f'%{cliente_term}%')]
+        if cliente_filtro.isdigit():
+            cliente_query_filter.append(Cliente.id_cliente == int(cliente_filtro))
+        query_base = query_base.outerjoin(ColaCobro.cliente).filter(or_(*cliente_query_filter))
+
+    query = query_base
+    if estado_filtro:
+        query = query.filter(ColaCobro.estado == estado_filtro)
+
+    query = query.options(
+        joinedload(ColaCobro.cliente),
+        joinedload(ColaCobro.usuario_destino),
+    )
+
+    enviados = query.order_by(ColaCobro.fecha_envio.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+
+    resumen_estado = {k: 0 for k in estados_validos}
+    resumen_rows = (
+        query_base.with_entities(ColaCobro.estado, func.count(ColaCobro.id))
+        .group_by(ColaCobro.estado)
+        .all()
+    )
+    for estado, total in resumen_rows:
+        key = (estado or '').strip().lower()
+        if key in resumen_estado:
+            resumen_estado[key] = int(total or 0)
+
+    metricas_enviadas = int(
+        query_base.with_entities(func.count(ColaCobro.id)).scalar() or 0
+    )
+    metricas_pendientes = int(
+        query_base.filter(ColaCobro.estado.in_(['pendiente', 'en_proceso']))
+        .with_entities(func.count(ColaCobro.id))
+        .scalar() or 0
+    )
+
+    query_cobradas = Venta.query.filter(
+        Venta.id_usuario_vendedor == current_user.id_usuario,
+        Venta.estado == 'completada',
+    )
+    if start_utc and end_utc:
+        query_cobradas = query_cobradas.filter(
+            Venta.fecha_venta >= start_utc,
+            Venta.fecha_venta < end_utc,
+        )
+    if cliente_query_filter:
+        query_cobradas = query_cobradas.outerjoin(Cliente, Venta.id_cliente == Cliente.id_cliente)
+        query_cobradas = query_cobradas.filter(or_(*cliente_query_filter))
+
+    metricas_cobradas = int(
+        query_cobradas.with_entities(func.count(Venta.id_venta)).scalar() or 0
+    )
+    tasa_cobro = round((metricas_cobradas / metricas_enviadas) * 100, 1) if metricas_enviadas > 0 else 0.0
+
+    def _estado_ui(estado):
+        estado = (estado or '').strip().lower()
+        if estado == 'pendiente':
+            return 'Pendiente', 'bg-amber-100 text-amber-800'
+        if estado == 'en_proceso':
+            return 'En proceso', 'bg-blue-100 text-blue-800'
+        if estado == 'cobrado':
+            return 'Cobrado', 'bg-green-100 text-green-800'
+        if estado == 'cancelado':
+            return 'Cancelado', 'bg-red-100 text-red-800'
+        return (estado or 'Desconocido').replace('_', ' ').title(), 'bg-gray-100 text-gray-700'
+
+    enviados_rows = []
+    for item in enviados.items:
+        metadata = item.get_metadata() or {}
+        estado_label, estado_badge_class = _estado_ui(item.estado)
+        cliente_nombre = ((item.cliente.nombre if item.cliente else '') or '').strip() or 'Consumidor Final'
+        cajero_nombre = ((item.usuario_destino.nombre_completo if item.usuario_destino else '') or '').strip() or '-'
+        items_meta = metadata.get('items') if isinstance(metadata.get('items'), list) else []
+        cantidad_items = 0
+        for it in items_meta:
+            try:
+                cantidad_items += int(it.get('cantidad') or 0)
+            except Exception:
+                continue
+        enviados_rows.append({
+            'id': int(item.id),
+            'estado': item.estado,
+            'estado_label': estado_label,
+            'estado_badge_class': estado_badge_class,
+            'monto_total': float(item.monto_total or 0),
+            'cliente_nombre': cliente_nombre,
+            'cantidad_items': int(cantidad_items),
+            'fecha_envio_label': local_strftime(item.fecha_envio),
+            'fecha_toma_label': local_strftime(item.fecha_toma),
+            'fecha_cobro_label': local_strftime(item.fecha_cobro),
+            'venta_id': metadata.get('venta_id'),
+            'observaciones': (metadata.get('observaciones') or '').strip(),
+            'cancelacion_motivo': (metadata.get('cancelacion_motivo') or '').strip(),
+            'cajero_nombre': cajero_nombre,
+        })
+
+    return render_template(
+        'ventas/registro_vendedor_enviadas.html',
+        enviados=enviados,
+        enviados_rows=enviados_rows,
+        estado_filtro=estado_filtro,
+        cliente_filtro=cliente_filtro,
+        fecha_desde_filtro=fecha_desde.isoformat() if fecha_desde else '',
+        fecha_hasta_filtro=fecha_hasta.isoformat() if fecha_hasta else '',
+        resumen_estado=resumen_estado,
+        metricas_vendedor={
+            'enviadas': metricas_enviadas,
+            'cobradas': metricas_cobradas,
+            'pendientes': metricas_pendientes,
+            'tasa_cobro': tasa_cobro,
+        },
+    )
+
+
+@ventas_bp.route('/validar-carrito', methods=['POST'])
+@login_required
+def validar_carrito():
+    """Validar productos del carrito guardado - retorna datos actualizados"""
+    try:
+        data = request.get_json()
+        ids_productos = data.get('ids', [])
+        
+        if not ids_productos:
+            return jsonify({'productos': {}})
+        
+        productos_validados = {}
+        for id_producto in ids_productos:
+            producto = db.session.get(Producto, id_producto)
+            if producto and producto.activo:
+                productos_validados[str(id_producto)] = {
+                    'existe': True,
+                    'codigo': producto.codigo,
+                    'nombre': producto.nombre,
+                    'precio': float(producto.precio_venta),
+                    'precio_mayorista': float(producto.precio_mayorista) if producto.precio_mayorista else None,
+                    'precios_opciones': [
+                        {
+                            'id': int(o.id_opcion_precio),
+                            'etiqueta': (o.etiqueta or '').strip() or None,
+                            'precio': float(o.precio or 0),
+                        }
+                        for o in (
+                            producto.precios_opciones.filter_by(activo=True)
+                            .order_by(ProductoPrecioOpcion.orden.asc(), ProductoPrecioOpcion.id_opcion_precio.asc())
+                            .all()
+                        )
+                    ],
+                    'stock': producto.stock_actual,
+                    'stock_minimo': producto.stock_minimo,
+                    'es_servicio': producto.es_servicio,
+                    'iva': producto.porcentaje_iva
+                }
+            else:
+                productos_validados[str(id_producto)] = {
+                    'existe': False
+                }
+        
+        return jsonify({'productos': productos_validados})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@ventas_bp.route('/enviar-a-caja', methods=['POST'])
+@login_required
+def enviar_a_caja():
+    """Guarda un borrador de venta en la cola de cobro para que lo procese caja."""
+    try:
+        if not Configuracion.obtener_bool(CLAVE_CAJA_FLUJO_ENVIADO, default=False):
+            return jsonify({'error': 'El flujo de envío a caja no está habilitado'}), 403
+
+        if not current_user.es_admin() and not current_user.tiene_permiso('enviar_caja_venta'):
+            if getattr(current_user, 'modo_demo', False):
+                return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
+            return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
+        if not current_user.es_admin() and not current_user.tiene_permiso('crear_venta'):
+            if getattr(current_user, 'modo_demo', False):
+                return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
+            return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
+
+        data = request.get_json() or {}
+        items = data.get('items', [])
+        id_cliente = data.get('id_cliente', 1)
+        id_usuario_vendedor_raw = data.get('id_usuario_vendedor')
+        descuento_monto = Decimal(str(data.get('descuento', 0) or 0))
+        forzar_precio_mayorista_raw = data.get('forzar_precio_mayorista', False)
+        client_request_id = (data.get('client_request_id') or '').strip()
+        reparacion_id = data.get('reparacion_id')
+        observaciones = (data.get('observaciones') or '').strip()
+
+        if reparacion_id not in (None, ''):
+            return jsonify({'error': 'El envío a caja para reparaciones se implementa en el siguiente bloque'}), 400
+
+        if client_request_id and len(client_request_id) > 64:
+            return jsonify({'error': 'client_request_id inválido'}), 400
+
+        try:
+            id_cliente = int(id_cliente)
+        except Exception:
+            return jsonify({'error': 'Cliente inválido'}), 400
+
+        cliente = db.session.get(Cliente, id_cliente)
+        if not cliente or not bool(cliente.activo):
+            return jsonify({'error': 'Cliente no encontrado o inactivo'}), 400
+
+        ocultar_selector_vendedor_pos = _ocultar_selector_vendedor_pos()
+        vendedores_cajeros = _usuarios_vendedores_cajeros_activos()
+        ids_vendedores = {int(u.id_usuario) for u in vendedores_cajeros}
+        if ocultar_selector_vendedor_pos:
+            id_usuario_vendedor = int(current_user.id_usuario)
+        elif id_usuario_vendedor_raw in (None, ''):
+            if int(current_user.id_usuario) in ids_vendedores or not vendedores_cajeros:
+                id_usuario_vendedor = int(current_user.id_usuario)
+            else:
+                id_usuario_vendedor = int(vendedores_cajeros[0].id_usuario)
+        else:
+            try:
+                id_usuario_vendedor = int(id_usuario_vendedor_raw)
+            except Exception:
+                return jsonify({'error': 'Vendedor/Cajero inválido'}), 400
+        if (not ocultar_selector_vendedor_pos) and ids_vendedores and id_usuario_vendedor not in ids_vendedores:
+            return jsonify({'error': 'Debe seleccionar un vendedor/cajero válido'}), 400
+
+        cliente_tipo = (cliente.tipo or '').strip().lower()
+        usar_precio_mayorista = _is_truthy(forzar_precio_mayorista_raw) or (cliente_tipo in ('mayorista', 'empresa'))
+        try:
+            items_normalizados, subtotal = _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=usar_precio_mayorista)
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
+
+        total = subtotal - descuento_monto
+        if total < 0:
+            return jsonify({'error': 'El descuento no puede ser mayor al total'}), 400
+
+        pendiente_existente = _buscar_cola_cobro_venta_activa_por_request_id(client_request_id)
+        if pendiente_existente:
+            return jsonify({
+                'success': True,
+                'cola_id': int(pendiente_existente.id),
+                'mensaje': f'La venta ya estaba enviada a caja como pendiente #{pendiente_existente.id}'
+            })
+
+        metadata = {
+            'client_request_id': client_request_id or None,
+            'id_usuario_vendedor': int(id_usuario_vendedor),
+            'descuento': float(descuento_monto or 0),
+            'forzar_precio_mayorista': bool(usar_precio_mayorista),
+            'observaciones': observaciones,
+            'items': items_normalizados,
+        }
+
+        pendiente = ColaCobro(
+            tipo_origen='venta',
+            id_origen=None,
+            id_cliente=id_cliente,
+            monto_total=total,
+            id_usuario_origen=id_usuario_vendedor,
+            estado='pendiente',
+        )
+        pendiente.set_metadata(metadata)
+        db.session.add(pendiente)
+        db.session.flush()
+
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='enviar_a_caja',
+                    modulo='ventas',
+                    descripcion=f'Envió venta a caja como pendiente #{pendiente.id}',
+                    referencia_tipo='cola_cobro',
+                    referencia_id=pendiente.id,
+                    datos_nuevos={
+                        'tipo_origen': 'venta',
+                        'cliente_id': id_cliente,
+                        'id_usuario_vendedor': id_usuario_vendedor,
+                        'monto_total': float(total or 0),
+                        'client_request_id': client_request_id or None,
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+        
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'cola_id': int(pendiente.id),
+            'mensaje': f'Venta enviada a caja como pendiente #{pendiente.id}'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+def _venta_existente_response(venta):
+    total_pagado = sum(float(p.monto) for p in venta.pagos.all())
+    total = float(venta.total or 0)
+    vuelto = max(0, total_pagado - total)
+    return {
+        'success': True,
+        'id_venta': venta.id_venta,
+        'total': total,
+        'pagado': total_pagado,
+        'vuelto': float(vuelto),
+        'mensaje': f'Venta #{venta.id_venta} ya estaba registrada'
+    }
+
+
+def _procesar_venta_payload(data):
+    perf_enabled = bool((data or {}).get('debug_perf') is True)
+    perf_t0 = perf_counter()
+    perf_last = perf_t0
+    perf_stages = []
+    def _perf_stage(nombre):
+        nonlocal perf_last
+        if not perf_enabled:
+            return
+        ahora = perf_counter()
+        perf_stages.append({'etapa': nombre, 'ms': round((ahora - perf_last) * 1000, 2)})
+        perf_last = ahora
+
+    if not current_user.es_admin() and not current_user.tiene_permiso('crear_venta'):
+        if getattr(current_user, 'modo_demo', False):
+            return {'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acci?n est? deshabilitada', 'modo_demo': True}, 403
+        return {'error': 'Sin permisos', 'modo_demo': False}, 403
+
+    data = data or {}
+    client_request_id = data.get('client_request_id')
+    if client_request_id:
+        client_request_id = str(client_request_id).strip()
+        if len(client_request_id) > 64:
+            return {'error': 'client_request_id inv?lido'}, 400
+        existente = Venta.query.filter_by(client_request_id=client_request_id).first()
+        if existente:
+            return _venta_existente_response(existente), 200
+
+    sesion = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta'
+    ).first()
+    if not sesion:
+        return {'error': 'No hay caja abierta'}, 400
+
+    items = data.get('items', [])
+    pagos = data.get('pagos', [])
+    id_cliente = data.get('id_cliente', 1)
+    id_usuario_vendedor_raw = data.get('id_usuario_vendedor')
+    reparacion_id = data.get('reparacion_id')
+    cola_cobro_id = data.get('cola_cobro_id')
+    forzar_precio_mayorista_raw = data.get('forzar_precio_mayorista', False)
+    descuento_monto = Decimal(str(data.get('descuento', 0)))
+    observaciones = data.get('observaciones', '')
+    id_autorizacion = data.get('id_autorizacion')
+    if id_autorizacion in (None, ''):
+        id_autorizacion = None
+    else:
+        id_autorizacion = int(id_autorizacion)
+
+    cola_cobro = None
+    cola_metadata = {}
+    cola_cobro_data = None
+    if cola_cobro_id not in (None, ''):
+        try:
+            cola_cobro_id = int(cola_cobro_id)
+        except Exception:
+            return {'error': 'cola_cobro_id inv?lido'}, 400
+        cola_cobro = db.session.get(ColaCobro, cola_cobro_id)
+        if not cola_cobro:
+            return {'error': 'Pendiente de cobro no encontrado'}, 404
+        if cola_cobro.tipo_origen not in ('venta', 'reparacion'):
+            return {'error': 'El pendiente indicado no corresponde a un origen soportado'}, 400
+        if cola_cobro.estado in ('cobrado', 'cancelado'):
+            return {'error': 'Este pendiente ya no est? disponible'}, 400
+        if cola_cobro.id_usuario_destino and int(cola_cobro.id_usuario_destino) != int(current_user.id_usuario):
+            return {'error': 'Este pendiente est? asignado a otro cajero'}, 403
+        if not current_user.es_admin() and not current_user.tiene_permiso('tomar_cola_cobro'):
+            return {'error': 'Sin permisos para cobrar pendientes enviados a caja'}, 403
+        if cola_cobro.estado != 'en_proceso':
+            return {'error': 'Debe tomar el pendiente antes de cobrarlo'}, 409
+        cola_metadata = cola_cobro.get_metadata()
+        cola_cobro_data = _build_pos_data_from_cola_cobro(cola_cobro)
+        items = _build_venta_items_payload_from_pos_items(cola_cobro_data.get('items'))
+        id_cliente = int(cola_cobro_data.get('cliente_id') or 1)
+        id_usuario_vendedor_raw = cola_cobro_data.get('id_usuario_vendedor')
+        descuento_monto = Decimal(str(cola_cobro_data.get('descuento') or 0))
+        forzar_precio_mayorista_raw = cola_metadata.get('forzar_precio_mayorista', False)
+        if not (observaciones or '').strip():
+            observaciones = cola_cobro_data.get('observaciones') or ''
+        if cola_cobro.tipo_origen == 'reparacion':
+            reparacion_id_cola = cola_metadata.get('reparacion_id') or cola_cobro.id_origen
+            if reparacion_id_cola not in (None, ''):
+                if reparacion_id not in (None, ''):
+                    try:
+                        reparacion_id = int(reparacion_id)
+                    except Exception:
+                        return {'error': 'reparacion_id inv?lido'}, 400
+                    if int(reparacion_id) != int(reparacion_id_cola):
+                        return {'error': 'El pendiente no corresponde a la reparaci?n indicada'}, 400
+                reparacion_id = reparacion_id_cola
+
+    modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
+    if modo_cobro_exclusivo_cajero and not current_user.es_admin():
+        puede_cobrar_pendientes = current_user.tiene_permiso('tomar_cola_cobro')
+        if cola_cobro is None and not puede_cobrar_pendientes:
+            return {'error': 'Debe enviar la venta a caja para que un cajero complete el cobro'}, 403
+
+    autorizacion_venta_credito = None
+    ids_metodo_efectivo = set()
+    if pagos:
+        metodo_ids = set()
+        for pago in pagos:
+            try:
+                metodo_ids.add(int(pago.get('id_metodo_pago')))
+            except Exception:
+                continue
+
+        if metodo_ids:
+            metodos = MetodoPago.query.filter(MetodoPago.id_metodo_pago.in_(list(metodo_ids))).all()
+            usa_credito = any(_es_metodo_credito_tienda(m.nombre) for m in metodos)
+            ids_metodo_efectivo = {
+                int(m.id_metodo_pago) for m in metodos
+                if _es_metodo_efectivo(m.nombre)
+            }
+            if usa_credito:
+                return {'error': 'Venta a cr?dito deshabilitada'}, 403
+            if usa_credito and not current_user.es_admin():
+                if not current_user.tiene_permiso('venta_credito'):
+                    return {'error': 'Sin permiso para venta a cr?dito'}, 403
+                ok, autorizacion_venta_credito = validar_autorizacion(id_autorizacion, 'venta_credito')
+                if not ok:
+                    return {'error': autorizacion_venta_credito, 'codigo_permiso': 'venta_credito'}, 403
+
+    _perf_stage('validaciones_iniciales')
+
+    if not items:
+        return {'error': 'No hay productos en la venta'}, 400
+
+    try:
+        id_cliente = int(id_cliente)
+    except Exception:
+        return {'error': 'Cliente inv?lido'}, 400
+
+    cliente = db.session.get(Cliente, id_cliente)
+    if not cliente or not bool(cliente.activo):
+        return {'error': 'Cliente no encontrado o inactivo'}, 400
+
+    ocultar_selector_vendedor_pos = _ocultar_selector_vendedor_pos()
+    vendedores_cajeros = _usuarios_vendedores_cajeros_activos()
+    ids_vendedores = {int(u.id_usuario) for u in vendedores_cajeros}
+    if cola_cobro is not None:
+        vendedor_origen = id_usuario_vendedor_raw or cola_cobro.id_usuario_origen or current_user.id_usuario
+        try:
+            id_usuario_vendedor = int(vendedor_origen)
+        except Exception:
+            return {'error': 'Vendedor original inv?lido en el pendiente enviado a caja'}, 400
+        vendedor_obj = db.session.get(Usuario, id_usuario_vendedor)
+        if not vendedor_obj:
+            return {'error': 'El vendedor original del pendiente ya no existe'}, 400
+    else:
+        if ocultar_selector_vendedor_pos:
+            id_usuario_vendedor = int(current_user.id_usuario)
+        elif id_usuario_vendedor_raw in (None, ''):
+            if int(current_user.id_usuario) in ids_vendedores or not vendedores_cajeros:
+                id_usuario_vendedor = int(current_user.id_usuario)
+            else:
+                id_usuario_vendedor = int(vendedores_cajeros[0].id_usuario)
+        else:
+            try:
+                id_usuario_vendedor = int(id_usuario_vendedor_raw)
+            except Exception:
+                return {'error': 'Vendedor/Cajero inv?lido'}, 400
+        if (not ocultar_selector_vendedor_pos) and ids_vendedores and id_usuario_vendedor not in ids_vendedores:
+            return {'error': 'Debe seleccionar un vendedor/cajero v?lido'}, 400
+
+    reparacion_obj = None
+    if reparacion_id not in (None, ''):
+        try:
+            reparacion_id = int(reparacion_id)
+        except Exception:
+            return {'error': 'reparacion_id inv?lido'}, 400
+        reparacion_obj = db.session.get(Reparacion, reparacion_id)
+        if not reparacion_obj:
+            return {'error': 'Reparaci?n no encontrada'}, 400
+        if int(reparacion_obj.cliente_id) != int(id_cliente):
+            return {'error': 'La reparaci?n no corresponde al cliente seleccionado'}, 400
+        existente = (
+            Venta.query
+            .filter(Venta.id_reparacion == reparacion_obj.id_reparacion, Venta.estado != 'anulada')
+            .first()
+        )
+        if existente:
+            return {'error': f'La reparaci?n ya fue cobrada en la venta #{existente.id_venta}'}, 400
+
+    cliente_tipo = (cliente.tipo or '').strip().lower()
+    usar_precio_mayorista = _is_truthy(forzar_precio_mayorista_raw) or (cliente_tipo in ('mayorista', 'empresa'))
+
+    producto_ids_requeridos = set()
+    precio_opcion_ids_requeridos = set()
+    for item in items:
+        try:
+            id_producto_item = int(item.get('id_producto'))
+        except Exception:
+            return {'error': 'Producto inválido'}, 400
+        producto_ids_requeridos.add(id_producto_item)
+        precio_opcion_id_item = item.get('precio_opcion_id')
+        if precio_opcion_id_item not in (None, ''):
+            try:
+                precio_opcion_ids_requeridos.add(int(precio_opcion_id_item))
+            except Exception:
+                return {'error': 'precio_opcion_id inv?lido'}, 400
+
+    productos_prefetch = (
+        Producto.query
+        .filter(Producto.id_producto.in_(list(producto_ids_requeridos)))
+        .all()
+    )
+    productos_prefetch_por_id = {int(p.id_producto): p for p in productos_prefetch}
+    for id_producto_item in sorted(producto_ids_requeridos):
+        if id_producto_item not in productos_prefetch_por_id:
+            return {'error': f'Producto no encontrado: {id_producto_item}'}, 400
+
+    opciones_precio_por_clave = {}
+    if precio_opcion_ids_requeridos:
+        opciones_precio = (
+            ProductoPrecioOpcion.query
+            .filter(
+                ProductoPrecioOpcion.id_opcion_precio.in_(list(precio_opcion_ids_requeridos)),
+                ProductoPrecioOpcion.id_producto.in_(list(producto_ids_requeridos)),
+                ProductoPrecioOpcion.activo == True
+            )
+            .all()
+        )
+        opciones_precio_por_clave = {
+            (int(op.id_producto), int(op.id_opcion_precio)): op
+            for op in opciones_precio
+        }
+
+    _perf_stage('prefetch_catalogo')
+
+    subtotal = Decimal('0')
+    total_iva_10 = Decimal('0')
+    total_iva_5 = Decimal('0')
+    total_exenta = Decimal('0')
+    detalles = []
+    productos_por_id = {}
+    cantidades_por_producto = {}
+
+    for item in items:
+        try:
+            id_producto_item = int(item.get('id_producto'))
+        except Exception:
+            return {'error': 'Producto inválido'}, 400
+        producto = productos_prefetch_por_id.get(id_producto_item)
+        if not producto:
+            return {'error': f'Producto no encontrado: {id_producto_item}'}, 400
+
+        cantidad = int(item['cantidad'])
+        if cola_cobro is not None:
+            try:
+                precio_original = Decimal(str(item.get('precio_base', producto.precio_venta or 0) or 0))
+            except Exception:
+                return {'error': 'Precio base invalido en el pendiente enviado a caja'}, 400
+            try:
+                precio = Decimal(str(item.get('precio')))
+            except Exception:
+                return {'error': 'Precio invalido en el pendiente enviado a caja'}, 400
+        else:
+            precio_original = Decimal(str(producto.precio_venta or 0))
+            precio = precio_original
+        precio_opcion_id = item.get('precio_opcion_id')
+        if precio_opcion_id not in (None, ''):
+            try:
+                precio_opcion_id = int(precio_opcion_id)
+            except Exception:
+                return {'error': 'precio_opcion_id inv?lido'}, 400
+            opcion = opciones_precio_por_clave.get((int(producto.id_producto), int(precio_opcion_id)))
+            if not opcion:
+                return {'error': 'Opci?n de precio inv?lida para el producto'}, 400
+            if cola_cobro is None:
+                try:
+                    precio = Decimal(str(opcion.precio))
+                except Exception:
+                    return {'error': 'Precio inv?lido en opci?n de precio'}, 400
+                if precio <= 0:
+                    return {'error': 'Precio inv?lido en opci?n de precio'}, 400
+        if (
+            producto.codigo == REPARACION_COSTO_BASE_CODIGO
+            and item.get('precio_manual')
+        ):
+            if cola_cobro is None and item.get('precio') is not None:
+                try:
+                    precio = Decimal(str(item.get('precio')))
+                except Exception:
+                    return {'error': 'Precio inv?lido para costo final de reparaci?n'}, 400
+            if precio < 0:
+                return {'error': 'Precio inv?lido para costo final de reparaci?n'}, 400
+        elif cola_cobro is None and usar_precio_mayorista and precio_opcion_id in (None, ''):
+            try:
+                if producto.precio_mayorista is not None:
+                    precio_may = Decimal(str(producto.precio_mayorista))
+                    if precio_may > 0:
+                        precio = precio_may
+            except Exception:
+                precio = precio_original
+        elif cola_cobro is not None and precio <= 0:
+            return {'error': 'Precio invalido en el pendiente enviado a caja'}, 400
+
+        item_subtotal = precio * cantidad
+        if not producto.es_servicio:
+            productos_por_id[producto.id_producto] = producto
+            cantidades_por_producto[producto.id_producto] = cantidades_por_producto.get(producto.id_producto, 0) + cantidad
+
+        if producto.porcentaje_iva == 10:
+            item_iva = item_subtotal / 11
+            total_iva_10 += item_iva
+        elif producto.porcentaje_iva == 5:
+            item_iva = item_subtotal / 21
+            total_iva_5 += item_iva
+        else:
+            item_iva = Decimal('0')
+            total_exenta += item_subtotal
+
+        subtotal += item_subtotal
+        detalle = DetalleVenta(
+            id_producto=producto.id_producto,
+            cantidad=cantidad,
+            precio_unitario=precio,
+            precio_original=precio_original,
+            porcentaje_iva=producto.porcentaje_iva,
+            monto_iva=item_iva,
+            subtotal=item_subtotal,
+            es_kit=producto.es_kit
+        )
+        detalles.append((detalle, producto, cantidad))
+
+    _perf_stage('calculo_items')
+
+    stock_warnings = []
+    for id_producto, cantidad_solicitada in cantidades_por_producto.items():
+        producto = productos_por_id[id_producto]
+        if producto.stock_actual <= 0:
+            stock_warnings.append({
+                'producto': producto.nombre,
+                'codigo': producto.codigo,
+                'cantidad_solicitada': cantidad_solicitada,
+                'stock_disponible': producto.stock_actual,
+                'tipo': 'sin_stock'
+            })
+        elif cantidad_solicitada > producto.stock_actual:
+            stock_warnings.append({
+                'producto': producto.nombre,
+                'codigo': producto.codigo,
+                'cantidad_solicitada': cantidad_solicitada,
+                'stock_disponible': producto.stock_actual,
+                'tipo': 'stock_insuficiente'
+            })
+
+    stock_negativo_permitido = Configuracion.obtener_bool('stock_negativo_permitido', default=False)
+    autorizacion_stock_negativo = None
+    if stock_warnings and not stock_negativo_permitido:
+        if not (current_user.es_admin() or current_user.tiene_permiso('vender_sin_stock')):
+            return {'error': 'Sin permiso para vender sin stock', 'stock_warnings': stock_warnings}, 403
+
+        if current_user.es_admin():
+            autorizacion_stock_negativo = None
+        elif not id_autorizacion:
+            return {'error': 'Se requiere autorizaci?n de administrador para vender sin stock', 'stock_warnings': stock_warnings}, 403
+        else:
+            autorizacion_stock_negativo = db.session.get(Autorizacion, id_autorizacion)
+            if not autorizacion_stock_negativo:
+                return {'error': 'Autorizaci?n no encontrada', 'stock_warnings': stock_warnings}, 403
+            if autorizacion_stock_negativo.estado != 'aprobada':
+                return {'error': 'Autorizaci?n no aprobada', 'stock_warnings': stock_warnings}, 403
+            if autorizacion_stock_negativo.id_usuario_solicitante != current_user.id_usuario:
+                return {'error': 'Autorizaci?n no corresponde al usuario solicitante', 'stock_warnings': stock_warnings}, 403
+            permiso_autorizado = db.session.get(Permiso, autorizacion_stock_negativo.id_permiso)
+            if not permiso_autorizado or permiso_autorizado.codigo != 'vender_sin_stock':
+                return {'error': 'Autorizaci?n inv?lida para esta operaci?n', 'stock_warnings': stock_warnings}, 403
+
+    _perf_stage('validacion_stock')
+
+    stock_inicial = {pid: p.stock_actual for pid, p in productos_por_id.items()}
+    total = subtotal - descuento_monto
+    total_pagado = sum(Decimal(str(p['monto'])) for p in pagos)
+    if total_pagado < total:
+        return {'error': f'Pago insuficiente. Faltan ? {total - total_pagado:,.0f}'}, 400
+
+    venta = Venta(
+        id_cliente=id_cliente,
+        id_sesion_caja=sesion.id_sesion,
+        id_usuario_vendedor=id_usuario_vendedor,
+        subtotal=subtotal,
+        descuento_monto=descuento_monto,
+        total_iva_10=total_iva_10,
+        total_iva_5=total_iva_5,
+        total_exenta=total_exenta,
+        total=total,
+        observaciones=observaciones
+    )
+    if reparacion_obj:
+        venta.id_reparacion = reparacion_obj.id_reparacion
+    if client_request_id:
+        venta.client_request_id = client_request_id
+    db.session.add(venta)
+    db.session.flush()
+
+    if autorizacion_venta_credito:
+        autorizacion_venta_credito.referencia_tipo = 'venta'
+        autorizacion_venta_credito.referencia_id = venta.id_venta
+        db.session.add(autorizacion_venta_credito)
+
+    if autorizacion_stock_negativo:
+        autorizacion_stock_negativo.referencia_tipo = 'venta'
+        autorizacion_stock_negativo.referencia_id = venta.id_venta
+        db.session.add(autorizacion_stock_negativo)
+
+    for detalle, producto, cantidad in detalles:
+        detalle.id_venta = venta.id_venta
+        db.session.add(detalle)
+        if producto.es_servicio:
+            continue
+
+        stock_anterior = producto.stock_actual
+        producto.stock_actual -= cantidad
+        db.session.add(MovimientoStock(
+            id_producto=producto.id_producto,
+            id_usuario=current_user.id_usuario,
+            tipo_movimiento='salida',
+            cantidad=cantidad,
+            stock_anterior=stock_anterior,
+            stock_nuevo=producto.stock_actual,
+            referencia_tipo='venta',
+            referencia_id=venta.id_venta
+        ))
+
+    low_stock_warnings = []
+    for id_producto, producto in productos_por_id.items():
+        if producto.stock_actual <= producto.stock_minimo:
+            low_stock_warnings.append({
+                'producto': producto.nombre,
+                'codigo': producto.codigo,
+                'stock_anterior': stock_inicial.get(id_producto, producto.stock_actual),
+                'stock_nuevo': producto.stock_actual,
+                'stock_minimo': producto.stock_minimo
+            })
+
+    if pagos and not ids_metodo_efectivo:
+        metodo_efectivo = MetodoPago.query.filter(MetodoPago.nombre.ilike('%efectivo%')).first()
+        if metodo_efectivo:
+            ids_metodo_efectivo.add(int(metodo_efectivo.id_metodo_pago))
+    vuelto = total_pagado - total
+    if vuelto > 0:
+        efectivo_pagado = Decimal('0')
+        for pago in pagos:
+            try:
+                if int(pago.get('id_metodo_pago')) in ids_metodo_efectivo:
+                    efectivo_pagado += Decimal(str(pago.get('monto', 0)))
+            except Exception:
+                continue
+        if efectivo_pagado <= 0:
+            return {'error': 'El vuelto solo es v?lido con pago en efectivo'}, 400
+        if efectivo_pagado < vuelto:
+            return {'error': 'El vuelto supera el efectivo recibido'}, 400
+
+    for pago in pagos:
+        id_metodo = int(pago['id_metodo_pago'])
+        monto_pago = Decimal(str(pago['monto']))
+        db.session.add(PagoVenta(
+            id_venta=venta.id_venta,
+            id_metodo_pago=id_metodo,
+            monto=monto_pago,
+            referencia=pago.get('referencia', '')
+        ))
+        if id_metodo in ids_metodo_efectivo:
+            db.session.add(MovimientoCaja(
+                id_sesion_caja=sesion.id_sesion,
+                id_usuario=current_user.id_usuario,
+                tipo='ingreso',
+                monto=monto_pago,
+                motivo=f'Cobro Efectivo Venta #{venta.id_venta}',
+                referencia_tipo='venta',
+                referencia_id=venta.id_venta,
+                fecha_movimiento=venta.fecha_venta
+            ))
+
+    if vuelto > 0:
+        db.session.add(MovimientoCaja(
+            id_sesion_caja=sesion.id_sesion,
+            id_usuario=current_user.id_usuario,
+            tipo='egreso',
+            monto=vuelto,
+            motivo=f'Vuelto Venta #{venta.id_venta}',
+            referencia_tipo='venta',
+            referencia_id=venta.id_venta,
+            fecha_movimiento=venta.fecha_venta
+        ))
+
+    if autorizacion_stock_negativo:
+        registrar_auditoria(
+            accion='venta_sin_stock',
+            modulo='ventas',
+            descripcion=f'Venta #{venta.id_venta} procesada con stock insuficiente',
+            referencia_tipo='venta',
+            referencia_id=venta.id_venta,
+            datos_nuevos={'stock_warnings': stock_warnings},
+            id_autorizacion=autorizacion_stock_negativo.id_autorizacion,
+            commit=False
+        )
+
+    numero_ticket = f"TK-{venta.id_venta:06d}"
+    db.session.add(Ticket(
+        id_venta=venta.id_venta,
+        numero_ticket=numero_ticket,
+        id_usuario_emision=current_user.id_usuario
+    ))
+
+    items_auditoria = []
+    for detalle, producto, cantidad in detalles:
+        items_auditoria.append({
+            'id_producto': producto.id_producto,
+            'codigo': (producto.codigo or '').strip(),
+            'nombre': (producto.nombre or '').strip(),
+            'cantidad': int(cantidad),
+            'precio_unitario': float(detalle.precio_unitario or 0),
+            'subtotal': float(detalle.subtotal or 0),
+            'es_servicio': bool(producto.es_servicio),
+            'es_kit': bool(producto.es_kit),
+        })
+
+    pagos_auditoria = []
+    for pago in pagos:
+        try:
+            pagos_auditoria.append({
+                'id_metodo_pago': int(pago.get('id_metodo_pago')),
+                'monto': float(Decimal(str(pago.get('monto', 0)))),
+                'referencia': (pago.get('referencia') or '').strip() or None,
+            })
+        except Exception:
+            pass
+
+    try:
+        with db.session.begin_nested():
+            registrar_auditoria(
+                accion='crear_venta',
+                modulo='ventas',
+                descripcion=f'Cre? venta #{venta.id_venta}',
+                referencia_tipo='venta',
+                referencia_id=venta.id_venta,
+                datos_nuevos={
+                    'id_cliente': int(id_cliente),
+                    'id_sesion_caja': int(sesion.id_sesion),
+                    'subtotal': float(subtotal or 0),
+                    'descuento_monto': float(descuento_monto or 0),
+                    'total': float(total or 0),
+                    'total_iva_10': float(total_iva_10 or 0),
+                    'total_iva_5': float(total_iva_5 or 0),
+                    'total_exenta': float(total_exenta or 0),
+                    'total_pagado': float(total_pagado or 0),
+                    'vuelto': float((total_pagado - total) or 0),
+                    'observaciones': observaciones,
+                    'numero_ticket': numero_ticket,
+                    'items': items_auditoria,
+                    'pagos': pagos_auditoria,
+                    'stock_warnings': stock_warnings,
+                    'low_stock_warnings': low_stock_warnings,
+                },
+                id_autorizacion=autorizacion_stock_negativo.id_autorizacion if autorizacion_stock_negativo else None,
+                commit=False
+            )
+    except Exception:
+        pass
+
+    if reparacion_obj:
+        estado_anterior_reparacion = reparacion_obj.estado
+        reparacion_obj.estado = 'entregado'
+        if not reparacion_obj.fecha_entrega:
+            reparacion_obj.fecha_entrega = datetime.utcnow()
+        db.session.add(ReparacionHistorialEstado(
+            id_reparacion=reparacion_obj.id_reparacion,
+            estado_anterior=estado_anterior_reparacion,
+            estado_nuevo='entregado',
+            nota=f'Entrega por venta #{venta.id_venta}'
+        ))
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='entregar_reparacion',
+                    modulo='reparaciones',
+                    descripcion=f'Entrega de reparaci?n #{reparacion_obj.id_reparacion} por venta #{venta.id_venta}',
+                    referencia_tipo='reparacion',
+                    referencia_id=reparacion_obj.id_reparacion,
+                    datos_anteriores={'estado': estado_anterior_reparacion},
+                    datos_nuevos={
+                        'estado': 'entregado',
+                        'fecha_entrega': reparacion_obj.fecha_entrega.isoformat() if reparacion_obj.fecha_entrega else None,
+                        'venta_id': int(venta.id_venta),
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+
+    if cola_cobro is not None:
+        estado_anterior_cola = cola_cobro.estado
+        metadata_cola = cola_metadata or cola_cobro.get_metadata()
+        metadata_cola['venta_id'] = int(venta.id_venta)
+        metadata_cola['cerrado_por_usuario'] = int(current_user.id_usuario)
+        id_origen_cola = cola_cobro.id_origen
+        if cola_cobro.tipo_origen == 'venta':
+            id_origen_cola = venta.id_venta
+        elif reparacion_obj:
+            id_origen_cola = int(reparacion_obj.id_reparacion)
+            metadata_cola['reparacion_id'] = int(reparacion_obj.id_reparacion)
+        fecha_cobro_cola = datetime.utcnow()
+        filas_actualizadas = (
+            db.session.query(ColaCobro)
+            .filter(
+                ColaCobro.id == cola_cobro.id,
+                ColaCobro.estado.in_(('pendiente', 'en_proceso')),
+                or_(ColaCobro.id_usuario_destino.is_(None), ColaCobro.id_usuario_destino == int(current_user.id_usuario))
+            )
+            .update(
+                {
+                    ColaCobro.id_usuario_destino: int(current_user.id_usuario),
+                    ColaCobro.id_origen: int(id_origen_cola) if id_origen_cola is not None else None,
+                    ColaCobro.estado: 'cobrado',
+                    ColaCobro.fecha_cobro: fecha_cobro_cola,
+                    ColaCobro.fecha_toma: func.coalesce(ColaCobro.fecha_toma, fecha_cobro_cola),
+                },
+                synchronize_session=False
+            )
+        )
+        if not filas_actualizadas:
+            db.session.rollback()
+            return {'error': 'Este pendiente ya fue procesado por otro usuario'}, 409
+
+        db.session.expire_all()
+        cola_cobro = db.session.get(ColaCobro, cola_cobro.id)
+        cola_cobro.set_metadata(metadata_cola)
+
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='cobrar_pendiente_caja',
+                    modulo='caja',
+                    descripcion=f'Cobr? pendiente de caja #{cola_cobro.id} con venta #{venta.id_venta}',
+                    referencia_tipo='cola_cobro',
+                    referencia_id=cola_cobro.id,
+                    datos_anteriores={'estado': estado_anterior_cola},
+                    datos_nuevos={
+                        'estado': 'cobrado',
+                        'venta_id': int(venta.id_venta),
+                        'tipo_origen': cola_cobro.tipo_origen,
+                        'reparacion_id': int(reparacion_obj.id_reparacion) if reparacion_obj else None,
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+
+    _perf_stage('persistencia_pre_commit')
+    db.session.commit()
+    _perf_stage('commit')
+
+    response_data = {
+        'success': True,
+        'id_venta': venta.id_venta,
+        'total': float(total),
+        'pagado': float(total_pagado),
+        'vuelto': float(vuelto),
+        'mensaje': f'Venta #{venta.id_venta} procesada correctamente'
+    }
+    if stock_warnings:
+        response_data['stock_warnings'] = stock_warnings
+    if low_stock_warnings:
+        response_data['low_stock_warnings'] = low_stock_warnings
+    if autorizacion_stock_negativo:
+        response_data['id_autorizacion'] = autorizacion_stock_negativo.id_autorizacion
+    if perf_enabled:
+        response_data['perf'] = {
+            'total_ms': round((perf_counter() - perf_t0) * 1000, 2),
+            'stages': perf_stages,
+        }
+    return response_data, 200
+
+
+@ventas_bp.route('/procesar', methods=['POST'])
+@login_required
+@caja_abierta_required
+def procesar():
+    """Procesar una venta"""
+    try:
+        data = request.get_json(silent=True) or {}
+        payload, status = _procesar_venta_payload(data)
+        return jsonify(payload), status
+    except IntegrityError:
+        db.session.rollback()
+        try:
+            data = request.get_json(silent=True) or {}
+            client_request_id = (data.get('client_request_id') or '').strip()
+            if client_request_id:
+                existente = Venta.query.filter_by(client_request_id=client_request_id).first()
+                if existente:
+                    return jsonify(_venta_existente_response(existente))
+        except Exception:
+            pass
+        return jsonify({'error': 'Conflicto al registrar la venta'}), 409
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+@ventas_bp.route('/<int:id>')
+@login_required
+def detalle(id):
+    """Ver detalle de una venta"""
+    if not current_user.tiene_permiso('ver_detalle_venta'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para ver el detalle de ventas.', 'danger')
+        return redirect(url_for('ventas.listar'))
+
+    venta = Venta.query.options(
+        joinedload(Venta.cliente),
+        joinedload(Venta.sesion_caja).joinedload(SesionCaja.usuario),
+        joinedload(Venta.vendedor)
+    ).filter(Venta.id_venta == id).first()
+    if venta is None:
+        abort(404)
+    return render_template('ventas/detalle.html', venta=venta)
+
+
+@ventas_bp.route('/<int:id>/ticket')
+@login_required
+def ticket(id):
+    """Imprimir ticket de una venta"""
+    if not (current_user.es_admin() or current_user.tiene_permiso('ver_detalle_venta') or current_user.tiene_permiso('crear_venta')):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para imprimir tickets.', 'danger')
+        return redirect(url_for('ventas.listar'))
+
+    preview = request.args.get('preview') == '1'
+    embedded = request.args.get('embedded') == '1'
+    venta = Venta.query.options(
+        joinedload(Venta.cliente),
+        joinedload(Venta.sesion_caja).joinedload(SesionCaja.usuario),
+        joinedload(Venta.vendedor)
+    ).filter(Venta.id_venta == id).first()
+    if venta is None:
+        abort(404)
+    detalles = venta.detalles.all()
+    pagos = venta.pagos.all()
+    
+    # Actualizar contador de impresiones si no es preview
+    if not preview and venta.ticket:
+        from datetime import datetime
+        venta.ticket.cantidad_impresiones += 1
+        venta.ticket.fecha_ultima_impresion = datetime.utcnow()
+        db.session.commit()
+
+    empresa = {
+        'nombre': Configuracion.obtener('nombre_empresa', '') or '',
+        'ruc': Configuracion.obtener('ruc_empresa', '') or '',
+        'direccion': Configuracion.obtener('direccion_empresa', '') or '',
+        'telefono': Configuracion.obtener('telefono_empresa', '') or ''
+    }
+
+    total_pagado = sum(float(p.monto) for p in pagos)
+    total = float(venta.total or 0)
+    vuelto = max(0, total_pagado - total)
+    moneda_simbolo = '₲' if preview else 'Gs'
+    footer_text = Configuracion.obtener('ticket_footer_text', 'Gracias por su compra') or 'Gracias por su compra'
+    template_html = (Configuracion.obtener('ticket_template_html', '') or '').strip()
+
+    try:
+        subtotal = float(getattr(venta, 'subtotal', venta.total) or 0)
+    except Exception:
+        subtotal = float(total or 0)
+    try:
+        descuento = float(getattr(venta, 'descuento_monto', 0) or 0)
+    except Exception:
+        descuento = 0.0
+    pagos_resumen = _build_pagos_resumen(pagos)
+
+    ctx = dict(
+        venta=venta,
+        detalles=detalles,
+        pagos=pagos,
+        pagos_resumen=pagos_resumen,
+        empresa=empresa,
+        subtotal=subtotal,
+        descuento=descuento,
+        total_pagado=total_pagado,
+        vuelto=vuelto,
+        preview=preview,
+        embedded=embedded,
+        moneda_simbolo=moneda_simbolo,
+        footer_text=footer_text,
+    )
+
+    if template_html:
+        try:
+            html = render_template_string(template_html, **ctx)
+            return _enforce_ticket_light_background(html)
+        except TemplateSyntaxError as e:
+            pos = None
+            m = re.search(r'at (\d+)\s*$', str(e))
+            if m:
+                try:
+                    pos = int(m.group(1))
+                except Exception:
+                    pos = None
+            if pos is not None:
+                snippet = template_html[max(0, pos - 120):pos + 120]
+                current_app.logger.error('Error en ticket_template_html cerca de: %r', snippet)
+            current_app.logger.exception('Error de sintaxis en ticket_template_html; usando plantilla por defecto')
+
+    return render_template('ventas/ticket.html', **ctx)
+
+
+@ventas_bp.route('/config/ticket', methods=['GET', 'POST'])
+@login_required
+def config_ticket():
+    if not (current_user.es_admin() or current_user.tiene_permiso('editar_configuracion')):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para editar el ticket.', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+    from pathlib import Path
+    ticket_path = Path(current_app.root_path) / 'templates' / 'ventas' / 'ticket.html'
+    try:
+        default_template_html = ticket_path.read_text(encoding='utf-8')
+    except Exception:
+        default_template_html = ''
+
+    if request.method == 'POST':
+        nombre = (request.form.get('nombre_empresa') or '').strip()
+        ruc = (request.form.get('ruc_empresa') or '').strip()
+        direccion = (request.form.get('direccion_empresa') or '').strip()
+        telefono = (request.form.get('telefono_empresa') or '').strip()
+        footer_text = (request.form.get('ticket_footer_text') or '').strip()
+        template_html = request.form.get('ticket_template_html') or ''
+
+        Configuracion.establecer('nombre_empresa', nombre, 'Nombre de la empresa')
+        Configuracion.establecer('ruc_empresa', ruc, 'RUC de la empresa')
+        Configuracion.establecer('direccion_empresa', direccion, 'Dirección fiscal')
+        Configuracion.establecer('telefono_empresa', telefono, 'Teléfono de contacto')
+        Configuracion.establecer('ticket_footer_text', footer_text, 'Texto del pie del ticket')
+        Configuracion.establecer('ticket_template_html', template_html, 'Plantilla HTML del ticket')
+
+        flash('Ticket actualizado correctamente.', 'success')
+        return redirect(url_for('ventas.config_ticket'))
+
+    last_sale = Venta.query.order_by(Venta.id_venta.desc()).first()
+    id_venta_preview = last_sale.id_venta if last_sale else ''
+
+    data = {
+        'nombre_empresa': Configuracion.obtener('nombre_empresa', '') or '',
+        'ruc_empresa': Configuracion.obtener('ruc_empresa', '') or '',
+        'direccion_empresa': Configuracion.obtener('direccion_empresa', '') or '',
+        'telefono_empresa': Configuracion.obtener('telefono_empresa', '') or '',
+        'ticket_footer_text': Configuracion.obtener('ticket_footer_text', 'Gracias por su compra') or 'Gracias por su compra',
+        'ticket_template_html': Configuracion.obtener('ticket_template_html', '') or '',
+    }
+
+    return render_template(
+        'ventas/ticket_config.html',
+        data=data,
+        default_template_html=default_template_html,
+        id_venta_preview=id_venta_preview,
+    )
+
+
+@ventas_bp.route('/config/ticket/preview', methods=['POST'])
+@login_required
+def config_ticket_preview():
+    if not (current_user.es_admin() or current_user.tiene_permiso('editar_configuracion')):
+        if getattr(current_user, 'modo_demo', False):
+            return jsonify({'success': False, 'error': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
+        return jsonify({'success': False, 'error': 'Sin permisos', 'modo_demo': False}), 403
+
+    payload = request.get_json(silent=True) or {}
+    id_venta = payload.get('id_venta')
+    template_html = payload.get('ticket_template_html') or ''
+    footer_text = (payload.get('ticket_footer_text') or 'Gracias por su compra').strip() or 'Gracias por su compra'
+
+    empresa = {
+        'nombre': (payload.get('nombre_empresa') or '').strip(),
+        'ruc': (payload.get('ruc_empresa') or '').strip(),
+        'direccion': (payload.get('direccion_empresa') or '').strip(),
+        'telefono': (payload.get('telefono_empresa') or '').strip(),
+    }
+
+    venta = None
+    if id_venta not in (None, '', 0, '0'):
+        try:
+            venta = db.session.get(Venta, int(id_venta))
+        except Exception:
+            venta = None
+
+    if not venta:
+        venta = Venta.query.order_by(Venta.id_venta.desc()).first()
+
+    if venta:
+        detalles = venta.detalles.all()
+        pagos = venta.pagos.all()
+        total_pagado = sum(float(p.monto) for p in pagos)
+        total = float(venta.total or 0)
+        vuelto = max(0, total_pagado - total)
+        try:
+            subtotal = float(getattr(venta, 'subtotal', venta.total) or 0)
+        except Exception:
+            subtotal = float(total or 0)
+        try:
+            descuento = float(getattr(venta, 'descuento_monto', 0) or 0)
+        except Exception:
+            descuento = 0.0
+    else:
+        from types import SimpleNamespace
+        from datetime import datetime
+        venta = SimpleNamespace(
+            id_venta=1,
+            fecha_venta=datetime.utcnow(),
+            total=28000,
+            subtotal=30000,
+            descuento_monto=2000,
+            cliente=SimpleNamespace(nombre='CONSUMIDOR FINAL')
+        )
+        producto = SimpleNamespace(nombre='Producto de ejemplo')
+        detalles = [SimpleNamespace(producto=producto, precio_unitario=28000, subtotal=28000, cantidad=1)]
+        pagos = [SimpleNamespace(metodo=SimpleNamespace(nombre='Efectivo'), monto=28000)]
+        total_pagado = 28000
+        vuelto = 0
+        subtotal = 30000
+        descuento = 2000
+
+    moneda_simbolo = '₲'
+    preview = True
+    pagos_resumen = _build_pagos_resumen(pagos)
+
+    ctx = dict(
+        venta=venta,
+        detalles=detalles,
+        pagos=pagos,
+        pagos_resumen=pagos_resumen,
+        empresa=empresa,
+        subtotal=subtotal,
+        descuento=descuento,
+        total_pagado=total_pagado,
+        vuelto=vuelto,
+        preview=preview,
+        moneda_simbolo=moneda_simbolo,
+        footer_text=footer_text,
+    )
+
+    try:
+        if template_html.strip():
+            html = render_template_string(template_html, **ctx)
+        else:
+            html = render_template('ventas/ticket.html', **ctx)
+        return jsonify({'success': True, 'html': _enforce_ticket_light_background(html)})
+    except TemplateSyntaxError as e:
+        pos = None
+        m = re.search(r'at (\d+)\s*$', str(e))
+        if m:
+            try:
+                pos = int(m.group(1))
+            except Exception:
+                pos = None
+        if pos is not None:
+            snippet = template_html[max(0, pos - 120):pos + 120]
+            return jsonify({'success': False, 'error': f'{e} | cerca de: {snippet}'}), 400
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@ventas_bp.route('/<int:id>/anular', methods=['POST'])
+@login_required
+def anular(id):
+    """Anular una venta"""
+    venta = db.session.get(Venta, id)
+    if venta is None:
+        abort(404)
+
+    if not current_user.es_admin() and not current_user.tiene_permiso('anular_venta'):
+        if getattr(current_user, 'modo_demo', False):
+            flash('Modo demo: esta acción está deshabilitada.', 'warning')
+        else:
+            flash('No tienes permisos para anular ventas.', 'danger')
+        return redirect(url_for('ventas.detalle', id=id))
+    
+    if venta.estado == 'anulada':
+        flash('Esta venta ya está anulada.', 'warning')
+        return redirect(url_for('ventas.detalle', id=id))
+
+    id_autorizacion = request.form.get('id_autorizacion', type=int)
+    ok, autorizacion = validar_autorizacion(id_autorizacion, 'anular_venta')
+    if not ok:
+        flash(str(autorizacion), 'danger')
+        return redirect(url_for('ventas.detalle', id=id))
+    
+    devueltos_rows = (
+        db.session.query(
+            DetalleDevolucion.id_detalle_venta_original,
+            func.coalesce(func.sum(DetalleDevolucion.cantidad), 0),
+        )
+        .join(Devolucion, DetalleDevolucion.id_devolucion == Devolucion.id_devolucion)
+        .filter(
+            Devolucion.id_venta == venta.id_venta,
+            Devolucion.estado != 'anulada',
+            Devolucion.accion_stock == 'retorno_stock',
+        )
+        .group_by(DetalleDevolucion.id_detalle_venta_original)
+        .all()
+    )
+    devuelto_por_detalle = {
+        int(r[0]): int(r[1] or 0) for r in devueltos_rows if r and r[0] is not None
+    }
+
+    reparacion_reabierta_id = None
+    if getattr(venta, 'id_reparacion', None):
+        try:
+            rid = int(venta.id_reparacion)
+        except Exception:
+            rid = None
+        if rid:
+            reparacion_obj = db.session.get(Reparacion, rid)
+            if reparacion_obj:
+                estado_anterior = (reparacion_obj.estado or '').strip()
+                if estado_anterior.lower() == 'entregado':
+                    reparacion_obj.estado = 'listo'
+                    reparacion_obj.fecha_entrega = None
+                    db.session.add(
+                        ReparacionHistorialEstado(
+                            id_reparacion=reparacion_obj.id_reparacion,
+                            estado_anterior=estado_anterior or None,
+                            estado_nuevo='listo',
+                            nota=f'Reapertura por anulación de venta #{venta.id_venta}'
+                        )
+                    )
+                    reparacion_reabierta_id = reparacion_obj.id_reparacion
+            venta.id_reparacion = None
+
+    # Restaurar stock
+    for detalle in venta.detalles.all():
+        producto = detalle.producto
+        if not producto or bool(getattr(producto, 'es_servicio', False)):
+            continue
+        cantidad_devuelta = int(devuelto_por_detalle.get(int(detalle.id_detalle_venta), 0) or 0)
+        cantidad_a_restaurar = int(detalle.cantidad or 0) - cantidad_devuelta
+        if cantidad_a_restaurar <= 0:
+            continue
+        stock_anterior = producto.stock_actual
+        producto.stock_actual += cantidad_a_restaurar
+        
+        movimiento = MovimientoStock(
+            id_producto=producto.id_producto,
+            id_usuario=current_user.id_usuario,
+            tipo_movimiento='entrada',
+            cantidad=cantidad_a_restaurar,
+            stock_anterior=stock_anterior,
+            stock_nuevo=producto.stock_actual,
+            referencia_tipo='anulacion_venta',
+            referencia_id=venta.id_venta,
+            motivo=f'Anulación de venta #{venta.id_venta}'
+        )
+        db.session.add(movimiento)
+
+    movimientos_caja_venta = (
+        MovimientoCaja.query.filter_by(
+            id_sesion_caja=venta.id_sesion_caja,
+            referencia_tipo='venta',
+            referencia_id=venta.id_venta,
+        )
+        .order_by(MovimientoCaja.id_movimiento_caja.asc())
+        .all()
+    )
+    from datetime import datetime
+
+    if movimientos_caja_venta:
+        for mov in movimientos_caja_venta:
+            tipo_original = (mov.tipo or '').strip().lower()
+            if tipo_original not in {'ingreso', 'egreso'}:
+                continue
+            tipo_reverso = 'egreso' if tipo_original == 'ingreso' else 'ingreso'
+            motivo_base = (mov.motivo or '').strip()
+            motivo_reverso = f'Anulación venta #{venta.id_venta}: {motivo_base}'.strip()
+            if len(motivo_reverso) > 200:
+                motivo_reverso = motivo_reverso[:200]
+            db.session.add(
+                MovimientoCaja(
+                    id_sesion_caja=mov.id_sesion_caja,
+                    id_usuario=current_user.id_usuario,
+                    tipo=tipo_reverso,
+                    monto=mov.monto,
+                    motivo=motivo_reverso or f'Anulación venta #{venta.id_venta}',
+                    referencia_tipo='anulacion_venta',
+                    referencia_id=venta.id_venta,
+                    fecha_movimiento=datetime.utcnow(),
+                )
+            )
+    else:
+        def _norm_metodo_pago_nombre(nombre: str) -> str:
+            s = (nombre or '').strip().lower()
+            s = s.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ñ', 'n')
+            return ' '.join(s.split())
+
+        metodos = MetodoPago.query.all()
+        metodo_efectivo = None
+        for m in metodos:
+            if _norm_metodo_pago_nombre(getattr(m, 'nombre', '') or '') == 'efectivo':
+                metodo_efectivo = m
+                break
+        if metodo_efectivo is None:
+            candidatos = [m for m in metodos if 'efectivo' in _norm_metodo_pago_nombre(getattr(m, 'nombre', '') or '')]
+            if candidatos:
+                candidatos.sort(key=lambda x: (int(getattr(x, 'orden_display', 0) or 0), int(getattr(x, 'id_metodo_pago', 0) or 0)))
+                metodo_efectivo = candidatos[0]
+
+        efectivo_id = int(getattr(metodo_efectivo, 'id_metodo_pago', 1) or 1)
+        total_efectivo_pagado = (
+            db.session.query(func.sum(PagoVenta.monto))
+            .filter(PagoVenta.id_venta == venta.id_venta, PagoVenta.id_metodo_pago == efectivo_id)
+            .scalar()
+        )
+        if total_efectivo_pagado and Decimal(str(total_efectivo_pagado)) > 0:
+            motivo_reverso = f'Anulación venta #{venta.id_venta}: ajuste efectivo'.strip()
+            if len(motivo_reverso) > 200:
+                motivo_reverso = motivo_reverso[:200]
+            db.session.add(
+                MovimientoCaja(
+                    id_sesion_caja=venta.id_sesion_caja,
+                    id_usuario=current_user.id_usuario,
+                    tipo='egreso',
+                    monto=total_efectivo_pagado,
+                    motivo=motivo_reverso,
+                    referencia_tipo='anulacion_venta',
+                    referencia_id=venta.id_venta,
+                    fecha_movimiento=datetime.utcnow(),
+                )
+            )
+    
+    venta.estado = 'anulada'
+    db.session.commit()
+
+    try:
+        id_aut = int(getattr(autorizacion, 'id_autorizacion', 0) or 0) if autorizacion else None
+        if not id_aut:
+            id_aut = None
+        registrar_auditoria(
+            accion='anular_venta',
+            modulo='ventas',
+            descripcion=f'Anulación de venta #{venta.id_venta}',
+            referencia_tipo='venta',
+            referencia_id=venta.id_venta,
+            id_autorizacion=id_aut
+        )
+    except Exception:
+        pass
+    
+    if reparacion_reabierta_id:
+        flash(
+            f'Venta #{id} anulada. Stock restaurado. Reparación #{reparacion_reabierta_id} reabierta para cobrar nuevamente.',
+            'success'
+        )
+    else:
+        flash(f'Venta #{id} anulada. Stock restaurado.', 'success')
+    return redirect(url_for('ventas.detalle', id=id))
+
+
+@ventas_bp.route('/<int:id>/devolucion', methods=['POST'])
+@login_required
+@caja_abierta_required
+def crear_devolucion(id):
+    """Registrar devolución parcial/total de una venta"""
+    try:
+        if not current_user.es_admin() and not current_user.tiene_permiso('anular_venta'):
+            if getattr(current_user, 'modo_demo', False):
+                return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
+            return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
+
+        venta = db.session.get(Venta, id)
+        if venta is None:
+            abort(404)
+        if venta.estado != 'completada':
+            return jsonify({'error': 'La venta no está en estado válido para devolución'}), 400
+
+        sesion = SesionCaja.query.filter_by(
+            id_usuario=current_user.id_usuario,
+            estado='abierta'
+        ).first()
+        if not sesion:
+            return jsonify({'error': 'No hay caja abierta'}), 400
+
+        data = request.get_json() or {}
+        items = data.get('items', [])
+        motivo = (data.get('motivo') or '').strip()
+        accion_stock = (data.get('accion_stock') or 'retorno_stock').strip()
+        metodo_reembolso = (data.get('metodo_reembolso') or 'efectivo').strip()
+        observaciones = data.get('observaciones', '')
+        id_autorizacion = data.get('id_autorizacion')
+        if id_autorizacion in (None, ''):
+            id_autorizacion = None
+        else:
+            id_autorizacion = int(id_autorizacion)
+
+        if not items:
+            return jsonify({'error': 'Debe indicar al menos un ítem para devolver'}), 400
+        if not motivo:
+            return jsonify({'error': 'Debe indicar el motivo de la devolución'}), 400
+        if accion_stock not in ['retorno_stock', 'descarte', 'ninguna']:
+            return jsonify({'error': 'accion_stock inválido'}), 400
+
+        cantidades_por_detalle = {}
+        for item in items:
+            try:
+                id_detalle_venta = int(item.get('id_detalle_venta'))
+                cantidad = int(item.get('cantidad'))
+            except Exception:
+                return jsonify({'error': 'Ítem inválido'}), 400
+            if cantidad <= 0:
+                return jsonify({'error': f'Cantidad inválida para detalle {id_detalle_venta}'}), 400
+            cantidades_por_detalle[id_detalle_venta] = cantidades_por_detalle.get(id_detalle_venta, 0) + cantidad
+
+        if not cantidades_por_detalle:
+            return jsonify({'error': 'Debe indicar al menos un ítem para devolver'}), 400
+
+        ok, autorizacion = validar_autorizacion(id_autorizacion, 'anular_venta')
+        if not ok:
+            return jsonify({'error': str(autorizacion), 'codigo_permiso': 'anular_venta'}), 403
+
+        detalles_venta_por_id = {int(d.id_detalle_venta): d for d in venta.detalles.all()}
+        detalle_ids = sorted(int(x) for x in cantidades_por_detalle.keys())
+        devueltos_rows = (
+            db.session.query(
+                DetalleDevolucion.id_detalle_venta_original,
+                func.coalesce(func.sum(DetalleDevolucion.cantidad), 0),
+            )
+            .join(Devolucion, DetalleDevolucion.id_devolucion == Devolucion.id_devolucion)
+            .filter(
+                Devolucion.id_venta == venta.id_venta,
+                Devolucion.estado != 'anulada',
+                DetalleDevolucion.id_detalle_venta_original.in_(detalle_ids),
+            )
+            .group_by(DetalleDevolucion.id_detalle_venta_original)
+            .all()
+        )
+        devueltos_por_detalle = {int(r[0]): int(r[1] or 0) for r in devueltos_rows if r and r[0] is not None}
+
+        monto_total = Decimal('0')
+        items_auditoria = []
+        items_normalizados = []
+
+        for id_detalle_venta in detalle_ids:
+            cantidad = int(cantidades_por_detalle.get(id_detalle_venta) or 0)
+            detalle_venta = detalles_venta_por_id.get(id_detalle_venta)
+            if not detalle_venta:
+                return jsonify({'error': f'Detalle de venta no encontrado: {id_detalle_venta}'}), 400
+
+            cantidad_original = int(detalle_venta.cantidad)
+            cantidad_devuelta = int(devueltos_por_detalle.get(id_detalle_venta) or 0)
+            disponible = cantidad_original - cantidad_devuelta
+            if disponible <= 0:
+                return jsonify({'error': f'No hay cantidad disponible para devolver en detalle {id_detalle_venta}'}), 400
+            if cantidad > disponible:
+                return jsonify({'error': f'Cantidad inválida para detalle {id_detalle_venta}. Disponible: {disponible}'}), 400
+
+            precio_unitario = Decimal(str(detalle_venta.precio_unitario))
+            subtotal = precio_unitario * Decimal(str(cantidad))
+            monto_total += subtotal
+            items_normalizados.append((detalle_venta, cantidad, subtotal))
+
+            items_auditoria.append({
+                'id_detalle_venta': id_detalle_venta,
+                'id_producto': detalle_venta.id_producto,
+                'cantidad': cantidad,
+                'precio_unitario': float(detalle_venta.precio_unitario or 0),
+                'subtotal': float(subtotal or 0),
+            })
+
+        devolucion = Devolucion(
+            id_venta=venta.id_venta,
+            id_usuario=current_user.id_usuario,
+            id_sesion_caja=sesion.id_sesion,
+            motivo=motivo,
+            accion_stock=accion_stock,
+            monto_total=monto_total,
+            metodo_reembolso=metodo_reembolso,
+            observaciones=observaciones
+        )
+        db.session.add(devolucion)
+        db.session.flush()
+
+        for detalle_venta, cantidad, subtotal in items_normalizados:
+            detalle_dev = DetalleDevolucion(
+                id_devolucion=devolucion.id_devolucion,
+                id_producto=detalle_venta.id_producto,
+                id_detalle_venta_original=detalle_venta.id_detalle_venta,
+                cantidad=cantidad,
+                precio_unitario=detalle_venta.precio_unitario,
+                subtotal=subtotal
+            )
+            db.session.add(detalle_dev)
+
+            if accion_stock == 'retorno_stock' and not detalle_venta.producto.es_servicio:
+                producto = detalle_venta.producto
+                stock_anterior = int(producto.stock_actual or 0)
+                producto.stock_actual = stock_anterior + cantidad
+
+                movimiento_stock = MovimientoStock(
+                    id_producto=producto.id_producto,
+                    id_usuario=current_user.id_usuario,
+                    tipo_movimiento='entrada',
+                    cantidad=cantidad,
+                    stock_anterior=stock_anterior,
+                    stock_nuevo=int(producto.stock_actual),
+                    referencia_tipo='devolucion',
+                    referencia_id=devolucion.id_devolucion,
+                    motivo=f'Devolución #{devolucion.id_devolucion} de venta #{venta.id_venta}'
+                )
+                db.session.add(movimiento_stock)
+
+        if metodo_reembolso.lower() == 'efectivo' and monto_total > 0:
+            movimiento_caja = MovimientoCaja(
+                id_sesion_caja=sesion.id_sesion,
+                id_usuario=current_user.id_usuario,
+                tipo='egreso',
+                monto=monto_total,
+                motivo=f'Reembolso devolución #{devolucion.id_devolucion} venta #{venta.id_venta}',
+                referencia_tipo='devolucion',
+                referencia_id=devolucion.id_devolucion
+            )
+            db.session.add(movimiento_caja)
+
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='crear_devolucion',
+                    modulo='ventas',
+                    descripcion=f'Devolución registrada para venta #{venta.id_venta}',
+                    referencia_tipo='devolucion',
+                    referencia_id=devolucion.id_devolucion,
+                    datos_nuevos={
+                        'id_venta': venta.id_venta,
+                        'id_sesion_caja': sesion.id_sesion,
+                        'motivo': motivo,
+                        'accion_stock': accion_stock,
+                        'metodo_reembolso': metodo_reembolso,
+                        'monto_total': float(monto_total or 0),
+                        'items': items_auditoria,
+                    },
+                    id_autorizacion=autorizacion.id_autorizacion if autorizacion else None,
+                    commit=False
+                )
+        except Exception:
+            pass
+
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'id_devolucion': devolucion.id_devolucion,
+            'monto_total': float(monto_total)
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

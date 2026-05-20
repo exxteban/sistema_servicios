@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Movimiento de Caja{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-6 text-center">
+            <i class="fas fa-exchange-alt text-blue-600 dark:text-blue-400 mr-2"></i>Movimiento de Caja
+        </h1>
+
+        <form method="POST" action="{{ url_for('caja.registrar_movimiento') }}" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Tipo de
+                    Movimiento</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="cursor-pointer">
+                        <input type="radio" name="tipo" value="ingreso" class="hidden peer" required>
+                        <div
+                            class="border-2 border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center transition peer-checked:border-green-500 peer-checked:bg-green-50 dark:peer-checked:bg-green-900/20">
+                            <i class="fas fa-arrow-down text-green-500 text-2xl mb-2"></i>
+                            <p class="font-semibold text-green-700 dark:text-green-300">Ingreso</p>
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="tipo" value="egreso" class="hidden peer">
+                        <div
+                            class="border-2 border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center transition peer-checked:border-red-500 peer-checked:bg-red-50 dark:peer-checked:bg-red-900/20">
+                            <i class="fas fa-arrow-up text-red-500 text-2xl mb-2"></i>
+                            <p class="font-semibold text-red-700 dark:text-red-300">Egreso</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Monto</label>
+                <input type="number" name="monto" required min="1"
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-3 px-4 text-lg text-right bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Motivo</label>
+                <input type="text" name="motivo" required
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                    placeholder="Ej: Aporte de caja chica, Pago a proveedor...">
+            </div>
+
+            <div class="flex space-x-4">
+                <a href="{{ url_for('caja.estado') }}"
+                    class="flex-1 text-center bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-3 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition">
+                    <i class="fas fa-save mr-2"></i>Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

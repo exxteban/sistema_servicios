@@ -1,0 +1,13 @@
+{% macro render_brand_logo(brand_logo) -%}
+{% if brand_logo %}
+{% set is_wide = brand_logo.is_wide if brand_logo.is_wide is defined else false %}
+<span class="flex h-8 shrink-0 items-center justify-center rounded-2xl border border-slate-200/70 bg-white text-[10px] font-black text-slate-500 shadow-[0_1px_3px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white dark:text-slate-500" style="width: {{ '46px' if is_wide else '32px' }}; height: 32px; background-color: #fff !important;">
+    <img src="{{ brand_logo.url }}" alt="{{ brand_logo.brand }}" loading="lazy"
+        class="object-contain"
+        style="width: {{ '38px' if is_wide else '22px' }}; height: {{ '22px' if is_wide else '22px' }};"
+        data-fallback-srcs="{{ brand_logo.fallback_urls|join('|') }}" data-fallback-idx="0"
+        onerror="const sources=(this.dataset.fallbackSrcs||'').split('|').filter(Boolean); const idx=Number(this.dataset.fallbackIdx||'0'); if (idx < sources.length) { this.dataset.fallbackIdx=String(idx + 1); this.src=sources[idx]; return; } this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
+    <span class="hidden">{{ brand_logo.fallback_label }}</span>
+</span>
+{% endif %}
+{%- endmacro %}

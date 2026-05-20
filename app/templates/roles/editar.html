@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Rol{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-user-shield text-indigo-600 dark:text-indigo-400 mr-2"></i>Permisos del rol: {{
+                rol.nombre }}
+            </h1>
+            <div class="text-sm text-gray-500 dark:text-gray-400">Nivel: {{ rol.nivel_jerarquia }}</div>
+        </div>
+        <a href="{{ url_for('roles.listar') }}"
+            class="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i>Volver
+        </a>
+    </div>
+
+    <form method="POST" action="{{ url_for('roles.editar', id_rol=rol.id_rol) }}"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-6 transition-colors duration-300">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="space-y-4">
+            {% for modulo, items in permisos_por_modulo.items() %}
+            <div class="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <div class="font-semibold text-gray-700 dark:text-gray-200 mb-2">{{ modulo|capitalize }}</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {% for p in items %}
+                    <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
+                        <input type="checkbox" name="permisos_rol" value="{{ p.id_permiso }}" {% if p.id_permiso in
+                            selected_permiso_ids %}checked{% endif %} class="mt-1 h-4 w-4">
+                        <span>
+                            <span class="font-medium">{{ p.nombre }}</span>
+                            <span class="text-gray-500 dark:text-gray-400">({{ p.codigo }})</span>
+                            {% if p.requiere_autorizacion %}
+                            <span class="text-yellow-700 dark:text-yellow-300"> - requiere autorización</span>
+                            {% endif %}
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+            <a href="{{ url_for('roles.listar') }}"
+                class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                Cancelar
+            </a>
+            <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">
+                Guardar cambios
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

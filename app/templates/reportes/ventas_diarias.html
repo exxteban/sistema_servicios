@@ -1,0 +1,526 @@
+{% extends "base.html" %}
+{% block title %}Ventas del Día{% endblock %}
+{% block content %}
+<div class="space-y-6" x-data='ventasDiarias({{ detalles_por_venta|tojson|forceescape }})'>
+    <div class="flex justify-between items-center flex-wrap gap-4">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-calendar-day text-green-600 dark:text-green-400 mr-2"></i>
+            {% if desde == hasta %}
+            Ventas del {{ desde.strftime('%d/%m/%Y') }}
+            {% else %}
+            Ventas del {{ desde.strftime('%d/%m/%Y') }} al {{ hasta.strftime('%d/%m/%Y') }}
+            {% endif %}
+        </h1>
+        <form method="GET" action="{{ url_for('reportes.ventas_diarias') }}" class="flex gap-2 flex-wrap">
+            <input type="date" name="desde" value="{{ desde.isoformat() }}"
+                class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            <input type="date" name="hasta" value="{{ hasta.isoformat() }}"
+                class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+            <button type="submit"
+                class="bg-gray-800 dark:bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition">Ver</button>
+        </form>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-5 flex flex-col gap-1">
+            <span class="block text-green-600 dark:text-green-400 font-medium text-sm">
+                {% if desde == hasta %}Recaudacion del dia{% else %}Recaudacion del periodo{% endif %}
+            </span>
+            <span class="block text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-300 leading-tight">
+                Gs {{ "{:,.0f}".format(recaudacion_total_dia).replace(",", ".") }}
+            </span>
+            <span class="block text-sm text-green-700/80 dark:text-green-200/80">
+                Ventas cobradas: Gs {{ "{:,.0f}".format(total_cobros_ventas_dia).replace(",", ".") }} · Creditos: Gs {{ "{:,.0f}".format(total_cobros_credito_dia).replace(",", ".") }}
+            </span>
+        </div>
+        <div class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-5 flex flex-col gap-1">
+            <span class="block text-emerald-600 dark:text-emerald-400 font-medium text-sm">
+                {% if desde == hasta %}Cobros de pedidos del dia{% else %}Cobros de pedidos del periodo{% endif %}
+            </span>
+            <span class="block text-2xl sm:text-3xl font-bold text-emerald-700 dark:text-emerald-300 leading-tight">
+                Gs {{ "{:,.0f}".format(cobros_pedidos_dia).replace(",", ".") }}
+            </span>
+            <span class="block text-sm text-emerald-700/80 dark:text-emerald-200/80">
+                Se contabilizan por `fecha_pago` y no como venta cerrada
+            </span>
+            {% if desglose_cobros_pedidos %}
+            <button type="button"
+                class="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition"
+                @click="pedidosModalOpen = true">
+                <i class="fas fa-list"></i>
+                Ver detalle
+            </button>
+            {% endif %}
+        </div>
+        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-5 flex flex-col gap-1">
+            <span class="block text-amber-600 dark:text-amber-400 font-medium text-sm">
+                {% if desde == hasta %}Ventas cerradas del dia{% else %}Ventas cerradas del periodo{% endif %}
+            </span>
+            <span class="block text-2xl sm:text-3xl font-bold text-amber-700 dark:text-amber-300 leading-tight">
+                Gs {{ "{:,.0f}".format(ventas_cerradas_dia).replace(",", ".") }}
+            </span>
+            <span class="block text-sm text-amber-700/80 dark:text-amber-200/80">
+                {{ ventas|length }} ventas completadas en {{ periodo_label }}
+            </span>
+        </div>
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-5 flex flex-col gap-1">
+            <span class="block text-blue-600 dark:text-blue-400 font-medium text-sm">Deuda credito generada</span>
+            <span class="block text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-300 leading-tight">
+                Gs {{ "{:,.0f}".format(total_credito_generado).replace(",", ".") }}
+            </span>
+            <span class="block text-sm text-blue-700/80 dark:text-blue-200/80">
+                Incluye el saldo de credito generado y sus intereses
+            </span>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-amber-200 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
+        `Recaudacion` suma solo cobros recibidos en el {{ periodo_label }}. `Ventas cerradas` muestra mercaderia entregada/facturada en ese mismo {{ periodo_label }}. Son metricas separadas y no deben sumarse entre si.
+    </div>
+
+    <!-- Toggle Button -->
+    <div class="flex justify-end">
+        <button @click="showChart = !showChart"
+            class="px-4 py-2 rounded-lg bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg">
+            <i class="fas" :class="showChart ? 'fa-table' : 'fa-chart-bar'"></i>
+            <span x-text="showChart ? 'Mostrar Detalle' : 'Mostrar Gráfico'"></span>
+        </button>
+    </div>
+
+    <!-- Chart View -->
+    <div x-show="showChart" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100"
+        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 transform scale-100"
+        x-transition:leave-end="opacity-0 transform scale-95"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-colors duration-300">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+            <i class="fas fa-chart-line text-blue-600 dark:text-blue-400 mr-2"></i>Gráfico de Ventas
+        </h2>
+        <div class="relative" style="height: 400px;">
+            <canvas id="ventasChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Table View -->
+    <div x-show="!showChart" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100"
+        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 transform scale-100"
+        x-transition:leave-end="opacity-0 transform scale-95"
+        class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transition-colors duration-300">
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300"># Venta</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">{% if show_date_in_labels %}Fecha/Hora{% else %}Hora{% endif %}</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Cliente</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Vendedor</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Detalle</th>
+                    <th class="px-3 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Total</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for venta in ventas %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer transition-colors"
+                    @click="verDetalle({{ venta.id_venta }})">
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ venta.id_venta }}</td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                        {% if show_date_in_labels %}
+                        {{ venta.fecha_venta|local_strftime('%d/%m %H:%M') }}
+                        {% else %}
+                        {{ venta.fecha_venta|local_strftime('%H:%M') }}
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ venta.cliente.nombre }}</td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                        {{ vendedor_por_venta.get(venta.id_venta, 'Desconocido') }}
+                    </td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                        {% set detalle_txt = detalles_por_venta.get(venta.id_venta, '') %}
+                        <button type="button"
+                            class="block max-w-[26rem] truncate text-left hover:underline"
+                            title="{{ detalle_txt }}"
+                            @click.stop="verDetalle({{ venta.id_venta }})">
+                            {{ detalle_txt or '—' }}
+                        </button>
+                    </td>
+                    <td class="px-3 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">₲&nbsp;{{
+                        "{:,.0f}".format(venta.total).replace(",", ".") }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No hay ventas en esta
+                        fecha</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include "reportes/_modal_cobros_pedidos.html" %}
+
+    <!-- Modal Ventas del Rango -->
+    <div x-show="ventasModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="ventasModalOpen = false">
+                <div class="absolute inset-0 bg-gray-900/70"></div>
+            </div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div
+                class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                                Detalle de Ventas
+                            </h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                {% if desde == hasta %}
+                                {{ desde.strftime('%d/%m/%Y') }}
+                                {% else %}
+                                {{ desde.strftime('%d/%m/%Y') }} al {{ hasta.strftime('%d/%m/%Y') }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <button type="button"
+                            class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+                            @click="ventasModalOpen = false">
+                            Cerrar
+                        </button>
+                    </div>
+
+                    <div class="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300"># Venta</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">{% if show_date_in_labels %}Fecha/Hora{% else %}Hora{% endif %}</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Cliente</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Vendedor</th>
+                                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Detalle</th>
+                                    <th class="px-3 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                {% for venta in ventas %}
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer transition-colors"
+                                    @click="ventasModalOpen = false; verDetalle({{ venta.id_venta }})">
+                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ venta.id_venta }}</td>
+                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                                        {% if show_date_in_labels %}
+                                        {{ venta.fecha_venta|local_strftime('%d/%m %H:%M') }}
+                                        {% else %}
+                                        {{ venta.fecha_venta|local_strftime('%H:%M') }}
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ venta.cliente.nombre }}</td>
+                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                                        {{ vendedor_por_venta.get(venta.id_venta, 'Desconocido') }}
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                                        {% set detalle_txt = detalles_por_venta.get(venta.id_venta, '') %}
+                                        <button type="button"
+                                            class="block max-w-[26rem] truncate text-left hover:underline"
+                                            title="{{ detalle_txt }}"
+                                            @click.stop="ventasModalOpen = false; verDetalle({{ venta.id_venta }})">
+                                            {{ detalle_txt or '—' }}
+                                        </button>
+                                    </td>
+                                    <td class="px-3 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">₲&nbsp;{{
+                                        "{:,.0f}".format(venta.total).replace(",", ".") }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No hay ventas en este rango</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalle Venta -->
+    <div x-show="modalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="modalOpen = false">
+                <div class="absolute inset-0 bg-gray-900/70"></div>
+            </div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div
+                class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                                Detalle de Venta #<span x-text="venta?.id"></span>
+                            </h3>
+                            <div class="mt-2" x-show="loading">
+                                <p class="text-gray-500 dark:text-gray-400 text-center py-4">Cargando detalles...</p>
+                            </div>
+                            <div class="mt-4" x-show="!loading && venta">
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-2"><strong>Cliente:</strong> <span
+                                        x-text="venta?.cliente"></span></p>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4"><strong>Fecha:</strong> <span
+                                        x-text="venta?.fecha"></span></p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Tipo de venta</p>
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="venta?.tipo_venta || 'Contado'"></p>
+                                    </div>
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Estado de cobro</p>
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="venta?.estado_cobro || 'Pendiente'"></p>
+                                    </div>
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Cobrado al momento</p>
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                            ₲ <span x-text="new Intl.NumberFormat('es-PY').format(venta?.cobrado_al_momento || 0)"></span>
+                                        </p>
+                                    </div>
+                                    <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Saldo pendiente</p>
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                            ₲ <span x-text="new Intl.NumberFormat('es-PY').format(venta?.saldo_pendiente || 0)"></span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="border-t border-gray-200 dark:border-gray-700 py-2">
+                                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                        <thead>
+                                            <tr>
+                                                <th
+                                                    class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Prod</th>
+                                                <th
+                                                    class="text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Cant</th>
+                                                <th
+                                                    class="text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                                    Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <template x-for="item in venta?.items" :key="item.producto">
+                                                <tr>
+                                                    <td class="py-2 text-sm text-gray-900 dark:text-gray-100"
+                                                        x-text="item.producto"></td>
+                                                    <td class="py-2 text-sm text-gray-500 dark:text-gray-400 text-right"
+                                                        x-text="item.cantidad"></td>
+                                                    <td
+                                                        class="py-2 text-sm text-gray-900 dark:text-gray-100 text-right">
+                                                        ₲ <span
+                                                            x-text="new Intl.NumberFormat('es-PY').format(item.subtotal)"></span>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="font-bold border-t border-gray-200 dark:border-gray-700">
+                                                <td colspan="2"
+                                                    class="pt-2 text-right text-gray-800 dark:text-gray-100">Total:</td>
+                                                <td class="pt-2 text-right text-gray-800 dark:text-gray-100">₲ <span
+                                                        x-text="venta ? new Intl.NumberFormat('es-PY').format(venta.total) : 0"></span>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <h4 class="text-sm font-bold text-gray-700 dark:text-gray-200 mb-2">Pagos Realizados
+                                    </h4>
+                                    <template x-for="pago in venta?.pagos" :key="pago.metodo">
+                                        <div class="flex justify-between text-sm text-gray-600 dark:text-gray-300 mb-1">
+                                            <span x-text="pago.metodo"></span>
+                                            <span>₲ <span
+                                                    x-text="new Intl.NumberFormat('es-PY').format(pago.monto)"></span></span>
+                                        </div>
+                                    </template>
+                                    <div x-show="!venta?.pagos || venta?.pagos.length === 0"
+                                        class="text-sm text-gray-500 dark:text-gray-400 italic">
+                                        No hay pagos registrados
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800/90 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                        @click="window.open('/ventas/' + venta.id + '/ticket', '_blank')">
+                        <i class="fas fa-print mr-2"></i> Reimprimir Ticket
+                    </button>
+                    <button type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        @click="modalOpen = false">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="detalleTextoOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="detalleTextoOpen = false">
+                <div class="absolute inset-0 bg-gray-900/70"></div>
+            </div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div
+                class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full">
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex items-start justify-between gap-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                            Detalle (Venta #<span x-text="detalleVentaId"></span>)
+                        </h3>
+                        <button type="button"
+                            class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+                            @click="detalleTextoOpen = false">
+                            Cerrar
+                        </button>
+                    </div>
+
+                    <div class="mt-4 text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words"
+                        x-text="detalleTexto || '—'"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    (function () {
+        window.ventasDiarias = function (detallesPorVenta) {
+            return {
+                modalOpen: false,
+                ventasModalOpen: false,
+                pedidosModalOpen: false,
+                venta: null,
+                loading: false,
+                showChart: true,
+                detallesPorVenta: detallesPorVenta || {},
+                detalleTextoOpen: false,
+                detalleVentaId: null,
+                detalleTexto: '',
+                async verDetalle(id) {
+                    this.loading = true;
+                    this.modalOpen = true;
+                    try {
+                        const response = await fetch(`/reportes/ventas/${id}/detalle`);
+                        this.venta = await response.json();
+                    } catch (error) {
+                        console.error('Error:', error);
+                        mostrarNotificacion('Error al cargar detalles', 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                verDetalleTexto(id) {
+                    this.detalleVentaId = id;
+                    this.detalleTexto = (this.detallesPorVenta && this.detallesPorVenta[id]) ? this.detallesPorVenta[id] : '';
+                    this.detalleTextoOpen = true;
+                }
+            };
+        };
+
+        async function initVentasChart() {
+            const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+            const ctx = scope.querySelector('#ventasChart');
+            if (!ctx) return;
+            try { if (window.ensureChartJs) await window.ensureChartJs(); } catch { return; }
+            if (!window.Chart) return;
+
+            const existingChart = Chart.getChart(ctx);
+            if (existingChart) existingChart.destroy();
+
+            const isDark = document.documentElement.classList.contains('dark');
+
+            const data = [{% for v in ventas %} {{ v.total }} {% if not loop.last %}, {% endif %} {% endfor %}];
+        const labels = [{% for v in ventas %}{{ ((v.fecha_venta|local_strftime('%d/%m %H:%M')) if show_date_in_labels else (v.fecha_venta|local_strftime('%H:%M'))) | tojson }} {% if not loop.last %}, {% endif %} {% endfor %}];
+
+    const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, isDark ? 'rgba(34, 197, 94, 0.6)' : 'rgba(34, 197, 94, 0.8)');
+    gradient.addColorStop(1, isDark ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.2)');
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Venta emitida (₲)',
+                data: data,
+                backgroundColor: gradient,
+                borderColor: isDark ? 'rgb(34, 197, 94)' : 'rgb(21, 128, 61)',
+                borderWidth: 2,
+                borderRadius: 8,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                    titleColor: isDark ? '#f3f4f6' : '#111827',
+                    bodyColor: isDark ? '#f3f4f6' : '#111827',
+                    borderColor: isDark ? '#374151' : '#e5e7eb',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: function (context) {
+                            return '₲ ' + new Intl.NumberFormat('es-PY').format(context.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: isDark ? 'rgba(75, 85, 99, 0.2)' : 'rgba(209, 213, 219, 0.5)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: isDark ? '#9ca3af' : '#6b7280',
+                        callback: function (value) {
+                            return '₲ ' + new Intl.NumberFormat('es-PY', { notation: 'compact' }).format(value);
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: isDark ? '#9ca3af' : '#6b7280'
+                    }
+                }
+            }
+        }
+    });
+        }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initVentasChart, { once: true });
+    } else {
+        initVentasChart();
+    }
+    }) ();
+</script>
+{% endblock %}

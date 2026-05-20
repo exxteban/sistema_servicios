@@ -1,0 +1,99 @@
+{% extends "layout_refactored.html" %}
+
+{% block title %}CRM WhatsApp{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full min-h-0">
+    <!-- CRM Sub-nav -->
+    <div
+        class="crm-subnav bg-gray-900/70 border-b border-white/8 px-4 py-2 flex items-center gap-2 flex-shrink-0 backdrop-blur-sm">
+        {% if crm_puede_ver_bandeja_jefe %}
+        <a href="{{ url_for('crm.bandeja') }}"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                {% if request.endpoint == 'crm.bandeja' %}bg-teal-500/20 text-teal-300{% else %}text-gray-400 hover:text-white hover:bg-white/10{% endif %}">
+            <i class="fas fa-inbox text-xs"></i> Bandeja
+        </a>
+        {% endif %}
+        <a href="{{ url_for('crm.lista_contactos') }}"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                {% if request.endpoint == 'crm.lista_contactos' %}bg-teal-500/20 text-teal-300{% else %}text-gray-400 hover:text-white hover:bg-white/10{% endif %}">
+            <i class="fas fa-address-book text-xs"></i> Contactos
+        </a>
+        <a href="{{ url_for('crm.panel_asesor') }}"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                {% if request.endpoint == 'crm.panel_asesor' %}bg-teal-500/20 text-teal-300{% else %}text-gray-400 hover:text-white hover:bg-white/10{% endif %}">
+            <i class="fas fa-headset text-xs"></i> Panel Asesor
+        </a>
+        {% if current_user.es_admin() or current_user.es_supervisor() or current_user.modo_demo %}
+        <a href="{{ url_for('crm.dashboard') }}"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                {% if request.endpoint == 'crm.dashboard' %}bg-teal-500/20 text-teal-300{% else %}text-gray-400 hover:text-white hover:bg-white/10{% endif %}">
+            <i class="fas fa-chart-bar text-xs"></i> Dashboard
+        </a>
+        <a href="{{ url_for('crm.monitor_ia') }}"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                {% if request.endpoint == 'crm.monitor_ia' %}bg-teal-500/20 text-teal-300{% else %}text-gray-400 hover:text-white hover:bg-white/10{% endif %}">
+            <i class="fas fa-robot text-xs"></i> Monitor IA
+        </a>
+        <a href="{{ url_for('crm.admin_calidad') }}"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                {% if request.endpoint == 'crm.admin_calidad' %}bg-teal-500/20 text-teal-300{% else %}text-gray-400 hover:text-white hover:bg-white/10{% endif %}">
+            <i class="fas fa-star text-xs"></i> Calidad
+        </a>
+        <a href="{{ url_for('crm.admin_config') }}"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                {% if request.endpoint in ['crm.admin_config', 'crm.admin_plantillas'] %}bg-teal-500/20 text-teal-300{% else %}text-gray-400 hover:text-white hover:bg-white/10{% endif %}">
+            <i class="fas fa-cog text-xs"></i> Config
+        </a>
+        {% endif %}
+
+        <!-- Búsqueda global -->
+        <div class="ml-auto relative" x-data="crmSearch()" @keydown.escape.window="cerrar()">
+            <div class="relative">
+                <input type="text" x-model="q" @input.debounce.300ms="buscar()" @focus="abierto = true"
+                    placeholder="Buscar contacto, mensaje..."
+                    class="w-56 bg-gray-700/50 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-teal-500/50 focus:bg-gray-700 transition-colors pl-8">
+                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+            </div>
+            <div x-show="abierto && resultados.length > 0"
+                class="absolute right-0 top-full mt-1 w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden"
+                style="display:none">
+                <template x-for="r in resultados" :key="r.id + r.tipo">
+                    <a :href="r.url"
+                        @click.prevent="if (window.appNavigateActiveTab) window.appNavigateActiveTab(r.url); else window.location.href = r.url;"
+                        class="flex items-center gap-2 px-3 py-2 hover:bg-white/10 text-sm text-gray-200 transition-colors">
+                        <i :class="r.tipo === 'contacto' ? 'fas fa-user text-teal-400' : 'fas fa-comment text-blue-400'"
+                            class="text-xs w-4"></i>
+                        <span x-text="r.texto" class="truncate"></span>
+                    </a>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido de la página -->
+    <div class="flex-1 min-h-0">
+        {% block crm_content %}{% endblock %}
+    </div>
+</div>
+
+<script>
+    function crmSearch() {
+        return {
+            q: '',
+            resultados: [],
+            abierto: false,
+            async buscar() {
+                if (this.q.length < 2) { this.resultados = []; return; }
+                try {
+                    const r = await fetch(`/crm/api/buscar?q=${encodeURIComponent(this.q)}`);
+                    const d = await r.json();
+                    this.resultados = d.resultados || [];
+                    this.abierto = true;
+                } catch (e) { }
+            },
+            cerrar() { this.abierto = false; }
+        };
+    }
+</script>
+{% endblock %}

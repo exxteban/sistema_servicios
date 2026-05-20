@@ -1,0 +1,45 @@
+<style>
+    .config-switch-input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+    }
+
+    .config-switch-track {
+        width: 2.75rem;
+        height: 1.5rem;
+        border-radius: 9999px;
+        background: #9ca3af;
+        transition: background-color .2s ease;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .dark .config-switch-track {
+        background: #4b5563;
+    }
+
+    .config-switch-thumb {
+        position: absolute;
+        left: 0.25rem;
+        top: 0.25rem;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 9999px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+        transform: translateX(0);
+        transition: transform .2s ease;
+    }
+
+    .config-switch-input:checked + .config-switch-track {
+        background: #2563eb;
+    }
+
+    .config-switch-input:checked + .config-switch-track .config-switch-thumb {
+        transform: translateX(1.25rem);
+    }
+</style>

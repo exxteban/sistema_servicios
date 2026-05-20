@@ -1,0 +1,152 @@
+{% if puede_crear_producto_rapido and not bloqueado %}
+<script>
+(function () {
+    window.__pedidoProductoRapidoCategorias = {{ (categorias_producto_rapido or [])|tojson }};
+    window.__pedidoProductoRapidoGuardando = false;
+
+    function pedidoProductoRapidoNode(id) {
+        return document.getElementById(id);
+    }
+
+    function mostrarPedidoProductoRapidoError(message) {
+        const box = pedidoProductoRapidoNode('pedido-producto-rapido-error');
+        if (!box) return;
+        box.textContent = message || '';
+        box.classList.toggle('hidden', !message);
+    }
+
+    function generarCodigoPedidoProductoRapido() {
+        const now = new Date();
+        const y = String(now.getFullYear()).slice(-2);
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        return `SP-${y}${m}${d}-${hh}${mm}${ss}`;
+    }
+
+    window.abrirPedidoProductoRapido = function () {
+        const categorias = window.__pedidoProductoRapidoCategorias || [];
+        if (!categorias.length) {
+            alert('No hay categorias activas para crear el producto.');
+            return;
+        }
+        mostrarPedidoProductoRapidoError('');
+        pedidoProductoRapidoNode('pedido-producto-rapido-nombre').value = '';
+        pedidoProductoRapidoNode('pedido-producto-rapido-codigo').value = '';
+        pedidoProductoRapidoNode('pedido-producto-rapido-precio').value = pedidoProductoRapidoNode('pedido-item-precio')?.value || '';
+        pedidoProductoRapidoNode('pedido-producto-rapido-cantidad').value = pedidoProductoRapidoNode('pedido-item-cantidad')?.value || '1';
+        pedidoProductoRapidoNode('pedido-producto-rapido-observaciones').value = pedidoProductoRapidoNode('pedido-item-observaciones')?.value || '';
+        pedidoProductoRapidoNode('pedido-producto-rapido-sobre-pedido').checked = true;
+        pedidoProductoRapidoNode('pedido-producto-rapido-categoria').value = categorias[0].id_categoria;
+
+        const modal = pedidoProductoRapidoNode('pedido-producto-rapido-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(function () {
+            pedidoProductoRapidoNode('pedido-producto-rapido-nombre')?.focus();
+        }, 50);
+    };
+
+    window.cerrarPedidoProductoRapido = function () {
+        const modal = pedidoProductoRapidoNode('pedido-producto-rapido-modal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        window.__pedidoProductoRapidoGuardando = false;
+    };
+
+    window.cerrarPedidoProductoRapidoDesdeFondo = function (event) {
+        if (event.target && event.target.id === 'pedido-producto-rapido-modal') {
+            window.cerrarPedidoProductoRapido();
+        }
+    };
+
+    window.guardarPedidoProductoRapido = async function () {
+        if (window.__pedidoProductoRapidoGuardando) return;
+
+        const nombre = (pedidoProductoRapidoNode('pedido-producto-rapido-nombre')?.value || '').trim();
+        const precioVenta = Number(pedidoProductoRapidoNode('pedido-producto-rapido-precio')?.value || 0);
+        const idCategoria = Number(pedidoProductoRapidoNode('pedido-producto-rapido-categoria')?.value || 0);
+        const cantidad = Math.max(1, parseInt(pedidoProductoRapidoNode('pedido-producto-rapido-cantidad')?.value || '1', 10) || 1);
+        const observaciones = (pedidoProductoRapidoNode('pedido-producto-rapido-observaciones')?.value || '').trim();
+        const esSobrePedido = pedidoProductoRapidoNode('pedido-producto-rapido-sobre-pedido')?.checked === true;
+
+        if (!nombre) {
+            mostrarPedidoProductoRapidoError('Ingrese un nombre para el producto.');
+            return;
+        }
+        if (!idCategoria) {
+            mostrarPedidoProductoRapidoError('Seleccione una categoria.');
+            return;
+        }
+        if (!Number.isFinite(precioVenta) || precioVenta <= 0) {
+            mostrarPedidoProductoRapidoError('El precio de venta debe ser mayor a cero.');
+            return;
+        }
+
+        let codigo = (pedidoProductoRapidoNode('pedido-producto-rapido-codigo')?.value || '').trim().toUpperCase();
+        if (!codigo) codigo = generarCodigoPedidoProductoRapido();
+        if (esSobrePedido && !codigo.startsWith('SP-')) codigo = `SP-${codigo}`;
+
+        const button = pedidoProductoRapidoNode('pedido-producto-rapido-guardar');
+        window.__pedidoProductoRapidoGuardando = true;
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Creando...';
+        }
+        mostrarPedidoProductoRapidoError('');
+
+        try {
+            const response = await fetch('/productos/crear_rapido', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    codigo: codigo,
+                    nombre: nombre,
+                    id_categoria: idCategoria,
+                    precio_compra: 0,
+                    precio_venta: Math.round(precioVenta),
+                    stock_minimo: 0,
+                    porcentaje_iva: 10,
+                    es_servicio: esSobrePedido
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success || !data.producto) {
+                mostrarPedidoProductoRapidoError((data && data.error) ? data.error : 'No se pudo crear el producto rapido.');
+                return;
+            }
+
+            const producto = data.producto;
+            const select = pedidoProductoRapidoNode('pedido-producto-select');
+            if (select) {
+                const option = new Option(`${producto.nombre} - ${producto.codigo} - Gs. ${Math.round(producto.precio_venta || precioVenta)}`, producto.id, true, true);
+                option.dataset.precio = String(producto.precio_venta || precioVenta || '');
+                select.add(option);
+                select.value = String(producto.id);
+            }
+            pedidoProductoRapidoNode('pedido-item-cantidad').value = String(cantidad);
+            pedidoProductoRapidoNode('pedido-item-precio').value = String(producto.precio_venta || precioVenta);
+            pedidoProductoRapidoNode('pedido-item-observaciones').value = observaciones;
+            window.cerrarPedidoProductoRapido();
+            setTimeout(function () {
+                const inputPrecio = pedidoProductoRapidoNode('pedido-item-precio');
+                if (!inputPrecio) return;
+                inputPrecio.focus();
+                inputPrecio.select?.();
+            }, 50);
+        } catch (error) {
+            mostrarPedidoProductoRapidoError('Error de conexion al crear producto rapido.');
+        } finally {
+            window.__pedidoProductoRapidoGuardando = false;
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Crear y preparar';
+            }
+        }
+    };
+})();
+</script>
+{% endif %}

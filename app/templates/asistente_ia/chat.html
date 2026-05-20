@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Asistente IA{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static_url('css/asistente_ia_chat.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="h-full min-h-[calc(100vh-7rem)] max-w-4xl mx-auto flex flex-col gap-0">
+
+    {# ── Shell del chat ── #}
+    <div class="ia-chat-shell flex-1 flex flex-col min-h-[32rem]">
+
+        {# ── Header ── #}
+        <header class="ia-chat-header">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="ia-chat-header-avatar">
+                    <i class="fas fa-robot" aria-hidden="true"></i>
+                </div>
+                <div class="ia-chat-header-info min-w-0">
+                    <h2>Asistente IA</h2>
+                    <p class="truncate">Modo solo lectura &mdash; ventas, cobranzas, inventario, caja y más</p>
+                </div>
+            </div>
+            <div class="ia-chat-header-actions">
+                <a href="{{ url_for('asistente_ia.historial') }}"
+                   class="ia-header-btn hidden sm:inline-flex"
+                   title="Ver historial de consultas">
+                    <i class="fas fa-history" aria-hidden="true"></i>
+                    <span>Historial</span>
+                </a>
+                {% if puede_gestionar %}
+                <a href="{{ url_for('asistente_ia.admin') }}"
+                   class="ia-header-btn hidden sm:inline-flex"
+                   title="Panel de administración IA">
+                    <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                    <span>Panel IA</span>
+                </a>
+                {% endif %}
+                <span class="ia-status-badge {% if cfg.enabled %}ia-status-badge--on{% else %}ia-status-badge--off{% endif %}">
+                    <span class="ia-status-dot"></span>
+                    {% if cfg.enabled %}IA activa{% else %}IA apagada{% endif %}
+                </span>
+            </div>
+        </header>
+
+        {# ── Barra de consumo ── #}
+        <div id="ia-chat-usage"
+             class="ia-usage-strip"
+             data-used="{{ consumo_diario.usado }}"
+             data-limit="{{ consumo_diario.limite }}"
+             data-remaining="{{ consumo_diario.restante if consumo_diario.restante is not none else '' }}">
+            <i class="fas fa-gauge-high ia-usage-strip-icon" aria-hidden="true"></i>
+            <span class="ia-usage-strip-label">Consumo diario</span>
+            <div class="ia-usage-strip-track" aria-hidden="true">
+                <div id="ia-chat-usage-bar"
+                     class="ia-usage-strip-fill {% if consumo_diario.porcentaje >= 90 %}ia-usage-strip-fill--danger{% elif consumo_diario.porcentaje >= 70 %}ia-usage-strip-fill--warn{% endif %}"
+                     style="--usage: {{ consumo_diario.porcentaje }}%;"></div>
+            </div>
+            <span id="ia-chat-usage-label" class="ia-usage-strip-text">
+                {% if consumo_diario.sin_limite %}
+                    {{ consumo_diario.usado }} tokens
+                {% else %}
+                    {{ consumo_diario.usado }} / {{ consumo_diario.limite }}
+                {% endif %}
+            </span>
+        </div>
+
+        {# ── Área de mensajes ── #}
+        <div id="ia-chat-messages"
+             class="ia-chat-messages"
+             aria-live="polite"
+             aria-label="Conversación con el asistente IA">
+
+            {% if not historial %}
+            <div class="ia-welcome">
+                <div class="ia-welcome-icon">
+                    <i class="fas fa-robot" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <p class="ia-welcome-title">¡Hola! Soy tu asistente IA</p>
+                    <p class="ia-welcome-sub">
+                        Puedo ayudarte a consultar ventas, cobranzas, inventario, gastos corrientes, caja y fidelización.
+                        Escribí tu pregunta o elegí una sugerencia.
+                    </p>
+                </div>
+                <div class="ia-welcome-chips" id="ia-chips">
+                    <button type="button" class="ia-chip" data-prompt="¿Cuánto vendí hoy?">
+                        <i class="fas fa-chart-line" aria-hidden="true"></i> Ventas de hoy
+                    </button>
+                    <button type="button" class="ia-chip" data-prompt="¿Cuál es el estado de caja?">
+                        <i class="fas fa-cash-register" aria-hidden="true"></i> Estado de caja
+                    </button>
+                    <button type="button" class="ia-chip" data-prompt="¿Qué productos tienen stock bajo?">
+                        <i class="fas fa-boxes-stacked" aria-hidden="true"></i> Stock bajo
+                    </button>
+                    <button type="button" class="ia-chip" data-prompt="¿Cuánto se cobró este mes?">
+                        <i class="fas fa-hand-holding-dollar" aria-hidden="true"></i> Cobranzas del mes
+                    </button>
+                    <button type="button" class="ia-chip" data-prompt="¿Cuáles son los gastos de esta semana?">
+                        <i class="fas fa-receipt" aria-hidden="true"></i> Gastos recientes
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+
+            {% for item in historial %}
+            <div class="ia-msg-row ia-msg-row--{{ item.role }}">
+                {% if item.role == 'assistant' %}
+                <div class="ia-msg-avatar ia-msg-avatar--assistant" aria-hidden="true">
+                    <i class="fas fa-robot"></i>
+                </div>
+                {% endif %}
+                <div class="ia-bubble ia-bubble--{{ item.role }}">{{ item.content }}</div>
+                {% if item.role == 'user' %}
+                <div class="ia-msg-avatar ia-msg-avatar--user" aria-hidden="true">
+                    <i class="fas fa-user"></i>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {# ── Composer ── #}
+        <div class="ia-composer">
+            <form id="ia-chat-form" autocomplete="off">
+                <div class="ia-composer-inner">
+                    <textarea id="ia-chat-input"
+                              class="ia-chat-input"
+                              rows="1"
+                              maxlength="1200"
+                              placeholder="Escribí tu consulta… (Enter para enviar)"
+                              aria-label="Escribí tu consulta"></textarea>
+                    <div class="ia-composer-btns">
+                        <button id="ia-chat-clear"
+                                type="button"
+                                class="ia-btn-icon ia-btn-clear"
+                                title="Limpiar conversación"
+                                aria-label="Limpiar conversación">
+                            <i class="fas fa-broom" aria-hidden="true"></i>
+                        </button>
+                        <button type="submit"
+                                class="ia-btn-icon ia-btn-send"
+                                title="Enviar (Enter)"
+                                aria-label="Enviar mensaje">
+                            <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="ia-composer-footer">
+                    <span class="ia-composer-hint">
+                        <kbd>Enter</kbd> enviar &nbsp;&middot;&nbsp; <kbd>Shift+Enter</kbd> nueva línea
+                    </span>
+                    <p id="ia-chat-status" class="ia-composer-status" aria-live="polite"></p>
+                </div>
+            </form>
+        </div>
+
+    </div>{# /ia-chat-shell #}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_url('js/asistente_ia/chat.js') }}"></script>
+{% endblock %}

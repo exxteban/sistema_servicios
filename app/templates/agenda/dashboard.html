@@ -1,0 +1,72 @@
+{% extends "layout_refactored.html" %}
+
+{% block title %}Agenda | {% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-calendar-check text-indigo-500 mr-2"></i>Agenda
+        </h1>
+        <div class="flex items-center gap-2">
+            <a href="{{ url_for('agenda.lista_actividades') }}"
+                class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm">
+                <i class="fas fa-list mr-1"></i> Ver lista
+            </a>
+            {% if current_user.tiene_permiso('agenda_crear') %}
+            <a href="{{ url_for('agenda.nueva_actividad') }}"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition text-sm">
+                <i class="fas fa-plus mr-1"></i> Nueva
+            </a>
+            {% endif %}
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{ fecha_hoy.strftime('%d/%m/%Y') }}</span>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border-t-4 border-blue-500">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Pendientes hoy</p>
+            <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ pendientes_hoy }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border-t-4 border-red-500">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Vencidas</p>
+            <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ vencidas }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border-t-4 border-amber-500">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Próximas</p>
+            <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ proximas }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+            <p class="text-gray-700 dark:text-gray-200 font-semibold">Actividades por prioridad</p>
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+                Total: {{ prioridades_pendientes.values()|sum }}
+            </span>
+        </div>
+        <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <a href="{{ url_for('agenda.lista_actividades', prioridad='baja') }}"
+                class="rounded-lg ring-1 ring-inset ring-emerald-500/40 dark:ring-emerald-400/35 bg-emerald-50/80 dark:bg-emerald-900/20 p-3 block transition hover:shadow-md hover:-translate-y-0.5 hover:ring-emerald-500/60 dark:hover:ring-emerald-300/55">
+                <p class="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300 font-semibold">Baja</p>
+                <p class="mt-1 text-2xl font-bold text-emerald-800 dark:text-emerald-200">{{ prioridades_pendientes.get('baja', 0) }}</p>
+            </a>
+            <a href="{{ url_for('agenda.lista_actividades', prioridad='media') }}"
+                class="rounded-lg ring-1 ring-inset ring-sky-500/40 dark:ring-sky-400/35 bg-sky-50/80 dark:bg-sky-900/20 p-3 block transition hover:shadow-md hover:-translate-y-0.5 hover:ring-sky-500/60 dark:hover:ring-sky-300/55">
+                <p class="text-xs uppercase tracking-wide text-sky-700 dark:text-sky-300 font-semibold">Media</p>
+                <p class="mt-1 text-2xl font-bold text-sky-800 dark:text-sky-200">{{ prioridades_pendientes.get('media', 0) }}</p>
+            </a>
+            <a href="{{ url_for('agenda.lista_actividades', prioridad='alta') }}"
+                class="rounded-lg ring-1 ring-inset ring-orange-500/40 dark:ring-orange-400/35 bg-orange-50/80 dark:bg-orange-900/20 p-3 block transition hover:shadow-md hover:-translate-y-0.5 hover:ring-orange-500/60 dark:hover:ring-orange-300/55">
+                <p class="text-xs uppercase tracking-wide text-orange-700 dark:text-orange-300 font-semibold">Alta</p>
+                <p class="mt-1 text-2xl font-bold text-orange-800 dark:text-orange-200">{{ prioridades_pendientes.get('alta', 0) }}</p>
+            </a>
+            <a href="{{ url_for('agenda.lista_actividades', prioridad='critica') }}"
+                class="rounded-lg ring-1 ring-inset ring-rose-500/40 dark:ring-rose-400/35 bg-rose-50/80 dark:bg-rose-900/20 p-3 block transition hover:shadow-md hover:-translate-y-0.5 hover:ring-rose-500/60 dark:hover:ring-rose-300/55">
+                <p class="text-xs uppercase tracking-wide text-rose-700 dark:text-rose-300 font-semibold">Crítica</p>
+                <p class="mt-1 text-2xl font-bold text-rose-800 dark:text-rose-200">{{ prioridades_pendientes.get('critica', 0) }}</p>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

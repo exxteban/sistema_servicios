@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Cerrar sesión{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
+        <div class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 flex items-center justify-center">
+                <i class="fas fa-exclamation-triangle text-xl"></i>
+            </div>
+            <div class="flex-1">
+                <h1 class="text-xl font-bold text-gray-900 dark:text-white">
+                    {{ 'Olvidaste cerrar la caja' if sesion else 'Cerrar sesión' }}
+                </h1>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">
+                    {% if sesion %}
+                        Tenés una caja abierta{% if sesion.caja %} ({{ sesion.caja.nombre }}){% endif %}.
+                        Si salís igual, la caja va a seguir abierta para tu usuario.
+                    {% else %}
+                        Confirmá para cerrar tu sesión.
+                    {% endif %}
+                </p>
+
+                {% if sesion %}
+                <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Apertura</p>
+                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                            {{ sesion.fecha_apertura|local_strftime('%d/%m/%Y %H:%M') if sesion.fecha_apertura else '-' }}
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Monto inicial</p>
+                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                            ₲ {{ "{:,.0f}".format(sesion.monto_inicial or 0).replace(",", ".") }}
+                        </p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
+                    <a href="{{ url_for('caja.estado') if sesion else url_for('main.dashboard') }}"
+                        class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                        <i class="fas fa-wallet mr-2"></i>Ir a Caja
+                    </a>
+                    <form method="POST" action="{{ url_for('auth.logout') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="force" value="1">
+                        <button type="submit"
+                            class="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition w-full">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Cerrar sesión
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

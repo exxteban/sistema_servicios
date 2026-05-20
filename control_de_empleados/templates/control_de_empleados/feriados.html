@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}Feriados RRHH{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Feriados personalizados</h1>
+            <p class="mt-1 text-sm text-gray-500">Se suman a los feriados legales fijos y cubren decretos, traslados o asuetos excepcionales.</p>
+        </div>
+        <div class="flex flex-col gap-3 sm:flex-row">
+            <a href="{{ url_for('control_empleados.index', periodo=periodo_actual) }}"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                <i class="fas fa-arrow-left"></i>
+                Volver
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-1">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900">Nuevo feriado</h2>
+                    <p class="text-sm text-gray-500">Marca una fecha y explica por qué no debe contar como día hábil.</p>
+                </div>
+                <form method="post" action="{{ url_for('control_empleados.feriados') }}" class="p-5 space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="anio" value="{{ anio }}">
+                    <div>
+                        <label for="fecha" class="block text-sm font-semibold text-gray-700 mb-2">Fecha</label>
+                        <input id="fecha" name="fecha" type="date" value="{{ fecha_hoy }}" required
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="motivo" class="block text-sm font-semibold text-gray-700 mb-2">Motivo</label>
+                        <input id="motivo" name="motivo" type="text" required placeholder="Ej: Decreto presidencial por feriado puente"
+                            class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div class="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                        En cuanto lo guardas, el cálculo de vacaciones deja de contar esa fecha como día hábil.
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-calendar-plus"></i>
+                            Guardar feriado
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="xl:col-span-2 space-y-6">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <div class="px-5 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900">Filtrar año</h2>
+                </div>
+                <form method="get" action="{{ url_for('control_empleados.feriados') }}" class="p-5 flex flex-col gap-4 md:flex-row">
+                    <div class="flex-1">
+                        <label for="anio" class="block text-sm font-semibold text-gray-700 mb-2">Año</label>
+                        <select id="anio" name="anio" class="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-blue-500">
+                            {% for opcion in opciones_anio %}
+                            <option value="{{ opcion }}" {% if opcion == anio %}selected{% endif %}>{{ opcion }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black transition-colors">
+                            <i class="fas fa-filter"></i>
+                            Ver año
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900">Calendario cargado</h2>
+                        <p class="text-sm text-gray-500">Feriados personalizados para {{ anio }}.</p>
+                    </div>
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ feriados|length }} registros</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Motivo</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white">
+                            {% for feriado in feriados %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-4 text-sm font-semibold text-gray-900">{{ feriado.fecha.strftime('%d/%m/%Y') }}</td>
+                                <td class="px-4 py-4 text-sm text-gray-700">{{ feriado.motivo }}</td>
+                                <td class="px-4 py-4 text-right">
+                                    <form method="post" action="{{ url_for('control_empleados.eliminar_feriado', id_feriado=feriado.id_feriado) }}" class="inline-flex">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors">
+                                            <i class="fas fa-trash"></i>
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="px-4 py-12 text-center">
+                                    <div class="mx-auto max-w-md">
+                                        <div class="w-14 h-14 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 text-xl">
+                                            <i class="fas fa-calendar-day"></i>
+                                        </div>
+                                        <h3 class="mt-4 text-lg font-semibold text-gray-900">Sin feriados personalizados</h3>
+                                        <p class="mt-2 text-sm text-gray-500">Si sale un decreto o un asueto extraordinario, lo puedes registrar aquí.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

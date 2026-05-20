@@ -1,0 +1,1356 @@
+{% if layout_shell_section|default('full') != 'after' %}
+    {% if current_user.is_authenticated and not embed_mode %}
+    <nav class="crm-topnav text-white z-50 relative" data-app-topnav>
+        <div class="w-full px-2 sm:px-4 lg:px-6">
+            <div class="crm-topnav__inner flex justify-between items-center h-14 2xl:h-16 gap-2">
+
+                {# ── Lado izquierdo: hamburger + logo ── #}
+                <div class="crm-topnav__brand flex items-center gap-2 sm:gap-3 min-w-0">
+                    <button @click="sidebarOpen = !sidebarOpen"
+                        class="md:hidden p-2 rounded-lg hover:bg-white/10 focus:outline-none transition-colors"
+                        aria-label="Abrir menú">
+                        <i class="fas fa-bars text-lg"></i>
+                    </button>
+
+                    <a href="{{ url_for('main.dashboard') }}" id="app-logo-link"
+                        class="crm-topnav__brand-link flex items-center gap-2.5 sm:gap-3 group min-w-0 select-none">
+
+                        {# Contenedor del ícono/logo con efecto glow #}
+                        <div class="crm-logo-icon shrink-0">
+                            {% if app_brand_logo_path %}
+                            <img src="{{ static_url(app_brand_logo_path) }}" alt="Logo empresa"
+                                class="h-8 w-8 sm:h-9 sm:w-9 object-contain rounded-md">
+                            {% else %}
+                            <i class="fas fa-store text-xl text-white"></i>
+                            {% endif %}
+                        </div>
+
+                        {# Separador vertical #}
+                        <div class="hidden sm:block w-px h-7 bg-white/20 shrink-0"></div>
+
+                        {% set username_actual = (current_user.username or '') | trim | lower %}
+                        {% set usuario_demo = current_user.modo_demo or username_actual in ['demo', 'demostracion', 'demostración'] %}
+                        <div class="crm-topnav__brand-copy flex {% if usuario_demo %}flex-col items-start{% else %}items-baseline gap-2{% endif %} min-w-0">
+                            <div class="crm-topnav__title-row flex items-baseline gap-2 min-w-0">
+                                <span class="crm-topnav__title-main font-bold text-sm sm:text-base tracking-wide text-white/95 truncate leading-tight">
+                                    Sistema de Gestión
+                                </span>
+                                <span class="crm-topnav__title-secondary hidden sm:inline font-light text-sm text-blue-200/80 tracking-widest uppercase truncate leading-tight">
+                                    Comercial
+                                </span>
+                            </div>
+                            {% if app_brand_name %}
+                            <span class="crm-brand-pill truncate max-w-[140px] sm:max-w-[200px]">
+                                {{ app_brand_name }}
+                            </span>
+                            {% endif %}
+                            {% if usuario_demo %}
+                            <a href="https://wa.me/595961862624?text=Hola%20Esteban%2C%20me%20interesa%20este%20sistema."
+                                target="_blank" rel="noopener noreferrer"
+                                class="mt-0.5 inline-flex items-center gap-1.5 rounded-full bg-amber-400/25 px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold text-amber-100 backdrop-blur-sm ring-1 ring-amber-300/40 hover:bg-amber-400/40 transition whitespace-nowrap"
+                                style="animation: pulse-subtle 2.5s ease-in-out infinite;"
+                                title="Contactar por WhatsApp">
+                                <i class="fab fa-whatsapp text-green-300 text-[13px]"></i>
+                                ¿Te interesa? Contacta al <strong class="text-white">0961862624</strong> &nbsp;Esteban Lezcano
+                            </a>
+                            {% endif %}
+                        </div>
+                    </a>
+                </div>
+
+                {# ── Lado derecho: acciones ── #}
+                {% set p_agenda = current_user.tiene_permiso('agenda_acceso') %}
+                {% set p_asistente_ia = current_user.tiene_permiso('usar_asistente_ia') %}
+                <div class="crm-topnav__actions flex items-center gap-1.5 sm:gap-2 shrink-0">
+
+                    {% if p_agenda %}
+                    <a href="{{ url_for('agenda.dashboard') }}" data-tab-url="{{ url_for('agenda.dashboard') }}"
+                        data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
+                        class="app-tab-link crm-nav-pill hidden md:inline-flex items-center gap-1.5"
+                        x-data="{
+                            pendingCount: 0,
+                            overdueCount: 0,
+                            alertCount: 0,
+                            init() {
+                                window.addEventListener('agenda:alertas-actualizadas', (event) => {
+                                    const detail = event && event.detail ? event.detail : {};
+                                    this.pendingCount = Number(detail.count || 0);
+                                    this.overdueCount = Number(detail.overdue_count || 0);
+                                    this.alertCount = Number(detail.alert_count || 0);
+                                });
+                            }
+                        }"
+                        :title="`Agenda: ${pendingCount} pendientes | ${overdueCount} vencidas | ${alertCount} en alerta`">
+                        <i class="fas fa-calendar-check text-indigo-300 text-xs"></i>
+                        <span class="crm-topnav__action-label text-xs font-semibold">Agenda</span>
+                        <span x-show="pendingCount > 0" x-cloak x-text="pendingCount > 99 ? '99+' : pendingCount"
+                            class="inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold"></span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_asistente_ia %}
+                    <a href="{{ url_for('asistente_ia.chat') }}" data-permiso="usar_asistente_ia"
+                        data-tab-url="{{ url_for('asistente_ia.chat') }}" data-tab-title="Asistente IA"
+                        data-tab-icon="fas fa-robot"
+                        class="app-tab-link crm-nav-pill inline-flex items-center gap-1.5"
+                        title="Abrir Asistente IA" aria-label="Abrir Asistente IA">
+                        <i class="fas fa-robot text-cyan-300 text-xs"></i>
+                        <span class="crm-topnav__action-label hidden lg:inline text-xs font-semibold">Asistente IA</span>
+                    </a>
+                    {% endif %}
+
+                    {# Separador #}
+                    <div class="crm-topnav__separator hidden sm:block w-px h-5 bg-white/15 mx-0.5"></div>
+
+                    {# Modo oscuro #}
+                    <button @click="darkMode = !darkMode"
+                        class="crm-nav-icon-btn"
+                        title="Alternar Modo Oscuro">
+                        <i class="fas text-sm" :class="darkMode ? 'fa-sun text-yellow-300' : 'fa-moon text-blue-200'"></i>
+                    </button>
+
+                    {# Reloj #}
+                    <span data-app-clock data-app-clock-format="datetime"
+                        class="crm-nav-pill crm-topnav__clock hidden sm:inline-flex items-center gap-1.5 font-mono"
+                        title="Fecha y hora del sistema">
+                        <i class="fas fa-clock text-blue-200 text-xs"></i>
+                        <span data-app-clock-text class="text-xs">{{ now().strftime('%d/%m/%Y %H:%M:%S') if now is defined else '' }}</span>
+                    </span>
+
+                    {# Usuario #}
+                    <span class="crm-topnav__user hidden md:inline-flex items-center gap-1.5 text-xs font-medium text-white/80 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-lg max-w-[180px] truncate">
+                        <i class="fas fa-circle-user text-blue-300 text-sm shrink-0"></i>
+                        <span class="truncate">{{ current_user.nombre_completo }}{% if current_user.rol %}<span class="text-white/40 ml-1">({{ current_user.rol.nombre }})</span>{% endif %}</span>
+                    </span>
+
+                    {# Salir #}
+                    <form id="app-logout-form" method="POST" action="{{ url_for('auth.logout') }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="crm-logout-btn" title="Cerrar sesión">
+                            <i class="fas fa-arrow-right-from-bracket text-xs"></i>
+                            <span class="crm-topnav__logout-label hidden sm:inline text-xs font-semibold">Salir</span>
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    {% if current_user.is_authenticated and not embed_mode %}
+    <div class="flex flex-1 min-h-0 w-full overflow-hidden">
+        {% endif %}
+
+        {% if current_user.is_authenticated and not embed_mode %}
+        <div x-show="sidebarOpen" @click="sidebarOpen = false"
+            x-transition:enter="transition-opacity ease-linear duration-300" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity ease-linear duration-300"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 bg-gray-900/80 z-40 md:hidden" style="display: none;"></div>
+
+        <aside
+            class="app-shell-sidebar fixed md:relative top-14 2xl:top-16 md:top-0 left-0 w-16 md:h-full bg-gray-900/90 backdrop-blur-xl border-r border-white/10 text-white flex flex-col items-center py-3 2xl:py-4 gap-2 2xl:gap-3 z-50 md:z-50 transform md:transform-none transition-transform duration-300 ease-in-out shadow-2xl"
+            :class="{'translate-x-0': sidebarOpen, '-translate-x-full': !sidebarOpen}" x-data="sidebarMenu()"
+            x-init="init()" @sidebar-menu-open="openMenu($event.detail.name)"
+            @sidebar-menu-close="closeMenu($event.detail.name)"
+            @sidebar-menu-close-now="closeMenuNow($event.detail.name)"
+            @sidebar-menu-toggle="toggleMenu($event.detail.name)"
+            @pointerdown.window="handleGlobalPointer($event)" @keydown.escape.window="activeMenu = null">
+
+            <a href="{{ url_for('main.dashboard') }}" id="sidebar-home-link"
+                class="sidebar-link group relative w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300"
+                style="--accent-rgb: 59, 130, 246" aria-label="Inicio">
+                <i class="fas fa-home text-lg group-hover:scale-110 transition-transform"></i>
+                <span
+                    class="pointer-events-none absolute left-full ml-3 whitespace-nowrap bg-gray-800 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition z-50 shadow-xl border border-white/10">
+                    Inicio
+                </span>
+            </a>
+
+            {% set p_pos_raw = current_user.tiene_permiso('crear_venta') %}
+            {% set p_pos = p_pos_raw and sidebar_mostrar_pos %}
+            {% set p_registro_vendedor = p_pos_raw and sidebar_mostrar_registro_vendedor %}
+            {% set p_pedidos = current_user.es_admin() or current_user.tiene_permiso('ver_clientes') or current_user.tiene_permiso('crear_cliente') or current_user.tiene_permiso('editar_cliente') %}
+            {% set p_caja = current_user.tiene_permiso('ver_caja') %}
+            {% set p_cajas = current_user.es_admin() or current_user.tiene_permiso('gestionar_cajas') %}
+            {% set p_cola_cobro = current_user.tiene_permiso('ver_cola_cobro') %}
+            {% set p_ticket = current_user.es_admin() or current_user.tiene_permiso('editar_configuracion') %}
+            {% set p_flujo_caja = modulo_flujo_caja_activo and (current_user.es_admin() or current_user.tiene_permiso('ver_flujo_caja')) %}
+            {% set p_gastos_corrientes = current_user.tiene_permiso('ver_gastos_corrientes') %}
+
+            {% if p_pos or p_registro_vendedor or p_pedidos or p_caja or p_cajas or p_ticket or p_flujo_caja or p_gastos_corrientes %}
+            <div class="relative group w-12" @mouseenter="$dispatch('sidebar-menu-open', { name: 'ventas' })" @mouseleave="$dispatch('sidebar-menu-close', { name: 'ventas' })"
+                {% if p_cola_cobro %}x-data="cajaNotification()"{% endif %}>
+                <button
+                    type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'ventas' })"
+                    data-sidebar-trigger="ventas"
+                    class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 focus:outline-none relative"
+                    {% if p_cola_cobro %}:class="{ 'whatsapp-pending-animation': hasPendingCobros }"{% endif %}
+                    style="--accent-rgb: 34, 197, 94">
+                    <i class="fas fa-cash-register text-lg group-hover:scale-110 transition-transform"></i>
+                    {% if p_cola_cobro %}
+                    <span x-show="hasPendingCobros" x-cloak x-text="pendingCount > 99 ? '99+' : pendingCount"
+                        class="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center"></span>
+                    {% endif %}
+                </button>
+
+                <template x-if="activeMenu === 'ventas'">
+                <div data-sidebar-menu="ventas"
+                    @mouseenter="$dispatch('sidebar-menu-open', { name: 'ventas' })"
+                    @mouseleave="$dispatch('sidebar-menu-close', { name: 'ventas' })"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+                    x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+                    class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+                    :style="getMenuStyle('ventas')" aria-hidden="false">
+
+                    <div
+                        class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+                        Operaciones
+                    </div>
+
+                    {% if p_pos %}
+                    <a href="{{ url_for('ventas.pos') }}" data-permiso="crear_venta"
+                        data-tab-url="{{ url_for('ventas.pos') }}" data-tab-title="POS"
+                        data-tab-icon="fas fa-cash-register"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-green-400 group-hover/item:bg-green-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-cash-register text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Punto de Venta</span>
+                    </a>
+                    {% endif %}
+                    {% if p_registro_vendedor %}
+                    <a href="{{ url_for('ventas.registro_vendedor') }}" data-permiso="crear_venta"
+                        data-tab-url="{{ url_for('ventas.registro_vendedor') }}" data-tab-title="Registro vendedor"
+                        data-tab-icon="fas fa-clipboard-list"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover/item:bg-amber-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-clipboard-list text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Registro vendedor</span>
+                    </a>
+                    <a href="{{ url_for('ventas.registro_vendedor_enviadas') }}" data-permiso="crear_venta"
+                        data-tab-url="{{ url_for('ventas.registro_vendedor_enviadas') }}"
+                        data-tab-title="Mis ventas enviadas" data-tab-icon="fas fa-paper-plane"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center text-sky-400 group-hover/item:bg-sky-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-paper-plane text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Mis ventas enviadas</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_pedidos %}
+                    <a href="{{ url_for('pedidos.listar') }}"
+                        data-tab-url="{{ url_for('pedidos.listar') }}" data-tab-title="Pedidos"
+                        data-tab-icon="fas fa-clipboard-list"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover/item:bg-cyan-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-clipboard-list text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Pedidos</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_caja %}
+                    <a href="{{ url_for('caja.estado') }}" data-permiso="ver_caja"
+                        data-tab-url="{{ url_for('caja.estado') }}" data-tab-title="Caja" data-tab-icon="fas fa-wallet"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover/item:bg-purple-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-wallet text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Caja Actual</span>
+                        {% if p_cola_cobro %}
+                        <span x-show="pendingCount > 0" x-cloak x-text="pendingCount"
+                            class="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full"></span>
+                        {% endif %}
+                    </a>
+                    <a href="{{ url_for('caja.cierres_listar') }}" data-permiso="ver_caja"
+                        data-tab-url="{{ url_for('caja.cierres_listar') }}" data-tab-title="Cierres de Caja"
+                        data-tab-icon="fas fa-file-invoice-dollar"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover/item:bg-purple-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-file-invoice-dollar text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Cierres</span>
+                    </a>
+                    <a href="{{ url_for('caja.contabilidad') }}" data-permiso="ver_caja"
+                        data-tab-url="{{ url_for('caja.contabilidad') }}" data-tab-title="Contabilidad"
+                        data-tab-icon="fas fa-calculator"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover/item:bg-emerald-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-calculator text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Contabilidad</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_flujo_caja %}
+                    <a href="{{ url_for('flujo_caja.index') }}" data-permiso="ver_flujo_caja"
+                        data-tab-url="{{ url_for('flujo_caja.index') }}" data-tab-title="Flujo proyectado"
+                        data-tab-icon="fas fa-chart-line"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover/item:bg-cyan-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-chart-line text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Flujo proyectado</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_gastos_corrientes %}
+                    <a href="{{ url_for('gastos_corrientes.index') }}" data-permiso="ver_gastos_corrientes"
+                        data-tab-url="{{ url_for('gastos_corrientes.index') }}" data-tab-title="Gastos corrientes"
+                        data-tab-icon="fas fa-file-invoice-dollar"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center text-rose-400 group-hover/item:bg-rose-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-file-invoice-dollar text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Gastos corrientes</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_cajas %}
+                    <a href="{{ url_for('caja.cajas_listar') }}" data-permiso="gestionar_cajas"
+                        data-tab-url="{{ url_for('caja.cajas_listar') }}" data-tab-title="Cajas"
+                        data-tab-icon="fas fa-layer-group"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover/item:bg-indigo-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-layer-group text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Gestión Cajas</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_ticket %}
+                    <a href="{{ url_for('ventas.config_ticket') }}" data-permiso="editar_configuracion"
+                        data-tab-url="{{ url_for('ventas.config_ticket') }}" data-tab-title="Ticket"
+                        data-tab-icon="fas fa-receipt"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover/item:bg-blue-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-receipt text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Config. Ticket</span>
+                    </a>
+                    {% endif %}
+                </div>
+                </template>
+            </div>
+            {% endif %}
+
+            {% if modulo_servicio_tecnico_activo %}
+            <a href="{{ url_for('reparaciones.listar') }}" data-tab-url="{{ url_for('reparaciones.listar') }}"
+                data-tab-title="Servicio Técnico" data-tab-icon="fas fa-tools"
+                class="sidebar-link app-tab-link group relative w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300"
+                style="--accent-rgb: 249, 115, 22" aria-label="Servicio Técnico">
+                <i class="fas fa-tools text-lg group-hover:scale-110 transition-transform"></i>
+                <span
+                    class="pointer-events-none absolute left-full ml-3 whitespace-nowrap bg-gray-800 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition z-50 shadow-xl border border-white/10">
+                    Servicio Técnico
+                </span>
+            </a>
+            {% endif %}
+
+            {% set p_control_empleados = current_user.es_admin() or current_user.tiene_permiso('ver_control_empleados') or current_user.tiene_permiso('gestionar_control_empleados') %}
+            {% if modulo_control_empleados_activo and p_control_empleados %}
+            <a href="{{ url_for('control_empleados.index') }}" data-tab-url="{{ url_for('control_empleados.index') }}"
+                data-tab-title="Control de Empleados" data-tab-icon="fas fa-users-cog"
+                class="sidebar-link app-tab-link group relative w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300"
+                style="--accent-rgb: 6, 182, 212" aria-label="Control de Empleados">
+                <i class="fas fa-users-cog text-lg group-hover:scale-110 transition-transform"></i>
+                <span
+                    class="pointer-events-none absolute left-full ml-3 whitespace-nowrap bg-gray-800 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition z-50 shadow-xl border border-white/10">
+                    Control de Empleados
+                </span>
+            </a>
+            {% endif %}
+
+            {% set p_cobranzas = current_user.es_admin() or current_user.tiene_permiso('ver_cobranzas') %}
+            {% if modulo_cobranzas_activo and p_cobranzas %}
+            <a href="{{ url_for('cobranzas.index') }}" data-tab-url="{{ url_for('cobranzas.index') }}"
+                data-tab-title="Cobranzas" data-tab-icon="fas fa-hand-holding-usd"
+                class="sidebar-link app-tab-link group relative w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-emerald-500/20 transition-all duration-300"
+                style="--accent-rgb: 16, 185, 129" aria-label="Cobranzas">
+                <i class="fas fa-hand-holding-usd text-lg group-hover:scale-110 transition-transform"></i>
+                <span
+                    class="pointer-events-none absolute left-full ml-3 whitespace-nowrap bg-gray-800 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition z-50 shadow-xl border border-white/10">
+                    Cobranzas
+                </span>
+            </a>
+            {% endif %}
+
+            {% set p_agenda = current_user.tiene_permiso('agenda_acceso') %}
+            {% if p_agenda %}
+            <a href="{{ url_for('agenda.dashboard') }}" data-tab-url="{{ url_for('agenda.dashboard') }}"
+                data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
+                x-data="agendaNotification()" x-init="init()"
+                :class="{ 'agenda-pending-animation': hasPendingAgenda }"
+                class="sidebar-link app-tab-link group relative w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-indigo-500/20 transition-all duration-300"
+                style="--accent-rgb: 99, 102, 241" aria-label="Agenda">
+                <i class="fas fa-calendar-check text-lg group-hover:scale-110 transition-transform"></i>
+                <span x-show="hasPendingAgenda" x-cloak x-text="pendingCount > 99 ? '99+' : pendingCount"
+                    class="agenda-notification-badge"></span>
+                <span
+                    class="pointer-events-none absolute left-full ml-3 whitespace-nowrap bg-gray-800 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition z-50 shadow-xl border border-white/10">
+                    Agenda
+                </span>
+            </a>
+            {% endif %}
+
+            {% set p_whatsapp_convs = modulo_whatsapp_activo and current_user.tiene_permiso('whatsapp_conversaciones') %}
+            {% if p_whatsapp_convs %}
+            <div class="relative group w-12" @mouseenter="$dispatch('sidebar-menu-open', { name: 'whatsapp' })" @mouseleave="$dispatch('sidebar-menu-close', { name: 'whatsapp' })"
+                x-data="whatsappNotification()">
+                <button
+                    type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'whatsapp' })"
+                    data-sidebar-trigger="whatsapp"
+                    class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 focus:outline-none relative"
+                    :class="{ 'whatsapp-pending-animation': hasPendingChats }" style="--accent-rgb: 37, 211, 102">
+                    <i class="fab fa-whatsapp text-lg group-hover:scale-110 transition-transform"></i>
+                    <span x-show="hasPendingChats" x-cloak class="whatsapp-notification-badge"></span>
+                </button>
+
+                <template x-if="activeMenu === 'whatsapp'">
+                <div data-sidebar-menu="whatsapp"
+                    @mouseenter="$dispatch('sidebar-menu-open', { name: 'whatsapp' })"
+                    @mouseleave="$dispatch('sidebar-menu-close', { name: 'whatsapp' })"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+                    x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+                    class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+                    :style="getMenuStyle('whatsapp')" aria-hidden="false">
+
+                    <div
+                        class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+                        WhatsApp
+                        <span x-show="pendingCount > 0" x-cloak x-text="'(' + pendingCount + ' pendientes)'"
+                            class="text-green-400 ml-1"></span>
+                    </div>
+
+                    <a href="{{ url_for('whatsapp.panel_asesor') }}"
+                        data-tab-url="{{ url_for('whatsapp.panel_asesor') }}" data-tab-title="WhatsApp"
+                        data-tab-icon="fab fa-whatsapp"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-green-400 group-hover/item:bg-green-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-headset text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium ml-1">Mis Conversaciones</span>
+                        <span x-show="pendingCount > 0" x-cloak x-text="pendingCount"
+                            class="ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full"></span>
+                    </a>
+                </div>
+                </template>
+            </div>
+            {% endif %}
+
+            {% set p_crm_whatsapp = modulo_crm_activo and current_user.tiene_permiso('crm_whatsapp') %}
+            {% if p_crm_whatsapp %}
+            <a href="{{ url_for('crm.bandeja') }}" data-tab-url="{{ url_for('crm.bandeja') }}"
+                data-tab-title="CRM WhatsApp" data-tab-icon="fas fa-address-book"
+                class="sidebar-link app-tab-link group relative w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-teal-500/20 transition-all duration-300"
+                style="--accent-rgb: 20, 184, 166" aria-label="CRM WhatsApp">
+                <i class="fas fa-address-book text-lg group-hover:scale-110 transition-transform"></i>
+                <span
+                    class="pointer-events-none absolute left-full ml-3 whitespace-nowrap bg-gray-800 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition z-50 shadow-xl border border-white/10">
+                    CRM WhatsApp
+                </span>
+            </a>
+            {% endif %}
+
+            <script>
+                const agendaActivitySyncStorageKey = 'agenda-activity-sync';
+
+                function agendaNotification() {
+                    return {
+                        hasPendingAgenda: false,
+                        pendingCount: 0,
+                        overdueCount: 0,
+                        alertCount: 0,
+                        pollInterval: null,
+                        currentPollMs: null,
+                        scheduledCheckTimeout: null,
+                        isChecking: false,
+                        lastKeys: null,
+                        lastItems: [],
+                        suppressedIds: {},
+                        suppressMs: 15000,
+                        inactivePollMs: 30000,
+                        activePollMs: 3000,
+                        storagePrefix: 'agenda-runtime-alerta-vista',
+
+                        init() {
+                            this.startPolling();
+                            document.addEventListener('visibilitychange', () => {
+                                if (document.hidden) {
+                                    this.stopPolling();
+                                } else {
+                                    this.startPolling();
+                                    this.checkAgendaAlerts();
+                                }
+                            });
+                            window.addEventListener('agenda:resolver-actividad', (event) => {
+                                this.resolveAgendaActivity(event && event.detail ? event.detail : {});
+                            });
+                            window.addEventListener('storage', (event) => {
+                                if (!event || event.key !== agendaActivitySyncStorageKey || !event.newValue) {
+                                    return;
+                                }
+                                try {
+                                    this.resolveAgendaActivity(JSON.parse(event.newValue));
+                                } catch (e) {
+                                }
+                            });
+                        },
+
+                        startPolling() {
+                            this.checkAgendaAlerts();
+                            this.refreshPollingInterval();
+                        },
+
+                        stopPolling() {
+                            if (this.pollInterval) {
+                                clearInterval(this.pollInterval);
+                                this.pollInterval = null;
+                            }
+                            this.currentPollMs = null;
+                            this.clearScheduledCheck();
+                        },
+
+                        refreshPollingInterval() {
+                            if (document.hidden) {
+                                if (this.pollInterval) {
+                                    clearInterval(this.pollInterval);
+                                    this.pollInterval = null;
+                                }
+                                this.currentPollMs = null;
+                                return;
+                            }
+                            const nextPollMs = this.hasPendingAgenda ? this.activePollMs : this.inactivePollMs;
+                            if (this.pollInterval && this.currentPollMs === nextPollMs) {
+                                return;
+                            }
+                            if (this.pollInterval) {
+                                clearInterval(this.pollInterval);
+                            }
+                            this.currentPollMs = nextPollMs;
+                            this.pollInterval = setInterval(() => this.checkAgendaAlerts(), nextPollMs);
+                        },
+
+                        clearScheduledCheck() {
+                            if (this.scheduledCheckTimeout) {
+                                clearTimeout(this.scheduledCheckTimeout);
+                                this.scheduledCheckTimeout = null;
+                            }
+                        },
+
+                        scheduleNextCheck(nextCheckAtUtc, serverTimeUtc) {
+                            this.clearScheduledCheck();
+
+                            const nextCheckMs = Date.parse(nextCheckAtUtc || '');
+                            const serverTimeMs = Date.parse(serverTimeUtc || '');
+                            if (!Number.isFinite(nextCheckMs) || !Number.isFinite(serverTimeMs)) {
+                                return;
+                            }
+
+                            const maxDelayMs = 5 * 60 * 1000;
+                            const delayMs = Math.min(Math.max(0, nextCheckMs - serverTimeMs + 250), maxDelayMs);
+                            this.scheduledCheckTimeout = setTimeout(() => {
+                                this.scheduledCheckTimeout = null;
+                                this.checkAgendaAlerts();
+                            }, delayMs);
+                        },
+
+                        pruneSuppressed() {
+                            const nowMs = Date.now();
+                            const nextSuppressed = {};
+                            Object.keys(this.suppressedIds || {}).forEach((id) => {
+                                const ts = Number(this.suppressedIds[id] || 0);
+                                if (nowMs - ts < this.suppressMs) {
+                                    nextSuppressed[id] = ts;
+                                }
+                            });
+                            this.suppressedIds = nextSuppressed;
+                        },
+
+                        suppressActivityId(activityId) {
+                            const id = String(activityId || '').trim();
+                            if (!id) return;
+                            this.suppressedIds[id] = Date.now();
+                            this.pruneSuppressed();
+                        },
+
+                        isSuppressed(activityId) {
+                            const id = String(activityId || '').trim();
+                            if (!id) return false;
+                            const ts = Number(this.suppressedIds[id] || 0);
+                            if (!ts) {
+                                return false;
+                            }
+                            return Date.now() - ts < this.suppressMs;
+                        },
+
+                        applyStateFromItems(items, summary) {
+                            const safeItems = Array.isArray(items) ? items : [];
+                            const hasSummary = summary && typeof summary === 'object';
+                            let overdueCount = hasSummary ? Number(summary.overdue_count || 0) : 0;
+                            let alertCount = hasSummary ? Number(summary.alert_count || 0) : 0;
+                            if (!Number.isFinite(overdueCount) || !Number.isFinite(alertCount) || !hasSummary) {
+                                overdueCount = 0;
+                                alertCount = 0;
+                                safeItems.forEach((item) => {
+                                    if (item && item.estado_alerta === 'overdue') {
+                                        overdueCount += 1;
+                                    } else if (item && item.estado_alerta === 'alert') {
+                                        alertCount += 1;
+                                    }
+                                });
+                            }
+                            const totalCount = hasSummary && Number.isFinite(Number(summary.count))
+                                ? Number(summary.count)
+                                : safeItems.length;
+                            this.lastItems = safeItems.slice();
+                            this.pendingCount = totalCount;
+                            this.overdueCount = overdueCount;
+                            this.alertCount = alertCount;
+                            this.hasPendingAgenda = this.pendingCount > 0;
+                            this.refreshPollingInterval();
+
+                            window.dispatchEvent(new CustomEvent('agenda:alertas-actualizadas', {
+                                detail: {
+                                    count: this.pendingCount,
+                                    overdue_count: this.overdueCount,
+                                    alert_count: this.alertCount,
+                                    has_alerts: this.hasPendingAgenda,
+                                    items: this.lastItems
+                                }
+                            }));
+                        },
+
+                        buildAlertKey(item) {
+                            const triggerAt = item && (item.trigger_at_utc || item.fecha_inicio_utc || '');
+                            const estado = item && item.estado_alerta ? item.estado_alerta : 'alert';
+                            const id = item && item.id ? item.id : '0';
+                            return `${this.storagePrefix}:${id}:${estado}:${triggerAt}`;
+                        },
+
+                        wasAlreadyNotified(key) {
+                            try {
+                                return window.localStorage && localStorage.getItem(key) === '1';
+                            } catch (e) {
+                                return false;
+                            }
+                        },
+
+                        markNotified(key) {
+                            try {
+                                if (window.localStorage) {
+                                    localStorage.setItem(key, '1');
+                                }
+                            } catch (e) {
+                            }
+                        },
+
+                        notifyNewAgendaItems(items) {
+                            if (!Array.isArray(items) || !items.length) {
+                                return;
+                            }
+
+                            const unseenItems = items.filter((item) => (
+                                item
+                                && item.estado_alerta === 'overdue'
+                                && !this.wasAlreadyNotified(this.buildAlertKey(item))
+                            ));
+                            if (!unseenItems.length) {
+                                return;
+                            }
+
+                            let delivered = false;
+                            if (typeof window.__emitAgendaLiveAlerts === 'function') {
+                                window.__emitAgendaLiveAlerts({
+                                    items: unseenItems
+                                });
+                                delivered = true;
+                            } else if (typeof window.mostrarNotificacion === 'function') {
+                                const primaryItem = unseenItems[0];
+                                const total = unseenItems.length;
+                                const suffix = total > 1 ? ` Hay ${total} actividades de agenda requiriendo atención.` : '';
+                                const message = primaryItem.estado_alerta === 'overdue'
+                                    ? `Agenda: "${primaryItem.titulo}" ya venció y sigue pendiente.${suffix}`
+                                    : `Agenda: "${primaryItem.titulo}" entró en alerta.${suffix}`;
+                                window.mostrarNotificacion(message, 'warning');
+                                delivered = true;
+                            } else {
+                                window.__agendaLiveAlertQueue = Array.isArray(window.__agendaLiveAlertQueue)
+                                    ? window.__agendaLiveAlertQueue
+                                    : [];
+                                window.__agendaLiveAlertQueue.push({ items: unseenItems });
+                                delivered = true;
+                            }
+
+                            if (delivered) {
+                                unseenItems.forEach((item) => this.markNotified(this.buildAlertKey(item)));
+                            }
+                        },
+
+                        resolveAgendaActivity(detail) {
+                            const activityId = String((detail && detail.id) || '');
+                            if (!activityId) {
+                                return;
+                            }
+                            this.suppressActivityId(activityId);
+
+                            if (Array.isArray(this.lastKeys)) {
+                                const token = `${this.storagePrefix}:${activityId}:`;
+                                this.lastKeys = this.lastKeys.filter((key) => !String(key).startsWith(token));
+                            }
+                            const items = Array.isArray(this.lastItems)
+                                ? this.lastItems.filter((item) => String(item && item.id ? item.id : '') !== activityId)
+                                : [];
+                            this.applyStateFromItems(items);
+                            this.checkAgendaAlerts();
+                        },
+
+                        async checkAgendaAlerts() {
+                            if (this.isChecking) {
+                                return;
+                            }
+                            this.isChecking = true;
+                            try {
+                                const response = await fetch('/agenda/api/alertas/resumen?limit=80', {
+                                    method: 'GET',
+                                    headers: { 'Accept': 'application/json' }
+                                });
+                                if (!response.ok) return;
+
+                                const data = await response.json();
+                                this.pruneSuppressed();
+                                const items = (Array.isArray(data.items) ? data.items : [])
+                                    .filter((item) => !this.isSuppressed(item && item.id ? item.id : ''));
+                                const keys = items
+                                    .map((item) => this.buildAlertKey(item))
+                                    .sort();
+
+                                const shouldNotify = this.lastKeys === null
+                                    ? items
+                                    : items.filter((item) => !this.lastKeys.includes(this.buildAlertKey(item)));
+                                this.notifyNewAgendaItems(shouldNotify);
+                                this.applyStateFromItems(items, data);
+                                this.scheduleNextCheck(data && data.next_check_at_utc, data && data.server_time_utc);
+                                this.lastKeys = keys;
+                            } catch (e) {
+                            } finally {
+                                this.isChecking = false;
+                            }
+                        }
+                    };
+                }
+
+                function whatsappNotification() {
+                    return {
+                        hasPendingChats: false,
+                        pendingCount: 0,
+                        pollInterval: null,
+                        lastData: null,
+
+                        init() {
+                            this.startPolling();
+                            document.addEventListener('visibilitychange', () => {
+                                if (document.hidden) {
+                                    this.stopPolling();
+                                } else {
+                                    this.startPolling();
+                                    this.checkPendingChats();
+                                }
+                            });
+                        },
+
+                        startPolling() {
+                            this.checkPendingChats();
+                            this.pollInterval = setInterval(() => this.checkPendingChats(), 10000);
+                        },
+
+                        stopPolling() {
+                            if (this.pollInterval) {
+                                clearInterval(this.pollInterval);
+                                this.pollInterval = null;
+                            }
+                        },
+
+                        async checkPendingChats() {
+                            try {
+                                const response = await fetch('/whatsapp/asesor/conversaciones', {
+                                    method: 'GET',
+                                    headers: { 'Accept': 'application/json' }
+                                });
+                                if (!response.ok) return;
+                                const data = await response.json();
+
+                                const colaCount = data.cola ? data.cola.length : 0;
+                                const pendingConvs = data.conversaciones ? data.conversaciones.filter(c => c.estado_asignacion === 'pendiente').length : 0;
+                                this.pendingCount = colaCount + pendingConvs;
+                                this.hasPendingChats = this.pendingCount > 0;
+
+                                if (this.lastData && this.pendingCount > this.lastData) {
+                                    if (window.mostrarNotificacion) {
+                                        window.mostrarNotificacion(`Tienes ${this.pendingCount} chat${this.pendingCount > 1 ? 's' : ''} pendiente${this.pendingCount > 1 ? 's' : ''} en WhatsApp`, 'info');
+                                    }
+                                }
+                                this.lastData = this.pendingCount;
+                            } catch (e) {
+                            }
+                        }
+                    };
+                }
+
+                function cajaNotification() {
+                    return {
+                        hasPendingCobros: false,
+                        pendingCount: 0,
+                        pollInterval: null,
+                        lastCount: null,
+
+                        init() {
+                            this.startPolling();
+                            document.addEventListener('visibilitychange', () => {
+                                if (document.hidden) {
+                                    this.stopPolling();
+                                } else {
+                                    this.startPolling();
+                                    this.checkPendingCobros();
+                                }
+                            });
+                            window.addEventListener('caja:cola-cobro-actualizada', (event) => {
+                                const detail = event && event.detail ? event.detail : {};
+                                const count = Number(detail.count || 0);
+                                const alertaActiva = Boolean(detail.alertaActiva);
+                                this.pendingCount = count;
+                                this.hasPendingCobros = alertaActiva && count > 0;
+                                this.lastCount = count;
+                            });
+                        },
+
+                        startPolling() {
+                            this.checkPendingCobros();
+                            if (this.pollInterval) {
+                                clearInterval(this.pollInterval);
+                            }
+                            this.pollInterval = setInterval(() => this.checkPendingCobros(), 3000);
+                        },
+
+                        stopPolling() {
+                            if (this.pollInterval) {
+                                clearInterval(this.pollInterval);
+                                this.pollInterval = null;
+                            }
+                        },
+
+                        async checkPendingCobros() {
+                            try {
+                                const response = await fetch('/caja/api/cola-cobro/resumen?detalle=0', {
+                                    method: 'GET',
+                                    headers: { 'Accept': 'application/json' }
+                                });
+                                if (!response.ok) return;
+
+                                const data = await response.json();
+                                const count = Number(data.count || 0);
+                                const alertaActiva = Boolean(data.alerta_activa);
+
+                                this.pendingCount = count;
+                                this.hasPendingCobros = alertaActiva && count > 0;
+
+                                if (this.lastCount !== null && count > this.lastCount && window.mostrarNotificacion) {
+                                    window.mostrarNotificacion(
+                                        `Hay ${count} pendiente${count === 1 ? '' : 's'} de cobro en caja`,
+                                        'info'
+                                    );
+                                }
+                                this.lastCount = count;
+                            } catch (e) {
+                            }
+                        }
+                    };
+                }
+            </script>
+
+            <script>
+                function sidebarMenu() {
+                    return {
+                        activeMenu: null,
+                        menuOffsets: {},
+                        closeDelay: 180,
+                        closeTimer: null,
+
+                        init() {
+                            const repositionMenus = () => {
+                                if (this.activeMenu) {
+                                    this.$nextTick(() => this.positionMenu(this.activeMenu));
+                                }
+                            };
+
+                            window.addEventListener('resize', repositionMenus, { passive: true });
+                            window.addEventListener('orientationchange', repositionMenus, { passive: true });
+                            if (window.visualViewport) {
+                                window.visualViewport.addEventListener('resize', repositionMenus, { passive: true });
+                            }
+                        },
+
+                        openMenu(name) {
+                            this.clearCloseTimer();
+                            this.activeMenu = name;
+                            this.$nextTick(() => this.positionMenu(name));
+                        },
+
+                        toggleMenu(name) {
+                            if (this.activeMenu === name) {
+                                this.activeMenu = null;
+                                return;
+                            }
+                            this.openMenu(name);
+                        },
+
+                        handleGlobalPointer(event) {
+                            if (!this.activeMenu || !event || !event.target || typeof event.target.closest !== 'function') {
+                                return;
+                            }
+                            if (event.target.closest('[data-sidebar-trigger]') || event.target.closest('[data-sidebar-menu]')) {
+                                return;
+                            }
+                            this.clearCloseTimer();
+                            this.activeMenu = null;
+                        },
+
+                        closeMenu(name) {
+                            this.clearCloseTimer();
+                            this.closeTimer = window.setTimeout(() => {
+                                if (this.activeMenu === name) {
+                                    this.activeMenu = null;
+                                }
+                                this.closeTimer = null;
+                            }, this.closeDelay);
+                        },
+
+                        clearCloseTimer() {
+                            if (this.closeTimer !== null) {
+                                window.clearTimeout(this.closeTimer);
+                                this.closeTimer = null;
+                            }
+                        },
+
+                        closeMenuNow(name) {
+                            this.clearCloseTimer();
+                            if (this.activeMenu === name) {
+                                this.activeMenu = null;
+                            }
+                        },
+
+                        getMenuStyle(name) {
+                            const offset = Number(this.menuOffsets[name] || 0);
+                            return `top: ${offset}px;`;
+                        },
+
+                        positionMenu(name) {
+                            const trigger = this.$el.querySelector(`[data-sidebar-trigger="${name}"]`);
+                            const menu = this.$el.querySelector(`[data-sidebar-menu="${name}"]`);
+                            if (!trigger || !menu) {
+                                return;
+                            }
+
+                            const padding = 12;
+                            const viewportHeight = Number(window.__appShellViewportHeight || 0)
+                                || (typeof window.__appShellGetViewportHeight === 'function'
+                                    ? window.__appShellGetViewportHeight()
+                                    : (window.innerHeight || document.documentElement.clientHeight || 0));
+                            const triggerRect = trigger.getBoundingClientRect();
+                            const menuRect = menu.getBoundingClientRect();
+                            let offset = 0;
+
+                            const overflowBottom = triggerRect.top + menuRect.height - (viewportHeight - padding);
+                            if (overflowBottom > 0) {
+                                offset -= overflowBottom;
+                            }
+
+                            const overflowTop = triggerRect.top + offset - padding;
+                            if (overflowTop < 0) {
+                                offset -= overflowTop;
+                            }
+
+                            this.menuOffsets = {
+                                ...this.menuOffsets,
+                                [name]: Math.round(offset)
+                            };
+                        }
+                    };
+                }
+            </script>
+
+            {% set p_prod = current_user.tiene_permiso('ver_inventario') %}
+            {% set p_prov = current_user.tiene_permiso('ver_proveedores') %}
+            {% set p_usados = current_user.tiene_permiso('ver_recepcion_usados') or current_user.tiene_permiso('crear_recepcion_usados') %}
+            {% set p_presup_emp = current_user.tiene_permiso('ver_presupuestos_empresariales') or current_user.tiene_permiso('crear_presupuestos_empresariales') %}
+
+            {% if p_prod or p_prov or p_usados or p_presup_emp %}
+            <div class="relative group w-12" @mouseenter="$dispatch('sidebar-menu-open', { name: 'inventario' })" @mouseleave="$dispatch('sidebar-menu-close', { name: 'inventario' })">
+                <button
+                    type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'inventario' })"
+                    data-sidebar-trigger="inventario"
+                    class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 focus:outline-none"
+                    style="--accent-rgb: 59, 130, 246">
+                    <i class="fas fa-boxes-stacked text-lg group-hover:scale-110 transition-transform"></i>
+                </button>
+
+                <template x-if="activeMenu === 'inventario'">
+                <div data-sidebar-menu="inventario"
+                    @mouseenter="$dispatch('sidebar-menu-open', { name: 'inventario' })"
+                    @mouseleave="$dispatch('sidebar-menu-close', { name: 'inventario' })"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+                    x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+                    class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+                    :style="getMenuStyle('inventario')" aria-hidden="false">
+
+                    <div
+                        class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+                        Logística
+                    </div>
+
+                    {% if p_prod %}
+                    <a href="{{ url_for('productos.listar') }}" data-permiso="ver_inventario"
+                        data-tab-url="{{ url_for('productos.listar') }}" data-tab-title="Productos"
+                        data-tab-icon="fas fa-box"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover/item:bg-blue-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-box text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Productos</span>
+                    </a>
+
+                    <a href="{{ url_for('tienda_admin.panel') }}"
+                        data-tab-url="{{ url_for('tienda_admin.panel') }}" data-tab-title="Mi Tienda Online"
+                        data-tab-icon="fas fa-store"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover/item:bg-emerald-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-store text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Mi Tienda Online</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_prov %}
+                    <a href="{{ url_for('proveedores.listar') }}" data-permiso="ver_proveedores"
+                        data-tab-url="{{ url_for('proveedores.listar') }}" data-tab-title="Proveedores"
+                        data-tab-icon="fas fa-truck-loading"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center text-sky-400 group-hover/item:bg-sky-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-truck-loading text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Proveedores</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_usados %}
+                    <a href="{{ url_for('recepcion_usados.listar') }}" data-permiso="ver_recepcion_usados"
+                        data-tab-url="{{ url_for('recepcion_usados.listar') }}" data-tab-title="Compra de usados"
+                        data-tab-icon="fas fa-file-signature"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover/item:bg-amber-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-file-signature text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Compra de usados</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_presup_emp %}
+                    <a href="{{ url_for('presupuestos_empresariales.listar') }}" data-permiso="ver_presupuestos_empresariales"
+                        data-tab-url="{{ url_for('presupuestos_empresariales.listar') }}" data-tab-title="Presupuestos empresariales"
+                        data-tab-icon="fas fa-file-contract"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover/item:bg-emerald-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-file-contract text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Presupuestos empresariales</span>
+                    </a>
+                    {% endif %}
+                </div>
+                </template>
+            </div>
+            {% endif %}
+
+            {% set p_cli = current_user.tiene_permiso('ver_clientes') %}
+            {% set p_fid = current_user.tiene_permiso('editar_cliente') %}
+            {% set p_usr = current_user.tiene_permiso('gestionar_usuarios') %}
+
+            {% if p_cli or p_fid or p_usr %}
+            <div class="relative group w-12" @mouseenter="$dispatch('sidebar-menu-open', { name: 'directorio' })" @mouseleave="$dispatch('sidebar-menu-close', { name: 'directorio' })">
+                <button
+                    type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'directorio' })"
+                    data-sidebar-trigger="directorio"
+                    class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-pink-500/20 transition-all duration-300 focus:outline-none"
+                    style="--accent-rgb: 236, 72, 153">
+                    <i class="fas fa-address-book text-lg group-hover:scale-110 transition-transform"></i>
+                </button>
+
+                <template x-if="activeMenu === 'directorio'">
+                <div data-sidebar-menu="directorio"
+                    @mouseenter="$dispatch('sidebar-menu-open', { name: 'directorio' })"
+                    @mouseleave="$dispatch('sidebar-menu-close', { name: 'directorio' })"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+                    x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+                    class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+                    :style="getMenuStyle('directorio')" aria-hidden="false">
+
+                    <div
+                        class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+                        Directorio
+                    </div>
+
+                    {% if p_cli %}
+                    <a href="{{ url_for('clientes.listar') }}" data-permiso="ver_clientes"
+                        data-tab-url="{{ url_for('clientes.listar') }}" data-tab-title="Clientes"
+                        data-tab-icon="fas fa-users"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center text-pink-400 group-hover/item:bg-pink-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-users text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Clientes</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_fid %}
+                    <a href="{{ url_for('clientes_fidelizacion.panel') }}" data-permiso="editar_cliente"
+                        data-tab-url="{{ url_for('clientes_fidelizacion.panel') }}" data-tab-title="Fidelizacion"
+                        data-tab-icon="fas fa-gift"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover/item:bg-purple-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-gift text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Fidelizacion</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_usr %}
+                    <a href="{{ url_for('usuarios.listar') }}" data-permiso="gestionar_usuarios"
+                        data-tab-url="{{ url_for('usuarios.listar') }}" data-tab-title="Usuarios"
+                        data-tab-icon="fas fa-user-cog"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 group-hover/item:bg-red-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-user-cog text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Usuarios</span>
+                    </a>
+                    {% endif %}
+                </div>
+                </template>
+            </div>
+            {% endif %}
+
+            {% set p_rep = current_user.tiene_permiso('ver_reportes') %}
+            {% set p_comp = current_user.tiene_permiso('ver_compras') %}
+            {% set p_aud = current_user.tiene_permiso('ver_auditoria') %}
+            {% set p_asistente_ia = current_user.tiene_permiso('usar_asistente_ia') %}
+            {% set p_modulos_sistema = es_usuario_root_actual %}
+
+            {% if p_rep or p_comp or p_aud or p_asistente_ia or p_modulos_sistema %}
+            <div class="relative group w-12" @mouseenter="$dispatch('sidebar-menu-open', { name: 'sistema' })" @mouseleave="$dispatch('sidebar-menu-close', { name: 'sistema' })">
+                <button
+                    type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'sistema' })"
+                    data-sidebar-trigger="sistema"
+                    class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 focus:outline-none"
+                    style="--accent-rgb: 234, 179, 8">
+                    <i class="fas fa-chart-pie text-lg group-hover:scale-110 transition-transform"></i>
+                </button>
+
+                <template x-if="activeMenu === 'sistema'">
+                <div data-sidebar-menu="sistema"
+                    @mouseenter="$dispatch('sidebar-menu-open', { name: 'sistema' })"
+                    @mouseleave="$dispatch('sidebar-menu-close', { name: 'sistema' })"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+                    x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+                    x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+                    class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+                    :style="getMenuStyle('sistema')" aria-hidden="false">
+
+                    <div
+                        class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+                        Sistema
+                    </div>
+
+                    {% if p_rep %}
+                    <a href="{{ url_for('reportes.index') }}" data-permiso="ver_reportes"
+                        data-tab-url="{{ url_for('reportes.index') }}" data-tab-title="Reportes"
+                        data-tab-icon="fas fa-chart-bar"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center text-yellow-400 group-hover/item:bg-yellow-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-chart-bar text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Reportes</span>
+                    </a>
+
+                    <a href="{{ url_for('inteligencia.dashboard') }}" data-permiso="ver_reportes"
+                        data-tab-url="{{ url_for('inteligencia.dashboard') }}" data-tab-title="Inteligencia"
+                        data-tab-icon="fas fa-brain"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover/item:bg-cyan-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-brain text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Inteligencia</span>
+                        {% if inteligencia_menu_badge %}
+                        <span data-bi-alertas="{{ inteligencia_menu_badge }}" class="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-cyan-400/15 px-2 py-0.5 text-[11px] font-semibold text-cyan-100 ring-1 ring-cyan-300/20">
+                            {{ inteligencia_menu_badge }}
+                        </span>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+
+                    {% if p_asistente_ia %}
+                    <a href="{{ url_for('asistente_ia.chat') }}" data-permiso="usar_asistente_ia"
+                        data-tab-url="{{ url_for('asistente_ia.chat') }}" data-tab-title="Asistente IA"
+                        data-tab-icon="fas fa-robot"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover/item:bg-blue-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-robot text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Asistente IA</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_comp %}
+                    <a href="{{ url_for('compras.listar') }}" data-permiso="ver_compras"
+                        data-tab-url="{{ url_for('compras.listar') }}" data-tab-title="Compras"
+                        data-tab-icon="fas fa-truck"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center text-orange-400 group-hover/item:bg-orange-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-truck text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Compras</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_aud %}
+                    <a href="{{ url_for('auditoria.listar') }}" data-permiso="ver_auditoria"
+                        data-tab-url="{{ url_for('auditoria.listar') }}" data-tab-title="Auditoría"
+                        data-tab-icon="fas fa-clipboard-list"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center text-teal-400 group-hover/item:bg-teal-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-clipboard-list text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Auditoría</span>
+                    </a>
+                    {% endif %}
+
+                    {% if p_modulos_sistema %}
+                    <a href="{{ url_for('usuarios.modulos_sistema') }}"
+                        data-tab-url="{{ url_for('usuarios.modulos_sistema') }}" data-tab-title="Módulos del sistema"
+                        data-tab-icon="fas fa-puzzle-piece"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover/item:bg-amber-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-puzzle-piece text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Módulos del sistema</span>
+                    </a>
+                    {% endif %}
+                </div>
+                </template>
+            </div>
+            {% endif %}
+        </aside>
+        {% endif %}
+
+        <main
+            class="flex-1 min-h-0 min-w-0 w-full overflow-hidden flex flex-col {% if embed_mode %}p-0{% else %}px-3 py-3 2xl:px-4 2xl:py-4{% endif %}">
+            <div class="min-h-0 flex flex-col flex-1 overflow-hidden">
+                {% if not embed_mode %}
+                <div id="app-tab-bar"
+                    class="relative z-30 flex items-end gap-1 overflow-x-auto border-b border-gray-200 dark:border-gray-700 pb-0 px-1 pt-1 2xl:px-2 2xl:pt-2 bg-gray-100 dark:bg-gray-900">
+                    <button type="button"
+                        class="app-tab-btn flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg border-t border-l border-r border-gray-200 dark:border-gray-700 transition-all duration-200 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-md hover:shadow-black/10 dark:hover:shadow-black/40"
+                        data-tab-id="principal" aria-selected="true">
+                        <i class="fas fa-tachometer-alt text-blue-600 dark:text-blue-400"></i>
+                        <span class="whitespace-nowrap">Dashboard</span>
+                        <span
+                            class="app-tab-close hidden ml-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 select-none transition-colors"
+                            role="button" aria-label="Cerrar pestaña">&times;</span>
+                    </button>
+                </div>
+                {% endif %}
+
+                <div id="app-tab-panels" class="flex-1 min-h-0 bg-transparent flex flex-col">
+                    {% set principal_page_title = '' %}
+                    {% if self.title is defined %}
+                    {% set principal_page_title = self.title() | striptags | trim %}
+                    {% endif %}
+                    <section id="app-tab-panel-principal"
+                        class="app-tab-panel flex-1 min-h-0 overflow-y-auto p-3 2xl:p-4" data-tab-panel="principal"
+                        data-page-title="{{ principal_page_title | e }}"
+                        data-page-is-dashboard="{{ '1' if request.endpoint == 'main.dashboard' else '0' }}"
+                        aria-hidden="false">
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="mb-4 p-4 rounded-lg {% if category == 'success' %}bg-green-100 text-green-800 border border-green-200{% elif category == 'danger' %}bg-red-100 text-red-800 border border-red-200{% elif category == 'warning' %}bg-yellow-100 text-yellow-800 border border-yellow-200{% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}"
+                            x-data="{ show: true }" x-show="show" x-transition>
+                            <div class="flex justify-between items-center">
+                                <span>{{ message }}</span>
+                                <button @click="show = false" class="text-xl">&times;</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                        {% endwith %}
+{% endif %}
+
+{% if layout_shell_section|default('full') == 'full' %}
+                        {% block content %}{% endblock %}
+{% endif %}
+
+{% if layout_shell_section|default('full') != 'before' %}
+                    </section>
+                </div>
+            </div>
+        </main>
+
+        {% if current_user.is_authenticated and not embed_mode %}
+    </div>
+    {% endif %}
+{% endif %}

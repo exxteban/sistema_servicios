@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Mini Analytics de Publicidad{% endblock %}
+
+{% block content %}
+{% set summary_7d = dashboard.summary_7d %}
+{% set summary_30d = dashboard.summary_30d %}
+{% set series = dashboard.daily_series %}
+{% set max_page_views = (series | map(attribute='page_views') | max) if series else 0 %}
+<section class="space-y-6">
+    <div class="rounded-3xl bg-slate-900 text-white p-6 shadow-xl">
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-sky-300">Root Only</p>
+        <h1 class="mt-2 text-3xl font-black">Mini Analytics privado de la landing</h1>
+        <p class="mt-3 max-w-3xl text-sm text-slate-300">
+            Este panel solo acepta acceso del usuario root exacto. La landing pública medida es
+            <a href="{{ landing_public_url }}" class="text-sky-300 underline underline-offset-4" target="_blank" rel="noopener">{{ landing_public_url }}</a>.
+        </p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <article class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Visitas 7 días</p>
+            <p class="mt-3 text-3xl font-black text-slate-900">{{ summary_7d.page_views }}</p>
+            <p class="mt-2 text-sm text-slate-500">{{ summary_7d.visitantes_unicos }} visitantes únicos</p>
+        </article>
+        <article class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Clicks CTA 7 días</p>
+            <p class="mt-3 text-3xl font-black text-slate-900">{{ summary_7d.cta_clicks }}</p>
+            <p class="mt-2 text-sm text-slate-500">{{ summary_7d.cta_rate }}% sobre page views</p>
+        </article>
+        <article class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Visitas 30 días</p>
+            <p class="mt-3 text-3xl font-black text-slate-900">{{ summary_30d.page_views }}</p>
+            <p class="mt-2 text-sm text-slate-500">{{ summary_30d.sesiones_unicas }} sesiones registradas</p>
+        </article>
+        <article class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Clicks CTA 30 días</p>
+            <p class="mt-3 text-3xl font-black text-slate-900">{{ summary_30d.cta_clicks }}</p>
+            <p class="mt-2 text-sm text-slate-500">{{ summary_30d.cta_rate }}% de conversión a contacto</p>
+        </article>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-[1.4fr,0.9fr]">
+        <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Tendencia</p>
+                    <h2 class="mt-1 text-xl font-black text-slate-900">Últimos 14 días</h2>
+                </div>
+                <div class="text-right text-sm text-slate-500">
+                    <div>Azul: page views</div>
+                    <div>Oscuro: clicks CTA</div>
+                </div>
+            </div>
+            <div class="mt-6 space-y-3">
+                {% for item in series %}
+                {% set page_width = ((item.page_views / max_page_views) * 100) if max_page_views else 0 %}
+                {% set cta_width = ((item.cta_clicks / max_page_views) * 100) if max_page_views else 0 %}
+                <div class="grid grid-cols-[56px,1fr,90px] items-center gap-3">
+                    <div class="text-sm font-semibold text-slate-500">{{ item.label }}</div>
+                    <div class="space-y-2">
+                        <div class="h-3 overflow-hidden rounded-full bg-slate-100">
+                            <div class="h-full rounded-full bg-sky-500" style="width: {{ '%.2f'|format(page_width) }}%"></div>
+                        </div>
+                        <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div class="h-full rounded-full bg-slate-800" style="width: {{ '%.2f'|format(cta_width) }}%"></div>
+                        </div>
+                    </div>
+                    <div class="text-right text-xs font-semibold text-slate-500">
+                        <div>{{ item.page_views }} visitas</div>
+                        <div>{{ item.cta_clicks }} CTA</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">CTAs que más convierten</p>
+            <h2 class="mt-1 text-xl font-black text-slate-900">Top clicks</h2>
+            <div class="mt-5 space-y-3">
+                {% for item in dashboard.top_ctas %}
+                <div class="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-bold text-slate-900">{{ item.label }}</p>
+                    </div>
+                    <span class="inline-flex rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white">{{ item.total }}</span>
+                </div>
+                {% else %}
+                <p class="text-sm text-slate-500">Todavía no hay clicks de CTA registrados.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-2">
+        <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Secciones</p>
+            <h2 class="mt-1 text-xl font-black text-slate-900">Qué parte miran más</h2>
+            <div class="mt-5 overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="text-left text-slate-500">
+                        <tr>
+                            <th class="py-2 pr-4">Sección</th>
+                            <th class="py-2 pr-4">Vistas</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in dashboard.top_sections %}
+                        <tr>
+                            <td class="py-3 pr-4 font-semibold text-slate-900">{{ item.section_id }}</td>
+                            <td class="py-3 pr-4 text-slate-600">{{ item.total }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="2" class="py-4 text-slate-500">Sin datos de secciones todavía.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Campañas</p>
+            <h2 class="mt-1 text-xl font-black text-slate-900">UTM más activas</h2>
+            <div class="mt-5 overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="text-left text-slate-500">
+                        <tr>
+                            <th class="py-2 pr-4">Source</th>
+                            <th class="py-2 pr-4">Medium</th>
+                            <th class="py-2 pr-4">Campaign</th>
+                            <th class="py-2 pr-4">Views</th>
+                            <th class="py-2 pr-4">CTA %</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in dashboard.campaigns %}
+                        <tr>
+                            <td class="py-3 pr-4 font-semibold text-slate-900">{{ item.source }}</td>
+                            <td class="py-3 pr-4 text-slate-600">{{ item.medium }}</td>
+                            <td class="py-3 pr-4 text-slate-600">{{ item.campaign }}</td>
+                            <td class="py-3 pr-4 text-slate-600">{{ item.page_views }}</td>
+                            <td class="py-3 pr-4 text-slate-600">{{ item.cta_rate }}%</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="py-4 text-slate-500">Sin campañas UTM registradas todavía.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+    </div>
+
+    <article class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Actividad reciente</p>
+        <h2 class="mt-1 text-xl font-black text-slate-900">Últimos eventos</h2>
+        <div class="mt-5 overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="text-left text-slate-500">
+                    <tr>
+                        <th class="py-2 pr-4">Fecha</th>
+                        <th class="py-2 pr-4">Tipo</th>
+                        <th class="py-2 pr-4">Etiqueta</th>
+                        <th class="py-2 pr-4">Sección</th>
+                        <th class="py-2 pr-4">Path</th>
+                        <th class="py-2 pr-4">Source</th>
+                        <th class="py-2 pr-4">Campaign</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in dashboard.recent_events %}
+                    <tr>
+                        <td class="py-3 pr-4 text-slate-600">{{ item.fecha_evento.strftime('%d/%m/%Y %H:%M') if item.fecha_evento else '-' }}</td>
+                        <td class="py-3 pr-4 font-semibold text-slate-900">{{ item.tipo_evento }}</td>
+                        <td class="py-3 pr-4 text-slate-600">{{ item.etiqueta }}</td>
+                        <td class="py-3 pr-4 text-slate-600">{{ item.section_id }}</td>
+                        <td class="py-3 pr-4 text-slate-600">{{ item.path_url }}</td>
+                        <td class="py-3 pr-4 text-slate-600">{{ item.utm_source }}</td>
+                        <td class="py-3 pr-4 text-slate-600">{{ item.utm_campaign }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="py-4 text-slate-500">Todavía no hay eventos guardados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

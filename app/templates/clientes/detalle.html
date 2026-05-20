@@ -1,0 +1,579 @@
+{% extends "base.html" %}
+
+{% block title %}Cliente {{ cliente.nombre }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6"
+    x-data="clienteHistorialApp({
+        detalleCompraTpl: '{{ url_for('clientes.detalle_compra_json', id=cliente.id_cliente, id_venta=0) }}',
+        detalleReparacionTpl: '{{ url_for('clientes.detalle_reparacion_json', id=cliente.id_cliente, id_reparacion=0) }}'
+    })"
+    @keydown.escape.window="cerrarModal()">
+    {% include 'clientes/_detalle_header.html' %}
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Observaciones con fecha</h2>
+        </div>
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700" data-permiso="editar_cliente">
+            <form method="POST" action="{{ url_for('clientes.agregar_observacion', id=cliente.id_cliente) }}" class="space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+                <textarea name="observacion" rows="3" required
+                    class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white"
+                    placeholder="Escribí aquí una observación con contexto del hecho ocurrido..."></textarea>
+                <div class="flex justify-end">
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm">
+                        Guardar observación
+                    </button>
+                </div>
+            </form>
+        </div>
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+            {% for obs in observaciones %}
+            <div class="px-4 py-3">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ obs.fecha_observacion|local_strftime('%d/%m/%Y %H:%M') }}
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ (obs.usuario.nombre_completo or obs.usuario.username) if obs.usuario else 'Usuario no disponible' }}
+                    </p>
+                </div>
+                <p class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line">{{ obs.observacion }}</p>
+            </div>
+            {% else %}
+            <div class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                Aún no hay observaciones registradas.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Registro de compras</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Fecha</th>
+                            <th class="px-4 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Comprobante</th>
+                            <th class="px-4 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Tipo</th>
+                            <th class="px-4 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Saldo</th>
+                            <th class="px-4 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for venta in ventas %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                            <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{{ venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
+                                <button type="button" @click="abrirCompra({{ venta.id_venta }})" class="hover:underline">
+                                    {{ venta.numero_comprobante or ('Venta #' ~ venta.id_venta) }}
+                                </button>
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                                {{ 'Credito' if (venta.tipo_venta or 'contado')|lower == 'credito' else 'Contado' }}
+                            </td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-700 dark:text-gray-200">
+                                ₲ {{ "{:,.0f}".format((venta.cuenta_por_cobrar.saldo_pendiente if venta.cuenta_por_cobrar else venta.saldo_pendiente) or 0).replace(",", ".") }}
+                            </td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-700 dark:text-gray-200">₲ {{ "{:,.0f}".format(venta.total or 0).replace(",", ".") }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">No hay compras registradas</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if compras_pag.pages > 1 %}
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                    Página {{ compras_pag.page }} de {{ compras_pag.pages }}
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if compras_pag.has_prev %}
+                    <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente, compras_page=compras_pag.prev_num, reparaciones_page=reparaciones_pag.page, partial=partial or None) }}"
+                        class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                        Anterior
+                    </a>
+                    {% else %}
+                    <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                        Anterior
+                    </span>
+                    {% endif %}
+                    {% if compras_pag.has_next %}
+                    <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente, compras_page=compras_pag.next_num, reparaciones_page=reparaciones_pag.page, partial=partial or None) }}"
+                        class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                        Siguiente
+                    </a>
+                    {% else %}
+                    <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                        Siguiente
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Registro de reparaciones</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Fecha</th>
+                            <th class="px-4 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Equipo</th>
+                            <th class="px-4 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Estado</th>
+                            <th class="px-4 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for reparacion in reparaciones %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                            <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{{ reparacion.fecha_ingreso|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="px-4 py-2 text-sm text-blue-600 dark:text-blue-400">
+                                <button type="button" @click="abrirReparacion({{ reparacion.id_reparacion }})" class="hover:underline text-left">
+                                    {{ reparacion.tipo_equipo }} - {{ reparacion.marca_modelo }}
+                                </button>
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">{{ reparacion.estado_display }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-700 dark:text-gray-200">₲ {{ "{:,.0f}".format(reparacion.monto or 0).replace(",", ".") }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">No hay reparaciones registradas</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if reparaciones_pag.pages > 1 %}
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                    Página {{ reparaciones_pag.page }} de {{ reparaciones_pag.pages }}
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if reparaciones_pag.has_prev %}
+                    <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente, compras_page=compras_pag.page, reparaciones_page=reparaciones_pag.prev_num, partial=partial or None) }}"
+                        class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                        Anterior
+                    </a>
+                    {% else %}
+                    <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                        Anterior
+                    </span>
+                    {% endif %}
+                    {% if reparaciones_pag.has_next %}
+                    <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente, compras_page=compras_pag.page, reparaciones_page=reparaciones_pag.next_num, partial=partial or None) }}"
+                        class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                        Siguiente
+                    </a>
+                    {% else %}
+                    <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                        Siguiente
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Historial general</h2>
+        </div>
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+            {% for item in historial %}
+            <button type="button" @click="abrirDesdeHistorial('{{ item.tipo }}', {{ item.id_referencia }})"
+                class="w-full text-left flex items-center justify-between gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ item.titulo }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ item.fecha_texto }} · {{ item.detalle }} · {{ item.estado }}</p>
+                </div>
+                <div class="text-sm font-semibold {% if item.tipo == 'compra' %}text-blue-600 dark:text-blue-400{% else %}text-purple-600 dark:text-purple-400{% endif %}">
+                    ₲ {{ "{:,.0f}".format(item.monto or 0).replace(",", ".") }}
+                </div>
+            </button>
+            {% else %}
+            <div class="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">Sin historial disponible</div>
+            {% endfor %}
+        </div>
+        {% if historial_pag.pages > 1 %}
+        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                Página {{ historial_pag.page }} de {{ historial_pag.pages }}
+            </div>
+            <div class="flex items-center gap-2">
+                {% if historial_pag.has_prev %}
+                <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente, compras_page=compras_pag.page, reparaciones_page=reparaciones_pag.page, historial_page=historial_pag.prev_num, partial=partial or None) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                    Anterior
+                </a>
+                {% else %}
+                <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                    Anterior
+                </span>
+                {% endif %}
+                {% if historial_pag.has_next %}
+                <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente, compras_page=compras_pag.page, reparaciones_page=reparaciones_pag.page, historial_page=historial_pag.next_num, partial=partial or None) }}"
+                    class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
+                    Siguiente
+                </a>
+                {% else %}
+                <span class="px-3 py-1.5 rounded-lg text-sm border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
+                    Siguiente
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <template x-teleport="body">
+        <div x-show="modalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+            <div class="flex items-center justify-center min-h-screen px-4 py-6 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="cerrarModal()">
+                    <div class="absolute inset-0 bg-gray-900/70"></div>
+                </div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100" x-text="modalTitulo"></h3>
+                        <button type="button" @click="cerrarModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="p-6 max-h-[70vh] overflow-y-auto">
+                        <div x-show="loading" class="text-sm text-gray-500 dark:text-gray-400">Cargando detalle...</div>
+                        <div x-show="error && !loading" class="text-sm text-red-600 dark:text-red-400" x-text="error"></div>
+
+                        <template x-if="!loading && !error && detalle && detalle.tipo === 'compra'">
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <p class="text-gray-500 dark:text-gray-400">Comprobante</p>
+                                    <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="detalle.comprobante || '-'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 dark:text-gray-400">Fecha</p>
+                                    <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="detalle.fecha || '-'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 dark:text-gray-400">Estado</p>
+                                    <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="detalle.estado || '-'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 dark:text-gray-400">Total</p>
+                                    <p class="font-semibold text-blue-600 dark:text-blue-400" x-text="'₲ ' + formatMoney(detalle.total)"></p>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Producto</th>
+                                            <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Cant.</th>
+                                            <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">P. Unit.</th>
+                                            <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                        <template x-for="(it, idx) in (detalle.items || [])" :key="'compra-item-' + idx">
+                                            <tr>
+                                                <td class="px-3 py-2 text-sm text-gray-800 dark:text-gray-100" x-text="it.producto"></td>
+                                                <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-200" x-text="it.cantidad"></td>
+                                                <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-200" x-text="'₲ ' + formatMoney(it.precio_unitario)"></td>
+                                                <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-200" x-text="'₲ ' + formatMoney(it.subtotal)"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        </template>
+
+                        <template x-if="!loading && !error && detalle && detalle.tipo === 'reparacion'">
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <p class="text-gray-500 dark:text-gray-400">Equipo</p>
+                                    <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="detalle.equipo || '-'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 dark:text-gray-400">Fecha</p>
+                                    <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="detalle.fecha || '-'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 dark:text-gray-400">Estado</p>
+                                    <p class="font-semibold text-gray-800 dark:text-gray-100" x-text="detalle.estado || '-'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 dark:text-gray-400">Monto</p>
+                                    <p class="font-semibold text-purple-600 dark:text-purple-400" x-text="'₲ ' + formatMoney(detalle.monto)"></p>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Falla reportada</p>
+                                <p class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line" x-text="detalle.falla_reportada || '-'"></p>
+                            </div>
+                            <div class="space-y-2">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Diagnóstico técnico</p>
+                                <p class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line" x-text="detalle.diagnostico_tecnico || '-'"></p>
+                            </div>
+                            <div class="space-y-2">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Solución</p>
+                                <p class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line" x-text="detalle.solucion || '-'"></p>
+                            </div>
+                            <div class="space-y-2" x-show="detalle.accesorios">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Accesorios</p>
+                                <p class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line" x-text="detalle.accesorios"></p>
+                            </div>
+                            <div class="overflow-x-auto" x-show="(detalle.items || []).length">
+                                <table class="w-full">
+                                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-300">Ítem</th>
+                                            <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Cant.</th>
+                                            <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">P. Unit.</th>
+                                            <th class="px-3 py-2 text-right text-xs text-gray-500 dark:text-gray-300">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                        <template x-for="(it, idx) in (detalle.items || [])" :key="'rep-item-' + idx">
+                                            <tr>
+                                                <td class="px-3 py-2 text-sm text-gray-800 dark:text-gray-100" x-text="it.item"></td>
+                                                <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-200" x-text="it.cantidad"></td>
+                                                <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-200" x-text="'₲ ' + formatMoney(it.precio_unitario)"></td>
+                                                <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-200" x-text="'₲ ' + formatMoney(it.subtotal)"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        </template>
+                    </div>
+                    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+                        <button type="button" x-show="detalle && detalle.url" @click="abrirFichaCompleta()"
+                            class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm">
+                            Abrir ficha completa
+                        </button>
+                        <button type="button" @click="cerrarModal()"
+                            class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 text-sm">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function clienteHistorialApp(config) {
+        return {
+            detalleCompraTpl: config.detalleCompraTpl || '',
+            detalleReparacionTpl: config.detalleReparacionTpl || '',
+            modalOpen: false,
+            modalTitulo: '',
+            loading: false,
+            error: '',
+            detalle: null,
+            formatMoney(value) {
+                const n = Number(value || 0);
+                return new Intl.NumberFormat('es-PY').format(isFinite(n) ? n : 0);
+            },
+            buildUrl(template, id) {
+                const safeId = Number(id || 0);
+                return String(template || '').replace(/\/0\/detalle_json$/, `/${safeId}/detalle_json`);
+            },
+            cerrarModal() {
+                this.modalOpen = false;
+                this.loading = false;
+                this.error = '';
+                this.detalle = null;
+                this.modalTitulo = '';
+            },
+            async cargarDetalle(tipo, id) {
+                this.modalOpen = true;
+                this.loading = true;
+                this.error = '';
+                this.detalle = null;
+                this.modalTitulo = tipo === 'compra' ? `Compra #${id}` : `Reparación #${id}`;
+                const endpoint = tipo === 'compra'
+                    ? this.buildUrl(this.detalleCompraTpl, id)
+                    : this.buildUrl(this.detalleReparacionTpl, id);
+                try {
+                    const response = await fetch(endpoint);
+                    const data = await response.json();
+                    if (!response.ok || !data?.success) {
+                        throw new Error(data?.error || 'No se pudo cargar el detalle');
+                    }
+                    this.detalle = data;
+                    this.modalTitulo = tipo === 'compra'
+                        ? `Detalle de compra #${data.id}`
+                        : `Detalle de reparación #${data.id}`;
+                } catch (err) {
+                    this.error = err?.message || 'No se pudo cargar el detalle';
+                } finally {
+                    this.loading = false;
+                }
+            },
+            abrirCompra(id) {
+                return this.cargarDetalle('compra', id);
+            },
+            abrirReparacion(id) {
+                return this.cargarDetalle('reparacion', id);
+            },
+            abrirDesdeHistorial(tipo, id) {
+                if (tipo === 'compra') {
+                    return this.abrirCompra(id);
+                }
+                return this.abrirReparacion(id);
+            },
+            abrirFichaCompleta() {
+                const url = this.detalle && this.detalle.url ? String(this.detalle.url) : '';
+                if (!url) {
+                    this.error = 'No hay una ficha asociada para abrir';
+                    return;
+                }
+                if (typeof window.appNavigateActiveTab === 'function') {
+                    window.appNavigateActiveTab(url);
+                    this.cerrarModal();
+                    return;
+                }
+                window.location.assign(url);
+            }
+        };
+    }
+</script>
+<script>
+    (function () {
+        const form = document.querySelector('.js-detalle-estrellas-form');
+        if (!form) return;
+
+        const select = form.querySelector('.js-detalle-estrellas-select');
+        const pill = document.querySelector('.js-detalle-estrellas-pill');
+        const stars = document.querySelector('.js-detalle-estrellas-stars');
+        const score = document.querySelector('.js-detalle-estrellas-score');
+        const csrfInput = form.querySelector('input[name="csrf_token"]');
+        const csrfToken = csrfInput ? (csrfInput.value || '').trim() : '';
+        if (!select || !pill || !stars || !score) return;
+
+        const getStyles = (nivel) => {
+            if (nivel >= 4) {
+                return {
+                    pill: 'background-color:rgba(34,197,94,0.14);border-color:#22c55e;color:#22c55e;',
+                    star: 'color:#22c55e;'
+                };
+            }
+            if (nivel === 3) {
+                return {
+                    pill: 'background-color:rgba(234,179,8,0.14);border-color:#eab308;color:#eab308;',
+                    star: 'color:#eab308;'
+                };
+            }
+            if (nivel === 2) {
+                return {
+                    pill: 'background-color:rgba(249,115,22,0.16);border-color:#f97316;color:#f97316;',
+                    star: 'color:#f97316;'
+                };
+            }
+            return {
+                pill: 'background-color:rgba(239,68,68,0.14);border-color:#ef4444;color:#ef4444;',
+                star: 'color:#ef4444;'
+            };
+        };
+
+        const renderStars = (nivel) => {
+            const filled = Math.max(0, Math.min(5, Number(nivel) || 0));
+            let html = '';
+            for (let i = 1; i <= 5; i += 1) {
+                if (i <= filled) {
+                    html += '★';
+                } else {
+                    html += '<span class="text-gray-300 dark:text-gray-500">★</span>';
+                }
+            }
+            return html;
+        };
+
+        const applyNivel = (nivel) => {
+            const styles = getStyles(nivel);
+            pill.style.cssText = styles.pill;
+            stars.style.cssText = styles.star;
+            stars.innerHTML = renderStars(nivel);
+            score.textContent = `${nivel}/5`;
+            select.value = String(nivel);
+        };
+
+        let inFlight = false;
+        select.addEventListener('change', async () => {
+            if (inFlight) return;
+            const nivel = parseInt(select.value || '0', 10);
+            if (!nivel) return;
+
+            inFlight = true;
+            const previo = parseInt(score.textContent || '0', 10) || 3;
+            form.classList.add('opacity-80');
+            select.disabled = true;
+            try {
+                const payload = new FormData(form);
+                payload.set('nivel_estrellas', String(nivel));
+
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    body: payload,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {})
+                    }
+                });
+                let data = null;
+                try {
+                    data = await response.json();
+                } catch (_errorJson) {
+                    data = null;
+                }
+                if (!response.ok || !data || data.success !== true || !data.cliente) {
+                    throw new Error((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo actualizar el nivel.');
+                }
+                const nuevoNivel = parseInt(data.cliente.nivel_estrellas || nivel, 10) || nivel;
+                applyNivel(nuevoNivel);
+                if (typeof window.mostrarNotificacion === 'function') {
+                    window.mostrarNotificacion(`Estrellas de "${data.cliente.nombre}" actualizadas.`, 'success');
+                }
+            } catch (error) {
+                applyNivel(previo);
+                if (typeof window.mostrarNotificacion === 'function') {
+                    window.mostrarNotificacion(error && error.message ? error.message : 'Error al actualizar estrellas.', 'error');
+                }
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                    return;
+                }
+                form.submit();
+            } finally {
+                inFlight = false;
+                form.classList.remove('opacity-80');
+                select.disabled = false;
+            }
+        });
+    })();
+</script>
+{% endblock %}

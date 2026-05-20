@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% from 'flujo_caja/_macros.html' import gs %}
+
+{% block title %}Flujo de caja proyectado{% endblock %}
+
+{% block content %}
+{% set puede_gestionar = current_user.es_admin() or current_user.tiene_permiso('gestionar_flujo_caja') %}
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+
+    {# ═══════════════════════════════════════════════════════════
+         BARRA SUPERIOR: título + navegación de semana
+    ═══════════════════════════════════════════════════════════ #}
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+            <h1 class="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500 text-white shadow-lg shadow-cyan-500/30">
+                    <i class="fas fa-chart-line text-sm"></i>
+                </span>
+                Flujo de caja proyectado
+            </h1>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Planificá ingresos y egresos de la semana y mirá el resultado de un vistazo.</p>
+        </div>
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('flujo_caja.index', semana=ctx.semana_anterior.isoformat(), tab=active_tab) }}"
+                   class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+                   title="Semana anterior">
+                    <i class="fas fa-chevron-left text-xs"></i>
+                </a>
+                <span class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    {{ ctx.semana.fecha_inicio.strftime('%d/%m') }} — {{ ctx.semana.fecha_fin.strftime('%d/%m/%Y') }}
+                </span>
+                <a href="{{ url_for('flujo_caja.index', semana=ctx.semana_siguiente.isoformat(), tab=active_tab) }}"
+                   class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+                   title="Semana siguiente">
+                    <i class="fas fa-chevron-right text-xs"></i>
+                </a>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('flujo_caja.imprimir', semana=ctx.semana.fecha_inicio.isoformat(), auto_print=1) }}"
+                   target="_blank"
+                   class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">
+                    <i class="fas fa-print text-xs"></i>
+                    Imprimir
+                </a>
+                <a href="{{ url_for('flujo_caja.imprimir', semana=ctx.semana.fecha_inicio.isoformat(), auto_pdf=1) }}"
+                   target="_blank"
+                   class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+                    <i class="fas fa-file-pdf text-xs"></i>
+                    Generar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════
+         PANEL RESUMEN: 4 KPIs
+    ═══════════════════════════════════════════════════════════ #}
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-800/30 dark:bg-slate-800/60">
+            <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                <i class="fas fa-arrow-down-to-line text-sm"></i>
+                <span class="text-xs font-bold uppercase tracking-wide">Ingresos</span>
+            </div>
+            <p class="mt-2 text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ gs(ctx.resumen.total_ingresos) }}</p>
+            <p class="mt-0.5 text-xs text-emerald-600/70 dark:text-emerald-400/70">segun estado esta semana</p>
+        </div>
+        <div class="rounded-2xl border border-rose-100 bg-rose-50 p-4 dark:border-rose-800/30 dark:bg-slate-800/60">
+            <div class="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                <i class="fas fa-arrow-up-from-line text-sm"></i>
+                <span class="text-xs font-bold uppercase tracking-wide">Egresos</span>
+            </div>
+            <p class="mt-2 text-2xl font-black text-rose-700 dark:text-rose-300">{{ gs(ctx.resumen.total_egresos) }}</p>
+            <p class="mt-0.5 text-xs text-rose-600/70 dark:text-rose-400/70">segun estado esta semana</p>
+        </div>
+        <div class="rounded-2xl border p-4
+            {% if ctx.resumen.resultado < 0 %}border-rose-200 bg-rose-50 dark:border-rose-800/30 dark:bg-slate-800/60
+            {% else %}border-sky-100 bg-sky-50 dark:border-sky-800/30 dark:bg-slate-800/60{% endif %}">
+            <div class="flex items-center gap-2 {% if ctx.resumen.resultado < 0 %}text-rose-600 dark:text-rose-400{% else %}text-sky-600 dark:text-sky-400{% endif %}">
+                <i class="fas fa-scale-balanced text-sm"></i>
+                <span class="text-xs font-bold uppercase tracking-wide">Resultado</span>
+            </div>
+            <p class="mt-2 text-2xl font-black {% if ctx.resumen.resultado < 0 %}text-rose-700 dark:text-rose-300{% else %}text-sky-700 dark:text-sky-300{% endif %}">
+                {% if ctx.resumen.resultado >= 0 %}+{% endif %}{{ gs(ctx.resumen.resultado) }}
+            </p>
+            <p class="mt-0.5 text-xs {% if ctx.resumen.resultado < 0 %}text-rose-600/70 dark:text-rose-400/70{% else %}text-sky-600/70 dark:text-sky-400/70{% endif %}">ingresos menos egresos</p>
+        </div>
+        <div class="rounded-2xl border border-violet-100 bg-violet-50 p-4 dark:border-violet-800/30 dark:bg-slate-800/60">
+            <div class="flex items-center gap-2 text-violet-600 dark:text-violet-400">
+                <i class="fas fa-wallet text-sm"></i>
+                <span class="text-xs font-bold uppercase tracking-wide">Saldo final</span>
+            </div>
+            <p class="mt-2 text-2xl font-black {% if ctx.resumen.saldo_final < 0 %}text-rose-700 dark:text-rose-300{% else %}text-violet-700 dark:text-violet-300{% endif %}">{{ gs(ctx.resumen.saldo_final) }}</p>
+            <p class="mt-0.5 text-xs text-violet-600/70 dark:text-violet-400/70">saldo inicial + resultado</p>
+        </div>
+    </div>
+
+    {# Semáforo de liquidez #}
+    <div class="flex items-start gap-4 rounded-2xl border p-4
+        {% if ctx.resumen.semaforo_tono == 'danger' %}border-rose-200 bg-rose-50 dark:border-rose-800/30 dark:bg-slate-800/60
+        {% elif ctx.resumen.semaforo_tono == 'warning' %}border-amber-200 bg-amber-50 dark:border-amber-800/30 dark:bg-slate-800/60
+        {% else %}border-emerald-200 bg-emerald-50 dark:border-emerald-800/30 dark:bg-slate-800/60{% endif %}">
+        <div class="mt-0.5 flex-shrink-0 text-xl
+            {% if ctx.resumen.semaforo_tono == 'danger' %}text-rose-500
+            {% elif ctx.resumen.semaforo_tono == 'warning' %}text-amber-500
+            {% else %}text-emerald-500{% endif %}">
+            <i class="fas {% if ctx.resumen.semaforo_tono == 'danger' %}fa-circle-exclamation{% elif ctx.resumen.semaforo_tono == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+            <p class="font-bold {% if ctx.resumen.semaforo_tono == 'danger' %}text-rose-800 dark:text-rose-300{% elif ctx.resumen.semaforo_tono == 'warning' %}text-amber-800 dark:text-amber-300{% else %}text-emerald-800 dark:text-emerald-300{% endif %}">
+                {{ ctx.resumen.semaforo_mensaje }}
+            </p>
+            <p class="mt-1 text-sm {% if ctx.resumen.semaforo_tono == 'danger' %}text-rose-700 dark:text-rose-400{% elif ctx.resumen.semaforo_tono == 'warning' %}text-amber-700 dark:text-amber-400{% else %}text-emerald-700 dark:text-emerald-400{% endif %}">
+                {{ ctx.resumen.recomendacion }}
+            </p>
+        </div>
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════
+         TABS DE NAVEGACIÓN
+    ═══════════════════════════════════════════════════════════ #}
+    <div class="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        {% for tab_id, label, icon in [('semana','Esta semana','fas fa-bolt'),('movimientos','Movimientos','fas fa-list-ul'),('historial','Historial','fas fa-clock-rotate-left'),('plantillas','Plantillas','fas fa-layer-group'),('comparativo','Comparativo','fas fa-chart-bar')] %}
+        <a href="{{ url_for('flujo_caja.index', semana=ctx.semana.fecha_inicio.isoformat(), tab=tab_id) }}"
+           class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all border
+           {% if active_tab == tab_id %}bg-slate-900 text-white shadow border-transparent dark:border-cyan-500/40 dark:bg-cyan-500/10 dark:text-cyan-100{% else %}text-slate-600 hover:bg-slate-100 border-transparent dark:text-slate-400 dark:hover:bg-cyan-500/5 dark:hover:border-cyan-500/20{% endif %}">
+            <i class="{{ icon }} text-xs"></i> {{ label }}
+            {% if tab_id == 'movimientos' and ctx.resumen.cantidad_movimientos > 0 %}
+            <span class="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-black
+                {% if active_tab == tab_id %}bg-white/20 text-white dark:bg-cyan-400/20 dark:text-cyan-100{% else %}bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300{% endif %}">
+                {{ ctx.resumen.cantidad_movimientos }}
+            </span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════
+         CONTENIDO DEL TAB ACTIVO
+    ═══════════════════════════════════════════════════════════ #}
+    {% if active_tab == 'semana' %}
+        {% include 'flujo_caja/_tab_semana.html' %}
+    {% elif active_tab == 'movimientos' %}
+        {% include 'flujo_caja/_tab_movimientos.html' %}
+    {% elif active_tab == 'historial' %}
+        {% include 'flujo_caja/_tab_historial.html' %}
+    {% elif active_tab == 'plantillas' %}
+        {% include 'flujo_caja/_tab_plantillas.html' %}
+    {% else %}
+        {% include 'flujo_caja/_tab_comparativo.html' %}
+    {% endif %}
+
+</div>
+{% endblock %}

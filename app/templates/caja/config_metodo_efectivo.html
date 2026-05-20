@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Método efectivo - Configuración{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-4xl mx-auto">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+            <i class="fas fa-cash-register text-emerald-600 dark:text-emerald-400 mr-2"></i>
+            Método de pago "Efectivo"
+        </h1>
+        <a href="{{ url_for('caja.cajas_listar') }}"
+            class="text-sm text-gray-600 dark:text-gray-300 hover:underline">
+            <i class="fas fa-arrow-left mr-1"></i>Volver a Cajas
+        </a>
+    </div>
+
+    <p class="text-sm text-gray-600 dark:text-gray-300">
+        Este metodo se usa en todo el sistema para calcular el cuadre de caja, validar
+        anulaciones en efectivo, generar movimientos espejo al cobrar, y mas.
+        Fijarlo explicitamente evita que un cambio de nombre afecte los numeros del cierre.
+    </p>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+            <i class="fas fa-stethoscope text-blue-600 mr-2"></i>Diagnostico actual
+        </h2>
+
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+                <dt class="text-gray-500 dark:text-gray-400">Origen de la resolucion</dt>
+                <dd class="font-medium text-gray-800 dark:text-gray-100">
+                    {% if diagnostico.origen == 'configuracion' %}
+                        <span class="text-emerald-600 dark:text-emerald-400">Configuracion explicita</span>
+                    {% elif diagnostico.origen == 'nombre' %}
+                        <span class="text-amber-600 dark:text-amber-400">Match por nombre (fallback)</span>
+                    {% else %}
+                        <span class="text-red-600 dark:text-red-400">No se pudo resolver</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-gray-500 dark:text-gray-400">Metodo resuelto</dt>
+                <dd class="font-medium text-gray-800 dark:text-gray-100">
+                    {% if diagnostico.metodo_resuelto_id %}
+                        #{{ diagnostico.metodo_resuelto_id }} - {{ diagnostico.metodo_resuelto_nombre }}
+                    {% else %}
+                        <span class="text-red-600 dark:text-red-400">Sin resolver</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-gray-500 dark:text-gray-400">ID configurado</dt>
+                <dd class="font-medium text-gray-800 dark:text-gray-100">
+                    {{ diagnostico.id_configurado if diagnostico.id_configurado else 'Sin configurar' }}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-gray-500 dark:text-gray-400">Candidatos por nombre</dt>
+                <dd class="font-medium text-gray-800 dark:text-gray-100">
+                    {{ diagnostico.candidatos_nombre|length }} encontrado(s)
+                </dd>
+            </div>
+        </dl>
+
+        {% if diagnostico.advertencias %}
+        <div class="mt-4 space-y-2">
+            {% for adv in diagnostico.advertencias %}
+            <div class="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 text-amber-700 dark:text-amber-300 px-4 py-2 text-sm rounded">
+                <i class="fas fa-exclamation-triangle mr-2"></i>{{ adv }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if diagnostico.candidatos_nombre %}
+        <div class="mt-4">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                Metodos que matchean "efectivo" por nombre:
+            </h3>
+            <ul class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                {% for c in diagnostico.candidatos_nombre %}
+                <li>
+                    <span class="font-mono">#{{ c.id }}</span> - {{ c.nombre }}
+                    {% if not c.activo %}<span class="text-red-500 ml-1">(inactivo)</span>{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <form method="POST" action="{{ url_for('caja.config_metodo_efectivo') }}" data-no-ajax class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
+            <i class="fas fa-cogs text-purple-600 mr-2"></i>Fijar metodo canonico
+        </h2>
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+            Dejar "Automatico" para que el sistema resuelva por nombre.
+            Para mayor seguridad contable, seleccione explicitamente el metodo que representa
+            dinero en efectivo en la caja.
+        </p>
+
+        <div>
+            <label for="id_metodo_pago" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Metodo de pago
+            </label>
+            <select name="id_metodo_pago" id="id_metodo_pago"
+                class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-100">
+                <option value="" {% if not id_preseleccionado %}selected{% endif %}>
+                    Automatico (match por nombre)
+                </option>
+                {% for m in metodos_activos %}
+                <option value="{{ m.id_metodo_pago }}"
+                    {% if id_preseleccionado and id_preseleccionado|int == m.id_metodo_pago %}selected{% endif %}>
+                    #{{ m.id_metodo_pago }} - {{ m.nombre }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="flex justify-end gap-3">
+            <a href="{{ url_for('caja.cajas_listar') }}"
+                class="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:underline">
+                Cancelar
+            </a>
+            <button type="submit"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm transition">
+                <i class="fas fa-save mr-2"></i>Guardar
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
