@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Servicios{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-concierge-bell text-emerald-600 dark:text-emerald-400 mr-2"></i>Servicios y costos
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Catálogo separado de servicios ofrecidos, sin stock ni atributos de productos.</p>
+        </div>
+        <a href="{{ url_for('servicios.nuevo') }}" data-permiso="crear_producto"
+            class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700">
+            <i class="fas fa-plus mr-2"></i>Nuevo Servicio
+        </a>
+    </div>
+
+    <div class="rounded-xl bg-white p-4 shadow-md transition-colors duration-300 dark:bg-gray-800">
+        <form method="GET" action="{{ url_for('servicios.listar') }}" class="flex flex-col gap-3 sm:flex-row">
+            <input type="text" name="buscar" value="{{ buscar }}" placeholder="Buscar por nombre, código o categoría..."
+                class="min-w-0 flex-1 rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+            {% if clientes %}
+            <select name="id_cliente" class="rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                <option value="">Todos los clientes</option>
+                {% for cliente in clientes %}
+                <option value="{{ cliente.id_cliente }}" {% if cliente_id and cliente_id == cliente.id_cliente %}selected{% endif %}>{{ cliente.nombre }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <button type="submit" class="rounded-lg bg-gray-800 px-6 py-2 text-white shadow-md transition hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600">
+                <i class="fas fa-search mr-2"></i>Buscar
+            </button>
+        </form>
+    </div>
+
+    <div class="overflow-hidden rounded-xl bg-white shadow-md transition-colors duration-300 dark:bg-gray-800">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[760px]">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Código</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Servicio</th>
+                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Categoría</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Costo</th>
+                        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Precio</th>
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Duración</th>
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Tienda</th>
+                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for servicio in servicios.items %}
+                    <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <td class="px-4 py-3 font-mono text-sm text-gray-700 dark:text-gray-200">{{ servicio.codigo or ('SRV-' ~ servicio.id_servicio) }}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-gray-900 dark:text-white">{{ servicio.nombre }}</div>
+                            {% if servicio.descripcion %}<div class="mt-0.5 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{{ servicio.descripcion }}</div>{% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ servicio.categoria or 'Sin categoría' }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">₲ {{ "{:,.0f}".format(servicio.costo or 0).replace(",", ".") }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300">₲ {{ "{:,.0f}".format(servicio.precio or 0).replace(",", ".") }}</td>
+                        <td class="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-300">{{ servicio.duracion_minutos }} min</td>
+                        <td class="px-4 py-3 text-center">
+                            {% if servicio.publicado_tienda %}
+                            <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Publicado</span>
+                            {% else %}
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-500 dark:bg-gray-700 dark:text-gray-300">No</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <a href="{{ url_for('servicios.editar', id_servicio=servicio.id_servicio) }}" data-permiso="editar_producto"
+                                class="mx-1 text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form action="{{ url_for('servicios.eliminar', id_servicio=servicio.id_servicio) }}" method="POST" class="inline" onsubmit="return confirm('¿Eliminar este servicio?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" data-permiso="eliminar_producto" class="mx-1 text-red-600 transition-colors hover:text-red-800 dark:text-red-400 dark:hover:text-red-300" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-10 text-center text-gray-400 dark:text-gray-500">No se encontraron servicios.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if servicios.pages > 1 %}
+    <div class="flex justify-center gap-2">
+        {% if servicios.has_prev %}
+        <a href="{{ url_for('servicios.listar', page=servicios.prev_num, buscar=buscar or none, id_cliente=cliente_id or none) }}" class="rounded-lg bg-gray-200 px-4 py-2 text-gray-800 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"><i class="fas fa-chevron-left"></i></a>
+        {% endif %}
+        <span class="rounded-lg bg-emerald-600 px-4 py-2 text-white">{{ servicios.page }} / {{ servicios.pages }}</span>
+        {% if servicios.has_next %}
+        <a href="{{ url_for('servicios.listar', page=servicios.next_num, buscar=buscar or none, id_cliente=cliente_id or none) }}" class="rounded-lg bg-gray-200 px-4 py-2 text-gray-800 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"><i class="fas fa-chevron-right"></i></a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

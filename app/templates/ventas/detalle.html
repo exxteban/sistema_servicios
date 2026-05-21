@@ -70,7 +70,7 @@
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                 {% for item in venta.detalles %}
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                    <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ item.producto.nombre }}</td>
+                    <td class="px-4 py-2 text-gray-800 dark:text-gray-100">{{ item.item_nombre }}</td>
                     <td class="px-4 py-2 text-center text-gray-800 dark:text-gray-100">{{ item.cantidad }}</td>
                     <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(item.precio_unitario).replace(",", ".") }}
                     </td>

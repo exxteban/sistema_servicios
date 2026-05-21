@@ -236,7 +236,7 @@
                 {% for item in detalles %}
                 <tr>
                     <td class="col-prod">
-                        {{ item.producto.nombre|thermal_safe }}<br />
+                        {{ item.item_nombre|thermal_safe }}<br />
                         <span class="small muted">{{ thermal_amount(item.precio_unitario) }}</span>
                     </td>
                     <td class="right col-cant">{{ item.cantidad }}</td>
@@ -365,7 +365,7 @@ Vendedor:
 {{ vendedor_nombre }}
 {{ '-' * thermal_width }}
 {{ thermal_pair('Producto', 'Cant    Total', thermal_width) }}
-{% for item in detalles %}{{ item.producto.nombre|thermal_safe }}
+{% for item in detalles %}{{ item.item_nombre|thermal_safe }}
 {{ thermal_amount(item.precio_unitario) }}
 {{ thermal_pair('', item.cantidad ~ '  ' ~ thermal_amount(item.subtotal), thermal_width) }}
 {% endfor %}{{ '-' * thermal_width }}

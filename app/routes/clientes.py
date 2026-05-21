@@ -848,7 +848,7 @@ def historial_json(id):
         # Resumen de items (ej: "Coca Cola x2, Pizza x1...")
         items = []
         for d in v.detalles.limit(3):
-            items.append(f"{d.producto.nombre} x{d.cantidad}")
+            items.append(f"{d.item_nombre} x{d.cantidad}")
         
         if v.detalles.count() > 3:
             items.append(f"... (+{v.detalles.count() - 3})")
@@ -1117,7 +1117,7 @@ def detalle_compra_json(id, id_venta):
 
     items = []
     for detalle in venta.detalles.all():
-        nombre_producto = detalle.producto.nombre if detalle.producto else f'Producto #{detalle.id_producto}'
+        nombre_producto = detalle.item_nombre
         items.append({
             'producto': nombre_producto,
             'cantidad': int(detalle.cantidad or 0),

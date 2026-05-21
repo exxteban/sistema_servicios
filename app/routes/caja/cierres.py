@@ -89,13 +89,13 @@ def cierre_transaccion_detalle(id_sesion):
             return jsonify({'error': 'No encontrado'}), 404
 
         detalles = (
-            DetalleVenta.query.options(joinedload(DetalleVenta.producto))
+            DetalleVenta.query.options(joinedload(DetalleVenta.producto), joinedload(DetalleVenta.servicio))
             .filter(DetalleVenta.id_venta == venta.id_venta)
             .all()
         )
         items = [
             {
-                'producto': d.producto.nombre if d.producto else '',
+                'producto': d.item_nombre,
                 'cantidad': int(d.cantidad or 0),
                 'precio_unitario': float(d.precio_unitario or 0),
                 'subtotal': float(d.subtotal or 0),

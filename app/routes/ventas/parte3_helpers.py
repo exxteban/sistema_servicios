@@ -125,30 +125,44 @@ def _validar_credito_cliente(id_cliente, monto_comprometido_credito):
 
 def _prefetch_catalogo_venta(items):
     producto_ids_requeridos = set()
+    servicio_ids_requeridos = set()
     precio_opcion_ids_requeridos = set()
+    servicio_opcion_ids_requeridos = set()
 
     for item in items:
-        try:
-            id_producto_item = int(item.get('id_producto'))
-        except Exception:
-            return None, ({'error': 'Producto inválido'}, 400)
-        producto_ids_requeridos.add(id_producto_item)
+        tipo_item = (item.get('tipo') or 'producto').strip().lower()
+        if tipo_item == 'servicio' or item.get('id_servicio') not in (None, ''):
+            try:
+                servicio_ids_requeridos.add(int(item.get('id_servicio') or item.get('id')))
+            except Exception:
+                return None, ({'error': 'Servicio inválido'}, 400)
+        else:
+            try:
+                id_producto_item = int(item.get('id_producto'))
+            except Exception:
+                return None, ({'error': 'Producto inválido'}, 400)
+            producto_ids_requeridos.add(id_producto_item)
         precio_opcion_id_item = item.get('precio_opcion_id')
         if precio_opcion_id_item not in (None, ''):
             try:
-                precio_opcion_ids_requeridos.add(int(precio_opcion_id_item))
+                if tipo_item == 'servicio' or item.get('id_servicio') not in (None, ''):
+                    servicio_opcion_ids_requeridos.add(int(precio_opcion_id_item))
+                else:
+                    precio_opcion_ids_requeridos.add(int(precio_opcion_id_item))
             except Exception:
                 return None, ({'error': 'precio_opcion_id inv?lido'}, 400)
 
-    productos_prefetch = (
-        Producto.query
-        .filter(Producto.id_producto.in_(list(producto_ids_requeridos)))
-        .all()
-    )
+    productos_prefetch = Producto.query.filter(Producto.id_producto.in_(list(producto_ids_requeridos))).all() if producto_ids_requeridos else []
     productos_prefetch_por_id = {int(p.id_producto): p for p in productos_prefetch}
     for id_producto_item in sorted(producto_ids_requeridos):
         if id_producto_item not in productos_prefetch_por_id:
             return None, ({'error': f'Producto no encontrado: {id_producto_item}'}, 400)
+
+    servicios_prefetch = Servicio.query.filter(Servicio.id_servicio.in_(list(servicio_ids_requeridos)), Servicio.activo.is_(True)).all() if servicio_ids_requeridos else []
+    servicios_prefetch_por_id = {int(s.id_servicio): s for s in servicios_prefetch}
+    for id_servicio_item in sorted(servicio_ids_requeridos):
+        if id_servicio_item not in servicios_prefetch_por_id:
+            return None, ({'error': f'Servicio no encontrado: {id_servicio_item}'}, 400)
 
     opciones_precio_por_clave = {}
     if precio_opcion_ids_requeridos:
@@ -166,16 +180,32 @@ def _prefetch_catalogo_venta(items):
             for op in opciones_precio
         }
 
+    servicio_opciones_precio_por_clave = {}
+    if servicio_opcion_ids_requeridos:
+        opciones_servicio = ServicioPrecioOpcion.query.filter(
+            ServicioPrecioOpcion.id_opcion_precio.in_(list(servicio_opcion_ids_requeridos)),
+            ServicioPrecioOpcion.id_servicio.in_(list(servicio_ids_requeridos)),
+            ServicioPrecioOpcion.activo == True,
+        ).all()
+        servicio_opciones_precio_por_clave = {
+            (int(op.id_servicio), int(op.id_opcion_precio)): op
+            for op in opciones_servicio
+        }
+
     return {
         'productos_prefetch_por_id': productos_prefetch_por_id,
+        'servicios_prefetch_por_id': servicios_prefetch_por_id,
         'opciones_precio_por_clave': opciones_precio_por_clave,
+        'servicio_opciones_precio_por_clave': servicio_opciones_precio_por_clave,
     }, None
 
 
 def _construir_detalles_venta(
     items,
     productos_prefetch_por_id,
+    servicios_prefetch_por_id,
     opciones_precio_por_clave,
+    servicio_opciones_precio_por_clave,
     cola_cobro,
     reparacion_obj,
     usar_precio_mayorista,
@@ -189,6 +219,27 @@ def _construir_detalles_venta(
     cantidades_por_producto = {}
 
     for item in items:
+        tipo_item = (item.get('tipo') or 'producto').strip().lower()
+        if tipo_item == 'servicio' or item.get('id_servicio') not in (None, ''):
+            result, error = _construir_detalle_servicio(
+                item,
+                servicios_prefetch_por_id,
+                servicio_opciones_precio_por_clave,
+                cola_cobro,
+            )
+            if error:
+                return None, error
+            detalle, servicio, cantidad, item_subtotal, item_iva = result
+            subtotal += item_subtotal
+            if servicio.porcentaje_iva == 10:
+                total_iva_10 += item_iva
+            elif servicio.porcentaje_iva == 5:
+                total_iva_5 += item_iva
+            else:
+                total_exenta += item_subtotal
+            detalles.append((detalle, None, cantidad, servicio))
+            continue
+
         try:
             id_producto_item = int(item.get('id_producto'))
         except Exception:
@@ -288,7 +339,7 @@ def _construir_detalles_venta(
             subtotal=item_subtotal,
             es_kit=producto.es_kit
         )
-        detalles.append((detalle, producto, cantidad))
+        detalles.append((detalle, producto, cantidad, None))
 
     return {
         'subtotal': subtotal,
@@ -299,6 +350,57 @@ def _construir_detalles_venta(
         'productos_por_id': productos_por_id,
         'cantidades_por_producto': cantidades_por_producto,
     }, None
+
+
+def _construir_detalle_servicio(item, servicios_prefetch_por_id, servicio_opciones_precio_por_clave, cola_cobro):
+    try:
+        id_servicio_item = int(item.get('id_servicio') or item.get('id'))
+    except Exception:
+        return None, ({'error': 'Servicio inválido'}, 400)
+    servicio = servicios_prefetch_por_id.get(id_servicio_item)
+    if not servicio:
+        return None, ({'error': f'Servicio no encontrado: {id_servicio_item}'}, 400)
+    try:
+        cantidad = int(item.get('cantidad', 0))
+    except Exception:
+        return None, ({'error': f'Cantidad inválida para servicio {id_servicio_item}'}, 400)
+    if cantidad <= 0:
+        return None, ({'error': f'Cantidad inválida para servicio {id_servicio_item}'}, 400)
+
+    precio_original = Decimal(str(item.get('precio_base', servicio.precio or 0) if cola_cobro is not None else servicio.precio or 0))
+    precio = Decimal(str(item.get('precio') if cola_cobro is not None else servicio.precio or 0))
+    precio_opcion_id = item.get('precio_opcion_id')
+    if precio_opcion_id not in (None, ''):
+        try:
+            precio_opcion_id = int(precio_opcion_id)
+        except Exception:
+            return None, ({'error': 'precio_opcion_id inválido'}, 400)
+        opcion = servicio_opciones_precio_por_clave.get((int(servicio.id_servicio), int(precio_opcion_id)))
+        if not opcion:
+            return None, ({'error': 'Opción de precio inválida para el servicio'}, 400)
+        if cola_cobro is None:
+            precio = Decimal(str(opcion.precio or 0))
+
+    item_subtotal = precio * cantidad
+    if item_subtotal <= 0:
+        return None, ({'error': f'Subtotal inválido para servicio {id_servicio_item}'}, 400)
+    if servicio.porcentaje_iva == 10:
+        item_iva = item_subtotal / 11
+    elif servicio.porcentaje_iva == 5:
+        item_iva = item_subtotal / 21
+    else:
+        item_iva = Decimal('0')
+    detalle = DetalleVenta(
+        id_servicio=servicio.id_servicio,
+        cantidad=cantidad,
+        precio_unitario=precio,
+        precio_original=precio_original,
+        porcentaje_iva=servicio.porcentaje_iva,
+        monto_iva=item_iva,
+        subtotal=item_subtotal,
+        es_kit=False,
+    )
+    return (detalle, servicio, cantidad, item_subtotal, item_iva), None
 
 
 def _validar_stock_para_venta(productos_por_id, cantidades_por_producto, id_autorizacion):

@@ -36,6 +36,9 @@ export default function ProductoCard({ slug, producto, brandColor, themeKey, cta
         )}
       </Link>
       <div className="card-content flex flex-col flex-grow">
+        {producto.es_servicio ? (
+          <span className="product-card-category">Servicio</span>
+        ) : null}
         {producto.categoria ? (
           <span className="product-card-category">
             {producto.categoria}

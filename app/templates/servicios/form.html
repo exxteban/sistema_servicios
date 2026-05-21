@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}{% if servicio %}Editar{% else %}Nuevo{% endif %} Servicio{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl">
+    <div class="rounded-xl bg-white p-6 shadow-md transition-colors duration-300 dark:bg-gray-800">
+        <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-{% if servicio %}edit{% else %}plus-circle{% endif %} mr-2 text-emerald-600 dark:text-emerald-400"></i>
+                {% if servicio %}Editar Servicio{% else %}Nuevo Servicio{% endif %}
+            </h1>
+            <div class="flex justify-end gap-3">
+                <a href="{{ url_for('servicios.listar') }}" class="rounded-lg bg-gray-200 px-6 py-2 text-gray-700 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">Cancelar</a>
+                <button type="submit" form="servicioForm" class="rounded-lg bg-emerald-600 px-6 py-2 text-white transition hover:bg-emerald-700">
+                    <i class="fas fa-save mr-2"></i>Guardar
+                </button>
+            </div>
+        </div>
+
+        <form method="POST" id="servicioForm" class="space-y-6" action="{{ url_for('servicios.editar', id_servicio=servicio.id_servicio) if servicio else url_for('servicios.nuevo') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            {% if clientes %}
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Cliente *</label>
+                <select name="id_cliente" required class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    <option value="">Seleccione cliente...</option>
+                    {% set selected_cliente = request.form.get('id_cliente', servicio.id_cliente if servicio else cliente_id) | string %}
+                    {% for cliente in clientes %}
+                    <option value="{{ cliente.id_cliente }}" {% if selected_cliente == (cliente.id_cliente|string) %}selected{% endif %}>{{ cliente.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Este dato define a qué tenant pertenece el servicio.</p>
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Código interno</label>
+                    <input type="text" name="codigo" maxlength="50" value="{{ request.form.get('codigo', servicio.codigo if servicio else '') }}"
+                        class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        placeholder="Opcional. Ej: CORTE01">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Categoría</label>
+                    <input type="text" name="categoria" maxlength="100" value="{{ request.form.get('categoria', servicio.categoria if servicio else '') }}"
+                        class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        placeholder="Ej: Peluquería, Técnico, Estética">
+                </div>
+            </div>
+
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del servicio *</label>
+                <input type="text" name="nombre" required maxlength="200" value="{{ request.form.get('nombre', servicio.nombre if servicio else '') }}"
+                    class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    placeholder="Ej: Corte clásico, diagnóstico técnico, manicura">
+            </div>
+
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción</label>
+                <textarea name="descripcion" rows="3" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    placeholder="Detalle del servicio ofrecido, alcance, condiciones o materiales incluidos...">{{ request.form.get('descripcion', servicio.descripcion if servicio else '') }}</textarea>
+            </div>
+
+            <div class="rounded-lg bg-gray-50 p-4 transition-colors duration-300 dark:bg-gray-700/40">
+                <h3 class="mb-4 font-semibold text-gray-700 dark:text-gray-200">Costo y precio</h3>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Costo interno</label>
+                        <input type="number" name="costo" min="0" step="0.01" value="{{ request.form.get('costo', servicio.costo if servicio else 0) }}"
+                            class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Precio al cliente *</label>
+                        <input type="number" name="precio" min="0" step="0.01" required value="{{ request.form.get('precio', servicio.precio if servicio else '') }}"
+                            class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Duración</label>
+                        <input type="number" name="duracion_minutos" min="0" step="5" value="{{ request.form.get('duracion_minutos', servicio.duracion_minutos if servicio else 30) }}"
+                            class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">IVA</label>
+                        <select name="porcentaje_iva" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                            {% set iva_actual = request.form.get('porcentaje_iva', servicio.porcentaje_iva if servicio else 10)|string %}
+                            <option value="10" {% if iva_actual == '10' %}selected{% endif %}>10%</option>
+                            <option value="5" {% if iva_actual == '5' %}selected{% endif %}>5%</option>
+                            <option value="0" {% if iva_actual == '0' %}selected{% endif %}>Exenta</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-800/30 dark:bg-emerald-900/10">
+                <h3 class="font-semibold text-emerald-800 dark:text-emerald-300">Variantes de costo/precio</h3>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Opcional. Una variante por línea con formato: Nombre | costo | precio.</p>
+                <textarea name="variantes" rows="4" class="mt-3 w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    placeholder="Corte simple | 15000 | 30000&#10;Corte + barba | 25000 | 50000">{{ variantes_text }}</textarea>
+            </div>
+
+            <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-4 transition-colors duration-300 dark:border-indigo-800/30 dark:bg-indigo-900/20">
+                <h3 class="mb-4 flex items-center gap-2 font-semibold text-indigo-800 dark:text-indigo-300"><i class="fas fa-store"></i>Tienda Online</h3>
+                <label class="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" name="publicado_tienda" value="1" {% if request.form.get('publicado_tienda') or (servicio and servicio.publicado_tienda and request.method != 'POST') %}checked{% endif %}
+                        class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600">
+                    Publicar servicio en Tienda Web
+                </label>
+                <div class="mt-4">
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción extendida para tienda</label>
+                    <textarea name="descripcion_tienda" rows="3" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">{{ request.form.get('descripcion_tienda', servicio.descripcion_tienda if servicio else '') }}</textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <a href="{{ url_for('servicios.listar') }}" class="rounded-lg bg-gray-200 px-6 py-2 text-gray-700 transition hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">Cancelar</a>
+                <button type="submit" class="rounded-lg bg-emerald-600 px-6 py-2 text-white transition hover:bg-emerald-700"><i class="fas fa-save mr-2"></i>Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

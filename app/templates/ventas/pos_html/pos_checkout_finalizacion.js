@@ -44,7 +44,9 @@
             .filter(pago => pago.monto > 0.0001);
         const payload = {
             items: this.carrito.map(it => ({
+                tipo: it.tipo || 'producto',
                 id_producto: it.id_producto,
+                id_servicio: it.id_servicio || null,
                 cantidad: it.cantidad,
                 precio: it.precio,
                 precio_manual: it.precio_manual === true,

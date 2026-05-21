@@ -356,6 +356,7 @@ def create_app(config_name='default'):
     from app.routes.main import main_bp
     from app.routes.auth import auth_bp
     from app.routes.productos import productos_bp
+    from app.routes.servicios import servicios_bp
     from app.routes.ventas import ventas_bp
     from app.routes.caja import caja_bp
     from app.routes.compras import compras_bp
@@ -397,6 +398,7 @@ def create_app(config_name='default'):
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(productos_bp, url_prefix='/productos')
+    app.register_blueprint(servicios_bp, url_prefix='/servicios')
     app.register_blueprint(ventas_bp, url_prefix='/ventas')
     app.register_blueprint(caja_bp, url_prefix='/caja')
     app.register_blueprint(compras_bp, url_prefix='/compras')

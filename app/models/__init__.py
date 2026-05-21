@@ -7,6 +7,7 @@ from app.models.permiso import Permiso
 from app.models.autorizacion import Autorizacion
 from app.models.auditoria import Auditoria
 from app.models.producto import Producto, Categoria, ProductoCompuesto, ProductoRepuesto, ProductoPrecioOpcion
+from app.models.servicio import Servicio, ServicioPrecioOpcion
 from app.models.cliente import Cliente, ClienteObservacion
 from app.models.cliente_calificacion import ClienteCalificacionRegla, ClienteCalificacionHistorial
 from app.models.cliente_fidelizacion import ClienteFidelizacionMovimiento
@@ -43,7 +44,7 @@ from gastos_corrientes.models import GastoCorriente, PagoGastoCorriente
 __all__ = [
     'Usuario', 'PreferenciaUsuario', 'Rol', 'Permiso', 'Autorizacion', 'Auditoria',
     'Producto', 'Categoria', 'ProductoCompuesto', 'ProductoRepuesto',
-    'ProductoPrecioOpcion',
+    'ProductoPrecioOpcion', 'Servicio', 'ServicioPrecioOpcion',
     'Cliente', 'ClienteObservacion', 'ClienteCalificacionRegla', 'ClienteCalificacionHistorial',
     'ClienteFidelizacionMovimiento',
     'Proveedor',

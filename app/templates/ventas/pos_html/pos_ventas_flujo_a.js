@@ -645,7 +645,7 @@
                     return;
                 }
 
-                const response = await fetch(`/productos/buscar?q=${encodeURIComponent(this.busqueda)}`);
+                const response = await fetch(`/ventas/catalogo/buscar?q=${encodeURIComponent(this.busqueda)}`);
                 this.resultados = await response.json();
             },
 

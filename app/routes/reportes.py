@@ -372,7 +372,7 @@ def detalle_venta(id_venta):
     detalles = []
     for detalle in venta.detalles:
         detalles.append({
-            'producto': detalle.producto.nombre,
+            'producto': detalle.item_nombre,
             'cantidad': detalle.cantidad,
             'precio_unitario': float(detalle.precio_unitario),
             'subtotal': float(detalle.subtotal),

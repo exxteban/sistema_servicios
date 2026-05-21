@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo turno peluquería/barbería{% endblock %}
+
+{% block extra_css %}
+<style>
+    .turno-rapido-page {
+        margin-inline: auto;
+        width: 100%;
+        max-width: 1680px;
+        padding-inline: 0.5rem;
+    }
+
+    .turno-rapido-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        width: 100%;
+    }
+
+    .turno-rapido-main {
+        min-width: 0;
+    }
+
+    .turno-rapido-summary {
+        width: 100%;
+    }
+
+    @media (min-width: 1280px) {
+        .turno-rapido-page {
+            padding-inline: 1rem;
+        }
+
+        .turno-rapido-form {
+            align-items: flex-start;
+            flex-direction: row;
+            gap: 1.5rem;
+        }
+
+        .turno-rapido-main {
+            flex: 1 1 auto;
+        }
+
+        .turno-rapido-summary {
+            flex: 0 0 24rem;
+            max-width: 24rem;
+            position: sticky;
+            top: 1rem;
+        }
+    }
+
+    @media (min-width: 1536px) {
+        .turno-rapido-summary {
+            flex-basis: 25rem;
+            max-width: 25rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="turno-rapido-page space-y-5" x-data='peluqueriaTurnoRapido({
+    clientesUrl: "{{ url_for('agenda.buscar_clientes_relacion') }}",
+    profesionales: {{ profesionales|tojson }},
+    servicios: {{ servicios|tojson }},
+    horarios: {{ horarios|tojson }}
+})'>
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-xs font-black uppercase tracking-[0.25em] text-violet-500">Peluquería / Barbería</p>
+            <h1 class="mt-1 text-3xl font-black tracking-tight text-slate-950 dark:text-white">Nuevo turno rápido</h1>
+            <p class="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                Pensado para locales chicos o equipos grandes: elegís profesional, servicio, cliente y hora con botones.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('agenda.nueva_actividad') }}"
+               data-tab-url="{{ url_for('agenda.nueva_actividad') }}"
+               data-tab-title="Nueva actividad"
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
+                <i class="fas fa-sliders-h text-xs"></i> Formulario completo
+            </a>
+            <a href="{{ url_for('main.dashboard') }}"
+               data-tab-url="{{ url_for('main.dashboard') }}"
+               data-tab-title="Dashboard"
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
+                <i class="fas fa-arrow-left text-xs"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('agenda.nueva_actividad') }}" class="turno-rapido-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="titulo" :value="tituloTurno()">
+        <input type="hidden" name="tipo" value="cita">
+        <input type="hidden" name="prioridad" value="media">
+        <input type="hidden" name="usuario_id" :value="profesionalId">
+        <input type="hidden" name="cliente_id" :value="clienteId || ''">
+        <input type="hidden" name="fecha_inicio" :value="fechaInicio">
+        <input type="hidden" name="fecha_fin" :value="fechaFin">
+        <input type="hidden" name="mostrar_agenda_en" value="solo_responsable">
+        <input type="hidden" name="recordatorio_a" value="solo_responsable">
+        <input type="hidden" name="recordatorio_minutos" value="15">
+        <input type="hidden" name="descripcion" :value="descripcionTurno()">
+
+        <div class="turno-rapido-main space-y-5">
+            <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-slate-900/95 dark:shadow-none">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-black text-slate-950 dark:text-white">1. Profesional</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Funciona igual para 1, 2 o más personas.</p>
+                    </div>
+                    <span class="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 dark:bg-violet-500/15 dark:text-violet-200" x-text="profesionales.length + ' disponibles'"></span>
+                </div>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <template x-for="profesional in profesionales" :key="profesional.id">
+                        <button type="button" @click="seleccionarProfesional(profesional)"
+                            class="group flex items-center gap-3 rounded-2xl border p-4 text-left transition"
+                            :class="profesionalId === profesional.id ? 'ring-2 dark:ring-offset-slate-900' : 'border-slate-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/[0.03]'"
+                            :style="estiloTarjetaProfesional(profesional)">
+                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-black text-white" :style="estiloAvatarProfesional(profesional)" x-text="profesional.iniciales"></span>
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-black text-slate-900 dark:text-white" x-text="profesional.nombre"></span>
+                                <span class="mt-0.5 block text-xs font-semibold" :style="{ color: colorItem(profesional.id).solid }" x-show="profesionalId === profesional.id">Seleccionado</span>
+                            </span>
+                        </button>
+                    </template>
+                </div>
+            </section>
+
+            <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-slate-900/95 dark:shadow-none">
+                <h2 class="text-base font-black text-slate-950 dark:text-white">2. Servicio</h2>
+                <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">Tocá una opción y se calcula la duración automáticamente.</p>
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                    <template x-for="servicio in servicios" :key="servicio.id">
+                        <button type="button" @click="seleccionarServicio(servicio)"
+                            class="rounded-2xl border border-slate-200 bg-white p-4 text-left text-slate-800 transition hover:border-slate-400 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-white/[0.03]"
+                            :style="estiloTarjetaServicio(servicio)">
+                            <i :class="servicio.icono" class="mb-3 text-lg" :style="estiloIconoServicio(servicio)"></i>
+                            <span class="block text-sm font-black" x-text="servicio.nombre"></span>
+                            <span class="mt-1 block text-xs opacity-70" x-text="servicio.duracion + ' min'"></span>
+                        </button>
+                    </template>
+                </div>
+                <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div x-show="servicioId === 'otro'" x-cloak>
+                        <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Nombre del servicio</label>
+                        <input type="text" x-model="servicioPersonalizado" placeholder="Ej: alisado, cejas, nutrición..."
+                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Duración</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="minutos in [15, 20, 30, 45, 60, 90]" :key="minutos">
+                                <button type="button" @click="duracion = minutos"
+                                    class="rounded-xl border px-3 py-2 text-xs font-black transition"
+                                    :class="duracion === minutos ? 'border-violet-500 bg-violet-50 text-violet-800 dark:border-violet-300 dark:bg-violet-500/15 dark:text-violet-100' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/[0.03]'"
+                                    x-text="minutos + 'm'"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="overflow-visible rounded-3xl border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-slate-900/95 dark:shadow-none">
+                <h2 class="text-base font-black text-slate-950 dark:text-white">3. Cliente y horario</h2>
+                <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div class="relative z-40" @click.outside="mostrarClientes = false">
+                        <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Cliente</label>
+                        <input type="text" x-model="clienteBusqueda" @focus="buscarClientes(clienteBusqueda, true)" @input.debounce.250ms="buscarClientes(clienteBusqueda, true)"
+                            placeholder="Buscar por nombre, teléfono o RUC..."
+                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/20">
+                        <div x-show="mostrarClientes" x-cloak class="absolute z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-300/70 dark:border-white/10 dark:bg-slate-950 dark:shadow-black/40">
+                            <div x-show="cargandoClientes" class="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">Buscando clientes...</div>
+                            <template x-for="cliente in clientes" :key="cliente.id_cliente">
+                                <button type="button" @click="seleccionarCliente(cliente)" class="block w-full border-b border-slate-100 px-3 py-2 text-left transition hover:bg-violet-50 dark:border-white/5 dark:hover:bg-violet-500/10">
+                                    <span class="block text-sm font-bold text-slate-900 dark:text-white" x-text="cliente.nombre"></span>
+                                    <span class="block text-xs text-slate-500 dark:text-slate-400" x-text="detalleCliente(cliente)"></span>
+                                </button>
+                            </template>
+                            <div x-show="!cargandoClientes && clientes.length === 0" class="px-3 py-3 text-sm text-slate-500 dark:text-slate-400">No se encontraron clientes.</div>
+                        </div>
+                        <div x-show="clienteSeleccionado" x-cloak class="mt-2 flex items-center justify-between gap-3 rounded-xl bg-violet-50 px-3 py-2 text-sm dark:bg-violet-500/15">
+                            <span class="font-bold text-violet-800 dark:text-violet-100" x-text="clienteSeleccionado ? clienteSeleccionado.nombre : ''"></span>
+                            <button type="button" @click="limpiarCliente()" class="text-xs font-bold text-violet-600 dark:text-violet-200">Quitar</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Fecha</label>
+                            <input type="date" x-model="fecha" required class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:border-violet-400 dark:focus:ring-violet-500/20">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Hora manual</label>
+                            <input type="time" x-model="hora" required step="900" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:border-violet-400 dark:focus:ring-violet-500/20">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 flex gap-2 overflow-x-auto pb-1">
+                    <template x-for="opcion in horarios" :key="opcion">
+                        <button type="button" @click="hora = opcion" class="shrink-0 rounded-xl border px-3 py-2 text-xs font-black transition"
+                            :class="hora === opcion ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/[0.03]'"
+                            x-text="opcion"></button>
+                    </template>
+                </div>
+            </section>
+        </div>
+
+        <aside class="turno-rapido-summary">
+            <div class="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 p-5 text-white shadow-sm shadow-slate-300/50 dark:border-white/10 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 dark:shadow-none" :style="estiloResumenPanel()">
+                <p class="text-xs font-black uppercase tracking-[0.22em]" :style="estiloTextoResumen()">Resumen del turno</p>
+                <h2 class="mt-2 break-words text-2xl font-black" x-text="tituloTurno()"></h2>
+                <div class="mt-5 space-y-3 text-sm text-slate-200">
+                    <div class="flex items-center gap-2"><i class="fas fa-user-tie w-5" :style="estiloTextoResumen()"></i><span x-text="profesionalNombre()"></span></div>
+                    <div class="flex items-center gap-2"><i class="far fa-clock w-5" :style="estiloTextoResumen()"></i><span x-text="horarioResumen()"></span></div>
+                    <div class="flex items-center gap-2"><i class="fas fa-stopwatch w-5" :style="estiloTextoResumen()"></i><span x-text="duracion + ' minutos'"></span></div>
+                    <div class="flex items-center gap-2"><i class="fas fa-bell w-5" :style="estiloTextoResumen()"></i><span>Recordatorio 15 min antes</span></div>
+                </div>
+                <label class="mt-5 block text-sm font-bold text-slate-200 dark:text-slate-300">Observaciones</label>
+                <textarea name="observaciones" x-model="observaciones" rows="3" placeholder="Notas internas: seña, preferencia, color, etc."
+                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-slate-400 dark:focus:border-violet-400 dark:focus:ring-violet-500/20"></textarea>
+                <button type="submit" class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-slate-950 transition" :style="estiloBotonResumen()">
+                    <i class="fas fa-calendar-plus"></i> Crear turno
+                </button>
+            </div>
+        </aside>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function peluqueriaTurnoRapido(config) {
+    return {
+        clientesUrl: config.clientesUrl || '',
+        profesionales: Array.isArray(config.profesionales) ? config.profesionales : [],
+        servicios: Array.isArray(config.servicios) ? config.servicios : [],
+        horarios: Array.isArray(config.horarios) ? config.horarios : [],
+        profesionalId: '',
+        servicioId: '',
+        servicioNombre: '',
+        servicioPersonalizado: '',
+        duracion: 30,
+        fecha: '',
+        hora: '',
+        clienteSeleccionado: null,
+        clienteId: '',
+        clienteBusqueda: '',
+        clientes: [],
+        mostrarClientes: false,
+        cargandoClientes: false,
+        clienteFetchId: 0,
+        observaciones: '',
+        paleta: [
+            { solid: '#7c3aed', soft: 'rgba(124, 58, 237, 0.12)', border: 'rgba(124, 58, 237, 0.28)', ring: 'rgba(124, 58, 237, 0.18)' },
+            { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.12)', border: 'rgba(37, 99, 235, 0.28)', ring: 'rgba(37, 99, 235, 0.18)' },
+            { solid: '#db2777', soft: 'rgba(219, 39, 119, 0.12)', border: 'rgba(219, 39, 119, 0.28)', ring: 'rgba(219, 39, 119, 0.18)' },
+            { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.28)', ring: 'rgba(234, 88, 12, 0.18)' },
+            { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)', border: 'rgba(8, 145, 178, 0.28)', ring: 'rgba(8, 145, 178, 0.18)' },
+            { solid: '#65a30d', soft: 'rgba(101, 163, 13, 0.12)', border: 'rgba(101, 163, 13, 0.28)', ring: 'rgba(101, 163, 13, 0.18)' },
+            { solid: '#dc2626', soft: 'rgba(220, 38, 38, 0.12)', border: 'rgba(220, 38, 38, 0.28)', ring: 'rgba(220, 38, 38, 0.18)' },
+        ],
+        coloresServicio: {
+            corte: { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.12)', border: 'rgba(37, 99, 235, 0.28)', ring: 'rgba(37, 99, 235, 0.18)' },
+            barba: { solid: '#16a34a', soft: 'rgba(22, 163, 74, 0.12)', border: 'rgba(22, 163, 74, 0.28)', ring: 'rgba(22, 163, 74, 0.18)' },
+            corte_barba: { solid: '#7c3aed', soft: 'rgba(124, 58, 237, 0.12)', border: 'rgba(124, 58, 237, 0.28)', ring: 'rgba(124, 58, 237, 0.18)' },
+            color: { solid: '#db2777', soft: 'rgba(219, 39, 119, 0.12)', border: 'rgba(219, 39, 119, 0.28)', ring: 'rgba(219, 39, 119, 0.18)' },
+            peinado: { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.28)', ring: 'rgba(234, 88, 12, 0.18)' },
+            lavado: { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)', border: 'rgba(8, 145, 178, 0.28)', ring: 'rgba(8, 145, 178, 0.18)' },
+            otro: { solid: '#475569', soft: 'rgba(71, 85, 105, 0.12)', border: 'rgba(71, 85, 105, 0.28)', ring: 'rgba(71, 85, 105, 0.18)' },
+        },
+        init() {
+            const hoy = new Date();
+            this.fecha = this.formatearFecha(hoy);
+            this.hora = this.horaInicial(hoy);
+            if (this.profesionales.length) this.seleccionarProfesional(this.profesionales[0]);
+            if (this.servicios.length) this.seleccionarServicio(this.servicios[0]);
+        },
+        colorItem(seed) {
+            const valor = String(seed || 'item');
+            let hash = 0;
+            for (let index = 0; index < valor.length; index += 1) {
+                hash = ((hash << 5) - hash) + valor.charCodeAt(index);
+                hash |= 0;
+            }
+            return this.paleta[Math.abs(hash) % this.paleta.length];
+        },
+        estiloTarjetaProfesional(profesional) {
+            const color = this.colorItem(profesional ? profesional.id : 'profesional');
+            if (this.profesionalId === (profesional ? profesional.id : '')) {
+                return {
+                    borderColor: color.border,
+                    backgroundColor: color.soft,
+                    boxShadow: `0 0 0 3px ${color.ring}`,
+                };
+            }
+            return {
+                borderColor: color.ring,
+            };
+        },
+        estiloAvatarProfesional(profesional) {
+            const color = this.colorItem(profesional ? profesional.id : 'profesional');
+            return {
+                backgroundColor: color.solid,
+                boxShadow: this.profesionalId === (profesional ? profesional.id : '') ? `0 0 0 4px ${color.ring}` : 'none',
+            };
+        },
+        seleccionarProfesional(profesional) {
+            this.profesionalId = profesional ? profesional.id : '';
+        },
+        colorServicio(servicioId) {
+            return this.coloresServicio[servicioId] || this.colorItem(servicioId || 'servicio');
+        },
+        colorResumen() {
+            return this.colorServicio(this.servicioId || 'corte');
+        },
+        hexToRgba(hex, alpha) {
+            const valor = String(hex || '').replace('#', '');
+            if (valor.length !== 6) return `rgba(124, 58, 237, ${alpha})`;
+            const red = Number.parseInt(valor.slice(0, 2), 16);
+            const green = Number.parseInt(valor.slice(2, 4), 16);
+            const blue = Number.parseInt(valor.slice(4, 6), 16);
+            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+        },
+        estiloResumenPanel() {
+            const color = this.colorResumen();
+            return {
+                borderColor: color.border,
+                boxShadow: `0 14px 40px ${this.hexToRgba(color.solid, 0.20)}`,
+                backgroundImage: `linear-gradient(135deg, #020617 0%, #0f172a 58%, ${this.hexToRgba(color.solid, 0.42)} 100%)`,
+            };
+        },
+        estiloTextoResumen() {
+            const color = this.colorResumen();
+            return {
+                color: color.solid,
+            };
+        },
+        estiloBotonResumen() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: color.solid,
+                boxShadow: `0 10px 24px ${this.hexToRgba(color.solid, 0.24)}`,
+                color: '#ffffff',
+            };
+        },
+        estiloTarjetaServicio(servicio) {
+            const color = this.colorServicio(servicio ? servicio.id : 'servicio');
+            if (this.servicioId === (servicio ? servicio.id : '')) {
+                return {
+                    borderColor: color.border,
+                    backgroundColor: color.soft,
+                    boxShadow: `0 0 0 3px ${color.ring}`,
+                };
+            }
+            return {
+                borderColor: color.ring,
+            };
+        },
+        estiloIconoServicio(servicio) {
+            const color = this.colorServicio(servicio ? servicio.id : 'servicio');
+            return {
+                color: color.solid,
+            };
+        },
+        seleccionarServicio(servicio) {
+            if (!servicio) return;
+            this.servicioId = servicio.id;
+            this.servicioNombre = servicio.nombre;
+            this.duracion = Number(servicio.duracion || 30);
+        },
+        nombreServicio() {
+            if (this.servicioId === 'otro' && this.servicioPersonalizado.trim()) {
+                return this.servicioPersonalizado.trim();
+            }
+            return this.servicioNombre || 'Turno';
+        },
+        profesionalNombre() {
+            const profesional = this.profesionales.find((item) => item.id === this.profesionalId);
+            return profesional ? profesional.nombre : 'Sin profesional';
+        },
+        tituloTurno() {
+            const cliente = this.clienteSeleccionado ? ` - ${this.clienteSeleccionado.nombre}` : '';
+            return `${this.nombreServicio()}${cliente}`;
+        },
+        descripcionTurno() {
+            return `Turno peluquería/barbería: ${this.nombreServicio()} con ${this.profesionalNombre()}.`;
+        },
+        get fechaInicio() {
+            return this.fecha && this.hora ? `${this.fecha}T${this.hora}` : '';
+        },
+        get fechaFin() {
+            if (!this.fechaInicio) return '';
+            const fin = new Date(this.fechaInicio);
+            fin.setMinutes(fin.getMinutes() + Number(this.duracion || 30));
+            return this.formatearDatetimeLocal(fin);
+        },
+        horarioResumen() {
+            if (!this.fecha || !this.hora) return 'Sin horario';
+            return `${this.fecha} ${this.hora} a ${this.fechaFin.slice(11, 16)}`;
+        },
+        formatearFecha(fecha) {
+            return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+        },
+        formatearDatetimeLocal(fecha) {
+            return `${this.formatearFecha(fecha)}T${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`;
+        },
+        horaInicial(fecha) {
+            const siguiente = new Date(fecha);
+            const minutos = siguiente.getMinutes();
+            siguiente.setMinutes(minutos <= 30 ? 30 : 60, 0, 0);
+            const hora = `${String(siguiente.getHours()).padStart(2, '0')}:${String(siguiente.getMinutes()).padStart(2, '0')}`;
+            return this.horarios.includes(hora) ? hora : '09:00';
+        },
+        detalleCliente(cliente) {
+            if (!cliente) return '';
+            return [cliente.ruc_ci, cliente.telefono, cliente.email].filter(Boolean).join(' · ') || 'Sin datos extra';
+        },
+        limpiarCliente() {
+            this.clienteSeleccionado = null;
+            this.clienteId = '';
+            this.clienteBusqueda = '';
+        },
+        seleccionarCliente(cliente) {
+            this.clienteSeleccionado = cliente;
+            this.clienteId = cliente ? cliente.id_cliente : '';
+            this.clienteBusqueda = '';
+            this.clientes = [];
+            this.mostrarClientes = false;
+        },
+        async buscarClientes(query = '', abrir = false) {
+            if (abrir) this.mostrarClientes = true;
+            const fetchId = ++this.clienteFetchId;
+            this.cargandoClientes = true;
+            try {
+                const url = new URL(this.clientesUrl, window.location.origin);
+                if ((query || '').trim()) url.searchParams.set('q', query.trim());
+                const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                const data = await response.json();
+                if (fetchId === this.clienteFetchId) this.clientes = Array.isArray(data.items) ? data.items : [];
+            } catch (_error) {
+                if (fetchId === this.clienteFetchId) this.clientes = [];
+            } finally {
+                if (fetchId === this.clienteFetchId) this.cargandoClientes = false;
+            }
+        },
+    };
+}
+</script>
+{% endblock %}

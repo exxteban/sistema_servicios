@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Productos{% endblock %}
+{% block title %}{% if tipo == 'servicio' %}Servicios{% else %}Productos{% endif %}{% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="productosApp()">
+<div class="space-y-6" x-data='productosApp({ buscar: {{ buscar|default("", true)|tojson }}, categoriaId: {{ (categoria_id if categoria_id else "")|tojson }} })'>
     <div class="flex justify-between items-center">
         <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
-            <i class="fas fa-box text-blue-600 dark:text-blue-400 mr-2"></i>Productos
+            <i class="fas {{ 'fa-concierge-bell' if tipo == 'servicio' else 'fa-box' }} text-blue-600 dark:text-blue-400 mr-2"></i>{% if tipo == 'servicio' %}Servicios y costos{% else %}Productos{% endif %}
         </h1>
-        <a href="{{ url_for('productos.nuevo') }}" data-permiso="crear_producto"
+        <a href="{{ url_for('productos.nuevo', tipo='servicio') if tipo == 'servicio' else url_for('productos.nuevo') }}" data-permiso="crear_producto"
             class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition shadow-lg shadow-blue-600/30">
-            <i class="fas fa-plus mr-2"></i>Nuevo Producto
+            <i class="fas fa-plus mr-2"></i>{% if tipo == 'servicio' %}Nuevo Servicio{% else %}Nuevo Producto{% endif %}
         </a>
     </div>
 
@@ -50,6 +50,14 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="w-48">
+                    <select name="tipo" @change.prevent.stop="$nextTick(() => { const form = $refs.filtrosForm; if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); })"
+                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                        <option value="" {% if not tipo %}selected{% endif %}>Productos y servicios</option>
+                        <option value="producto" {% if tipo == 'producto' %}selected{% endif %}>Solo productos</option>
+                        <option value="servicio" {% if tipo == 'servicio' %}selected{% endif %}>Solo servicios</option>
+                    </select>
+                </div>
                 <button type="submit"
                     class="bg-gray-800 dark:bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition shadow-md">
                     <i class="fas fa-search mr-2"></i>Buscar
@@ -62,7 +70,7 @@
                 data-confirm="¿Eliminar la categoría seleccionada? Solo se podrá si no tiene productos activos.">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="id_autorizacion" value="">
-                <input type="hidden" name="next" value="{{ url_for('productos.listar', buscar=buscar or none, sort=sort, dir=dir) }}">
+                <input type="hidden" name="next" value="{{ url_for('productos.listar', buscar=buscar or none, tipo=tipo or none, sort=sort, dir=dir) }}">
                 <button type="submit" data-permiso="eliminar_producto"
                     class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     x-bind:disabled="!categoriaSeleccionada"
@@ -80,11 +88,12 @@
                 {% set current_dir = dir or 'asc' %}
                 {% set base_buscar = buscar or none %}
                 {% set base_categoria = categoria_id if categoria_id else none %}
+                {% set base_tipo = tipo if tipo else none %}
                 <thead class="bg-gray-50 dark:bg-gray-700/50">
                     <tr>
                         <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
                             {% set next_dir = 'desc' if current_sort == 'codigo' and current_dir == 'asc' else 'asc' %}
-                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='codigo', dir=next_dir) }}"
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, tipo=base_tipo, sort='codigo', dir=next_dir) }}"
                                 class="inline-flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                 <span>Código</span>
                                 {% if current_sort == 'codigo' %}
@@ -97,7 +106,7 @@
                         <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
                             {% set next_dir = 'desc' if current_sort == 'producto' and current_dir == 'asc' else 'asc'
                             %}
-                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='producto', dir=next_dir) }}"
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, tipo=base_tipo, sort='producto', dir=next_dir) }}"
                                 class="inline-flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                 <span>Producto</span>
                                 {% if current_sort == 'producto' %}
@@ -110,7 +119,7 @@
                         <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">
                             {% set next_dir = 'desc' if current_sort == 'categoria' and current_dir == 'asc' else 'asc'
                             %}
-                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='categoria', dir=next_dir) }}"
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, tipo=base_tipo, sort='categoria', dir=next_dir) }}"
                                 class="inline-flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                 <span>Categoría</span>
                                 {% if current_sort == 'categoria' %}
@@ -122,12 +131,12 @@
                         </th>
                         <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">
                             {% set next_dir = 'desc' if current_sort == 'precio' and current_dir == 'asc' else 'asc' %}
-                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='precio', dir=next_dir) }}"
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, tipo=base_tipo, sort='precio', dir=next_dir) }}"
                                 class="flex items-start justify-end gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                 <div class="flex flex-col items-end leading-tight whitespace-normal">
-                                    <span>Precio</span>
-                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Mayorista</span>
-                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Minorista</span>
+                                    <span>{% if tipo == 'servicio' %}Costo / Precio{% else %}Precio{% endif %}</span>
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{% if tipo == 'servicio' %}Costo interno{% else %}Mayorista{% endif %}</span>
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{% if tipo == 'servicio' %}Cliente{% else %}Minorista{% endif %}</span>
                                 </div>
                                 <span class="pt-0.5">
                                     {% if current_sort == 'precio' %}
@@ -140,7 +149,7 @@
                         </th>
                         <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">
                             {% set next_dir = 'desc' if current_sort == 'stock' and current_dir == 'asc' else 'asc' %}
-                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, sort='stock', dir=next_dir) }}"
+                            <a href="{{ url_for('productos.listar', page=1, buscar=base_buscar, categoria=base_categoria, tipo=base_tipo, sort='stock', dir=next_dir) }}"
                                 class="inline-flex items-center justify-center gap-2 w-full hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                 <span>Stock</span>
                                 {% if current_sort == 'stock' %}
@@ -172,7 +181,9 @@
                         <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">
                             <div class="flex flex-col items-end leading-tight whitespace-nowrap">
                                 <span>
-                                    {% if producto.precio_mayorista is not none %}
+                                    {% if tipo == 'servicio' %}
+                                    ₲ {{ "{:,.0f}".format(producto.precio_compra or 0).replace(",", ".") }}
+                                    {% elif producto.precio_mayorista is not none %}
                                     ₲ {{ "{:,.0f}".format(producto.precio_mayorista).replace(",", ".") }}
                                     {% else %}
                                     —
@@ -239,7 +250,7 @@
                     {% else %}
                     <tr>
                         <td colspan="6" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
-                            No se encontraron productos
+                            {% if tipo == 'servicio' %}No se encontraron servicios{% else %}No se encontraron productos{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -251,7 +262,7 @@
     {% if productos.pages > 1 %}
     <div class="flex justify-center space-x-2">
         {% if productos.has_prev %}
-        <a href="{{ url_for('productos.listar', page=productos.prev_num, buscar=buscar or none, categoria=(categoria_id if categoria_id else none), sort=sort, dir=dir) }}"
+        <a href="{{ url_for('productos.listar', page=productos.prev_num, buscar=buscar or none, categoria=(categoria_id if categoria_id else none), tipo=tipo or none, sort=sort, dir=dir) }}"
             class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
             <i class="fas fa-chevron-left"></i>
         </a>
@@ -262,7 +273,7 @@
         </span>
 
         {% if productos.has_next %}
-        <a href="{{ url_for('productos.listar', page=productos.next_num, buscar=buscar or none, categoria=(categoria_id if categoria_id else none), sort=sort, dir=dir) }}"
+        <a href="{{ url_for('productos.listar', page=productos.next_num, buscar=buscar or none, categoria=(categoria_id if categoria_id else none), tipo=tipo or none, sort=sort, dir=dir) }}"
             class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
             <i class="fas fa-chevron-right"></i>
         </a>
@@ -450,169 +461,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    function productosApp() {
-        return {
-            modalAjuste: {
-                visible: false,
-                idProducto: null,
-                nombre: '',
-                stockActual: 0,
-                tipo: 'entrada',
-                cantidad: 1,
-                motivo: '',
-                observaciones: ''
-            },
-            modalHistorial: {
-                visible: false,
-                idProducto: null,
-                nombre: '',
-                codigo: '',
-                historial: [],
-                cargando: false,
-                error: ''
-            },
-            guardando: false,
-            busqueda: '{{ buscar|default("", true) }}',
-            categoriaSeleccionada: '{{ categoria_id if categoria_id else "" }}',
-            autoBusquedaHabilitada: true,
-
-            init() {
-                try {
-                    this.autoBusquedaHabilitada = window.localStorage.getItem('productos_auto_busqueda') !== 'false';
-                } catch (error) {}
-            },
-
-            guardarPreferenciaAutoBusqueda() {
-                try {
-                    window.localStorage.setItem('productos_auto_busqueda', this.autoBusquedaHabilitada ? 'true' : 'false');
-                } catch (error) {}
-            },
-
-            manejarInputBusqueda() {
-                if (!this.autoBusquedaHabilitada || !this.$refs.filtrosForm) return;
-                this.$refs.filtrosForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-            },
-
-            limpiarBusqueda(form) {
-                this.busqueda = '';
-                this.$nextTick(() => {
-                    if (form) {
-                        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-                    }
-                });
-            },
-
-            abrirModalAjuste(id, nombre, stock) {
-                this.modalAjuste = {
-                    visible: true,
-                    idProducto: id,
-                    nombre: nombre,
-                    stockActual: stock,
-                    tipo: 'entrada',
-                    cantidad: 1,
-                    motivo: '',
-                    observaciones: ''
-                };
-            },
-
-            cerrarModalAjuste() {
-                this.modalAjuste.visible = false;
-            },
-
-            async abrirModalHistorial(id, nombre, codigo) {
-                this.modalHistorial = {
-                    visible: true,
-                    idProducto: id,
-                    nombre: nombre,
-                    codigo: codigo,
-                    historial: [],
-                    cargando: true,
-                    error: ''
-                };
-
-                try {
-                    const response = await fetch(`/productos/${id}/historial_compras`);
-                    const data = await response.json().catch(() => ({}));
-
-                    if (!response.ok) {
-                        this.modalHistorial.error = data.error || 'No se pudo cargar el historial.';
-                        return;
-                    }
-
-                    this.modalHistorial.historial = Array.isArray(data.historial) ? data.historial : [];
-                } catch (error) {
-                    console.error('Error cargando historial:', error);
-                    this.modalHistorial.error = 'Error de conexión al cargar el historial.';
-                } finally {
-                    this.modalHistorial.cargando = false;
-                }
-            },
-
-            cerrarModalHistorial() {
-                this.modalHistorial.visible = false;
-            },
-
-            async togglePublicacionTienda(idProducto, publicadoActual) {
-                const response = await fetch(`/api/tienda/admin/producto/${idProducto}/publicar`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ publicar: !publicadoActual })
-                });
-                if (!response.ok) {
-                    alert('No se pudo actualizar la publicación en tienda');
-                    return;
-                }
-                location.reload();
-            },
-
-            async guardarAjuste() {
-                if (!this.modalAjuste.motivo) {
-                    alert('Debe seleccionar un motivo');
-                    return;
-                }
-
-                if (this.modalAjuste.cantidad <= 0) {
-                    alert('La cantidad debe ser mayor a 0');
-                    return;
-                }
-
-                this.guardando = true;
-
-                try {
-                    const response = await fetch(`/productos/${this.modalAjuste.idProducto}/ajuste_rapido`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            tipo: this.modalAjuste.tipo,
-                            cantidad: this.modalAjuste.cantidad,
-                            motivo: this.modalAjuste.motivo,
-                            observaciones: this.modalAjuste.observaciones
-                        })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok && data.success) {
-                        // Mostrar mensaje de éxito
-                        const tipoTexto = this.modalAjuste.tipo === 'entrada' ? 'agregadas' : 'retiradas';
-                        alert(`✓ ${this.modalAjuste.cantidad} unidades ${tipoTexto}. Stock nuevo: ${data.stock_nuevo}`);
-
-                        // Recargar página para actualizar stock
-                        location.reload();
-                    } else {
-                        alert('Error: ' + (data.error || 'No se pudo guardar el ajuste'));
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Error de conexión al guardar el ajuste');
-                } finally {
-                    this.guardando = false;
-                }
-            }
-        }
-    }
-</script>
+<script src="{{ url_for('static', filename='js/productos_listar.js') }}"></script>
 {% endblock %}

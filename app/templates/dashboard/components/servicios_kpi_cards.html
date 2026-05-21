@@ -9,9 +9,9 @@
                     <i class="far fa-calendar"></i>
                 </span>
                 <div class="min-w-0">
-                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Turnos hoy</p>
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Turnos hoy</p>
                     <p class="mt-0.5 text-2xl font-black text-slate-950 dark:text-white">{{ agenda_pendientes_hoy or 0 }}</p>
-                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{{ agenda_vencidas or 0 }} vencidos</p>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ agenda_vencidas or 0 }} vencidos</p>
                 </div>
             </div>
         </div>
@@ -27,9 +27,9 @@
                     <i class="fas fa-cut"></i>
                 </span>
                 <div class="min-w-0">
-                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">En atención</p>
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">En atención</p>
                     <p class="mt-0.5 text-2xl font-black text-slate-950 dark:text-white">{{ agenda_pendientes_hoy or 0 }}</p>
-                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Servicios activos ahora</p>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Servicios activos ahora</p>
                 </div>
             </div>
         </div>
@@ -48,9 +48,9 @@
                     <i class="far fa-user"></i>
                 </span>
                 <div class="min-w-0">
-                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Profesionales</p>
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Profesionales</p>
                     <p class="mt-0.5 text-2xl font-black text-slate-950 dark:text-white">{{ profesionales_activos or 0 }}</p>
-                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Activos en el sistema</p>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Activos en el sistema</p>
                 </div>
             </div>
         </div>
@@ -69,9 +69,9 @@
                     <i class="fas fa-money-bill-wave"></i>
                 </span>
                 <div class="min-w-0">
-                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Cobrado hoy</p>
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Cobrado hoy</p>
                     <p class="mt-0.5 text-xl font-black text-slate-950 dark:text-white">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</p>
-                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Servicios + productos + propinas</p>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Servicios + productos + propinas</p>
                 </div>
             </div>
         </div>
@@ -90,11 +90,11 @@
                     <i class="fas fa-cash-register"></i>
                 </span>
                 <div class="min-w-0">
-                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Caja</p>
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Caja</p>
                     <p class="mt-0.5 text-lg font-black {% if sesion_caja %}text-emerald-600 dark:text-emerald-300{% else %}text-amber-600 dark:text-amber-300{% endif %}">
                         {% if sesion_caja %}Abierta{% else %}Pendiente{% endif %}
                     </p>
-                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {% if sesion_caja %}{{ sesion_caja.caja.nombre }}{% else %}Abrir para cobrar{% endif %}
                     </p>
                 </div>

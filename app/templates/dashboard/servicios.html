@@ -3,7 +3,7 @@
 {% block title %}Dashboard Servicios{% endblock %}
 
 {% block content %}
-<div class="space-y-6"
+<div class="mx-auto w-full max-w-[1440px] space-y-6"
     x-data='serviceDashboardCardsCustomizer({
         availableCards: {{ dashboard_service_cards_available|tojson }},
         visibleCards: {{ dashboard_service_cards_selected|tojson }},
@@ -23,7 +23,7 @@
             <div class="relative" @keydown.escape.window="selectorOpen = false">
                 <button type="button"
                     @click="selectorOpen = !selectorOpen"
-                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
                     <i class="fas fa-sliders-h text-xs"></i>
                     Tarjetas visibles
                     <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
@@ -33,7 +33,7 @@
                 <div x-show="selectorOpen"
                     x-transition
                     @click.away="selectorOpen = false"
-                    class="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-900"
+                    class="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-xl shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/95 dark:shadow-black/30"
                     style="display: none;">
                     <div class="border-b border-slate-100 px-4 py-3 dark:border-white/5">
                         <p class="text-sm font-bold text-slate-950 dark:text-white">Personalizar dashboard</p>
@@ -61,18 +61,35 @@
                 </div>
             </div>
             {% if current_user.tiene_permiso('agenda_crear') %}
-            <a href="{{ url_for('agenda.nueva_actividad') }}"
-               data-tab-url="{{ url_for('agenda.nueva_actividad') }}"
+            {% set nuevo_turno_url = url_for('agenda.nuevo_turno_peluqueria') if dashboard_negocio.id == 'peluqueria_barberia' else url_for('agenda.nueva_actividad') %}
+            <a href="{{ nuevo_turno_url }}"
+               data-tab-url="{{ nuevo_turno_url }}"
                data-tab-title="Nuevo turno" data-tab-icon="fas fa-plus"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-slate-300/50 transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:shadow-none dark:hover:bg-slate-100">
                 <i class="fas fa-plus"></i>Nuevo turno
+            </a>
+            {% endif %}
+            {% if current_user.tiene_permiso('crear_producto') %}
+            <a href="{{ url_for('servicios.nuevo') }}"
+               data-tab-url="{{ url_for('servicios.nuevo') }}"
+               data-tab-title="Nuevo servicio" data-tab-icon="fas fa-concierge-bell"
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-300/50 transition hover:bg-emerald-700 dark:bg-emerald-500 dark:shadow-none dark:hover:bg-emerald-400">
+                <i class="fas fa-concierge-bell"></i>Cargar servicio
+            </a>
+            {% endif %}
+            {% if can_ver_inventario %}
+            <a href="{{ url_for('servicios.listar') }}"
+               data-tab-url="{{ url_for('servicios.listar') }}"
+               data-tab-title="Servicios y costos" data-tab-icon="fas fa-list-ul"
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
+                <i class="fas fa-list-ul"></i>Servicios y costos
             </a>
             {% endif %}
             {% if can_ver_agenda %}
             <a href="{{ url_for('agenda.dashboard') }}"
                data-tab-url="{{ url_for('agenda.dashboard') }}"
                data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
                 <i class="far fa-calendar"></i>Agenda
             </a>
             {% endif %}
@@ -80,21 +97,21 @@
             <a href="{{ url_for('ventas.pos') }}"
                data-tab-url="{{ url_for('ventas.pos') }}"
                data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
                 <i class="fas fa-dollar-sign"></i>Cobrar servicio
             </a>
             {% endif %}
             <a href="{{ url_for('clientes.nuevo') }}"
                data-tab-url="{{ url_for('clientes.nuevo') }}"
                data-tab-title="Cliente nuevo" data-tab-icon="fas fa-user-plus"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
                 <i class="fas fa-user-plus"></i>Cliente nuevo
             </a>
         </div>
     </div>
 
     <div x-show="!hasVisibleCards()" {% if dashboard_service_cards_selected %}style="display: none;"{% endif %}
-        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center dark:border-white/10 dark:bg-slate-900/50">
+        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-5 py-8 text-center dark:border-white/10 dark:bg-slate-900/60">
         <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">No hay tarjetas visibles en este dashboard.</p>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Usa el selector de arriba para volver a mostrar las que necesites.</p>
     </div>

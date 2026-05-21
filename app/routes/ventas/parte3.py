@@ -220,14 +220,18 @@ def _procesar_venta_payload(data):
     if error_response:
         return error_response
     productos_prefetch_por_id = catalogo_ctx['productos_prefetch_por_id']
+    servicios_prefetch_por_id = catalogo_ctx['servicios_prefetch_por_id']
     opciones_precio_por_clave = catalogo_ctx['opciones_precio_por_clave']
+    servicio_opciones_precio_por_clave = catalogo_ctx['servicio_opciones_precio_por_clave']
 
     _perf_stage('prefetch_catalogo')
 
     detalles_ctx, error_response = _construir_detalles_venta(
         items,
         productos_prefetch_por_id,
+        servicios_prefetch_por_id,
         opciones_precio_por_clave,
+        servicio_opciones_precio_por_clave,
         cola_cobro,
         reparacion_obj,
         usar_precio_mayorista,
@@ -365,10 +369,10 @@ def _procesar_venta_payload(data):
             credito_plan=plan_credito_ctx,
         )
 
-    for detalle, producto, cantidad in detalles:
+    for detalle, producto, cantidad, servicio in detalles:
         detalle.id_venta = venta.id_venta
         db.session.add(detalle)
-        if producto.es_servicio:
+        if not producto or producto.es_servicio:
             continue
 
         stock_anterior = producto.stock_actual
@@ -429,16 +433,20 @@ def _procesar_venta_payload(data):
     ))
 
     items_auditoria = []
-    for detalle, producto, cantidad in detalles:
+    for detalle, producto, cantidad, servicio in detalles:
+        item_id = producto.id_producto if producto else servicio.id_servicio
         items_auditoria.append({
-            'id_producto': producto.id_producto,
-            'codigo': (producto.codigo or '').strip(),
-            'nombre': (producto.nombre or '').strip(),
+            'tipo': 'producto' if producto else 'servicio',
+            'id_producto': producto.id_producto if producto else None,
+            'id_servicio': servicio.id_servicio if servicio else None,
+            'id_item': item_id,
+            'codigo': ((producto.codigo if producto else servicio.codigo) or '').strip(),
+            'nombre': ((producto.nombre if producto else servicio.nombre) or '').strip(),
             'cantidad': int(cantidad),
             'precio_unitario': float(detalle.precio_unitario or 0),
             'subtotal': float(detalle.subtotal or 0),
-            'es_servicio': bool(producto.es_servicio),
-            'es_kit': bool(producto.es_kit),
+            'es_servicio': bool(servicio or producto.es_servicio),
+            'es_kit': bool(producto.es_kit) if producto else False,
         })
 
     pagos_auditoria = []

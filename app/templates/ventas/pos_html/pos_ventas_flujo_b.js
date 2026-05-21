@@ -8,14 +8,18 @@
             agregarProductoConPrecioOpcion(producto, opcion) {
                 const precio = parseFloat(opcion.precio) || 0;
                 const precioOpcionId = opcion.id || null;
-                const existente = this.carrito.find(item => item.id_producto === producto.id && String(item.precio_opcion_id || '') === String(precioOpcionId || ''));
+                const tipo = producto.tipo || 'producto';
+                const existente = this.carrito.find(item => (item.tipo || 'producto') === tipo && item.id_item === producto.id && String(item.precio_opcion_id || '') === String(precioOpcionId || ''));
 
                 if (existente) {
                     existente.cantidad++;
                     this.validarStockItem(existente);
                 } else {
                     const nuevoItem = {
-                        id_producto: producto.id,
+                        tipo: tipo,
+                        id_item: producto.id,
+                        id_producto: tipo === 'servicio' ? null : producto.id,
+                        id_servicio: tipo === 'servicio' ? producto.id : null,
                         codigo: producto.codigo,
                         nombre: producto.nombre,
                         precio: precio,
@@ -49,7 +53,8 @@
                     return;
                 }
 
-                const existente = this.carrito.find(item => item.id_producto === producto.id && !item.precio_opcion_id);
+                const tipo = producto.tipo || 'producto';
+                const existente = this.carrito.find(item => (item.tipo || 'producto') === tipo && item.id_item === producto.id && !item.precio_opcion_id);
 
                 // Determinar precio según toggle o tipo de cliente
                 const esMayorista = this.usaPrecioMayorista();
@@ -62,7 +67,10 @@
                     this.validarStockItem(existente);
                 } else {
                     const nuevoItem = {
-                        id_producto: producto.id,
+                        tipo: tipo,
+                        id_item: producto.id,
+                        id_producto: tipo === 'servicio' ? null : producto.id,
+                        id_servicio: tipo === 'servicio' ? producto.id : null,
                         codigo: producto.codigo,
                         nombre: producto.nombre,
                         precio: precioAplicar,
@@ -95,7 +103,7 @@
                 if (!q) return;
 
                 try {
-                    const response = await fetch(`/productos/buscar_exacto?q=${encodeURIComponent(q)}`);
+                    const response = await fetch(`/ventas/catalogo/buscar_exacto?q=${encodeURIComponent(q)}`);
                     if (response.ok) {
                         const producto = await response.json();
                         if (producto && producto.id) {
@@ -564,7 +572,9 @@
         try {
             const payload = {
                 items: this.carrito.map(it => ({
+                    tipo: it.tipo || 'producto',
                     id_producto: it.id_producto,
+                    id_servicio: it.id_servicio || null,
                     cantidad: it.cantidad,
                     precio: it.precio,
                     precio_manual: it.precio_manual === true,

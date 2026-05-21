@@ -63,7 +63,8 @@ export default function ProductoPage() {
     const title = config?.nombre_tienda
       ? `${producto.nombre} | ${config.nombre_tienda}`
       : `${producto.nombre} | Tienda Online`
-    const description = producto.descripcion || config?.texto_portada || 'Detalle de producto disponible para compra por WhatsApp.'
+    const tipo = producto.es_servicio ? 'servicio' : 'producto'
+    const description = producto.descripcion || config?.texto_portada || `Detalle de ${tipo} disponible para consulta por WhatsApp.`
     applyPageMeta(title, description)
   }, [config, producto])
 
@@ -162,6 +163,9 @@ export default function ProductoPage() {
             <ImageGallery imagenes={producto.imagenes} nombre={producto.nombre} />
           </div>
           <div className="product-page-info">
+            {producto.es_servicio ? (
+              <span className="product-detail-category">Servicio</span>
+            ) : null}
             {producto.categoria ? (
               <span className="product-detail-category">{producto.categoria}</span>
             ) : null}
@@ -206,7 +210,7 @@ export default function ProductoPage() {
         {mostrarRelacionados && (
           <div style={{ marginTop: 48 }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 20 }}>
-              {config?.titulo_relacionados || 'Productos relacionados'}
+              {config?.titulo_relacionados || (producto.es_servicio ? 'Servicios relacionados' : 'Productos relacionados')}
             </h3>
             <div className="grid">
               {producto.relacionados.map((r) => (

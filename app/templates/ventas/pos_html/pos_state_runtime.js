@@ -271,7 +271,10 @@
 
                     if (COLA_COBRO_DATA.items && Array.isArray(COLA_COBRO_DATA.items)) {
                         this.carrito = COLA_COBRO_DATA.items.map(item => ({
-                            id_producto: item.id,
+                            tipo: item.tipo || 'producto',
+                            id_item: item.id,
+                            id_producto: item.id_producto || ((item.tipo || 'producto') === 'servicio' ? null : item.id),
+                            id_servicio: item.id_servicio || ((item.tipo || 'producto') === 'servicio' ? item.id : null),
                             codigo: item.codigo || '',
                             nombre: item.nombre,
                             precio: parseFloat(item.precio),

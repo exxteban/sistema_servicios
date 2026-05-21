@@ -93,7 +93,9 @@ class DetalleVenta(db.Model):
     id_venta = db.Column(db.Integer, db.ForeignKey('ventas.id_venta', ondelete='CASCADE'), 
                          nullable=False, index=True)
     id_producto = db.Column(db.Integer, db.ForeignKey('productos.id_producto'), 
-                            nullable=False, index=True)
+                            nullable=True, index=True)
+    id_servicio = db.Column(db.Integer, db.ForeignKey('servicios.id_servicio'),
+                            nullable=True, index=True)
     cantidad = db.Column(db.Integer, nullable=False)
     
     # Snapshot de precios
@@ -112,9 +114,31 @@ class DetalleVenta(db.Model):
     
     # Relación al producto
     producto = db.relationship('Producto')
+    servicio = db.relationship('Servicio')
+
+    @property
+    def item_nombre(self):
+        if self.producto:
+            return self.producto.nombre
+        if self.servicio:
+            return self.servicio.nombre
+        return 'Item'
+
+    @property
+    def item_codigo(self):
+        if self.producto:
+            return self.producto.codigo
+        if self.servicio:
+            return self.servicio.codigo or f'SRV-{self.servicio.id_servicio}'
+        return ''
+
+    @property
+    def es_servicio_detalle(self):
+        return bool(self.servicio or (self.producto and self.producto.es_servicio))
     
     def __repr__(self):
-        return f'<DetalleVenta {self.id_producto} x{self.cantidad}>'
+        item_id = self.id_producto if self.id_producto is not None else f'S{self.id_servicio}'
+        return f'<DetalleVenta {item_id} x{self.cantidad}>'
 
 
 class PagoVenta(db.Model):

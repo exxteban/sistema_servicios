@@ -18,7 +18,7 @@
                     </span>
                     <div class="min-w-0">
                         <p class="break-words text-sm font-semibold leading-5 text-slate-900 dark:text-white">{{ usuario.nombre_completo }}</p>
-                        <p class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{{ usuario.rol.nombre if usuario.rol else 'Profesional' }}</p>
+                        <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ usuario.rol.nombre if usuario.rol else 'Profesional' }}</p>
                     </div>
                 </div>
                 <div class="self-start sm:self-center sm:pl-3">
@@ -36,7 +36,7 @@
                 </div>
             </div>
             {% else %}
-            <div class="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400 dark:border-white/10 dark:text-slate-500">
+            <div class="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
                 No hay profesionales activos.
             </div>
             {% endfor %}

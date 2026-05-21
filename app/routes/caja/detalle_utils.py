@@ -16,8 +16,7 @@ def _resumen_productos(detalles):
     partes = []
     restantes = 0
     for index, det in enumerate(items):
-        producto = getattr(det, 'producto', None)
-        nombre = getattr(producto, 'nombre', '') if producto else ''
+        nombre = getattr(det, 'item_nombre', '') or ''
         if not nombre:
             nombre = 'Producto'
         cantidad = getattr(det, 'cantidad', None)
@@ -60,7 +59,7 @@ def _enriquecer_motivos_movimientos(movimientos):
     detalles_ventas_por_id = {}
     if venta_ids:
         rows = (
-            DetalleVenta.query.options(joinedload(DetalleVenta.producto))
+            DetalleVenta.query.options(joinedload(DetalleVenta.producto), joinedload(DetalleVenta.servicio))
             .filter(DetalleVenta.id_venta.in_(sorted(venta_ids)))
             .order_by(DetalleVenta.id_venta.asc(), DetalleVenta.id_detalle_venta.asc())
             .all()
@@ -179,7 +178,7 @@ def _resumenes_ventas_por_ids(venta_ids):
         return {}
 
     rows = (
-        DetalleVenta.query.options(joinedload(DetalleVenta.producto))
+        DetalleVenta.query.options(joinedload(DetalleVenta.producto), joinedload(DetalleVenta.servicio))
         .filter(DetalleVenta.id_venta.in_(ids))
         .order_by(DetalleVenta.id_venta.asc(), DetalleVenta.id_detalle_venta.asc())
         .all()

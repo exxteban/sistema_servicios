@@ -1,18 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}{% if producto %}Editar{% else %}Nuevo{% endif %} Producto{% endblock %}
+{% block title %}{% if producto %}Editar {{ 'Servicio' if producto.es_servicio else 'Producto' }}{% else %}Nuevo {{ 'Servicio' if request.args.get('tipo') == 'servicio' else 'Producto' }}{% endif %}{% endblock %}
 
 {% block content %}
+{% set es_servicio_form = (request.method == 'POST' and request.form.get('es_servicio')) or (request.method != 'POST' and ((producto and producto.es_servicio) or (not producto and request.args.get('tipo') == 'servicio'))) %}
+{% set entidad_label = 'Servicio' if es_servicio_form else 'Producto' %}
 <div class="max-w-4xl mx-auto">
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 transition-colors duration-300">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
                 <i
                     class="fas fa-{% if producto %}edit{% else %}plus-circle{% endif %} text-blue-600 dark:text-blue-400 mr-2"></i>
-                {% if producto %}Editar Producto{% else %}Nuevo Producto{% endif %}
+                {% if producto %}Editar {{ entidad_label }}{% else %}Nuevo {{ entidad_label }}{% endif %}
             </h1>
             <div class="flex justify-end gap-3">
-                <a href="{{ url_for('productos.listar') }}"
+                <a href="{{ url_for('productos.listar', tipo='servicio') if es_servicio_form else url_for('productos.listar') }}"
                     class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 transition">
                     Cancelar
                 </a>
@@ -25,7 +27,7 @@
 
         <form method="POST"
             action="{{ url_for('productos.editar', id=producto.id_producto) if producto else url_for('productos.nuevo') }}"
-            class="space-y-6" x-data="{ usarNuevaCategoria: false, esServicio: {% if request.method == 'POST' %}{% if request.form.get('es_servicio') %}true{% else %}false{% endif %}{% elif producto and producto.es_servicio %}true{% else %}false{% endif %}, usarPreciosOpciones: {% if precios_opciones_text %}true{% else %}false{% endif %} }"
+            class="space-y-6" x-data="{ usarNuevaCategoria: false, esServicio: {{ 'true' if es_servicio_form else 'false' }}, usarPreciosOpciones: {% if precios_opciones_text %}true{% else %}false{% endif %} }"
             id="productoForm" x-ref="productoForm"
             data-product-code-lookup-url="{{ url_for('productos.sugerencias_codigos') }}"
             data-product-current-id="{{ producto.id_producto if producto else '' }}">
@@ -93,18 +95,18 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del Producto
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"><span x-text="esServicio ? 'Nombre del Servicio' : 'Nombre del Producto'"></span>
                     *</label>
                 <input type="text" name="nombre" required maxlength="200" value="{{ request.form.get('nombre', producto.nombre if producto else '') }}"
                     class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
-                    placeholder="Ej: Termo Stanley Classic 1L">
+                    x-bind:placeholder="esServicio ? 'Ej: Corte clásico, diagnóstico técnico, manicura' : 'Ej: Termo Stanley Classic 1L'">
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
                 <textarea name="descripcion" rows="3"
                     class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
-                    placeholder="Descripción detallada del producto...">{{ request.form.get('descripcion', producto.descripcion if producto else '') }}</textarea>
+                    x-bind:placeholder="esServicio ? 'Detalle del servicio ofrecido, duración o condiciones...' : 'Descripción detallada del producto...'">{{ request.form.get('descripcion', producto.descripcion if producto else '') }}</textarea>
             </div>
 
             <!-- Características -->
@@ -137,13 +139,13 @@
                 <h3 class="font-semibold text-gray-700 dark:text-gray-200 mb-4">Precios</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precio de Compra</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" x-text="esServicio ? 'Costo del Servicio' : 'Precio de Compra'"></label>
                         <input type="number" name="precio_compra" step="0.01"
                             value="{{ request.form.get('precio_compra', producto.precio_compra if producto else 0) }}"
                             class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precio de Venta *</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"><span x-text="esServicio ? 'Precio al Cliente' : 'Precio de Venta'"></span> *</label>
                         <input type="number" name="precio_venta" step="0.01" required
                             value="{{ request.form.get('precio_venta', producto.precio_venta if producto else '') }}"
                             class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
@@ -159,13 +161,13 @@
                     <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                         <input type="checkbox" name="usa_precios_opciones" value="1" x-model="usarPreciosOpciones"
                             class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
-                        Precio con desplegable en POS
+                        <span x-text="esServicio ? 'Variantes de costo/precio en POS' : 'Precio con desplegable en POS'"></span>
                     </label>
                     <div class="mt-3" x-show="usarPreciosOpciones" x-cloak>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Importes (uno por línea o separados por coma)</label>
                         <textarea name="precios_opciones" rows="3"
                             class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
-                            placeholder="Ej: 5000&#10;10000&#10;20000">{{ precios_opciones_text }}</textarea>
+                            x-bind:placeholder="esServicio ? 'Ej: 30000 corte simple\n50000 corte + barba\n90000 servicio completo' : 'Ej: 5000\n10000\n20000'">{{ precios_opciones_text }}</textarea>
                     </div>
                 </div>
             </div>
@@ -232,7 +234,7 @@
 
             <!-- Botones -->
             <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <a href="{{ url_for('productos.listar') }}"
+                <a href="{{ url_for('productos.listar', tipo='servicio') if es_servicio_form else url_for('productos.listar') }}"
                     class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 transition">
                     Cancelar
                 </a>

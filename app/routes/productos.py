@@ -212,6 +212,9 @@ def listar():
     page = request.args.get('page', 1, type=int)
     buscar = request.args.get('buscar', '')
     categoria_id = request.args.get('categoria', 0, type=int)
+    tipo = (request.args.get('tipo') or '').strip().lower()
+    if tipo not in ('producto', 'servicio'):
+        tipo = ''
     sort_key = (request.args.get('sort') or 'stock').strip().lower()
     sort_dir = (request.args.get('dir') or 'asc').strip().lower()
     if sort_dir not in ('asc', 'desc'):
@@ -235,6 +238,11 @@ def listar():
     
     if categoria_id:
         query = query.filter_by(id_categoria=categoria_id)
+
+    if tipo == 'servicio':
+        query = query.filter(Producto.es_servicio.is_(True))
+    elif tipo == 'producto':
+        query = query.filter(Producto.es_servicio.isnot(True))
     
     sort_columns = {
         'codigo': Producto.codigo,
@@ -266,6 +274,7 @@ def listar():
         categorias=categorias,
         buscar=buscar,
         categoria_id=categoria_id,
+        tipo=tipo,
         sort=sort_key,
         dir=sort_dir
     )
@@ -567,8 +576,9 @@ def nuevo():
                 commit=False
             )
             db.session.commit()
-            flash(f'Producto "{nombre}" creado correctamente.', 'success')
-            return redirect(url_for('productos.listar'))
+            entidad = 'Servicio' if es_servicio else 'Producto'
+            flash(f'{entidad} "{nombre}" creado correctamente.', 'success')
+            return redirect(url_for('productos.listar', tipo='servicio') if es_servicio else url_for('productos.listar'))
         except (IntegrityError, DataError) as exc:
             db.session.rollback()
             flash(mensaje_error_producto(exc, codigo=codigo, codigo_barras=codigo_barras), 'danger')
@@ -695,8 +705,9 @@ def editar(id):
         )
         try:
             db.session.commit()
-            flash(f'Producto "{producto.nombre}" actualizado.', 'success')
-            return redirect(url_for('productos.listar'))
+            entidad = 'Servicio' if producto.es_servicio else 'Producto'
+            flash(f'{entidad} "{producto.nombre}" actualizado.', 'success')
+            return redirect(url_for('productos.listar', tipo='servicio') if producto.es_servicio else url_for('productos.listar'))
         except (IntegrityError, DataError) as exc:
             db.session.rollback()
             flash(mensaje_error_producto(exc, codigo=producto.codigo, codigo_barras=codigo_barras), 'danger')

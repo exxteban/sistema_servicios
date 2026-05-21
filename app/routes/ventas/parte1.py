@@ -13,7 +13,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from app.models import (
-    Producto, Categoria, ProductoPrecioOpcion, Cliente, Venta, DetalleVenta, PagoVenta, Ticket,
+    Producto, Categoria, ProductoPrecioOpcion, Servicio, ServicioPrecioOpcion, Cliente, Venta, DetalleVenta, PagoVenta, Ticket,
     CuentaPorCobrar,
     MetodoPago, SesionCaja, MovimientoCaja, MovimientoStock, Configuracion, Permiso, Autorizacion, ColaCobro,
     Devolucion, DetalleDevolucion, Reparacion, Usuario, Rol
@@ -154,27 +154,51 @@ def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
     items_normalizados = []
 
     for item in items:
-        try:
-            id_producto = int(item.get('id_producto'))
-        except Exception:
-            raise ValueError('Producto inválido')
-
-        producto = db.session.get(Producto, id_producto)
-        if not producto:
-            raise ValueError(f'Producto no encontrado: {id_producto}')
+        tipo_item = (item.get('tipo') or 'producto').strip().lower()
+        if tipo_item == 'servicio' or item.get('id_servicio') not in (None, ''):
+            try:
+                id_servicio = int(item.get('id_servicio') or item.get('id'))
+            except Exception:
+                raise ValueError('Servicio inválido')
+            servicio = db.session.get(Servicio, id_servicio)
+            if not servicio or not servicio.activo:
+                raise ValueError(f'Servicio no encontrado: {id_servicio}')
+            producto = None
+        else:
+            try:
+                id_producto = int(item.get('id_producto'))
+            except Exception:
+                raise ValueError('Producto inválido')
+            producto = db.session.get(Producto, id_producto)
+            if not producto:
+                raise ValueError(f'Producto no encontrado: {id_producto}')
+            servicio = None
 
         try:
             cantidad = int(item.get('cantidad', 0))
         except Exception:
-            raise ValueError(f'Cantidad inválida para producto {id_producto}')
+                raise ValueError('Cantidad inválida')
         if cantidad <= 0:
-            raise ValueError(f'Cantidad inválida para producto {id_producto}')
+            raise ValueError('Cantidad inválida')
 
-        precio_original = Decimal(str(producto.precio_venta or 0))
+        precio_original = Decimal(str((servicio.precio if servicio else producto.precio_venta) or 0))
         precio = precio_original
         precio_opcion_id = item.get('precio_opcion_id')
 
-        if precio_opcion_id not in (None, ''):
+        if servicio and precio_opcion_id not in (None, ''):
+            try:
+                precio_opcion_id = int(precio_opcion_id)
+            except Exception:
+                raise ValueError('precio_opcion_id inválido')
+            opcion = ServicioPrecioOpcion.query.filter_by(
+                id_opcion_precio=precio_opcion_id,
+                id_servicio=servicio.id_servicio,
+                activo=True
+            ).first()
+            if not opcion:
+                raise ValueError('Opción de precio inválida para el servicio')
+            precio = Decimal(str(opcion.precio or 0))
+        elif precio_opcion_id not in (None, ''):
             try:
                 precio_opcion_id = int(precio_opcion_id)
             except Exception:
@@ -192,7 +216,7 @@ def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
                 raise ValueError('Precio inválido en opción de precio')
             if precio <= 0:
                 raise ValueError('Precio inválido en opción de precio')
-        elif (
+        elif producto and (
             producto.codigo == REPARACION_COSTO_BASE_CODIGO
             and item.get('precio_manual')
             and item.get('precio') is not None
@@ -203,7 +227,7 @@ def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
                 raise ValueError('Precio inválido para costo final de reparación')
             if precio < 0:
                 raise ValueError('Precio inválido para costo final de reparación')
-        elif usar_precio_mayorista:
+        elif producto and usar_precio_mayorista:
             try:
                 if producto.precio_mayorista is not None:
                     precio_may = Decimal(str(producto.precio_mayorista))
@@ -216,22 +240,25 @@ def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
         subtotal += item_subtotal
 
         try:
-            precio_mayorista = float(producto.precio_mayorista) if producto.precio_mayorista is not None else None
+            precio_mayorista = float(producto.precio_mayorista) if producto and producto.precio_mayorista is not None else None
         except Exception:
             precio_mayorista = None
 
         items_normalizados.append({
-            'id': int(producto.id_producto),
-            'codigo': (producto.codigo or '').strip(),
-            'nombre': (producto.nombre or '').strip(),
+            'tipo': 'servicio' if servicio else 'producto',
+            'id': int(servicio.id_servicio if servicio else producto.id_producto),
+            'id_producto': int(producto.id_producto) if producto else None,
+            'id_servicio': int(servicio.id_servicio) if servicio else None,
+            'codigo': ((servicio.codigo if servicio else producto.codigo) or '').strip(),
+            'nombre': ((servicio.nombre if servicio else producto.nombre) or '').strip(),
             'precio': float(precio),
             'precio_base': float(precio_original),
             'precio_mayorista': precio_mayorista,
             'cantidad': int(cantidad),
-            'es_servicio': bool(producto.es_servicio),
-            'stock': int(producto.stock_actual or 0),
-            'stock_minimo': int(producto.stock_minimo or 0),
-            'iva': int(producto.porcentaje_iva or 0),
+            'es_servicio': bool(servicio or producto.es_servicio),
+            'stock': int(producto.stock_actual or 0) if producto else 0,
+            'stock_minimo': int(producto.stock_minimo or 0) if producto else 0,
+            'iva': int((servicio.porcentaje_iva if servicio else producto.porcentaje_iva) or 0),
             'precio_manual': bool(item.get('precio_manual') is True),
             'precio_opcion_id': int(precio_opcion_id) if precio_opcion_id not in (None, '') else None,
         })
@@ -242,11 +269,18 @@ def _build_pos_data_from_cola_cobro(item_cola):
     metadata = item_cola.get_metadata()
     items_metadata = metadata.get('items') if isinstance(metadata.get('items'), list) else []
     ids_productos = []
+    ids_servicios = []
     for item in items_metadata:
-        try:
-            ids_productos.append(int(item.get('id')))
-        except Exception:
-            continue
+        if (item.get('tipo') or '').strip().lower() == 'servicio' or item.get('id_servicio') not in (None, ''):
+            try:
+                ids_servicios.append(int(item.get('id_servicio') or item.get('id')))
+            except Exception:
+                continue
+        else:
+            try:
+                ids_productos.append(int(item.get('id_producto') or item.get('id')))
+            except Exception:
+                continue
 
     productos = {}
     if ids_productos:
@@ -254,30 +288,42 @@ def _build_pos_data_from_cola_cobro(item_cola):
             int(p.id_producto): p
             for p in Producto.query.filter(Producto.id_producto.in_(ids_productos)).all()
         }
+    servicios = {}
+    if ids_servicios:
+        servicios = {
+            int(s.id_servicio): s
+            for s in Servicio.query.filter(Servicio.id_servicio.in_(ids_servicios)).all()
+        }
 
     items = []
     for item in items_metadata:
+        tipo_item = (item.get('tipo') or 'producto').strip().lower()
         try:
-            id_producto = int(item.get('id'))
+            id_item = int(item.get('id_servicio') or item.get('id_producto') or item.get('id'))
         except Exception:
             continue
-        producto = productos.get(id_producto)
-        stock_actual = int(getattr(producto, 'stock_actual', item.get('stock', 0)) or 0)
-        stock_minimo = int(getattr(producto, 'stock_minimo', item.get('stock_minimo', 0)) or 0)
-        es_servicio = bool(getattr(producto, 'es_servicio', item.get('es_servicio', False)))
-        iva = int(getattr(producto, 'porcentaje_iva', item.get('iva', 0)) or 0)
+        producto = None if tipo_item == 'servicio' else productos.get(id_item)
+        servicio = servicios.get(id_item) if tipo_item == 'servicio' else None
+        stock_actual = int(getattr(producto, 'stock_actual', item.get('stock', 0)) or 0) if producto else 0
+        stock_minimo = int(getattr(producto, 'stock_minimo', item.get('stock_minimo', 0)) or 0) if producto else 0
+        es_servicio = bool(servicio or getattr(producto, 'es_servicio', item.get('es_servicio', False)))
+        iva = int(getattr(servicio or producto, 'porcentaje_iva', item.get('iva', 0)) or 0)
 
         try:
-            precio_mayorista = float(getattr(producto, 'precio_mayorista', item.get('precio_mayorista')))
+            precio_mayorista = float(getattr(producto, 'precio_mayorista', item.get('precio_mayorista'))) if producto else None
         except Exception:
             precio_mayorista = item.get('precio_mayorista')
 
         items.append({
-            'id': id_producto,
-            'codigo': (item.get('codigo') or getattr(producto, 'codigo', '') or '').strip(),
-            'nombre': (item.get('nombre') or getattr(producto, 'nombre', '') or f'Producto #{id_producto}').strip(),
+            'tipo': tipo_item,
+            'id_item': id_item,
+            'id_servicio': id_item if tipo_item == 'servicio' else None,
+            'id_producto': id_item if tipo_item != 'servicio' else None,
+            'id': id_item,
+            'codigo': (item.get('codigo') or getattr(servicio or producto, 'codigo', '') or '').strip(),
+            'nombre': (item.get('nombre') or getattr(servicio or producto, 'nombre', '') or f'Item #{id_item}').strip(),
             'precio': float(item.get('precio') or 0),
-            'precio_base': float(item.get('precio_base') or getattr(producto, 'precio_venta', 0) or 0),
+            'precio_base': float(item.get('precio_base') or getattr(servicio or producto, 'precio', getattr(producto, 'precio_venta', 0)) or 0),
             'precio_mayorista': precio_mayorista,
             'cantidad': int(item.get('cantidad') or 0),
             'es_servicio': es_servicio,
@@ -310,14 +356,17 @@ def _build_pos_data_from_cola_cobro(item_cola):
 def _build_venta_items_payload_from_pos_items(items_pos):
     items_payload = []
     for item_pos in items_pos or []:
+        tipo_item = (item_pos.get('tipo') or 'producto').strip().lower()
         try:
-            id_producto = int(item_pos['id'])
+            id_item = int(item_pos.get('id_servicio') or item_pos.get('id_producto') or item_pos.get('id'))
             cantidad = int(item_pos.get('cantidad') or 0)
         except Exception:
             continue
 
         items_payload.append({
-            'id_producto': id_producto,
+            'tipo': tipo_item,
+            'id_producto': id_item if tipo_item != 'servicio' else None,
+            'id_servicio': id_item if tipo_item == 'servicio' else None,
             'cantidad': cantidad,
             'precio': float(item_pos.get('precio') or 0),
             'precio_base': item_pos.get('precio_base'),

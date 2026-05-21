@@ -240,10 +240,12 @@ def dashboard():
         total_productos = Producto.query.filter_by(activo=True).count()
         productos_stock_bajo = Producto.query.filter(
             Producto.activo == True,
+            Producto.es_servicio.isnot(True),
             Producto.stock_actual <= Producto.stock_minimo
         ).count()
         productos_stock_bajo_lista = Producto.query.filter(
             Producto.activo == True,
+            Producto.es_servicio.isnot(True),
             Producto.stock_actual <= Producto.stock_minimo
         ).order_by(Producto.stock_actual.asc()).limit(5).all()
     else:

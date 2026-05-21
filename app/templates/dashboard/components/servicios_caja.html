@@ -34,10 +34,10 @@
             <span class="leading-5 text-slate-500 dark:text-slate-400">Gastos del día</span>
             <b class="text-right text-rose-600 dark:text-rose-400">-Gs. {{ "{:,.0f}".format(gastos_corrientes_resumen.total_pendiente|float if gastos_corrientes_resumen else 0).replace(",", ".") }}</b>
         </div>
-        <div class="rounded-2xl bg-slate-950 px-4 py-3 text-white dark:bg-emerald-500/10 dark:ring-1 dark:ring-emerald-500/20">
+        <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50 px-4 py-3 text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
             <div class="flex items-center justify-between">
-                <span class="text-sm font-bold text-white dark:text-emerald-100">Total neto</span>
-                <b class="text-lg font-black text-emerald-300 dark:text-emerald-300">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</b>
+                <span class="text-sm font-bold text-emerald-900 dark:text-emerald-100">Total neto</span>
+                <b class="text-lg font-black text-emerald-700 dark:text-emerald-300">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</b>
             </div>
         </div>
         <a href="{{ url_for('caja.estado') }}"

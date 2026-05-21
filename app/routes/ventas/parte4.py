@@ -419,8 +419,8 @@ def crear_devolucion(id):
             )
             db.session.add(detalle_dev)
 
-            if accion_stock == 'retorno_stock' and not detalle_venta.producto.es_servicio:
-                producto = detalle_venta.producto
+            producto = detalle_venta.producto
+            if accion_stock == 'retorno_stock' and producto and not producto.es_servicio:
                 stock_anterior = int(producto.stock_actual or 0)
                 producto.stock_actual = stock_anterior + cantidad
 

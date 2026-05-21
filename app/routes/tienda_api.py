@@ -509,7 +509,8 @@ def _calcular_metricas_comerciales(p: Producto, config: TiendaConfig) -> dict:
 def _render_whatsapp_message(template: str | None, producto: Producto) -> str:
     plantilla = (template or '').strip()
     if not plantilla:
-        return f'Hola, vengo de la tienda web y me interesa el producto: {producto.nombre}'
+        tipo = 'servicio' if getattr(producto, 'es_servicio', False) else 'producto'
+        return f'Hola, vengo de la tienda web y me interesa el {tipo}: {producto.nombre}'
 
     reemplazos = {
         '{producto}': producto.nombre or '',
@@ -665,7 +666,8 @@ def _serializar_producto(p: Producto, config: TiendaConfig, imagenes_precargadas
         'categoria': p.categoria.nombre if p.categoria else None,
         'marca': p.marca,
         'modelo': p.modelo,
-        'disponible': p.stock_actual > 0,
+        'es_servicio': bool(getattr(p, 'es_servicio', False)),
+        'disponible': bool(getattr(p, 'es_servicio', False)) or p.stock_actual > 0,
         'imagenes': imagenes,
         'whatsapp_link': _build_wa_link(p, config),
         'vistas': p.vistas_tienda or 0,
@@ -699,7 +701,8 @@ def _serializar_producto_card(p: Producto, config: TiendaConfig, imagenes_precar
         'categoria': p.categoria.nombre if p.categoria else None,
         'marca': p.marca,
         'modelo': p.modelo,
-        'disponible': p.stock_actual > 0,
+        'es_servicio': bool(getattr(p, 'es_servicio', False)),
+        'disponible': bool(getattr(p, 'es_servicio', False)) or p.stock_actual > 0,
         'imagenes': [primera_imagen] if primera_imagen else [],
         'whatsapp_link': _build_wa_link(p, config),
         'vistas': p.vistas_tienda or 0,
