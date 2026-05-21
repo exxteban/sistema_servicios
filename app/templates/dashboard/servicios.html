@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Servicios{% endblock %}
+
+{% block content %}
+<div class="space-y-6"
+    x-data='serviceDashboardCardsCustomizer({
+        availableCards: {{ dashboard_service_cards_available|tojson }},
+        visibleCards: {{ dashboard_service_cards_selected|tojson }},
+        saveUrl: "{{ url_for('main.api_dashboard_preferencias') }}"
+    })'>
+    <!-- Header -->
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+            <h1 class="text-2xl font-black tracking-tight text-slate-950 dark:text-white">
+                Turnos, atención y caja del día
+            </h1>
+            <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+                Vista principal para gestionar agenda, profesionales, cobros y operación diaria{% if dashboard_negocio.id == 'peluqueria_barberia' %} de peluquería/barbería{% endif %}.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <div class="relative" @keydown.escape.window="selectorOpen = false">
+                <button type="button"
+                    @click="selectorOpen = !selectorOpen"
+                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+                    <i class="fas fa-sliders-h text-xs"></i>
+                    Tarjetas visibles
+                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                        x-text="`${selectedCount()}/${availableCards.length}`"></span>
+                </button>
+
+                <div x-show="selectorOpen"
+                    x-transition
+                    @click.away="selectorOpen = false"
+                    class="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-900"
+                    style="display: none;">
+                    <div class="border-b border-slate-100 px-4 py-3 dark:border-white/5">
+                        <p class="text-sm font-bold text-slate-950 dark:text-white">Personalizar dashboard</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Marca las tarjetas que este cliente quiere ver.</p>
+                    </div>
+                    <div class="max-h-80 space-y-2 overflow-y-auto px-4 py-3">
+                        <template x-for="card in availableCards" :key="card.id">
+                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-100 px-3 py-2.5 transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]">
+                                <input type="checkbox"
+                                    class="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                    :checked="isCardVisible(card.id)"
+                                    @change="toggleCard(card.id, $event.target.checked)">
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="card.title"></span>
+                                    <span class="block text-xs text-slate-500 dark:text-slate-400" x-text="card.description"></span>
+                                </span>
+                            </label>
+                        </template>
+                    </div>
+                    <div class="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs dark:border-white/5">
+                        <span class="text-slate-500 dark:text-slate-400" x-show="!saving && !saveError">Preferencia compartida para este cliente.</span>
+                        <span class="text-amber-600 dark:text-amber-300" x-show="saving">Guardando...</span>
+                        <span class="text-rose-600 dark:text-rose-300" x-show="saveError">No se pudo guardar. Reintenta.</span>
+                    </div>
+                </div>
+            </div>
+            {% if current_user.tiene_permiso('agenda_crear') %}
+            <a href="{{ url_for('agenda.nueva_actividad') }}"
+               data-tab-url="{{ url_for('agenda.nueva_actividad') }}"
+               data-tab-title="Nuevo turno" data-tab-icon="fas fa-plus"
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100">
+                <i class="fas fa-plus"></i>Nuevo turno
+            </a>
+            {% endif %}
+            {% if can_ver_agenda %}
+            <a href="{{ url_for('agenda.dashboard') }}"
+               data-tab-url="{{ url_for('agenda.dashboard') }}"
+               data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+                <i class="far fa-calendar"></i>Agenda
+            </a>
+            {% endif %}
+            {% if can_crear_venta %}
+            <a href="{{ url_for('ventas.pos') }}"
+               data-tab-url="{{ url_for('ventas.pos') }}"
+               data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register"
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+                <i class="fas fa-dollar-sign"></i>Cobrar servicio
+            </a>
+            {% endif %}
+            <a href="{{ url_for('clientes.nuevo') }}"
+               data-tab-url="{{ url_for('clientes.nuevo') }}"
+               data-tab-title="Cliente nuevo" data-tab-icon="fas fa-user-plus"
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+                <i class="fas fa-user-plus"></i>Cliente nuevo
+            </a>
+        </div>
+    </div>
+
+    <div x-show="!hasVisibleCards()" {% if dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center dark:border-white/10 dark:bg-slate-900/50">
+        <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">No hay tarjetas visibles en este dashboard.</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Usa el selector de arriba para volver a mostrar las que necesites.</p>
+    </div>
+
+    <!-- KPI Cards -->
+    {% include "dashboard/components/servicios_kpi_cards.html" %}
+
+    <!-- Middle Section: Agenda + Profesionales + Caja -->
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-12">
+        <div class="xl:col-span-2 2xl:col-span-6" x-show="isCardVisible('agenda_hoy')" {% if 'agenda_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+            {% include "dashboard/components/servicios_agenda_hoy.html" %}
+        </div>
+        <div class="2xl:col-span-3" x-show="isCardVisible('profesionales_hoy')" {% if 'profesionales_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+            {% include "dashboard/components/servicios_profesionales.html" %}
+        </div>
+        <div class="2xl:col-span-3" x-show="isCardVisible('caja_dia')" {% if 'caja_dia' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+            {% include "dashboard/components/servicios_caja.html" %}
+        </div>
+    </div>
+
+    <!-- Bottom Cards -->
+    {% include "dashboard/components/servicios_bottom_cards.html" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function serviceDashboardCardsCustomizer(config) {
+    return {
+        availableCards: Array.isArray(config.availableCards) ? config.availableCards : [],
+        visibleCards: Array.isArray(config.visibleCards) ? config.visibleCards.slice() : [],
+        saveUrl: config.saveUrl || '',
+        selectorOpen: false,
+        saving: false,
+        saveError: false,
+        isCardVisible(cardId) {
+            return this.visibleCards.includes(cardId);
+        },
+        hasVisibleCards() {
+            return this.visibleCards.length > 0;
+        },
+        selectedCount() {
+            return this.visibleCards.length;
+        },
+        async toggleCard(cardId, checked) {
+            if (!cardId) {
+                return;
+            }
+
+            const next = checked
+                ? [...new Set([...this.visibleCards, cardId])]
+                : this.visibleCards.filter((currentId) => currentId !== cardId);
+
+            this.visibleCards = next;
+            await this.persist();
+        },
+        async persist() {
+            this.saving = true;
+            this.saveError = false;
+            try {
+                const response = await fetch(this.saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ service_cards: this.visibleCards })
+                });
+                const data = await response.json();
+                if (!response.ok || data.ok !== true) {
+                    throw new Error('save_failed');
+                }
+                if (Array.isArray(data.service_cards_selected)) {
+                    this.visibleCards = data.service_cards_selected;
+                }
+            } catch (error) {
+                this.saveError = true;
+            } finally {
+                this.saving = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

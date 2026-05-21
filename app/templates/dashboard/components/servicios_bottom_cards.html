@@ -1,0 +1,264 @@
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+    <!-- Cobros pendientes -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('cobros_pendientes')" {% if 'cobros_pendientes' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-sm text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
+                    <i class="fas fa-clock"></i>
+                </span>
+                <h2 class="text-sm font-bold text-slate-950 dark:text-white">Cobros pendientes</h2>
+            </div>
+            <a href="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
+               data-tab-url="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
+               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver todos</a>
+        </div>
+        <div class="px-5 py-4 space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">DR</span>
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Diego Ramírez</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">Corte + barba</p>
+                    </div>
+                </div>
+                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. 80.000</p>
+            </div>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">MG</span>
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">María González</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">Coloración</p>
+                    </div>
+                </div>
+                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. 250.000</p>
+            </div>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">SA</span>
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Sofía Aquino</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">Tratamiento capilar</p>
+                    </div>
+                </div>
+                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. 120.000</p>
+            </div>
+        </div>
+        <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
+            <div class="flex items-center justify-between text-sm">
+                <span class="font-semibold text-slate-500 dark:text-slate-400">Total pendientes</span>
+                <span class="font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(cobrado_en_creditos_display or 0).replace(",", ".") }}</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Servicios realizados hoy -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('servicios_realizados')" {% if 'servicios_realizados' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-sm text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                    <i class="fas fa-cut"></i>
+                </span>
+                <h2 class="text-sm font-bold text-slate-950 dark:text-white">Servicios realizados hoy</h2>
+            </div>
+            <a href="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
+               data-tab-url="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
+               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver reporte</a>
+        </div>
+        <div class="px-5 py-4 space-y-4">
+            <div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-300">Corte hombre</span>
+                    <span class="font-bold text-slate-900 dark:text-white">8 <span class="font-normal text-slate-400 dark:text-slate-500">Gs. 640.000</span></span>
+                </div>
+                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div class="h-full rounded-full bg-violet-500" style="width: 100%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-300">Barba</span>
+                    <span class="font-bold text-slate-900 dark:text-white">6 <span class="font-normal text-slate-400 dark:text-slate-500">Gs. 240.000</span></span>
+                </div>
+                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div class="h-full rounded-full bg-indigo-500" style="width: 75%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-300">Coloración</span>
+                    <span class="font-bold text-slate-900 dark:text-white">4 <span class="font-normal text-slate-400 dark:text-slate-500">Gs. 360.000</span></span>
+                </div>
+                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div class="h-full rounded-full bg-blue-500" style="width: 50%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-300">Lavado + peinado</span>
+                    <span class="font-bold text-slate-900 dark:text-white">3 <span class="font-normal text-slate-400 dark:text-slate-500">Gs. 150.000</span></span>
+                </div>
+                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div class="h-full rounded-full bg-cyan-500" style="width: 38%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-300">Tratamiento capilar</span>
+                    <span class="font-bold text-slate-900 dark:text-white">2 <span class="font-normal text-slate-400 dark:text-slate-500">Gs. 140.000</span></span>
+                </div>
+                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div class="h-full rounded-full bg-slate-400" style="width: 25%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
+            <div class="flex items-center justify-between text-sm">
+                <span class="font-semibold text-slate-500 dark:text-slate-400">Total</span>
+                <span class="font-bold text-slate-900 dark:text-white">{{ ventas_hoy or 0 }} <span class="font-normal text-slate-400 dark:text-slate-500">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</span></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Clientes -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('clientes_panel')" {% if 'clientes_panel' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-sm text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+                    <i class="fas fa-users"></i>
+                </span>
+                <h2 class="text-sm font-bold text-slate-950 dark:text-white">Clientes</h2>
+            </div>
+            <a href="{{ url_for('clientes.listar') }}"
+               data-tab-url="{{ url_for('clientes.listar') }}"
+               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver todos</a>
+        </div>
+        <div class="px-5 py-4 space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Clientes nuevos</p>
+                    <p class="text-xs text-slate-400 dark:text-slate-500">Primer visita</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-2xl font-black text-slate-950 dark:text-white">5</p>
+                    <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">+2 vs ayer</p>
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Clientes recurrentes</p>
+                    <p class="text-xs text-slate-400 dark:text-slate-500">Que ya vinieron</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-2xl font-black text-slate-950 dark:text-white">28</p>
+                    <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">+8 vs ayer</p>
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">No asistieron hoy</p>
+                    <p class="text-xs text-slate-400 dark:text-slate-500">Ausentes</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-2xl font-black text-slate-950 dark:text-white">2</p>
+                    <p class="text-xs font-semibold text-rose-600 dark:text-rose-400">-1 vs ayer</p>
+                </div>
+            </div>
+        </div>
+        <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Total clientes</span>
+                <span class="text-2xl font-black text-slate-950 dark:text-white">33</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Insumos criticos -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('insumos_criticos')" {% if 'insumos_criticos' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-sm text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </span>
+                <h2 class="text-sm font-bold text-slate-950 dark:text-white">Insumos críticos</h2>
+            </div>
+            <a href="{{ url_for('reportes.stock_bajo') if can_ver_reporte_inventario else url_for('productos.listar') }}"
+               data-tab-url="{{ url_for('reportes.stock_bajo') if can_ver_reporte_inventario else url_for('productos.listar') }}"
+               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver inventario</a>
+        </div>
+        <div class="px-5 py-4 space-y-3">
+            {% for producto in productos_stock_bajo_lista %}
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 dark:bg-rose-500/15">
+                        <i class="fas fa-exclamation-triangle text-[10px] text-rose-500 dark:text-rose-300"></i>
+                    </span>
+                    <span class="text-sm text-slate-700 dark:text-slate-200">{{ producto.nombre }}</span>
+                </div>
+                <span class="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">{{ producto.stock_actual }} u.</span>
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center gap-2 py-4 text-center">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/15">
+                    <i class="fas fa-check text-emerald-600 dark:text-emerald-300"></i>
+                </span>
+                <p class="text-sm text-slate-400 dark:text-slate-500">Sin alertas críticas por ahora.</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% if productos_stock_bajo > 5 %}
+        <div class="border-t border-slate-100 px-5 py-3 text-center dark:border-white/5">
+            <a href="{{ url_for('reportes.stock_bajo') if can_ver_reporte_inventario else url_for('productos.listar') }}"
+               data-tab-url="{{ url_for('reportes.stock_bajo') if can_ver_reporte_inventario else url_for('productos.listar') }}"
+               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver todos en inventario</a>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Comisiones del dia -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('comisiones_dia')" {% if 'comisiones_dia' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-sm text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+                    <i class="fas fa-hand-holding-usd"></i>
+                </span>
+                <h2 class="text-sm font-bold text-slate-950 dark:text-white">Comisiones del día</h2>
+            </div>
+            <a href="{{ url_for('usuarios.listar') }}"
+               data-tab-url="{{ url_for('usuarios.listar') }}"
+               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver todas</a>
+        </div>
+        <div class="px-5 py-4 space-y-3">
+            {% for usuario in usuarios_activos_lista[:3] %}
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ usuario.nombre_completo[:1] }}</span>
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ usuario.nombre_completo }}</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">30% de ventas</p>
+                    </div>
+                </div>
+                <p class="text-sm font-bold text-slate-900 dark:text-white">Gs. {{ "{:,.0f}".format((total_cobrado_display or 0) // (usuarios_activos_lista|length or 1) ).replace(",", ".") }}</p>
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center gap-2 py-4 text-center">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                    <i class="fas fa-chart-line text-slate-400 dark:text-slate-500"></i>
+                </span>
+                <p class="text-sm text-slate-400 dark:text-slate-500">Listo para el módulo de comisiones.</p>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
+            <div class="flex items-center justify-between text-sm">
+                <span class="font-semibold text-slate-500 dark:text-slate-400">Total comisiones</span>
+                <span class="font-bold text-emerald-600 dark:text-emerald-400">Gs. 0</span>
+            </div>
+        </div>
+    </section>
+</div>

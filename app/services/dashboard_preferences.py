@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
+from app import db
+from app.models import Configuracion
 from flask import url_for
 from werkzeug.routing import BuildError
 
@@ -14,7 +17,24 @@ DASHBOARD_VIEW_CLASSIC = 'classic'
 DASHBOARD_VIEW_NEW = 'new'
 DASHBOARD_VIEW_PREF_KEY = 'dashboard_view'
 DASHBOARD_QUICK_ACTIONS_PREF_KEY = 'dashboard_quick_actions'
+DASHBOARD_SERVICE_CARDS_PREF_PREFIX = 'dashboard_service_cards_'
 DASHBOARD_QUICK_ACTION_SLOTS = 4
+
+_SERVICE_CARD_DEFINITIONS = (
+    ('kpi_turnos_hoy', 'Turnos hoy', 'Contador principal de agenda del dia'),
+    ('kpi_en_atencion', 'En atencion', 'Servicios activos y operacion actual'),
+    ('kpi_profesionales', 'Profesionales', 'Resumen rapido del equipo activo'),
+    ('kpi_cobrado_hoy', 'Cobrado hoy', 'Cobros totales del rango actual'),
+    ('kpi_caja', 'Caja', 'Estado de apertura de caja'),
+    ('agenda_hoy', 'Agenda de hoy', 'Tabla de turnos y acciones del dia'),
+    ('profesionales_hoy', 'Profesionales de hoy', 'Disponibilidad rapida del equipo'),
+    ('caja_dia', 'Caja del dia', 'Detalle de cobros y egresos'),
+    ('cobros_pendientes', 'Cobros pendientes', 'Servicios pendientes de cobrar'),
+    ('servicios_realizados', 'Servicios realizados', 'Ranking de servicios del dia'),
+    ('clientes_panel', 'Clientes', 'Resumen comercial de clientes'),
+    ('insumos_criticos', 'Insumos criticos', 'Alertas de stock bajo'),
+    ('comisiones_dia', 'Comisiones del dia', 'Resumen rapido de comisiones'),
+)
 
 
 def normalize_dashboard_view(value: str | None) -> str:
@@ -47,6 +67,24 @@ def set_dashboard_quick_actions(user: Any, action_ids: list[str] | None) -> tupl
     user.set_preferencia(
         DASHBOARD_QUICK_ACTIONS_PREF_KEY,
         json.dumps([action['id'] for action in selected], ensure_ascii=False),
+    )
+    return available, selected
+
+
+def get_dashboard_service_cards(user: Any) -> tuple[list[dict], list[str]]:
+    available = _build_available_service_cards()
+    selected_ids = _load_service_card_ids(user)
+    selected = _select_service_cards(available, selected_ids)
+    return available, selected
+
+
+def set_dashboard_service_cards(user: Any, card_ids: list[str] | None) -> tuple[list[dict], list[str]]:
+    available = _build_available_service_cards()
+    selected = _select_service_cards(available, card_ids or [])
+    _set_client_configuration(
+        _service_cards_pref_key(user),
+        json.dumps(selected, ensure_ascii=False),
+        description='Tarjetas visibles del dashboard de servicios por cliente',
     )
     return available, selected
 
@@ -95,6 +133,17 @@ def _build_available_actions(user: Any) -> list[dict]:
                 'bg-stone-600', 'proveedores.listar', _can(user, 'ver_proveedores')),
     ]
     return [action for action in definitions if action]
+
+
+def _build_available_service_cards() -> list[dict]:
+    return [
+        {
+            'id': card_id,
+            'title': title,
+            'description': description,
+        }
+        for card_id, title, description in _SERVICE_CARD_DEFINITIONS
+    ]
 
 
 def _build_sales_action(user: Any) -> dict | None:
@@ -189,11 +238,79 @@ def _load_action_ids(user: Any) -> list[str]:
     return [str(item) for item in data]
 
 
+def _load_service_card_ids(user: Any) -> list[str] | None:
+    raw = _get_client_configuration(_service_cards_pref_key(user), '')
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(data, list):
+        return None
+    return [str(item) for item in data]
+
+
+def _select_service_cards(available: list[dict], requested_ids: list[str] | None) -> list[str]:
+    allowed_ids = [card['id'] for card in available]
+    if requested_ids is None:
+        return allowed_ids
+    allowed_lookup = set(allowed_ids)
+    selected = []
+    seen = set()
+    for card_id in requested_ids:
+        normalized = str(card_id or '').strip()
+        if normalized in allowed_lookup and normalized not in seen:
+            selected.append(normalized)
+            seen.add(normalized)
+    return selected if selected or not requested_ids else allowed_ids
+
+
 def _get_preference(user: Any, key: str, default: str = '') -> str:
     try:
         return str(user.get_preferencia(key, default) or default)
     except Exception:
         return default
+
+
+def _get_client_configuration(key: str, default: str = '') -> str:
+    try:
+        return str(Configuracion.obtener(key, default) or default)
+    except Exception:
+        return default
+
+
+def _set_client_configuration(key: str, value: str | None, *, description: str | None = None) -> None:
+    config = db.session.get(Configuracion, key)
+    if value is None:
+        if config:
+            db.session.delete(config)
+        return
+
+    normalized = str(value)
+    if config:
+        config.valor = normalized
+        config.descripcion = description or config.descripcion
+        config.fecha_modificacion = datetime.utcnow()
+        return
+
+    db.session.add(
+        Configuracion(
+            clave=key,
+            valor=normalized,
+            descripcion=description,
+            fecha_modificacion=datetime.utcnow(),
+        )
+    )
+
+
+def _service_cards_pref_key(user: Any) -> str:
+    try:
+        cliente_id = int(getattr(user, 'id_cliente', 0) or 0)
+    except Exception:
+        cliente_id = 0
+    suffix = str(cliente_id) if cliente_id > 0 else 'global'
+    return f'{DASHBOARD_SERVICE_CARDS_PREF_PREFIX}{suffix}'
 
 
 def _module_enabled(key: str, default: bool = False) -> bool:

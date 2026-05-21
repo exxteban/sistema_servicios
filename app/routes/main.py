@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app, g
 from datetime import timedelta
 from flask_login import login_required, current_user
 from sqlalchemy import and_, case
-from sqlalchemy.orm import load_only, noload
+from sqlalchemy.orm import load_only, noload, joinedload
 from app import db
 from app.models import (
     AgendaActividad,
@@ -16,16 +16,20 @@ from app.models import (
     PagoVenta,
     Producto,
     SesionCaja,
+    Usuario,
     Venta,
 )
 from app.routes.agenda.actividades import _filtro_mostrar_agenda_para_usuario
 from app.utils.helpers import today_local, utc_bounds_for_local_dates, parse_iso_date, local_strftime
 from app.services.dashboard_preferences import (
+    get_dashboard_service_cards,
     get_dashboard_quick_actions,
     get_dashboard_view_preference,
+    set_dashboard_service_cards,
     set_dashboard_quick_actions,
     set_dashboard_view_preference,
 )
+from app.services.dashboard_negocio import obtener_dashboard_negocio_actual
 from gastos_corrientes.services import (
     obtener_dashboard_detallado_gastos_corrientes,
     obtener_resumen_dashboard_gastos_corrientes,
@@ -238,6 +242,12 @@ def dashboard():
             Producto.activo == True,
             Producto.stock_actual <= Producto.stock_minimo
         ).count()
+        productos_stock_bajo_lista = Producto.query.filter(
+            Producto.activo == True,
+            Producto.stock_actual <= Producto.stock_minimo
+        ).order_by(Producto.stock_actual.asc()).limit(5).all()
+    else:
+        productos_stock_bajo_lista = []
     
     # Sesión de caja actual
     puede_ver_otras_cajas = current_user.es_admin() or current_user.tiene_permiso('ver_otras_cajas')
@@ -317,11 +327,24 @@ def dashboard():
     gastos_corrientes_resumen = _obtener_resumen_gastos_dashboard(can_ver_gastos_corrientes, today)
     gastos_corrientes_dashboard = _obtener_dashboard_detallado_gastos(can_ver_gastos_corrientes, today)
     dashboard_quick_actions_available, dashboard_quick_actions_selected = get_dashboard_quick_actions(current_user)
+    dashboard_service_cards_available, dashboard_service_cards_selected = get_dashboard_service_cards(current_user)
     dashboard_view_preference = get_dashboard_view_preference(current_user)
-    
-    return render_template('dashboard.html',
+    dashboard_negocio = obtener_dashboard_negocio_actual()
+
+    profesionales_activos = 0
+    usuarios_activos_lista = []
+    if dashboard_negocio.get('full_template'):
+        profesionales_activos = Usuario.query.filter_by(activo=True).count()
+        usuarios_activos_lista = Usuario.query.options(joinedload(Usuario.rol)).filter_by(activo=True).order_by(Usuario.nombre_completo.asc()).limit(5).all()
+
+    template_dashboard = dashboard_negocio.get('full_template') or 'dashboard.html'
+
+    return render_template(template_dashboard,
         total_productos=total_productos,
         productos_stock_bajo=productos_stock_bajo,
+        productos_stock_bajo_lista=productos_stock_bajo_lista,
+        profesionales_activos=profesionales_activos,
+        usuarios_activos_lista=usuarios_activos_lista,
         sesion_caja=sesion_caja,
         cierre_id=cierre_id,
         ventas_hoy=ventas_hoy,
@@ -348,8 +371,11 @@ def dashboard():
         gastos_corrientes_resumen=gastos_corrientes_resumen,
         gastos_corrientes_dashboard=gastos_corrientes_dashboard,
         dashboard_view_preference=dashboard_view_preference,
+        dashboard_negocio=dashboard_negocio,
         dashboard_quick_actions_available=dashboard_quick_actions_available,
         dashboard_quick_actions_selected=dashboard_quick_actions_selected,
+        dashboard_service_cards_available=dashboard_service_cards_available,
+        dashboard_service_cards_selected=dashboard_service_cards_selected,
         mostrar_alerta_sin_caja=mostrar_alerta_sin_caja,
         can_ver_agenda=can_ver_agenda,
         agenda_total_pendientes=agenda_resumen['total_pendientes'],
@@ -379,6 +405,14 @@ def api_dashboard_preferencias():
         available, selected = set_dashboard_quick_actions(current_user, action_ids)
         response['quick_actions_available'] = available
         response['quick_actions_selected'] = selected
+
+    if 'service_cards' in data:
+        card_ids = data.get('service_cards')
+        if not isinstance(card_ids, list):
+            card_ids = []
+        available, selected = set_dashboard_service_cards(current_user, card_ids)
+        response['service_cards_available'] = available
+        response['service_cards_selected'] = selected
 
     if response:
         db.session.commit()

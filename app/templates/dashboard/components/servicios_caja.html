@@ -1,0 +1,49 @@
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
+    <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/5">
+        <div class="flex min-w-0 items-center gap-2">
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-sm text-green-600 dark:bg-green-500/15 dark:text-green-300">
+                <i class="fas fa-coins"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-sm font-bold text-slate-950 dark:text-white">Caja del día</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Resumen de cobros y egresos de la jornada.</p>
+            </div>
+        </div>
+        <a href="{{ url_for('caja.estado') }}"
+           data-tab-url="{{ url_for('caja.estado') }}"
+           class="app-tab-link inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 sm:self-start dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5">Ver detalle</a>
+    </div>
+    <div class="space-y-3 px-5 py-4 text-sm">
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+            <span class="leading-5 text-slate-500 dark:text-slate-400">Servicios cobrados</span>
+            <b class="text-right text-slate-900 dark:text-white">Gs. {{ "{:,.0f}".format(cobrado_en_ventas_display or 0).replace(",", ".") }}</b>
+        </div>
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+            <span class="leading-5 text-slate-500 dark:text-slate-400">Productos vendidos</span>
+            <b class="text-right text-slate-900 dark:text-white">Gs. {{ "{:,.0f}".format(cobrado_en_pedidos_display or 0).replace(",", ".") }}</b>
+        </div>
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+            <span class="leading-5 text-slate-500 dark:text-slate-400">Propinas</span>
+            <b class="text-right text-slate-900 dark:text-white">Gs. 0</b>
+        </div>
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
+            <span class="leading-5 text-slate-500 dark:text-slate-400">Adelantos / Señas</span>
+            <b class="text-right text-slate-900 dark:text-white">Gs. {{ "{:,.0f}".format(cobrado_en_creditos_display or 0).replace(",", ".") }}</b>
+        </div>
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-2.5 dark:border-rose-500/10 dark:bg-rose-500/5">
+            <span class="leading-5 text-slate-500 dark:text-slate-400">Gastos del día</span>
+            <b class="text-right text-rose-600 dark:text-rose-400">-Gs. {{ "{:,.0f}".format(gastos_corrientes_resumen.total_pendiente|float if gastos_corrientes_resumen else 0).replace(",", ".") }}</b>
+        </div>
+        <div class="rounded-2xl bg-slate-950 px-4 py-3 text-white dark:bg-emerald-500/10 dark:ring-1 dark:ring-emerald-500/20">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white dark:text-emerald-100">Total neto</span>
+                <b class="text-lg font-black text-emerald-300 dark:text-emerald-300">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</b>
+            </div>
+        </div>
+        <a href="{{ url_for('caja.estado') }}"
+           data-tab-url="{{ url_for('caja.estado') }}"
+           class="app-tab-link mt-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5">
+            Ver detalle de caja <i class="fas fa-external-link-alt text-[9px]"></i>
+        </a>
+    </div>
+</section>

@@ -1,0 +1,104 @@
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <!-- Turnos hoy -->
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('kpi_turnos_hoy')" {% if 'kpi_turnos_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="h-1 bg-violet-500"></div>
+        <div class="p-5">
+            <div class="flex items-start gap-4">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-base text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                    <i class="far fa-calendar"></i>
+                </span>
+                <div class="min-w-0">
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Turnos hoy</p>
+                    <p class="mt-0.5 text-2xl font-black text-slate-950 dark:text-white">{{ agenda_pendientes_hoy or 0 }}</p>
+                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{{ agenda_vencidas or 0 }} vencidos</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- En atención -->
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('kpi_en_atencion')" {% if 'kpi_en_atencion' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="h-1 bg-emerald-500"></div>
+        <div class="p-5">
+            <div class="flex items-start gap-4">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-base text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+                    <i class="fas fa-cut"></i>
+                </span>
+                <div class="min-w-0">
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">En atención</p>
+                    <p class="mt-0.5 text-2xl font-black text-slate-950 dark:text-white">{{ agenda_pendientes_hoy or 0 }}</p>
+                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Servicios activos ahora</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profesionales activos -->
+    <a href="{{ url_for('control_empleados.index') if modulo_control_empleados_activo else url_for('usuarios.listar') }}"
+       data-tab-url="{{ url_for('control_empleados.index') if modulo_control_empleados_activo else url_for('usuarios.listar') }}"
+       data-tab-title="Profesionales" data-tab-icon="fas fa-users"
+       x-show="isCardVisible('kpi_profesionales')" {% if 'kpi_profesionales' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900">
+        <div class="h-1 bg-blue-500"></div>
+        <div class="p-5">
+            <div class="flex items-start gap-4">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-base text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+                    <i class="far fa-user"></i>
+                </span>
+                <div class="min-w-0">
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Profesionales</p>
+                    <p class="mt-0.5 text-2xl font-black text-slate-950 dark:text-white">{{ profesionales_activos or 0 }}</p>
+                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Activos en el sistema</p>
+                </div>
+            </div>
+        </div>
+    </a>
+
+    <!-- Cobrado hoy -->
+    <a href="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
+       data-tab-url="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
+       data-tab-title="Cobrado hoy" data-tab-icon="fas fa-money-bill-wave"
+       x-show="isCardVisible('kpi_cobrado_hoy')" {% if 'kpi_cobrado_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900">
+        <div class="h-1 bg-green-500"></div>
+        <div class="p-5">
+            <div class="flex items-start gap-4">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50 text-base text-green-600 dark:bg-green-500/15 dark:text-green-300">
+                    <i class="fas fa-money-bill-wave"></i>
+                </span>
+                <div class="min-w-0">
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Cobrado hoy</p>
+                    <p class="mt-0.5 text-xl font-black text-slate-950 dark:text-white">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</p>
+                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Servicios + productos + propinas</p>
+                </div>
+            </div>
+        </div>
+    </a>
+
+    <!-- Caja -->
+    <a href="{{ url_for('caja.estado') }}"
+       data-tab-url="{{ url_for('caja.estado') }}"
+       data-tab-title="Caja" data-tab-icon="fas fa-cash-register"
+       x-show="isCardVisible('kpi_caja')" {% if 'kpi_caja' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900">
+        <div class="h-1 {% if sesion_caja %}bg-emerald-500{% else %}bg-amber-500{% endif %}"></div>
+        <div class="p-5">
+            <div class="flex items-start gap-4">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {% if sesion_caja %}bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300{% else %}bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300{% endif %}">
+                    <i class="fas fa-cash-register"></i>
+                </span>
+                <div class="min-w-0">
+                    <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Caja</p>
+                    <p class="mt-0.5 text-lg font-black {% if sesion_caja %}text-emerald-600 dark:text-emerald-300{% else %}text-amber-600 dark:text-amber-300{% endif %}">
+                        {% if sesion_caja %}Abierta{% else %}Pendiente{% endif %}
+                    </p>
+                    <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                        {% if sesion_caja %}{{ sesion_caja.caja.nombre }}{% else %}Abrir para cobrar{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </a>
+</div>

@@ -3,6 +3,11 @@ from flask_login import current_user, login_required
 
 from app.models import Configuracion
 from app.routes.usuarios import usuarios_bp
+from app.services.dashboard_negocio import (
+    establecer_dashboard_negocio_actual,
+    listar_dashboards_negocio,
+    obtener_dashboard_negocio_actual,
+)
 from app.services.ia_backoffice.security import es_usuario_root
 from app.services.system_modules import iter_system_modules, list_system_modules_with_state
 
@@ -30,6 +35,9 @@ def _guardar_modulos() -> list[str]:
         )
         estado = 'activado' if activo else 'desactivado'
         mensajes.append(f"{modulo['nombre']} {estado}")
+    if 'dashboard_negocio' in request.form:
+        dashboard = establecer_dashboard_negocio_actual(request.form.get('dashboard_negocio'))
+        mensajes.append(f"dashboard {dashboard['nombre']}")
     return mensajes
 
 
@@ -46,6 +54,8 @@ def modulos_sistema():
     return render_template(
         'usuarios/modulos_sistema.html',
         modulos=list_system_modules_with_state(),
+        dashboards_negocio=listar_dashboards_negocio(),
+        dashboard_negocio_actual=obtener_dashboard_negocio_actual(),
     )
 
 
