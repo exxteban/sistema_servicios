@@ -1,4 +1,5 @@
 from .parte1 import *
+from app.models import ClienteServicio
 from .parte3_helpers import (
     _construir_detalles_venta,
     _normalizar_pagos_venta,
@@ -20,6 +21,7 @@ from app.services.clientes_fidelizacion import (
     registrar_compra_fidelizacion_por_venta,
     resolver_descuento_beneficio_pos,
 )
+from app.services.clientes_servicios import get_cliente_servicios_cobrables, parse_cliente_servicio_ids
 
 
 def _procesar_venta_payload(data):
@@ -62,6 +64,11 @@ def _procesar_venta_payload(data):
     id_cliente = data.get('id_cliente', 1)
     id_usuario_vendedor_raw = data.get('id_usuario_vendedor')
     reparacion_id = data.get('reparacion_id')
+    cliente_servicio_id = data.get('cliente_servicio_id')
+    cliente_servicio_ids = parse_cliente_servicio_ids([
+        data.get('cliente_servicio_ids'),
+        cliente_servicio_id,
+    ])
     cola_cobro_id = data.get('cola_cobro_id')
     beneficio_fidelizacion_id = data.get('beneficio_fidelizacion_id')
     usar_precio_mayorista_raw = data.get('usar_precio_mayorista', None)
@@ -117,6 +124,11 @@ def _procesar_venta_payload(data):
         id_usuario_vendedor_raw = cola_cobro_data.get('id_usuario_vendedor')
         descuento_monto = Decimal(str(cola_cobro_data.get('descuento') or 0))
         beneficio_fidelizacion_id = cola_cobro_data.get('beneficio_fidelizacion_id')
+        cliente_servicio_ids = parse_cliente_servicio_ids([
+            cola_cobro_data.get('cliente_servicio_ids'),
+            cola_cobro_data.get('cliente_servicio_id'),
+        ])
+        cliente_servicio_id = cliente_servicio_ids[0] if cliente_servicio_ids else None
         usar_precio_mayorista_raw = cola_metadata.get('usar_precio_mayorista', None)
         forzar_precio_mayorista_raw = cola_metadata.get('forzar_precio_mayorista', False)
         if not (observaciones or '').strip():
@@ -192,6 +204,7 @@ def _procesar_venta_payload(data):
             return {'error': 'Debe seleccionar un vendedor/cajero v?lido'}, 400
 
     reparacion_obj = None
+    cliente_servicio_objs = []
     if reparacion_id not in (None, ''):
         try:
             reparacion_id = int(reparacion_id)
@@ -209,6 +222,37 @@ def _procesar_venta_payload(data):
         )
         if existente:
             return {'error': f'La reparaci?n ya fue cobrada en la venta #{existente.id_venta}'}, 400
+
+    if cliente_servicio_ids:
+        try:
+            cliente_servicio_objs = get_cliente_servicios_cobrables(cliente_servicio_ids, id_cliente=id_cliente)
+        except ValueError as exc:
+            mensaje = str(exc)
+            status_code = 404 if 'no encontrado' in mensaje.lower() else 400
+            return {'error': mensaje}, status_code
+
+        requerido_por_servicio = {}
+        for asignacion in cliente_servicio_objs:
+            servicio_id = int(asignacion.id_servicio or 0)
+            requerido_por_servicio[servicio_id] = requerido_por_servicio.get(servicio_id, 0) + max(int(asignacion.cantidad or 1), 1)
+
+        cantidad_en_venta_por_servicio = {}
+        for item in items or []:
+            try:
+                id_servicio_item = int(item.get('id_servicio') or item.get('id') or 0)
+                cantidad_item = max(int(item.get('cantidad') or 0), 0)
+            except Exception:
+                id_servicio_item = 0
+                cantidad_item = 0
+            if id_servicio_item > 0 and cantidad_item > 0:
+                cantidad_en_venta_por_servicio[id_servicio_item] = cantidad_en_venta_por_servicio.get(id_servicio_item, 0) + cantidad_item
+
+        for asignacion in cliente_servicio_objs:
+            servicio_id = int(asignacion.id_servicio or 0)
+            cantidad_requerida = requerido_por_servicio.get(servicio_id, 0)
+            cantidad_en_venta = cantidad_en_venta_por_servicio.get(servicio_id, 0)
+            if cantidad_en_venta < cantidad_requerida:
+                return {'error': f'La venta no incluye la cantidad suficiente del servicio asignado para #{asignacion.id_cliente_servicio}'}, 400
 
     cliente_tipo = (cliente.tipo or '').strip().lower()
     if usar_precio_mayorista_raw is None:
@@ -470,6 +514,8 @@ def _procesar_venta_payload(data):
                 referencia_id=venta.id_venta,
                 datos_nuevos={
                     'id_cliente': int(id_cliente),
+                    'cliente_servicio_id': int(cliente_servicio_objs[0].id_cliente_servicio) if len(cliente_servicio_objs) == 1 else None,
+                    'cliente_servicio_ids': [int(asignacion.id_cliente_servicio) for asignacion in cliente_servicio_objs],
                     'id_sesion_caja': int(sesion.id_sesion),
                     'subtotal': float(subtotal or 0),
                     'descuento_monto': float(descuento_monto or 0),
@@ -521,6 +567,43 @@ def _procesar_venta_payload(data):
                         'estado': 'entregado',
                         'fecha_entrega': reparacion_obj.fecha_entrega.isoformat() if reparacion_obj.fecha_entrega else None,
                         'venta_id': int(venta.id_venta),
+                    },
+                    commit=False
+                )
+        except Exception:
+            pass
+
+    for cliente_servicio_obj in cliente_servicio_objs:
+        estado_anterior_servicio = cliente_servicio_obj.estado
+        estado_normalizado = (cliente_servicio_obj.estado or '').strip().lower()
+        cobro_anticipado = estado_normalizado in {'agendado', 'presupuestado'} and cliente_servicio_obj.fecha_programada is not None
+        cliente_servicio_obj.estado = estado_anterior_servicio if cobro_anticipado else 'completado'
+        cliente_servicio_obj.id_venta = venta.id_venta
+        if cliente_servicio_obj.estado == 'completado' and not cliente_servicio_obj.fecha_cierre:
+            cliente_servicio_obj.fecha_cierre = datetime.utcnow()
+        elif cliente_servicio_obj.estado != 'completado':
+            cliente_servicio_obj.fecha_cierre = None
+        observaciones_servicio = (cliente_servicio_obj.observaciones or '').strip()
+        cierre_texto = (
+            f'Cobrado por anticipado en venta #{venta.id_venta}'
+            if cobro_anticipado else
+            f'Cobrado en venta #{venta.id_venta}'
+        )
+        if cierre_texto not in observaciones_servicio:
+            cliente_servicio_obj.observaciones = f'{observaciones_servicio} | {cierre_texto}'.strip(' |')
+        try:
+            with db.session.begin_nested():
+                registrar_auditoria(
+                    accion='cobrar_servicio_cliente',
+                    modulo='clientes',
+                    descripcion=f'Servicio del cliente #{cliente_servicio_obj.id_cliente_servicio} cobrado en venta #{venta.id_venta}',
+                    referencia_tipo='cliente_servicio',
+                    referencia_id=cliente_servicio_obj.id_cliente_servicio,
+                    datos_anteriores={'estado': estado_anterior_servicio},
+                    datos_nuevos={
+                        'estado': cliente_servicio_obj.estado,
+                        'venta_id': int(venta.id_venta),
+                        'fecha_cierre': cliente_servicio_obj.fecha_cierre.isoformat() if cliente_servicio_obj.fecha_cierre else None,
                     },
                     commit=False
                 )

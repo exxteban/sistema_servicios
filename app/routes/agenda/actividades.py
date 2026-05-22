@@ -539,6 +539,26 @@ def _cargar_actividad_visible_o_404(id_actividad: int):
     return _query_visible().filter(AgendaActividad.id == id_actividad).first_or_404()
 
 
+def _redirect_agenda_next(default_endpoint='agenda.lista_actividades'):
+    next_url = (request.form.get('next') or request.args.get('next') or '').strip()
+    if next_url.startswith('/') and not next_url.startswith('//'):
+        return next_url
+    return url_for(default_endpoint)
+
+
+def _sincronizar_cliente_servicio_desde_actividad(actividad: AgendaActividad, *, accion: str):
+    asignacion = getattr(actividad, 'cliente_servicio', None)
+    if asignacion is None:
+        return
+    if accion == 'iniciar' and (asignacion.estado or '').strip().lower() in {'solicitado', 'agendado', 'presupuestado'}:
+        asignacion.estado = 'en_proceso'
+        return
+    if accion == 'completar' and (asignacion.estado or '').strip().lower() != 'cancelado':
+        asignacion.estado = 'completado'
+        if not asignacion.fecha_cierre:
+            asignacion.fecha_cierre = datetime.utcnow()
+
+
 def _resolver_filtros_lista_actividades(args=None):
     args = args or request.args
     return {
@@ -1107,6 +1127,25 @@ def editar_actividad(id_actividad: int):
     )
 
 
+@agenda_bp.post('/actividades/<int:id_actividad>/iniciar')
+@login_required
+def iniciar_actividad(id_actividad: int):
+    if not (current_user.tiene_permiso('agenda_editar') or current_user.tiene_permiso('agenda_completar')):
+        mensaje = 'No tienes permiso para iniciar actividades.'
+        if _wants_json_response():
+            return jsonify({'ok': False, 'mensaje': mensaje}), 403
+        flash(mensaje, 'danger')
+        return redirect(_redirect_agenda_next())
+    actividad = _cargar_actividad_visible_o_404(id_actividad)
+    _sincronizar_cliente_servicio_desde_actividad(actividad, accion='iniciar')
+    db.session.commit()
+    mensaje = 'Actividad iniciada.'
+    if _wants_json_response():
+        return jsonify({'ok': True, 'mensaje': mensaje, 'id': actividad.id, 'estado': actividad.estado})
+    flash(mensaje, 'success')
+    return redirect(_redirect_agenda_next())
+
+
 @agenda_bp.post('/actividades/<int:id_actividad>/completar')
 @login_required
 def completar_actividad(id_actividad: int):
@@ -1115,16 +1154,17 @@ def completar_actividad(id_actividad: int):
         if _wants_json_response():
             return jsonify({'ok': False, 'mensaje': mensaje}), 403
         flash(mensaje, 'danger')
-        return redirect(url_for('agenda.lista_actividades'))
+        return redirect(_redirect_agenda_next())
     actividad = _cargar_actividad_visible_o_404(id_actividad)
     estado_alerta = _resolver_estado_alerta(actividad)
     actividad.estado = 'hecha'
+    _sincronizar_cliente_servicio_desde_actividad(actividad, accion='completar')
     db.session.commit()
     mensaje = 'Actividad marcada como hecha.'
     if _wants_json_response():
         return jsonify({'ok': True, 'mensaje': mensaje, 'id': actividad.id, 'estado_alerta': estado_alerta, 'estado': actividad.estado})
     flash(mensaje, 'success')
-    return redirect(url_for('agenda.lista_actividades'))
+    return redirect(_redirect_agenda_next())
 
 
 @agenda_bp.post('/actividades/<int:id_actividad>/cancelar')

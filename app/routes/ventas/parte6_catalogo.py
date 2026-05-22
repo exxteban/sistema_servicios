@@ -2,19 +2,8 @@ from flask import jsonify, request
 from flask_login import current_user, login_required
 
 from app import db
-from app.models import Categoria, Cliente, Producto, ProductoPrecioOpcion, Servicio, ServicioPrecioOpcion
+from app.models import Categoria, Producto, ProductoPrecioOpcion, Servicio, ServicioPrecioOpcion
 from app.routes.ventas.parte1 import ventas_bp
-
-
-def _id_cliente_servicios():
-    id_cliente = getattr(current_user, 'id_cliente', None)
-    if id_cliente:
-        return int(id_cliente)
-    if current_user.es_admin():
-        clientes = Cliente.query.filter_by(activo=True).order_by(Cliente.id_cliente.asc()).limit(2).all()
-        if len(clientes) == 1:
-            return int(clientes[0].id_cliente)
-    return None
 
 
 def _puede_buscar_catalogo():
@@ -88,12 +77,8 @@ def _buscar_producto_exacto(q):
 
 
 def _buscar_servicios(q):
-    id_cliente = _id_cliente_servicios()
-    if not id_cliente:
-        return []
     like = f'%{q}%'
     servicios = Servicio.query.filter(
-        Servicio.id_cliente == id_cliente,
         Servicio.activo.is_(True),
         db.or_(Servicio.nombre.ilike(like), Servicio.codigo.ilike(like), Servicio.categoria.ilike(like)),
     ).order_by(Servicio.nombre.asc()).limit(10).all()
@@ -102,12 +87,8 @@ def _buscar_servicios(q):
 
 
 def _buscar_servicio_exacto(q):
-    id_cliente = _id_cliente_servicios()
-    if not id_cliente:
-        return None
     q_lower = q.lower()
     servicio = Servicio.query.filter(
-        Servicio.id_cliente == id_cliente,
         Servicio.activo.is_(True),
         db.func.lower(Servicio.codigo) == q_lower,
     ).first()

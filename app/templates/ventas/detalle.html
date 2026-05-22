@@ -116,6 +116,47 @@
             </tfoot>
         </table>
 
+        {% if servicios_cliente_cobrados %}
+        <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-900/60 dark:bg-emerald-900/10">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <p class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Servicios del cliente cobrados en esta venta</p>
+                    <p class="mt-1 text-sm text-emerald-900/80 dark:text-emerald-100/80">
+                        Esta venta quedo vinculada a {{ servicios_cliente_cobrados|length }} asignacion{% if servicios_cliente_cobrados|length != 1 %}es{% endif %} de servicio.
+                    </p>
+                </div>
+                {% if current_user.tiene_permiso('ver_clientes') %}
+                <a href="{{ url_for('clientes_servicios.detalle', id_cliente=venta.cliente.id_cliente) }}"
+                    class="inline-flex items-center rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-700 dark:text-emerald-200 dark:hover:bg-emerald-900/30">
+                    <i class="fas fa-user-check mr-2"></i>Ver servicios del cliente
+                </a>
+                {% endif %}
+            </div>
+            <div class="mt-4 grid gap-3">
+                {% for asignacion in servicios_cliente_cobrados %}
+                <div class="rounded-lg bg-white/80 px-4 py-3 shadow-sm dark:bg-slate-900/60">
+                    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p class="font-semibold text-gray-800 dark:text-gray-100">
+                                #{{ asignacion.id_cliente_servicio }} · {{ asignacion.servicio.nombre if asignacion.servicio else 'Servicio eliminado' }}
+                            </p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                Cantidad {{ asignacion.cantidad }} · Estado {{ asignacion.estado_display }}
+                            </p>
+                        </div>
+                        {% if current_user.tiene_permiso('ver_clientes') %}
+                        <a href="{{ url_for('clientes_servicios.detalle', id_cliente=venta.cliente.id_cliente) }}#cliente-servicio-{{ asignacion.id_cliente_servicio }}"
+                            class="inline-flex items-center text-sm font-semibold text-emerald-700 underline dark:text-emerald-300">
+                            Ver asignacion
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
             <a href="{{ url_for('ventas.listar') }}" class="text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors">
                 <i class="fas fa-arrow-left mr-2"></i>Volver

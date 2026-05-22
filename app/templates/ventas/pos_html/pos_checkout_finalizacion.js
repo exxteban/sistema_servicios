@@ -68,6 +68,11 @@
         };
         if (idAutorizacion) payload.id_autorizacion = idAutorizacion;
         if (this.reparacionId) payload.reparacion_id = this.reparacionId;
+        if (Array.isArray(this.clienteServicioIds) && this.clienteServicioIds.length > 0) {
+            payload.cliente_servicio_ids = this.clienteServicioIds;
+        } else if (this.clienteServicioId) {
+            payload.cliente_servicio_id = this.clienteServicioId;
+        }
         if (this.colaCobroId) payload.cola_cobro_id = this.colaCobroId;
         if (this.colaCobroId) payload.debug_perf = true;
         return payload;
@@ -428,6 +433,8 @@
             ? Number(VENDEDOR_ID_INICIAL)
             : null;
         this.reparacionId = null;
+        this.clienteServicioId = null;
+        this.clienteServicioIds = [];
         this.colaCobroId = null;
         this.forzarPrecioMayorista = false;  // Reset del toggle mayorista
         this.bloquearPrecioMayorista = false;

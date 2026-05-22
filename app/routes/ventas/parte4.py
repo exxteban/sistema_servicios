@@ -1,5 +1,6 @@
 from .parte1 import *
 from .parte3 import _procesar_venta_payload
+from app.models import ClienteServicio
 from app.services.clientes_fidelizacion import revertir_fidelizacion_por_anulacion_venta
 from cobranzas.services.cuenta_service import anular_cuenta_por_cobrar
 
@@ -64,6 +65,12 @@ def detalle(id):
     ).filter(Venta.id_venta == id).first()
     if venta is None:
         abort(404)
+    servicios_cliente_cobrados = (
+        ClienteServicio.query.options(joinedload(ClienteServicio.servicio))
+        .filter(ClienteServicio.id_venta == venta.id_venta)
+        .order_by(ClienteServicio.id_cliente_servicio.asc())
+        .all()
+    )
     total_pagado_inmediato = sum(float(p.monto or 0) for p in venta.pagos.all())
     saldo_pendiente_actual = float(
         getattr(getattr(venta, 'cuenta_por_cobrar', None), 'saldo_pendiente', venta.saldo_pendiente) or 0
@@ -80,6 +87,7 @@ def detalle(id):
     return render_template(
         'ventas/detalle.html',
         venta=venta,
+        servicios_cliente_cobrados=servicios_cliente_cobrados,
         total_pagado_inmediato=total_pagado_inmediato,
         saldo_pendiente_actual=saldo_pendiente_actual,
         estado_cobro=estado_cobro,
@@ -146,6 +154,7 @@ def anular(id):
     }
 
     reparacion_reabierta_id = None
+    cliente_servicio_reabiertos = []
     if getattr(venta, 'id_reparacion', None):
         try:
             rid = int(venta.id_reparacion)
@@ -168,6 +177,23 @@ def anular(id):
                     )
                     reparacion_reabierta_id = reparacion_obj.id_reparacion
             venta.id_reparacion = None
+
+    cliente_servicio_objs = (
+        ClienteServicio.query
+        .filter_by(id_venta=venta.id_venta)
+        .order_by(ClienteServicio.id_cliente_servicio.asc())
+        .all()
+    )
+    for cliente_servicio_obj in cliente_servicio_objs:
+        cliente_servicio_obj.id_venta = None
+        cliente_servicio_obj.fecha_cierre = None
+        if (cliente_servicio_obj.estado or '').strip().lower() == 'completado':
+            cliente_servicio_obj.estado = 'solicitado'
+        observaciones_servicio = (cliente_servicio_obj.observaciones or '').strip()
+        reapertura_texto = f'Reabierto por anulación de venta #{venta.id_venta}'
+        if reapertura_texto not in observaciones_servicio:
+            cliente_servicio_obj.observaciones = f'{observaciones_servicio} | {reapertura_texto}'.strip(' |')
+        cliente_servicio_reabiertos.append(int(cliente_servicio_obj.id_cliente_servicio))
 
     # Restaurar stock
     for detalle in venta.detalles.all():
@@ -276,9 +302,19 @@ def anular(id):
     except Exception:
         pass
     
-    if reparacion_reabierta_id:
+    if reparacion_reabierta_id and cliente_servicio_reabiertos:
+        flash(
+            f'Venta #{id} anulada. Stock restaurado. Reparación #{reparacion_reabierta_id} y {len(cliente_servicio_reabiertos)} servicio(s) del cliente reabiertos para cobrar nuevamente.',
+            'success'
+        )
+    elif reparacion_reabierta_id:
         flash(
             f'Venta #{id} anulada. Stock restaurado. Reparación #{reparacion_reabierta_id} reabierta para cobrar nuevamente.',
+            'success'
+        )
+    elif cliente_servicio_reabiertos:
+        flash(
+            f'Venta #{id} anulada. Stock restaurado. {len(cliente_servicio_reabiertos)} servicio(s) del cliente reabiertos para cobrar nuevamente.',
             'success'
         )
     else:
@@ -481,3 +517,5 @@ def crear_devolucion(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+

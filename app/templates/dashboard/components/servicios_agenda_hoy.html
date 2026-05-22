@@ -46,12 +46,28 @@
                         </span>
                     </td>
                     <td class="whitespace-nowrap px-5 py-3.5">
+                        {% if actividad.cliente_servicio_id and actividad.cliente_servicio_estado in ['agendado', 'solicitado', 'presupuestado'] %}
+                        <form method="POST" action="{{ url_for('agenda.iniciar_actividad', id_actividad=actividad.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+                            <button type="submit"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/15">
+                                <i class="fas fa-play text-[9px]"></i> Iniciar
+                            </button>
+                        </form>
+                        {% elif actividad.cliente_servicio_id and actividad.cliente_servicio_estado == 'en_proceso' %}
+                        <button type="button" @click="enAtencionOpen = true"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/15">
+                            <i class="fas fa-scissors text-[9px]"></i> Ver atención
+                        </button>
+                        {% else %}
                         <a href="{{ url_for('agenda.lista_actividades', estado='pendiente', desde=agenda_fecha_hoy_iso, hasta=agenda_fecha_hoy_iso) }}"
                            data-tab-url="{{ url_for('agenda.lista_actividades', estado='pendiente', desde=agenda_fecha_hoy_iso, hasta=agenda_fecha_hoy_iso) }}"
                            data-tab-title="Agenda"
                            class="app-tab-link inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5">
-                            <i class="fas fa-play text-[9px]"></i> Iniciar
+                             <i class="fas fa-play text-[9px]"></i> Iniciar
                         </a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% else %}

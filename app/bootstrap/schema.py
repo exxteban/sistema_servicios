@@ -37,6 +37,19 @@ SCHEMA_COLUMN_MIGRATIONS = {
             ),
         ),
     ],
+    'agenda_actividades': [
+        (
+            'cliente_servicio_id',
+            (
+                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INTEGER",
+                "CREATE INDEX IF NOT EXISTS ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
+            ),
+            (
+                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INT NULL",
+                "CREATE INDEX ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
+            ),
+        ),
+    ],
     'productos': [
         (
             'codigo_barras',
@@ -88,6 +101,19 @@ SCHEMA_COLUMN_MIGRATIONS = {
                 "CREATE INDEX IF NOT EXISTS ix_productos_id_cliente ON productos(id_cliente)",
             ),
             ("ALTER TABLE productos ADD COLUMN id_cliente INT NULL",),
+        ),
+    ],
+    'servicios': [
+        (
+            'turno_rapido_tipo',
+            (
+                "ALTER TABLE servicios ADD COLUMN turno_rapido_tipo VARCHAR(30)",
+                "CREATE INDEX IF NOT EXISTS ix_servicios_turno_rapido_tipo ON servicios(turno_rapido_tipo)",
+            ),
+            (
+                "ALTER TABLE servicios ADD COLUMN turno_rapido_tipo VARCHAR(30) NULL",
+                "CREATE INDEX ix_servicios_turno_rapido_tipo ON servicios(turno_rapido_tipo)",
+            ),
         ),
     ],
     'tienda_config': [

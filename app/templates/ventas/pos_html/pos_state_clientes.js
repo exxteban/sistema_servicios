@@ -6,6 +6,8 @@
     const POS_EMPRESA = {{ empresa| tojson
     }};
     const REPARACION_DATA = {{ (reparacion_data if reparacion_data is defined else None)| tojson }};
+    const AGENDA_TURNO_DATA = {{ (agenda_turno_data if agenda_turno_data is defined else None)| tojson }};
+    const CLIENTE_SERVICIO_DATA = {{ (cliente_servicio_data if cliente_servicio_data is defined else None)| tojson }};
     const COLA_COBRO_DATA = {{ (cola_cobro_data if cola_cobro_data is defined else None)| tojson }};
     const REPARACION_TOKEN = {{ (reparacion_token if reparacion_token is defined else None)| tojson }};
     const VENDEDORES_CAJEROS = {{ (vendedores_cajeros if vendedores_cajeros is defined else [])|tojson }};
@@ -95,6 +97,8 @@
                 : 'cuenta_corriente',
             enviandoCaja: false,
             reparacionId: null,
+            clienteServicioId: null,
+            clienteServicioIds: [],
             colaCobroId: null,
             reparacionToken: (typeof REPARACION_TOKEN !== 'undefined' && REPARACION_TOKEN !== null) ? String(REPARACION_TOKEN) : '',
 

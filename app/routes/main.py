@@ -1,7 +1,7 @@
 """
 Rutas principales (Dashboard)
 """
-from flask import Blueprint, render_template, request, jsonify, current_app, g
+from flask import Blueprint, render_template, request, jsonify, current_app, g, url_for
 from datetime import timedelta
 from flask_login import login_required, current_user
 from sqlalchemy import and_, case
@@ -10,11 +10,13 @@ from app import db
 from app.models import (
     AgendaActividad,
     Cliente,
+    ClienteServicio,
     Configuracion,
     PagoCuentaCobrar,
     PedidoClientePago,
     PagoVenta,
     Producto,
+    Servicio,
     SesionCaja,
     Usuario,
     Venta,
@@ -22,6 +24,7 @@ from app.models import (
 from app.routes.agenda.actividades import _filtro_mostrar_agenda_para_usuario
 from app.utils.helpers import today_local, utc_bounds_for_local_dates, parse_iso_date, local_strftime
 from app.services.dashboard_preferences import (
+    set_dashboard_service_card_order,
     get_dashboard_service_cards,
     get_dashboard_quick_actions,
     get_dashboard_view_preference,
@@ -30,6 +33,11 @@ from app.services.dashboard_preferences import (
     set_dashboard_view_preference,
 )
 from app.services.dashboard_negocio import obtener_dashboard_negocio_actual
+from app.services.dashboard_servicios import (
+    obtener_resumen_cobros_pendientes_dashboard,
+    resolver_destino_cobros_pendientes_dashboard,
+    serializar_resumen_cobros_pendientes_dashboard,
+)
 from gastos_corrientes.services import (
     obtener_dashboard_detallado_gastos_corrientes,
     obtener_resumen_dashboard_gastos_corrientes,
@@ -79,6 +87,12 @@ def _obtener_resumen_agenda_dashboard(can_ver_agenda, today):
                 AgendaActividad.tipo,
                 AgendaActividad.prioridad,
                 AgendaActividad.fecha_inicio,
+                AgendaActividad.cliente_servicio_id,
+            ),
+            joinedload(AgendaActividad.cliente_servicio).load_only(
+                ClienteServicio.id_cliente_servicio,
+                ClienteServicio.id_venta,
+                ClienteServicio.estado,
             ),
             noload(AgendaActividad.usuarios_agenda),
             noload(AgendaActividad.usuarios_recordatorio),
@@ -98,6 +112,9 @@ def _obtener_resumen_agenda_dashboard(can_ver_agenda, today):
             'prioridad': actividad.prioridad or 'baja',
             'prioridad_label': (actividad.prioridad or 'baja').title(),
             'hora_label': local_strftime(actividad.fecha_inicio, '%H:%M'),
+            'cliente_servicio_id': int(actividad.cliente_servicio_id) if actividad.cliente_servicio_id else None,
+            'cliente_servicio_estado': ((actividad.cliente_servicio.estado or '').strip().lower() if actividad.cliente_servicio else ''),
+            'cliente_servicio_cobrado': bool(actividad.cliente_servicio and actividad.cliente_servicio.id_venta),
         }
         for actividad in proximas_actividades
     ]
@@ -109,6 +126,63 @@ def _obtener_resumen_agenda_dashboard(can_ver_agenda, today):
         'vencidas': agenda_vencidas,
         'proximas_actividades': agenda_proximas_actividades,
         'fecha_hoy_iso': agenda_fecha_hoy_iso,
+    }
+
+
+def _obtener_resumen_en_atencion_dashboard(can_ver_agenda, today):
+    if not can_ver_agenda:
+        return {'count': 0, 'items': []}
+
+    start_utc, end_utc = utc_bounds_for_local_dates(today, today)
+    query = (
+        AgendaActividad.query
+        .join(ClienteServicio, ClienteServicio.id_cliente_servicio == AgendaActividad.cliente_servicio_id)
+        .filter(
+            AgendaActividad.estado == 'pendiente',
+            AgendaActividad.fecha_inicio >= start_utc,
+            AgendaActividad.fecha_inicio < end_utc,
+            ClienteServicio.estado == 'en_proceso',
+        )
+    )
+    if not (current_user.es_admin() or current_user.tiene_permiso('agenda_ver_todas')):
+        query = query.filter(_filtro_mostrar_agenda_para_usuario(current_user.id_usuario))
+
+    items = (
+        query.options(
+            load_only(
+                AgendaActividad.id,
+                AgendaActividad.titulo,
+                AgendaActividad.fecha_inicio,
+                AgendaActividad.cliente_servicio_id,
+            ),
+            joinedload(AgendaActividad.cliente_servicio).load_only(
+                ClienteServicio.id_cliente_servicio,
+                ClienteServicio.id_cliente,
+                ClienteServicio.id_servicio,
+                ClienteServicio.id_venta,
+                ClienteServicio.estado,
+                ClienteServicio.precio_pactado,
+                ClienteServicio.cantidad,
+            ).joinedload(ClienteServicio.cliente).load_only(Cliente.id_cliente, Cliente.nombre),
+            joinedload(AgendaActividad.cliente_servicio).joinedload(ClienteServicio.servicio).load_only(Servicio.id_servicio, Servicio.nombre),
+        )
+        .order_by(AgendaActividad.fecha_inicio.asc(), AgendaActividad.id.asc())
+        .all()
+    )
+    return {
+        'count': len(items),
+        'items': [
+            {
+                'id': int(actividad.id),
+                'titulo': actividad.titulo or '',
+                'hora_label': local_strftime(actividad.fecha_inicio, '%H:%M'),
+                'cliente_nombre': (actividad.cliente_servicio.cliente.nombre if actividad.cliente_servicio and actividad.cliente_servicio.cliente else 'Consumidor Final'),
+                'servicio_nombre': (actividad.cliente_servicio.servicio.nombre if actividad.cliente_servicio and actividad.cliente_servicio.servicio else 'Servicio'),
+                'cliente_servicio_id': int(actividad.cliente_servicio_id) if actividad.cliente_servicio_id else None,
+                'cobrado': bool(actividad.cliente_servicio and actividad.cliente_servicio.id_venta),
+            }
+            for actividad in items
+        ],
     }
 
 
@@ -220,7 +294,7 @@ def dashboard():
     can_ver_caja = current_user.tiene_permiso('ver_caja')
     can_abrir_caja = current_user.tiene_permiso('abrir_caja')
     can_ver_reportes = current_user.tiene_permiso('ver_reportes')
-    can_tomar_cola_cobro = current_user.tiene_permiso('tomar_cola_cobro')
+    can_tomar_cola_cobro = current_user.es_admin() or current_user.tiene_permiso('tomar_cola_cobro')
     can_ver_agenda = current_user.tiene_permiso('agenda_acceso')
     can_ver_gastos_corrientes = current_user.es_admin() or current_user.tiene_permiso('ver_gastos_corrientes')
     can_ver_inteligencia = current_user.es_admin() or can_ver_reportes
@@ -326,12 +400,27 @@ def dashboard():
         cobrado_en_pedidos_display = totales_cobro['cobrado_en_pedidos']
 
     agenda_resumen = _obtener_resumen_agenda_dashboard(can_ver_agenda, today)
+    en_atencion_resumen = _obtener_resumen_en_atencion_dashboard(can_ver_agenda, today)
     gastos_corrientes_resumen = _obtener_resumen_gastos_dashboard(can_ver_gastos_corrientes, today)
     gastos_corrientes_dashboard = _obtener_dashboard_detallado_gastos(can_ver_gastos_corrientes, today)
     dashboard_quick_actions_available, dashboard_quick_actions_selected = get_dashboard_quick_actions(current_user)
-    dashboard_service_cards_available, dashboard_service_cards_selected = get_dashboard_service_cards(current_user)
+    dashboard_service_cards_available, dashboard_service_cards_selected, dashboard_service_cards_order = get_dashboard_service_cards(current_user)
     dashboard_view_preference = get_dashboard_view_preference(current_user)
     dashboard_negocio = obtener_dashboard_negocio_actual()
+    dashboard_cobros_pendientes_destino = resolver_destino_cobros_pendientes_dashboard(
+        can_crear_venta=can_crear_venta,
+        can_ver_ventas=can_ver_ventas,
+        can_ver_caja=can_ver_caja,
+        can_tomar_cola_cobro=can_tomar_cola_cobro,
+        modo_cobro_exclusivo_cajero=modo_cobro_exclusivo_cajero,
+        date_from=start_date.isoformat(),
+        date_to=end_date.isoformat(),
+    )
+    dashboard_cobros_pendientes_url = url_for(
+        dashboard_cobros_pendientes_destino['endpoint'],
+        **dashboard_cobros_pendientes_destino['params'],
+    )
+    dashboard_servicios_cobros_pendientes = obtener_resumen_cobros_pendientes_dashboard(limit=3)
 
     profesionales_activos = 0
     usuarios_activos_lista = []
@@ -378,6 +467,14 @@ def dashboard():
         dashboard_quick_actions_selected=dashboard_quick_actions_selected,
         dashboard_service_cards_available=dashboard_service_cards_available,
         dashboard_service_cards_selected=dashboard_service_cards_selected,
+        dashboard_service_cards_order=dashboard_service_cards_order,
+        dashboard_cobros_pendientes_url=dashboard_cobros_pendientes_url,
+        dashboard_cobros_pendientes_label=dashboard_cobros_pendientes_destino['label'],
+        dashboard_cobros_pendientes_tab_title=dashboard_cobros_pendientes_destino['tab_title'],
+        dashboard_cobros_pendientes_tab_icon=dashboard_cobros_pendientes_destino['tab_icon'],
+        dashboard_servicios_cobros_pendientes=dashboard_servicios_cobros_pendientes['items'],
+        dashboard_servicios_cobros_pendientes_total_count=dashboard_servicios_cobros_pendientes['total_count'],
+        dashboard_servicios_cobros_pendientes_total_monto=dashboard_servicios_cobros_pendientes['total_monto'],
         mostrar_alerta_sin_caja=mostrar_alerta_sin_caja,
         can_ver_agenda=can_ver_agenda,
         agenda_total_pendientes=agenda_resumen['total_pendientes'],
@@ -385,6 +482,8 @@ def dashboard():
         agenda_vencidas=agenda_resumen['vencidas'],
         agenda_proximas_actividades=agenda_resumen['proximas_actividades'],
         agenda_fecha_hoy_iso=agenda_resumen['fecha_hoy_iso'],
+        dashboard_en_atencion_count=en_atencion_resumen['count'],
+        dashboard_en_atencion_items=en_atencion_resumen['items'],
     )
 
 
@@ -412,9 +511,19 @@ def api_dashboard_preferencias():
         card_ids = data.get('service_cards')
         if not isinstance(card_ids, list):
             card_ids = []
-        available, selected = set_dashboard_service_cards(current_user, card_ids)
+        available, selected, order = set_dashboard_service_cards(current_user, card_ids)
         response['service_cards_available'] = available
         response['service_cards_selected'] = selected
+        response['service_card_order'] = order
+
+    if 'service_card_order' in data:
+        order_ids = data.get('service_card_order')
+        if not isinstance(order_ids, list):
+            order_ids = []
+        available, selected, order = set_dashboard_service_card_order(current_user, order_ids)
+        response['service_cards_available'] = available
+        response['service_cards_selected'] = selected
+        response['service_card_order'] = order
 
     if response:
         db.session.commit()
@@ -507,6 +616,7 @@ def api_dashboard_totales():
 
     agenda_resumen = _obtener_resumen_agenda_dashboard(can_ver_agenda, today)
     gastos_corrientes_resumen = _obtener_resumen_gastos_dashboard(can_ver_gastos_corrientes, today)
+    cobros_pendientes_resumen = obtener_resumen_cobros_pendientes_dashboard(limit=3)
 
     return jsonify({
         'ventas_hoy': ventas_hoy,
@@ -522,6 +632,11 @@ def api_dashboard_totales():
         'date_from': start_date.isoformat() if start_date else None,
         'date_to': end_date.isoformat() if end_date else None,
         'agenda': (agenda_resumen if can_ver_agenda else None),
+        'cobros_pendientes': {
+            'items': serializar_resumen_cobros_pendientes_dashboard(cobros_pendientes_resumen['items']),
+            'total_count': int(cobros_pendientes_resumen['total_count'] or 0),
+            'total_monto': float(cobros_pendientes_resumen['total_monto'] or 0),
+        },
         'gastos_corrientes': (
             {
                 **gastos_corrientes_resumen,

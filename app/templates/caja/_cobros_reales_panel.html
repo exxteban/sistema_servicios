@@ -1,0 +1,59 @@
+<section class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">
+                <i class="fas fa-clock text-rose-500 mr-2"></i>Pendientes reales de cobro
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Servicios y turnos que siguen sin cobrarse y alimentan la tarjeta del dashboard.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs">
+            <span class="px-2 py-1 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 font-semibold">
+                {{ cobros_reales_total_count or 0 }} pendientes
+            </span>
+            <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200 font-semibold">
+                ₲ {{ "{:,.0f}".format(cobros_reales_total_monto or 0).replace(",", ".") }}
+            </span>
+        </div>
+    </div>
+    <div class="p-4 space-y-3">
+        {% for asignacion in cobros_reales_items %}
+        {% set cliente_nombre = (asignacion.cliente.nombre if asignacion.cliente else 'Consumidor Final') %}
+        {% set servicio_nombre = (asignacion.servicio.nombre if asignacion.servicio else 'Servicio eliminado') %}
+        {% set cobrar_url = (asignacion.cobrar_url if asignacion.cobrar_url is defined and asignacion.cobrar_url else url_for('ventas.pos', cliente_servicio_id=asignacion.id_cliente_servicio)) %}
+        {% set iniciales = (cliente_nombre or 'CF').strip()[:2].upper() %}
+        {% if puede_abrir_cobro_directo %}
+        <a href="{{ cobrar_url }}"
+           data-tab-url="{{ cobrar_url }}"
+           data-tab-title="Cobrar pendiente"
+           data-tab-icon="fas fa-cash-register"
+           class="app-tab-link flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-3 transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]">
+        {% else %}
+        <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-3 dark:border-white/5">
+        {% endif %}
+            <div class="flex min-w-0 items-center gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ iniciales }}</span>
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ cliente_nombre }}</p>
+                    <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {{ servicio_nombre }} · {% if asignacion.id_cliente_servicio %}#{{ asignacion.id_cliente_servicio }}{% else %}Turno agenda{% endif %} · {{ asignacion.estado_display }}
+                    </p>
+                </div>
+            </div>
+            <div class="shrink-0 text-right">
+                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(asignacion.subtotal or 0).replace(",", ".") }}</p>
+                <p class="text-[11px] text-slate-400 dark:text-slate-500">{{ asignacion.fecha_solicitud|local_strftime('%d/%m %H:%M') }}</p>
+            </div>
+        {% if puede_abrir_cobro_directo %}
+        </a>
+        {% else %}
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-5 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300/75">
+            No hay servicios o turnos pendientes de cobro ahora mismo.
+        </div>
+        {% endfor %}
+    </div>
+</section>

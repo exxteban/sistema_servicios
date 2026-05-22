@@ -589,6 +589,11 @@
                 descuento: this.descuento,
                 client_request_id: this.generarClientRequestId(),
             };
+            if (Array.isArray(this.clienteServicioIds) && this.clienteServicioIds.length > 0) {
+                payload.cliente_servicio_ids = this.clienteServicioIds;
+            } else if (this.clienteServicioId) {
+                payload.cliente_servicio_id = this.clienteServicioId;
+            }
 
             const response = await fetch('/ventas/enviar-a-caja', {
                 method: 'POST',

@@ -198,6 +198,13 @@ def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
             if not opcion:
                 raise ValueError('Opción de precio inválida para el servicio')
             precio = Decimal(str(opcion.precio or 0))
+        elif servicio and item.get('precio_manual') and item.get('precio') is not None:
+            try:
+                precio = Decimal(str(item.get('precio')))
+            except Exception:
+                raise ValueError('Precio inválido para el servicio')
+            if precio <= 0:
+                raise ValueError('Precio inválido para el servicio')
         elif precio_opcion_id not in (None, ''):
             try:
                 precio_opcion_id = int(precio_opcion_id)
@@ -345,6 +352,8 @@ def _build_pos_data_from_cola_cobro(item_cola):
         'id': int(item_cola.id),
         'tipo_origen': item_cola.tipo_origen,
         'cliente_id': int(item_cola.id_cliente or 1),
+        'cliente_servicio_id': metadata.get('cliente_servicio_id'),
+        'cliente_servicio_ids': metadata.get('cliente_servicio_ids') if isinstance(metadata.get('cliente_servicio_ids'), list) else [],
         'reparacion_id': reparacion_id,
         'id_usuario_vendedor': int(metadata.get('id_usuario_vendedor') or item_cola.id_usuario_origen),
         'descuento': float(metadata.get('descuento') or 0),

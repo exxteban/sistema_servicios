@@ -1,6 +1,13 @@
 from .parte1 import *
 from .ticket_context import build_sales_ticket_context
+from app.models import ClienteServicio
 from app.services.clientes_fidelizacion import resolver_descuento_beneficio_pos
+from app.services.clientes_servicios import (
+    build_pos_data_from_cliente_servicios,
+    get_cliente_servicios_cobrables,
+    parse_cliente_servicio_ids,
+)
+from app.services.agenda_turnos_peluqueria import build_pos_data_from_agenda_turno
 from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO, DIAS_VENCIMIENTO_CUENTA_CORRIENTE
 
 
@@ -89,6 +96,8 @@ def _render_pos_interface(sesion=None, solo_registro_vendedor=False):
         puede_cobrar_pos_directo = False
 
     cola_cobro_data = None
+    cliente_servicio_data = None
+    agenda_turno_data = None
 
     # Lógica para precargar reparación
     reparacion_id = None if solo_registro_vendedor else request.args.get('reparacion_id', type=int)
@@ -149,6 +158,24 @@ def _render_pos_interface(sesion=None, solo_registro_vendedor=False):
             ):
                 vendedor_default_id = int(reparacion.id_usuario_vendedor)
 
+    cliente_servicio_ids = parse_cliente_servicio_ids([
+        request.args.get('cliente_servicio_ids'),
+        request.args.get('cliente_servicio_id'),
+    ])
+    if cliente_servicio_ids:
+        try:
+            asignaciones = get_cliente_servicios_cobrables(cliente_servicio_ids)
+        except ValueError as exc:
+            flash(str(exc), 'warning')
+        else:
+            cliente_servicio_data = build_pos_data_from_cliente_servicios(asignaciones)
+
+    agenda_turno_data = build_pos_data_from_agenda_turno(
+        cliente_id=request.args.get('agenda_turno_cliente_id', type=int),
+        servicio_id=request.args.get('agenda_turno_servicio_id', type=int),
+        vendedor_id=request.args.get('agenda_turno_vendedor_id', type=int),
+    )
+
     cola_id = None if solo_registro_vendedor else request.args.get('cola_id', type=int)
     if cola_id:
         if not (current_user.es_admin() or current_user.tiene_permiso('tomar_cola_cobro')):
@@ -176,6 +203,8 @@ def _render_pos_interface(sesion=None, solo_registro_vendedor=False):
         empresa=empresa,
         reparacion_data=reparacion_data,
         reparacion_token=reparacion_token,
+        agenda_turno_data=agenda_turno_data,
+        cliente_servicio_data=cliente_servicio_data,
         cola_cobro_data=cola_cobro_data,
         vendedores_cajeros=vendedores_cajeros_data,
         vendedor_default_id=vendedor_default_id,
@@ -205,7 +234,7 @@ def pos():
 
     # En modo exclusivo, vendedor sin permiso de caja entra al módulo de registro.
     if modo_cobro_exclusivo_cajero and not _usuario_puede_tomar_cola_cobro():
-        return redirect(url_for('ventas.registro_vendedor'))
+        return redirect(url_for('ventas.registro_vendedor', **request.args.to_dict(flat=True)))
 
     sesion = SesionCaja.query.filter_by(
         id_usuario=current_user.id_usuario,
@@ -231,10 +260,10 @@ def registro_vendedor():
     modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
 
     if not modo_cobro_exclusivo_cajero:
-        return redirect(url_for('ventas.pos'))
+        return redirect(url_for('ventas.pos', **request.args.to_dict(flat=True)))
 
     if _usuario_puede_tomar_cola_cobro():
-        return redirect(url_for('ventas.pos'))
+        return redirect(url_for('ventas.pos', **request.args.to_dict(flat=True)))
 
     return _render_pos_interface(sesion=None, solo_registro_vendedor=True)
 
@@ -424,6 +453,10 @@ def enviar_a_caja():
         items = data.get('items', [])
         id_cliente = data.get('id_cliente', 1)
         id_usuario_vendedor_raw = data.get('id_usuario_vendedor')
+        cliente_servicio_ids = parse_cliente_servicio_ids([
+            data.get('cliente_servicio_ids'),
+            data.get('cliente_servicio_id'),
+        ])
         descuento_monto = Decimal(str(data.get('descuento', 0) or 0))
         beneficio_fidelizacion_id = data.get('beneficio_fidelizacion_id')
         usar_precio_mayorista_raw = data.get('usar_precio_mayorista', None)
@@ -452,6 +485,14 @@ def enviar_a_caja():
         cliente = db.session.get(Cliente, id_cliente)
         if not cliente or not bool(cliente.activo):
             return jsonify({'error': 'Cliente no encontrado o inactivo'}), 400
+
+        if cliente_servicio_ids:
+            try:
+                get_cliente_servicios_cobrables(cliente_servicio_ids, id_cliente=id_cliente)
+            except ValueError as exc:
+                mensaje = str(exc)
+                status_code = 404 if 'no encontrado' in mensaje.lower() else 400
+                return jsonify({'error': mensaje}), status_code
 
         ocultar_selector_vendedor_pos = _ocultar_selector_vendedor_pos()
         vendedores_cajeros = _usuarios_vendedores_cajeros_activos()
@@ -511,6 +552,8 @@ def enviar_a_caja():
             'descuento_beneficio': float(descuento_beneficio_monto or 0),
             'beneficio_fidelizacion_id': beneficio_fidelizacion_id if beneficio_fidelizacion_id not in (None, '', 0, '0') else None,
             'beneficio_fidelizacion_resumen': beneficio_descuento_ctx['beneficio_resumen'] or '',
+            'cliente_servicio_id': cliente_servicio_ids[0] if len(cliente_servicio_ids) == 1 else None,
+            'cliente_servicio_ids': cliente_servicio_ids,
             'usar_precio_mayorista': bool(usar_precio_mayorista),
             'forzar_precio_mayorista': bool(usar_precio_mayorista),
             'observaciones': observaciones,

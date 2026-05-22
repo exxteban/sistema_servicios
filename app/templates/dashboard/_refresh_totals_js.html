@@ -13,12 +13,17 @@
         const totalCobradoNuevoMetaEl = root.querySelector('#dashboard-new-total-cobrado-meta');
         const agendaPendientesNuevoEl = root.querySelector('#dashboard-new-agenda-pendientes');
         const agendaRoot = scope.querySelector('[data-dashboard-agenda-root="1"]');
+        const cobrosPendientesRoot = scope.querySelector('[data-dashboard-cobros-pendientes-root="1"]');
         const agendaPendientesHoyEl = agendaRoot ? agendaRoot.querySelector('#dashboard-agenda-pendientes-hoy') : null;
         const agendaTotalEl = agendaRoot ? agendaRoot.querySelector('#dashboard-agenda-total') : null;
         const agendaVencidasEl = agendaRoot ? agendaRoot.querySelector('#dashboard-agenda-vencidas') : null;
         const agendaListEl = agendaRoot ? agendaRoot.querySelector('#dashboard-agenda-list') : null;
         const agendaListUrl = agendaListEl ? (agendaListEl.getAttribute('data-agenda-list-url') || '') : '';
-        if (!ventasHoyEl && !ventasHoyNuevoEl && !totalVendidoEl && !totalCobradoNuevoEl && !totalVendidoLabelEl && !agendaRoot && !agendaPendientesNuevoEl) return;
+        const cobrosPendientesListEl = cobrosPendientesRoot ? cobrosPendientesRoot.querySelector('#dashboard-cobros-pendientes-list') : null;
+        const cobrosPendientesMontoEl = cobrosPendientesRoot ? cobrosPendientesRoot.querySelector('#dashboard-cobros-pendientes-total-monto') : null;
+        const cobrosPendientesCountEl = cobrosPendientesRoot ? cobrosPendientesRoot.querySelector('#dashboard-cobros-pendientes-total-count') : null;
+        const cobrosPendientesCanCrearVenta = cobrosPendientesRoot ? String(cobrosPendientesRoot.getAttribute('data-can-crear-venta') || '0') === '1' : false;
+        if (!ventasHoyEl && !ventasHoyNuevoEl && !totalVendidoEl && !totalCobradoNuevoEl && !totalVendidoLabelEl && !agendaRoot && !agendaPendientesNuevoEl && !cobrosPendientesRoot) return;
 
         let inFlight = false;
         let timerId = null;
@@ -96,6 +101,62 @@
             }).join('');
         }
 
+        function pluralizeServiciosSinCobrar(count) {
+            return `${count} servicio${count === 1 ? '' : 's'} sin cobrar.`;
+        }
+
+        function renderCobrosPendientes(resumen) {
+            if (!cobrosPendientesRoot || !resumen || typeof resumen !== 'object') {
+                return;
+            }
+            const items = Array.isArray(resumen.items) ? resumen.items : [];
+            const totalCount = Number(resumen.total_count || 0);
+            const totalMonto = Number(resumen.total_monto || 0);
+
+            if (cobrosPendientesMontoEl) {
+                cobrosPendientesMontoEl.textContent = `Gs. ${new Intl.NumberFormat('es-PY').format(totalMonto)}`;
+            }
+            if (cobrosPendientesCountEl) {
+                cobrosPendientesCountEl.textContent = pluralizeServiciosSinCobrar(totalCount);
+            }
+            if (!cobrosPendientesListEl) {
+                return;
+            }
+            if (!items.length) {
+                cobrosPendientesListEl.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300/75">No hay servicios pendientes de cobro ahora mismo.</div>';
+                return;
+            }
+
+            cobrosPendientesListEl.innerHTML = items.map((asignacion) => {
+                const clienteNombre = escapeHtml(asignacion && asignacion.cliente_nombre ? asignacion.cliente_nombre : 'Consumidor Final');
+                const servicioNombre = escapeHtml(asignacion && asignacion.servicio_nombre ? asignacion.servicio_nombre : 'Servicio eliminado');
+                const estadoDisplay = escapeHtml(asignacion && asignacion.estado_display ? asignacion.estado_display : 'Pendiente');
+                const fechaLabel = escapeHtml(asignacion && asignacion.fecha_solicitud_label ? asignacion.fecha_solicitud_label : '');
+                const cobrarUrl = String(asignacion && asignacion.cobrar_url ? asignacion.cobrar_url : '');
+                const idClienteServicio = Number((asignacion && asignacion.id_cliente_servicio) || 0);
+                const monto = `Gs. ${new Intl.NumberFormat('es-PY').format(Number(asignacion && asignacion.subtotal ? asignacion.subtotal : 0))}`;
+                const iniciales = (clienteNombre || 'CF').trim().slice(0, 2).toUpperCase();
+                const detalle = `${servicioNombre} · ${idClienteServicio ? `#${idClienteServicio}` : 'Turno agenda'} · ${estadoDisplay}`;
+                const contenido = `
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">${escapeHtml(iniciales)}</span>
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">${clienteNombre}</p>
+                            <p class="truncate text-xs text-slate-500 dark:text-slate-400">${detalle}</p>
+                        </div>
+                    </div>
+                    <div class="shrink-0 text-right">
+                        <p class="text-sm font-bold text-rose-600 dark:text-rose-400">${monto}</p>
+                        <p class="text-[11px] text-slate-400 dark:text-slate-500">${fechaLabel}</p>
+                    </div>
+                `;
+                if (cobrosPendientesCanCrearVenta && cobrarUrl) {
+                    return `<a href="${cobrarUrl}" data-tab-url="${cobrarUrl}" data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register" class="app-tab-link flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]">${contenido}</a>`;
+                }
+                return `<div class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 dark:border-white/5">${contenido}</div>`;
+            }).join('');
+        }
+
         async function refresh() {
             if (!isAlive()) {
                 if (timerId) clearInterval(timerId);
@@ -143,6 +204,7 @@
                     totalCobradoNuevoMetaEl.textContent = `Ventas cobradas: Gs. ${new Intl.NumberFormat('es-PY').format(cobradoVentas)}`;
                 }
                 renderAgenda(data.agenda);
+                renderCobrosPendientes(data.cobros_pendientes);
             } catch (e) {
             } finally {
                 inFlight = false;
@@ -151,10 +213,11 @@
 
         window.dashboardRefreshTotals = refresh;
         window.addEventListener('dashboard:refresh-totals', refresh);
+        window.addEventListener('caja:venta-cobrada', refresh);
         window.addEventListener('agenda:alertas-actualizadas', refresh);
         window.addEventListener('agenda:resolver-actividad', refresh);
         window.addEventListener('storage', (event) => {
-            if (!event || event.key !== 'agenda-activity-sync') {
+            if (!event || !['agenda-activity-sync', 'caja_estado_refresh_v1'].includes(event.key)) {
                 return;
             }
             refresh();

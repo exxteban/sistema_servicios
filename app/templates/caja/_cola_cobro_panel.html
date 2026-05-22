@@ -1,0 +1,160 @@
+<div id="cola-cobro-panel" x-ref="colaPanel" class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300 order-first">
+    <div class="bg-amber-50 dark:bg-amber-900/20 px-6 py-4 border-b border-amber-100 dark:border-amber-800 flex items-center justify-between gap-3">
+        <div>
+            <h2 class="font-semibold text-amber-900 dark:text-amber-200">
+                <i class="fas fa-bell mr-2"></i>{{ cola_panel_titulo or 'Pendientes enviados a caja' }}
+            </h2>
+            {% if cola_panel_subtitulo %}
+            <p class="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">{{ cola_panel_subtitulo }}</p>
+            {% endif %}
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2 text-xs">
+            <span id="cola-visibles" class="px-2 py-1 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-100 font-bold">
+                {{ cola_pendientes|length }} visibles
+            </span>
+            <span id="cola-total" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-100">
+                {{ cola_totales.total }} activas
+            </span>
+            <span id="cola-pendientes-count" class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
+                {{ cola_totales.pendiente }} pendientes
+            </span>
+            <span id="cola-en-proceso-count" class="px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                {{ cola_totales.en_proceso }} en proceso
+            </span>
+        </div>
+    </div>
+    <form method="get" @submit.prevent="aplicarFiltrosCola($event)" class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <label class="block text-sm">
+                <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Origen</span>
+                <select name="cola_tipo" x-model="colaFiltros.tipo" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
+                    <option value="todas" {% if cola_filtros.tipo == 'todas' %}selected{% endif %}>Todos</option>
+                    <option value="venta" {% if cola_filtros.tipo == 'venta' %}selected{% endif %}>Ventas</option>
+                    <option value="reparacion" {% if cola_filtros.tipo == 'reparacion' %}selected{% endif %}>Reparaciones</option>
+                    <option value="cobro_credito" {% if cola_filtros.tipo == 'cobro_credito' %}selected{% endif %}>Cobros de crédito</option>
+                    <option value="pedido" {% if cola_filtros.tipo == 'pedido' %}selected{% endif %}>Pedidos</option>
+                </select>
+            </label>
+            <label class="block text-sm">
+                <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Estado</span>
+                <select name="cola_estado" x-model="colaFiltros.estado" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
+                    <option value="todas" {% if cola_filtros.estado == 'todas' %}selected{% endif %}>Todos</option>
+                    <option value="pendiente" {% if cola_filtros.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                    <option value="en_proceso" {% if cola_filtros.estado == 'en_proceso' %}selected{% endif %}>En proceso</option>
+                </select>
+            </label>
+            <label class="block text-sm">
+                <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Alcance</span>
+                <select name="cola_scope" x-model="colaFiltros.scope" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
+                    <option value="todas" {% if cola_filtros.scope == 'todas' %}selected{% endif %}>Todas</option>
+                    <option value="mias" {% if cola_filtros.scope == 'mias' %}selected{% endif %}>Mis tomados</option>
+                    <option value="disponibles" {% if cola_filtros.scope == 'disponibles' %}selected{% endif %}>Sin asignar</option>
+                </select>
+            </label>
+            <div class="flex items-end gap-2">
+                <button type="submit" :disabled="colaUiRefrescando" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                    Filtrar
+                </button>
+                <button type="button" @click="limpiarFiltrosCola()" :disabled="colaUiRefrescando" class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                    Limpiar
+                </button>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-3 text-xs">
+            <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                <span id="cola-ventas-count">{{ cola_totales.venta }}</span> ventas
+            </span>
+            <span class="px-2 py-1 rounded-full bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300">
+                <span id="cola-reparaciones-count">{{ cola_totales.reparacion }}</span> reparaciones
+            </span>
+            <span class="px-2 py-1 rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                <span id="cola-cobros-credito-count">{{ cola_totales.cobro_credito }}</span> cobros de crédito
+            </span>
+            <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                <span id="cola-pedidos-count">{{ cola_totales.pedido }}</span> pedidos
+            </span>
+            <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200">
+                Actualización automática activa
+            </span>
+        </div>
+    </form>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm cola-pendientes-table">
+            <thead class="bg-gray-50 dark:bg-gray-700/50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Origen</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Cliente</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Estado</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Asignado</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Enviado</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="cola-pendientes-tbody" class="cola-pendientes-tbody">
+                {% if cola_pendientes %}
+                {% for item in cola_pendientes %}
+                <tr class="cola-pendiente-row hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                    data-cola-row-id="{{ item.id }}"
+                    data-cola-row-firma="{{ [item.estado or '', (item.monto_total or 0), (item.id_usuario_destino or ''), (item.fecha_envio.isoformat() if item.fecha_envio else ''), (item.cliente.nombre if item.cliente else 'Consumidor Final')]|join('|') }}">
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
+                        {% if item.tipo_origen == 'reparacion' %}
+                        Reparación #{{ item.id_origen or '-' }}
+                        {% elif item.tipo_origen == 'cobro_credito' %}
+                        Cobro de crédito #{{ item.id_origen or item.id }}
+                        {% elif item.tipo_origen == 'pedido' %}
+                        Pedido #{{ item.id_origen or item.id }}
+                        {% else %}
+                        Venta enviada #{{ item.id }}
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        {{ item.cliente.nombre if item.cliente else 'Consumidor Final' }}
+                    </td>
+                    <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100">
+                        ₲ {{ "{:,.0f}".format(item.monto_total or 0).replace(",", ".") }}
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs {% if item.estado == 'pendiente' %}bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300{% else %}bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300{% endif %}">
+                            {{ item.estado.replace('_', ' ')|title }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        {{ item.usuario_destino.nombre_completo if item.usuario_destino else 'Sin asignar' }}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        {{ item.fecha_envio|local_strftime('%d/%m %H:%M') }}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <button type="button" data-permiso="tomar_cola_cobro"
+                                data-cola-action="tomar"
+                                data-cola-id="{{ item.id }}"
+                                data-cola-tipo="{{ item.tipo_origen }}"
+                                data-cola-origen="{{ item.id_origen if item.id_origen is not none else '' }}"
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs">
+                                {% if item.tipo_origen in ['cobro_credito', 'pedido'] %}Abrir cobro{% else %}Abrir POS{% endif %}
+                            </button>
+                            {% if current_user.es_admin() or current_user.tiene_permiso('tomar_cola_cobro') %}
+                            <button type="button" data-permiso="tomar_cola_cobro"
+                                data-cola-action="cancelar"
+                                data-cola-id="{{ item.id }}"
+                                class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs">
+                                Cancelar
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        No hay pendientes de cobro en cola.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>

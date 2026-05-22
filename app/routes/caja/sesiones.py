@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from app import db
 from app.models import Caja, ColaCobro, Configuracion, MovimientoCaja, SesionCaja
 from app.routes.caja import caja_bp
+from app.routes.caja.cola_cobro import obtener_contexto_cola_cobro, puede_acceder_cola_cobro
 from app.routes.caja.common import _enriquecer_motivos_movimientos
 from app.utils.auditoria_utils import registrar_auditoria
 from app.utils.helpers import local_strftime
@@ -199,10 +200,7 @@ def estado():
     total_neto_sesion = resumen['total_neto_sesion']
     movimientos = resumen['movimientos']
     caja_alerta_pendientes_activa = Configuracion.obtener_bool('caja_alerta_pendientes_activa', default=False)
-    cola_tipo = request.args.get('cola_tipo', 'todas')
-    cola_estado = request.args.get('cola_estado', 'todas')
-    cola_scope = request.args.get('cola_scope', 'todas')
-
+    puede_acceder_panel_cola = puede_acceder_cola_cobro(current_user)
     cola_pendientes = []
     cola_totales = {
         'total': 0,
@@ -213,43 +211,18 @@ def estado():
         'cobro_credito': 0,
         'pedido': 0,
     }
-    if current_user.tiene_permiso('ver_cola_cobro'):
-        cola_base_query = ColaCobro.query.filter(ColaCobro.estado.in_(['pendiente', 'en_proceso']))
-        cola_base = cola_base_query.all()
-        cola_totales = {
-            'total': len(cola_base),
-            'pendiente': sum(1 for item in cola_base if item.estado == 'pendiente'),
-            'en_proceso': sum(1 for item in cola_base if item.estado == 'en_proceso'),
-            'venta': sum(1 for item in cola_base if item.tipo_origen == 'venta'),
-            'reparacion': sum(1 for item in cola_base if item.tipo_origen == 'reparacion'),
-            'cobro_credito': sum(1 for item in cola_base if item.tipo_origen == 'cobro_credito'),
-            'pedido': sum(1 for item in cola_base if item.tipo_origen == 'pedido'),
-        }
-
-        cola_query = cola_base_query
-        if cola_tipo in {'venta', 'reparacion', 'cobro_credito', 'pedido'}:
-            cola_query = cola_query.filter(ColaCobro.tipo_origen == cola_tipo)
-        else:
-            cola_tipo = 'todas'
-
-        if cola_estado in {'pendiente', 'en_proceso'}:
-            cola_query = cola_query.filter(ColaCobro.estado == cola_estado)
-        else:
-            cola_estado = 'todas'
-
-        if cola_scope == 'mias':
-            cola_query = cola_query.filter(ColaCobro.id_usuario_destino == current_user.id_usuario)
-        elif cola_scope == 'disponibles':
-            cola_query = cola_query.filter(ColaCobro.id_usuario_destino.is_(None))
-        else:
-            cola_scope = 'todas'
-
-        cola_pendientes = (
-            cola_query
-            .order_by(ColaCobro.fecha_envio.asc())
-            .limit(50)
-            .all()
+    cola_filtros = {'tipo': 'todas', 'estado': 'todas', 'scope': 'todas'}
+    if puede_acceder_panel_cola:
+        contexto_cola = obtener_contexto_cola_cobro(
+            usuario=current_user,
+            limit=50,
+            default_estado='todas',
         )
+        cola_pendientes = contexto_cola['cola_pendientes']
+        cola_totales = contexto_cola['cola_totales']
+        cola_filtros = contexto_cola['cola_filtros']
+
+    mostrar_panel_cola = puede_acceder_panel_cola and caja_alerta_pendientes_activa
 
     return render_template(
         'caja/estado.html',
@@ -266,12 +239,11 @@ def estado():
         total_neto_sesion=total_neto_sesion,
         cola_pendientes=cola_pendientes,
         cola_totales=cola_totales,
-        cola_filtros={
-            'tipo': cola_tipo,
-            'estado': cola_estado,
-            'scope': cola_scope,
-        },
+        cola_filtros=cola_filtros,
         caja_alerta_pendientes_activa=caja_alerta_pendientes_activa,
+        mostrar_panel_cola=mostrar_panel_cola,
+        cola_realtime_activa=mostrar_panel_cola,
+        cola_force_activa=False,
     )
 
 

@@ -380,6 +380,13 @@ def _construir_detalle_servicio(item, servicios_prefetch_por_id, servicio_opcion
             return None, ({'error': 'Opción de precio inválida para el servicio'}, 400)
         if cola_cobro is None:
             precio = Decimal(str(opcion.precio or 0))
+    elif cola_cobro is None and item.get('precio_manual') and item.get('precio') is not None:
+        try:
+            precio = Decimal(str(item.get('precio')))
+        except Exception:
+            return None, ({'error': f'Precio inválido para servicio {id_servicio_item}'}, 400)
+        if precio <= 0:
+            return None, ({'error': f'Precio inválido para servicio {id_servicio_item}'}, 400)
 
     item_subtotal = precio * cantidad
     if item_subtotal <= 0:

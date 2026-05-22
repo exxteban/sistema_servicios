@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Servicios de {{ cliente.nombre }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-300">Cliente y servicio</p>
+            <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Servicios contratados por {{ cliente.nombre }}</h1>
+            <p class="mt-2 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
+                El catálogo vive separado. En esta vista registramos qué servicio pidió el cliente, cuánto se pactó y en qué estado está.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ url_for('clientes.detalle', id=cliente.id_cliente) }}"
+                class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                <i class="fas fa-arrow-left mr-2"></i>Volver al cliente
+            </a>
+            <a href="{{ url_for('servicios.listar') }}"
+                class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                <i class="fas fa-concierge-bell mr-2"></i>Ver catálogo
+            </a>
+        </div>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-[1.1fr,1.9fr]">
+        <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+            <div class="mb-5">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Asignar servicio</h2>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Genera una solicitud concreta para este cliente usando un servicio del catálogo.</p>
+            </div>
+            <form method="POST" action="{{ url_for('clientes_servicios.asignar', id_cliente=cliente.id_cliente) }}" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Servicio del catálogo *</label>
+                    <select name="id_servicio" required class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                        <option value="">Selecciona un servicio...</option>
+                        {% for servicio in servicios_catalogo %}
+                        <option value="{{ servicio.id_servicio }}">
+                            {{ servicio.nombre }}{% if servicio.categoria %} · {{ servicio.categoria }}{% endif %} · ₲ {{ "{:,.0f}".format(servicio.precio or 0).replace(",", ".") }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cantidad</label>
+                        <input type="number" name="cantidad" min="1" value="1" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Estado inicial</label>
+                        <select name="estado" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                            {% for estado in estados %}
+                            <option value="{{ estado }}" {% if estado == 'solicitado' %}selected{% endif %}>{{ estado.replace('_', ' ').title() }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Costo pactado</label>
+                        <input type="number" name="costo_pactado" min="0" step="0.01" placeholder="Se usa el costo base si lo dejas vacío"
+                            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Precio pactado</label>
+                        <input type="number" name="precio_pactado" min="0" step="0.01" placeholder="Se usa el precio base si lo dejas vacío"
+                            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Fecha programada</label>
+                    <input type="datetime-local" name="fecha_programada"
+                        class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Observaciones</label>
+                    <textarea name="observaciones" rows="4" placeholder="Ej: cliente pidió prioridad, requiere visita, incluye materiales..."
+                        class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"></textarea>
+                </div>
+
+                <button type="submit"
+                    class="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                    <i class="fas fa-link mr-2"></i>Asignar servicio al cliente
+                </button>
+            </form>
+        </section>
+
+        <section class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+            <div class="border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Asignaciones registradas</h2>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Cada fila representa una contratación concreta de un servicio para este cliente.</p>
+                    </div>
+                    <form id="cobrarSeleccionadosForm" method="POST" action="{{ url_for('clientes_servicios.cobrar_seleccionados', id_cliente=cliente.id_cliente) }}" class="flex flex-wrap items-center gap-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+                        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Marca varias asignaciones y cóbralas juntas.</span>
+                        <button type="submit"
+                            class="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                            <i class="fas fa-cash-register mr-2"></i>Cobrar seleccionados
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-200 dark:divide-slate-800">
+                {% for asignacion in asignaciones %}
+                <form method="POST" action="{{ url_for('clientes_servicios.actualizar', id_cliente=cliente.id_cliente, id_cliente_servicio=asignacion.id_cliente_servicio) }}"
+                    id="cliente-servicio-{{ asignacion.id_cliente_servicio }}"
+                    class="space-y-4 px-6 py-5">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="flex items-start gap-3">
+                            {% if not asignacion.id_venta and asignacion.estado != 'cancelado' %}
+                            <label class="mt-1 inline-flex cursor-pointer items-center">
+                                <input type="checkbox" name="cliente_servicio_ids" value="{{ asignacion.id_cliente_servicio }}"
+                                    form="cobrarSeleccionadosForm"
+                                    class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-950">
+                            </label>
+                            {% endif %}
+                            <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-base font-semibold text-slate-900 dark:text-white">{{ asignacion.servicio.nombre if asignacion.servicio else 'Servicio eliminado' }}</h3>
+                                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ asignacion.estado_display }}</span>
+                                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">#{{ asignacion.id_cliente_servicio }}</span>
+                            </div>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                {{ asignacion.servicio.categoria if asignacion.servicio and asignacion.servicio.categoria else 'Sin categoría' }}
+                                · Solicitado {{ asignacion.fecha_solicitud|local_strftime('%d/%m/%Y %H:%M') }}
+                                {% if asignacion.usuario_registro %}
+                                · Cargado por {{ (asignacion.usuario_registro.nombre_completo or asignacion.usuario_registro.username) }}
+                                {% endif %}
+                            </p>
+                            {% if asignacion.fecha_cierre %}
+                            <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Cierre: {{ asignacion.fecha_cierre|local_strftime('%d/%m/%Y %H:%M') }}</p>
+                            {% endif %}
+                            </div>
+                        </div>
+                        <div class="rounded-2xl bg-emerald-50 px-4 py-3 text-right dark:bg-emerald-500/10">
+                            <p class="text-xs uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Subtotal pactado</p>
+                            <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-200">₲ {{ "{:,.0f}".format(asignacion.subtotal or 0).replace(",", ".") }}</p>
+                            {% if asignacion.id_venta %}
+                            <a href="{{ url_for('ventas.detalle', id=asignacion.id_venta) }}" class="mt-2 inline-flex items-center text-xs font-semibold text-emerald-700 underline dark:text-emerald-300">
+                                Ver venta #{{ asignacion.id_venta }}
+                            </a>
+                            {% elif asignacion.estado != 'cancelado' %}
+                            <a href="{{ url_for('clientes_servicios.cobrar', id_cliente=cliente.id_cliente, id_cliente_servicio=asignacion.id_cliente_servicio) }}"
+                                class="mt-2 inline-flex items-center text-xs font-semibold text-emerald-700 underline dark:text-emerald-300">
+                                Cobrar con un clic
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Estado</label>
+                            <select name="estado" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                                {% for estado in estados %}
+                                <option value="{{ estado }}" {% if asignacion.estado == estado %}selected{% endif %}>{{ estado.replace('_', ' ').title() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Cantidad</label>
+                            <input type="number" name="cantidad" min="1" value="{{ asignacion.cantidad }}"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Costo pactado</label>
+                            <input type="number" name="costo_pactado" min="0" step="0.01" value="{{ asignacion.costo_pactado or 0 }}"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Precio pactado</label>
+                            <input type="number" name="precio_pactado" min="0" step="0.01" value="{{ asignacion.precio_pactado or 0 }}"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Fecha programada</label>
+                            <input type="datetime-local" name="fecha_programada"
+                                value="{{ asignacion.fecha_programada.strftime('%Y-%m-%dT%H:%M') if asignacion.fecha_programada else '' }}"
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Observaciones</label>
+                        <textarea name="observaciones" rows="3"
+                            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white">{{ asignacion.observaciones or '' }}</textarea>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="submit"
+                            class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
+                            <i class="fas fa-save mr-2"></i>Guardar cambios
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="px-6 py-14 text-center">
+                    <i class="fas fa-concierge-bell text-3xl text-slate-300 dark:text-slate-600"></i>
+                    <p class="mt-4 text-sm font-medium text-slate-600 dark:text-slate-300">Todavía no hay servicios asignados a este cliente.</p>
+                    <p class="mt-1 text-sm text-slate-400 dark:text-slate-500">El catálogo queda libre y cada contratación concreta se registra recién cuando el cliente la solicita.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,7 +1,9 @@
-<div class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-    <!-- Cobros pendientes -->
-    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
-        x-show="isCardVisible('cobros_pendientes')" {% if 'cobros_pendientes' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+<!-- Cobros pendientes -->
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
+        data-dashboard-cobros-pendientes-root="1"
+        data-can-crear-venta="{{ 1 if can_crear_venta else 0 }}"
+        x-show="isCardVisible('cobros_pendientes')" {% if 'cobros_pendientes' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        :style="cardStyle('cobros_pendientes')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
                 <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-sm text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
@@ -9,53 +11,71 @@
                 </span>
                 <h2 class="text-sm font-bold text-slate-950 dark:text-white">Cobros pendientes</h2>
             </div>
-            <a href="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
-               data-tab-url="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
-               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver todos</a>
+            <a href="{{ dashboard_cobros_pendientes_url }}"
+               data-tab-url="{{ dashboard_cobros_pendientes_url }}"
+               data-tab-title="{{ dashboard_cobros_pendientes_tab_title }}"
+               data-tab-icon="{{ dashboard_cobros_pendientes_tab_icon }}"
+               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">{{ dashboard_cobros_pendientes_label }}</a>
         </div>
-        <div class="px-5 py-4 space-y-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">DR</span>
-                    <div>
-                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Diego Ramírez</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Corte + barba</p>
+        <div class="px-5 py-4 space-y-3" id="dashboard-cobros-pendientes-list">
+            {% for asignacion in dashboard_servicios_cobros_pendientes %}
+            {% set cliente_nombre = (asignacion.cliente.nombre if asignacion.cliente else 'Consumidor Final') %}
+            {% set servicio_nombre = (asignacion.servicio.nombre if asignacion.servicio else 'Servicio eliminado') %}
+            {% set cobrar_url = (asignacion.cobrar_url if asignacion.cobrar_url is defined and asignacion.cobrar_url else url_for('ventas.pos', cliente_servicio_id=asignacion.id_cliente_servicio)) %}
+            {% set iniciales = (cliente_nombre or 'CF').strip()[:2].upper() %}
+            {% if can_crear_venta %}
+            <a href="{{ cobrar_url }}"
+               data-tab-url="{{ cobrar_url }}"
+               data-tab-title="Cobrar servicio"
+               data-tab-icon="fas fa-cash-register"
+               class="app-tab-link flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]">
+            {% else %}
+            <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 dark:border-white/5">
+            {% endif %}
+                <div class="flex min-w-0 items-center gap-3">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ iniciales }}</span>
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ cliente_nombre }}</p>
+                        <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ servicio_nombre }} · {% if asignacion.id_cliente_servicio %}#{{ asignacion.id_cliente_servicio }}{% else %}Turno agenda{% endif %} · {{ asignacion.estado_display }}</p>
                     </div>
                 </div>
-                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. 80.000</p>
-            </div>
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">MG</span>
-                    <div>
-                        <p class="text-sm font-semibold text-slate-900 dark:text-white">María González</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Coloración</p>
-                    </div>
+                <div class="shrink-0 text-right">
+                    <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(asignacion.subtotal or 0).replace(",", ".") }}</p>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">{{ asignacion.fecha_solicitud|local_strftime('%d/%m %H:%M') }}</p>
                 </div>
-                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. 250.000</p>
+            {% if can_crear_venta %}
+            </a>
+            {% else %}
             </div>
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">SA</span>
-                    <div>
-                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Sofía Aquino</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Tratamiento capilar</p>
-                    </div>
-                </div>
-                <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. 120.000</p>
+            {% endif %}
+            {% else %}
+            <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300/75">
+                No hay servicios pendientes de cobro ahora mismo.
             </div>
+            {% endfor %}
         </div>
         <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
             <div class="flex items-center justify-between text-sm">
-                    <span class="font-semibold text-slate-600 dark:text-slate-400">Total pendientes</span>
-                <span class="font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(cobrado_en_creditos_display or 0).replace(",", ".") }}</span>
+                <span class="font-semibold text-slate-600 dark:text-slate-400">Total pendientes</span>
+                <span id="dashboard-cobros-pendientes-total-monto" class="font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(dashboard_servicios_cobros_pendientes_total_monto or 0).replace(",", ".") }}</span>
             </div>
+            <p id="dashboard-cobros-pendientes-total-count" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ dashboard_servicios_cobros_pendientes_total_count or 0 }} servicio{% if (dashboard_servicios_cobros_pendientes_total_count or 0) != 1 %}s{% endif %} sin cobrar.
+            </p>
+            <a href="{{ dashboard_cobros_pendientes_url }}"
+               data-tab-url="{{ dashboard_cobros_pendientes_url }}"
+               data-tab-title="{{ dashboard_cobros_pendientes_tab_title }}"
+               data-tab-icon="{{ dashboard_cobros_pendientes_tab_icon }}"
+               class="app-tab-link mt-3 inline-flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">
+                <i class="fas fa-arrow-right text-[10px]"></i>{{ dashboard_cobros_pendientes_label }}
+            </a>
         </div>
-    </section>
+</section>
 
-    <!-- Servicios realizados hoy -->
-    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
-        x-show="isCardVisible('servicios_realizados')" {% if 'servicios_realizados' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+<!-- Servicios realizados hoy -->
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('servicios_realizados')" {% if 'servicios_realizados' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        :style="cardStyle('servicios_realizados')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
                 <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-sm text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
@@ -120,11 +140,12 @@
                 <span class="font-bold text-slate-900 dark:text-white">{{ ventas_hoy or 0 }} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</span></span>
             </div>
         </div>
-    </section>
+</section>
 
-    <!-- Clientes -->
-    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
-        x-show="isCardVisible('clientes_panel')" {% if 'clientes_panel' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+<!-- Clientes -->
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('clientes_panel')" {% if 'clientes_panel' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        :style="cardStyle('clientes_panel')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
                 <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-sm text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
@@ -174,11 +195,12 @@
                 <span class="text-2xl font-black text-slate-950 dark:text-white">33</span>
             </div>
         </div>
-    </section>
+</section>
 
-    <!-- Insumos criticos -->
-    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
-        x-show="isCardVisible('insumos_criticos')" {% if 'insumos_criticos' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+<!-- Insumos criticos -->
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('insumos_criticos')" {% if 'insumos_criticos' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        :style="cardStyle('insumos_criticos')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
                 <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-sm text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">
@@ -217,11 +239,12 @@
                class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver todos en inventario</a>
         </div>
         {% endif %}
-    </section>
+</section>
 
-    <!-- Comisiones del dia -->
-    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
-        x-show="isCardVisible('comisiones_dia')" {% if 'comisiones_dia' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+<!-- Comisiones del dia -->
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
+        x-show="isCardVisible('comisiones_dia')" {% if 'comisiones_dia' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        :style="cardStyle('comisiones_dia')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
                 <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-sm text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
@@ -260,5 +283,4 @@
                 <span class="font-bold text-emerald-600 dark:text-emerald-400">Gs. 0</span>
             </div>
         </div>
-    </section>
-</div>
+</section>

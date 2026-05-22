@@ -6,38 +6,10 @@ from flask_login import current_user, login_required
 from sqlalchemy.exc import DataError, IntegrityError
 
 from app import db
-from app.models import Cliente, Servicio, ServicioPrecioOpcion
+from app.models import Servicio, ServicioPrecioOpcion
+from app.services.agenda_turnos_peluqueria import TURNO_PELUQUERIA_TIPO_LABELS
 
 servicios_bp = Blueprint('servicios', __name__)
-
-
-def _clientes_disponibles():
-    if not current_user.es_admin():
-        return []
-    return Cliente.query.filter_by(activo=True).order_by(Cliente.nombre.asc(), Cliente.id_cliente.asc()).all()
-
-
-def _id_cliente_actual():
-    id_cliente = getattr(current_user, 'id_cliente', None)
-    if id_cliente:
-        return int(id_cliente)
-    if current_user.es_admin():
-        raw = request.form.get('id_cliente') if request.method == 'POST' else request.args.get('id_cliente')
-        try:
-            if raw:
-                return int(raw)
-        except (TypeError, ValueError):
-            return None
-    if current_user.es_admin():
-        clientes = Cliente.query.filter_by(activo=True).order_by(Cliente.id_cliente.asc()).limit(2).all()
-        if len(clientes) == 1:
-            return int(clientes[0].id_cliente)
-    return None
-
-
-def _redirect_sin_cliente():
-    flash('No se pudo determinar el cliente para cargar servicios.', 'danger')
-    return redirect(url_for('main.dashboard'))
 
 
 def _decimal_form(name, default='0'):
@@ -113,16 +85,8 @@ def _actualizar_variantes(servicio, raw):
         ))
 
 
-def _query_servicios_cliente(id_cliente):
-    return Servicio.query.filter(Servicio.id_cliente == id_cliente, Servicio.activo.is_(True))
-
-
-def _query_servicios_visibles(id_cliente):
-    if id_cliente:
-        return _query_servicios_cliente(id_cliente)
-    if current_user.es_admin():
-        return Servicio.query.filter(Servicio.activo.is_(True))
-    return Servicio.query.filter(db.false())
+def _query_servicios_activos():
+    return Servicio.query.filter(Servicio.activo.is_(True))
 
 
 def _render_form(servicio=None, variantes_text=''):
@@ -130,8 +94,7 @@ def _render_form(servicio=None, variantes_text=''):
         'servicios/form.html',
         servicio=servicio,
         variantes_text=variantes_text,
-        clientes=_clientes_disponibles(),
-        cliente_id=_id_cliente_actual(),
+        turno_rapido_tipo_labels=TURNO_PELUQUERIA_TIPO_LABELS,
     )
 
 
@@ -141,16 +104,30 @@ def listar():
     if not current_user.tiene_permiso('ver_inventario'):
         flash('No tienes permisos para ver servicios.', 'danger')
         return redirect(url_for('main.dashboard'))
-    id_cliente = _id_cliente_actual()
 
     buscar = (request.args.get('buscar') or '').strip()
     page = request.args.get('page', 1, type=int)
-    query = _query_servicios_visibles(id_cliente)
+    query = _query_servicios_activos()
     if buscar:
         like = f'%{buscar}%'
-        query = query.filter(db.or_(Servicio.nombre.ilike(like), Servicio.codigo.ilike(like), Servicio.categoria.ilike(like)))
-    servicios = query.order_by(Servicio.categoria.asc(), Servicio.nombre.asc()).paginate(page=page, per_page=20, error_out=False)
-    return render_template('servicios/listar.html', servicios=servicios, buscar=buscar, clientes=_clientes_disponibles(), cliente_id=id_cliente)
+        query = query.filter(
+            db.or_(
+                Servicio.nombre.ilike(like),
+                Servicio.codigo.ilike(like),
+                Servicio.categoria.ilike(like),
+            )
+        )
+    servicios = query.order_by(Servicio.categoria.asc(), Servicio.nombre.asc()).paginate(
+        page=page,
+        per_page=20,
+        error_out=False,
+    )
+    return render_template(
+        'servicios/listar.html',
+        servicios=servicios,
+        buscar=buscar,
+        turno_rapido_tipo_labels=TURNO_PELUQUERIA_TIPO_LABELS,
+    )
 
 
 @servicios_bp.route('/nuevo', methods=['GET', 'POST'])
@@ -159,13 +136,9 @@ def nuevo():
     if not current_user.tiene_permiso('crear_producto'):
         flash('No tienes permisos para crear servicios.', 'danger')
         return redirect(url_for('servicios.listar'))
-    id_cliente = _id_cliente_actual()
 
     if request.method == 'POST':
-        if not id_cliente:
-            flash('Selecciona el cliente al que pertenece el servicio.', 'danger')
-            return _render_form(None, request.form.get('variantes', ''))
-        servicio = Servicio(id_cliente=id_cliente)
+        servicio = Servicio()
         error = _guardar_desde_form(servicio)
         if error:
             flash(error, 'danger')
@@ -189,8 +162,8 @@ def editar(id_servicio):
     if not current_user.tiene_permiso('editar_producto'):
         flash('No tienes permisos para editar servicios.', 'danger')
         return redirect(url_for('servicios.listar'))
-    id_cliente = _id_cliente_actual()
-    servicio = _query_servicios_visibles(id_cliente).filter_by(id_servicio=id_servicio).first_or_404()
+
+    servicio = _query_servicios_activos().filter_by(id_servicio=id_servicio).first_or_404()
 
     if request.method == 'POST':
         error = _guardar_desde_form(servicio)
@@ -214,8 +187,8 @@ def eliminar(id_servicio):
     if not current_user.tiene_permiso('eliminar_producto'):
         flash('No tienes permisos para eliminar servicios.', 'danger')
         return redirect(url_for('servicios.listar'))
-    id_cliente = _id_cliente_actual()
-    servicio = _query_servicios_visibles(id_cliente).filter_by(id_servicio=id_servicio).first_or_404()
+
+    servicio = _query_servicios_activos().filter_by(id_servicio=id_servicio).first_or_404()
     servicio.activo = False
     servicio.publicado_tienda = False
     db.session.commit()
@@ -228,15 +201,18 @@ def eliminar(id_servicio):
 def buscar_api():
     if not (current_user.tiene_permiso('crear_venta') or current_user.tiene_permiso('ver_inventario')):
         return jsonify({'error': 'Sin permisos'}), 403
-    id_cliente = _id_cliente_actual()
-    if not id_cliente:
-        return jsonify([])
+
     q = (request.args.get('q') or '').strip()
     if len(q) < 2:
         return jsonify([])
+
     like = f'%{q}%'
-    servicios = _query_servicios_cliente(id_cliente).filter(
-        db.or_(Servicio.nombre.ilike(like), Servicio.codigo.ilike(like), Servicio.categoria.ilike(like))
+    servicios = _query_servicios_activos().filter(
+        db.or_(
+            Servicio.nombre.ilike(like),
+            Servicio.codigo.ilike(like),
+            Servicio.categoria.ilike(like),
+        )
     ).order_by(Servicio.nombre.asc()).limit(10).all()
     return jsonify([_servicio_pos_dict(servicio) for servicio in servicios])
 
@@ -250,6 +226,8 @@ def _guardar_desde_form(servicio):
     servicio.precio = _decimal_form('precio')
     servicio.duracion_minutos = max(0, _int_form('duracion_minutos', 30))
     servicio.porcentaje_iva = _int_form('porcentaje_iva', 10)
+    turno_rapido_tipo = (request.form.get('turno_rapido_tipo') or '').strip().lower()
+    servicio.turno_rapido_tipo = turno_rapido_tipo or None
     servicio.publicado_tienda = bool(request.form.get('publicado_tienda'))
     servicio.descripcion_tienda = (request.form.get('descripcion_tienda') or '').strip() or None
     servicio.id_usuario_modificacion = current_user.id_usuario
@@ -261,6 +239,21 @@ def _guardar_desde_form(servicio):
         return 'El costo interno no puede ser negativo.'
     if servicio.porcentaje_iva not in (0, 5, 10):
         servicio.porcentaje_iva = 10
+    if servicio.turno_rapido_tipo and servicio.turno_rapido_tipo not in TURNO_PELUQUERIA_TIPO_LABELS:
+        return 'La opción de turno rápido seleccionada no es válida.'
+    if servicio.turno_rapido_tipo:
+        existente = (
+            _query_servicios_activos()
+            .filter(Servicio.turno_rapido_tipo == servicio.turno_rapido_tipo)
+            .filter(Servicio.id_servicio != getattr(servicio, 'id_servicio', None))
+            .first()
+        )
+        if existente:
+            return (
+                'La opción de turno rápido '
+                f'"{TURNO_PELUQUERIA_TIPO_LABELS[servicio.turno_rapido_tipo]}" '
+                f'ya está asignada a "{existente.nombre}".'
+            )
     return None
 
 
@@ -274,7 +267,12 @@ def _servicio_pos_dict(servicio):
         'precio': float(servicio.precio or 0),
         'costo': float(servicio.costo or 0),
         'precios_opciones': [
-            {'id': int(op.id_opcion_precio), 'etiqueta': op.etiqueta, 'precio': float(op.precio or 0), 'costo': float(op.costo or 0)}
+            {
+                'id': int(op.id_opcion_precio),
+                'etiqueta': op.etiqueta,
+                'precio': float(op.precio or 0),
+                'costo': float(op.costo or 0),
+            }
             for op in opciones
         ],
         'stock': 0,

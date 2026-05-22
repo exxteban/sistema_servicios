@@ -1,0 +1,567 @@
+{% extends "base.html" %}
+
+{% block title %}Cobros pendientes - {{ sesion.caja.nombre }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6"
+    x-data='cajaColaData({{ {
+        "csrfToken": csrf_token(),
+        "colaRealtimeActiva": cola_realtime_activa,
+        "colaForceActiva": cola_force_activa,
+        "colaPollingMs": 4000,
+        "colaFiltros": cola_filtros,
+        "esAdmin": current_user.es_admin(),
+        "puedeTomarColaCobro": current_user.tiene_permiso("tomar_cola_cobro")
+    }|tojson }})'>
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">
+                <i class="fas fa-cash-register text-amber-500 mr-2"></i>Cobros pendientes
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Vista unificada de pendientes reales de cobro y de la cola operativa de caja.
+            </p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+            {% if current_user.tiene_permiso('ver_caja') %}
+            <a href="{{ url_for('caja.estado') }}"
+                data-tab-url="{{ url_for('caja.estado') }}"
+                data-tab-title="Estado de Caja"
+                data-tab-icon="fas fa-wallet"
+                class="app-tab-link bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-100 px-4 py-2 rounded-lg transition w-full sm:w-auto text-center">
+                <i class="fas fa-wallet mr-2"></i>Estado de caja
+            </a>
+            {% endif %}
+            <a href="{{ url_for('caja.registrar_movimiento') }}"
+                data-permiso="movimiento_caja"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition w-full sm:w-auto text-center">
+                <i class="fas fa-exchange-alt mr-2"></i>Movimiento
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700/70">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Caja abierta</p>
+            <p class="mt-1 text-lg font-bold text-gray-800 dark:text-white">{{ sesion.caja.nombre }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Sesión #{{ sesion.id_sesion }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700/70">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Pendientes reales</p>
+            <p class="mt-1 text-lg font-bold text-rose-600 dark:text-rose-300">{{ cobros_reales_total_count or 0 }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Servicios y turnos sin cobrar</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700/70">
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Cola de caja</p>
+            <p class="mt-1 text-lg font-bold text-amber-600 dark:text-amber-300">{{ cola_totales.total }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pendientes enviados y en proceso</p>
+        </div>
+    </div>
+
+    {% include 'caja/_cobros_reales_panel.html' %}
+    {% set cola_panel_titulo = 'Cola de cobros' %}
+    {% set cola_panel_subtitulo = 'Esta sección agrupa lo que ya fue enviado o tomado dentro de la cola de caja.' %}
+    {% include 'caja/_cola_cobro_panel.html' %}
+</div>
+
+<style>
+@keyframes colaRowEnter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes colaRowChange {
+    0% { background-color: rgba(250, 204, 21, 0.22); }
+    100% { background-color: rgba(255, 255, 255, 0.96); }
+}
+@keyframes colaRowGlow {
+    0%, 100% {
+        box-shadow: 0 0 0 rgba(56, 189, 248, 0);
+        border-color: rgba(125, 211, 252, 0.22);
+    }
+    50% {
+        box-shadow: 0 0 0.85rem rgba(56, 189, 248, 0.22), 0 0 1.6rem rgba(34, 211, 238, 0.16);
+        border-color: rgba(103, 232, 249, 0.65);
+    }
+}
+@keyframes colaBadgeBump {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+.cola-pendientes-table {
+    border-collapse: separate;
+    border-spacing: 0 0.55rem;
+}
+.cola-pendientes-tbody::before,
+.cola-pendientes-tbody::after {
+    content: '';
+    display: table-row;
+    height: 0;
+}
+.cola-pendiente-row td {
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid rgba(56, 189, 248, 0.3);
+    border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -1px 0 rgba(14, 165, 233, 0.08);
+    transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.dark .cola-pendiente-row td {
+    background: rgba(17, 24, 39, 0.94);
+    border-top-color: rgba(103, 232, 249, 0.34);
+    border-bottom-color: rgba(103, 232, 249, 0.34);
+    box-shadow: inset 0 1px 0 rgba(165, 243, 252, 0.12), inset 0 -1px 0 rgba(34, 211, 238, 0.14);
+}
+.cola-pendiente-row td:first-child {
+    border-left: 4px solid rgba(14, 165, 233, 0.72);
+    border-top-left-radius: 0.9rem;
+    border-bottom-left-radius: 0.9rem;
+    padding-left: 1rem;
+}
+.cola-pendiente-row td:last-child {
+    border-right: 1px solid rgba(56, 189, 248, 0.3);
+    border-top-right-radius: 0.9rem;
+    border-bottom-right-radius: 0.9rem;
+    padding-right: 1rem;
+}
+.dark .cola-pendiente-row td:last-child {
+    border-right-color: rgba(103, 232, 249, 0.34);
+}
+.dark .cola-pendiente-row td:first-child {
+    border-left-color: rgba(34, 211, 238, 0.9);
+}
+.cola-pendiente-row:hover td {
+    background: rgba(240, 249, 255, 0.98);
+    border-top-color: rgba(14, 165, 233, 0.48);
+    border-bottom-color: rgba(14, 165, 233, 0.48);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), inset 0 -1px 0 rgba(14, 165, 233, 0.14);
+}
+.dark .cola-pendiente-row:hover td {
+    background: rgba(17, 24, 39, 0.98);
+    border-top-color: rgba(103, 232, 249, 0.52);
+    border-bottom-color: rgba(103, 232, 249, 0.52);
+    box-shadow: inset 0 1px 0 rgba(165, 243, 252, 0.18), inset 0 -1px 0 rgba(34, 211, 238, 0.2);
+}
+.cola-row-enter {
+    animation: colaRowEnter 180ms ease-out;
+}
+.cola-row-enter td {
+    animation: colaRowGlow 1.2s ease-in-out 0s 3;
+}
+.cola-row-change {
+    animation: colaRowChange 420ms ease-out;
+}
+.cola-row-change td {
+    animation: colaRowGlow 1s ease-in-out 0s 2;
+}
+.cola-badge-bump {
+    animation: colaBadgeBump 220ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+    .cola-row-enter,
+    .cola-row-change,
+    .cola-badge-bump {
+        animation: none !important;
+    }
+    .cola-row-enter td,
+    .cola-row-change td {
+        animation: none !important;
+    }
+}
+</style>
+<script>
+function cajaColaData(config) {
+    return {
+        csrfToken: String((config && config.csrfToken) || ''),
+        esAdmin: !!(config && config.esAdmin),
+        puedeTomarColaCobro: !!(config && config.puedeTomarColaCobro),
+        colaRealtimeActiva: !!(config && config.colaRealtimeActiva),
+        colaForceActiva: !!(config && config.colaForceActiva),
+        colaPollingInterval: null,
+        colaPollingFirma: null,
+        colaPollingEnCurso: false,
+        colaAccionesDelegadas: false,
+        colaFilasFirmas: {},
+        colaUiRefrescando: false,
+        colaResumenRequestId: 0,
+        colaResumenController: null,
+        colaAccionesEnCurso: {},
+        cajaRefreshStorageKey: 'caja_estado_refresh_v1',
+        colaPollingMs: Number((config && config.colaPollingMs) || 4000),
+        colaFiltros: {
+            tipo: (config && config.colaFiltros && config.colaFiltros.tipo) ? config.colaFiltros.tipo : 'todas',
+            estado: (config && config.colaFiltros && config.colaFiltros.estado) ? config.colaFiltros.estado : 'pendiente',
+            scope: (config && config.colaFiltros && config.colaFiltros.scope) ? config.colaFiltros.scope : 'todas'
+        },
+        init() {
+            this.inicializarAccionesCola();
+            this.sincronizarFirmasColaDesdeDom();
+            this.initColaRealtime();
+            window.addEventListener('storage', (event) => {
+                if (!event || event.key !== this.cajaRefreshStorageKey) return;
+                this.refrescarPanelCola(false, false);
+                this.verificarCambiosCola();
+            });
+        },
+        actualizarFiltrosDesdeForm(form) {
+            if (!form) return;
+            const fd = new FormData(form);
+            const tipo = String(fd.get('cola_tipo') || this.colaFiltros.tipo || 'todas').trim().toLowerCase();
+            const estado = String(fd.get('cola_estado') || this.colaFiltros.estado || 'pendiente').trim().toLowerCase();
+            const scope = String(fd.get('cola_scope') || this.colaFiltros.scope || 'todas').trim().toLowerCase();
+            this.colaFiltros = {
+                tipo: ['venta', 'reparacion', 'cobro_credito', 'pedido'].includes(tipo) ? tipo : 'todas',
+                estado: ['pendiente', 'en_proceso'].includes(estado) ? estado : 'todas',
+                scope: ['mias', 'disponibles'].includes(scope) ? scope : 'todas'
+            };
+        },
+        _estadoColaUrl() {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('cola_tipo');
+            url.searchParams.delete('cola_estado');
+            url.searchParams.delete('cola_scope');
+            if (this.colaFiltros.tipo && this.colaFiltros.tipo !== 'todas') url.searchParams.set('cola_tipo', this.colaFiltros.tipo);
+            if (this.colaFiltros.estado && this.colaFiltros.estado !== 'todas') url.searchParams.set('cola_estado', this.colaFiltros.estado);
+            if (this.colaFiltros.scope && this.colaFiltros.scope !== 'todas') url.searchParams.set('cola_scope', this.colaFiltros.scope);
+            return url;
+        },
+        _colaResumenParams(detalle = '1', firma = '1') {
+            const params = new URLSearchParams({
+                detalle: String(detalle),
+                firma: String(firma),
+                cola_tipo: this.colaFiltros.tipo || 'todas',
+                cola_estado: this.colaFiltros.estado || 'todas',
+                cola_scope: this.colaFiltros.scope || 'todas'
+            });
+            if (this.colaForceActiva) params.set('forzar_activa', '1');
+            return params;
+        },
+        _escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        },
+        _textoMonto(valor) {
+            return `₲ ${Number(valor || 0).toLocaleString('es-PY', { maximumFractionDigits: 0 })}`;
+        },
+        _textoEstado(estado) {
+            const limpio = String(estado || '').replace(/_/g, ' ').trim();
+            if (!limpio) return 'Pendiente';
+            return limpio.charAt(0).toUpperCase() + limpio.slice(1);
+        },
+        _claseEstado(estado) {
+            return estado === 'pendiente'
+                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+        },
+        _firmaFila(item) {
+            return [
+                String(item && item.estado ? item.estado : ''),
+                Number(item && item.monto_total ? item.monto_total : 0),
+                item && item.id_usuario_destino !== undefined && item.id_usuario_destino !== null ? String(item.id_usuario_destino) : '',
+                String(item && item.fecha_envio ? item.fecha_envio : ''),
+                String(item && item.cliente ? item.cliente : 'Consumidor Final')
+            ].join('|');
+        },
+        _filaPendienteHtml(item, claseAnimacion = '', firmaFila = '') {
+            const id = Number(item && item.id ? item.id : 0);
+            const tipoOrigen = String(item && item.tipo_origen ? item.tipo_origen : 'venta');
+            const idOrigen = item && item.id_origen !== undefined && item.id_origen !== null ? String(item.id_origen) : '';
+            const estado = String(item && item.estado ? item.estado : 'pendiente');
+            const montoTotal = Number(item && item.monto_total ? item.monto_total : 0);
+            const cliente = this._escapeHtml(item && item.cliente ? item.cliente : 'Consumidor Final');
+            const usuarioDestino = this._escapeHtml(item && item.usuario_destino ? item.usuario_destino : 'Sin asignar');
+            const fechaEnvio = this._escapeHtml(item && item.fecha_envio ? item.fecha_envio : '');
+            let origenTexto = tipoOrigen === 'reparacion'
+                ? `Reparación #${this._escapeHtml(idOrigen || '-')}`
+                : `Venta enviada #${id}`;
+            if (tipoOrigen === 'cobro_credito') origenTexto = `Cobro de crédito #${this._escapeHtml(idOrigen || id || '-')}`;
+            if (tipoOrigen === 'pedido') origenTexto = `Pedido #${this._escapeHtml(idOrigen || id || '-')}`;
+            const puedeCancelar = this.esAdmin || this.puedeTomarColaCobro;
+            const estaProcesando = !!(id && this.colaAccionesEnCurso[id]);
+            const claseBotonAccion = estaProcesando ? 'opacity-60 pointer-events-none cursor-wait' : '';
+            const textoBotonAbrir = ['cobro_credito', 'pedido'].includes(tipoOrigen) ? 'Abrir cobro' : 'Abrir POS';
+            let acciones = `
+                <button type="button"
+                    data-permiso="tomar_cola_cobro"
+                    data-cola-action="tomar"
+                    data-cola-id="${id}"
+                    data-cola-tipo="${this._escapeHtml(tipoOrigen)}"
+                    data-cola-origen="${this._escapeHtml(idOrigen)}"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs ${claseBotonAccion}">
+                    ${textoBotonAbrir}
+                </button>
+            `;
+            if (puedeCancelar) {
+                acciones += `
+                    <button type="button"
+                        data-permiso="tomar_cola_cobro"
+                        data-cola-action="cancelar"
+                        data-cola-id="${id}"
+                        class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-semibold text-xs ${claseBotonAccion}">
+                        Cancelar
+                    </button>
+                `;
+            }
+            return `
+                <tr class="cola-pendiente-row hover:bg-gray-50 dark:hover:bg-gray-700/30 ${claseAnimacion}"
+                    data-cola-row-id="${id}"
+                    data-cola-row-firma="${this._escapeHtml(firmaFila)}">
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">${origenTexto}</td>
+                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">${cliente}</td>
+                    <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-100">${this._textoMonto(montoTotal)}</td>
+                    <td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs ${this._claseEstado(estado)}">${this._textoEstado(estado)}</span></td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300">${usuarioDestino}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">${fechaEnvio}</td>
+                    <td class="px-4 py-3"><div class="flex flex-wrap justify-end gap-2">${acciones}</div></td>
+                </tr>
+            `;
+        },
+        sincronizarFirmasColaDesdeDom() {
+            const tbody = document.getElementById('cola-pendientes-tbody');
+            if (!tbody) {
+                this.colaFilasFirmas = {};
+                return;
+            }
+            const firmas = {};
+            tbody.querySelectorAll('tr[data-cola-row-id]').forEach((fila) => {
+                const id = Number(fila.dataset.colaRowId || 0);
+                if (id) firmas[id] = String(fila.dataset.colaRowFirma || '');
+            });
+            this.colaFilasFirmas = firmas;
+        },
+        inicializarAccionesCola() {
+            const tbody = document.getElementById('cola-pendientes-tbody');
+            if (!tbody || this.colaAccionesDelegadas) return;
+            tbody.addEventListener('click', async (event) => {
+                const boton = event.target.closest('button[data-cola-action]');
+                if (!boton) return;
+                event.preventDefault();
+                const accion = String(boton.dataset.colaAction || '').trim();
+                const idCola = Number(boton.dataset.colaId || 0);
+                if (!idCola) return;
+                if (accion === 'tomar') {
+                    await this.tomarPendienteCobro(idCola, boton.dataset.colaTipo || 'venta', boton.dataset.colaOrigen || null);
+                    return;
+                }
+                if (accion === 'cancelar') {
+                    await this.cancelarPendienteCobro(idCola);
+                }
+            });
+            this.colaAccionesDelegadas = true;
+        },
+        async _obtenerResumenCola(detalle = '1', firma = '1') {
+            const requestId = ++this.colaResumenRequestId;
+            try {
+                if (this.colaResumenController) this.colaResumenController.abort();
+                const controller = new AbortController();
+                this.colaResumenController = controller;
+                const response = await fetch(`/caja/api/cola-cobro/resumen?${this._colaResumenParams(detalle, firma).toString()}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+                if (requestId !== this.colaResumenRequestId || !response.ok) return null;
+                const data = await response.json().catch(() => null);
+                if (requestId !== this.colaResumenRequestId) return null;
+                if (!data || !data.alerta_activa) return null;
+                return data;
+            } catch (e) {
+                if (e && e.name === 'AbortError') return null;
+                return null;
+            } finally {
+                if (requestId === this.colaResumenRequestId) this.colaResumenController = null;
+            }
+        },
+        _actualizarBadge(id, texto) {
+            const nodo = document.getElementById(id);
+            if (!nodo) return;
+            if ((nodo.textContent || '').trim() === texto) return;
+            nodo.textContent = texto;
+            nodo.classList.remove('cola-badge-bump');
+            void nodo.offsetWidth;
+            nodo.classList.add('cola-badge-bump');
+        },
+        _actualizarBadgesCola(data) {
+            const totales = data && data.totales ? data.totales : {};
+            this._actualizarBadge('cola-visibles', `${Number(data && data.count ? data.count : 0)} visibles`);
+            this._actualizarBadge('cola-total', `${Number(totales.total || 0)} activas`);
+            this._actualizarBadge('cola-pendientes-count', `${Number(totales.pendiente || 0)} pendientes`);
+            this._actualizarBadge('cola-en-proceso-count', `${Number(totales.en_proceso || 0)} en proceso`);
+            this._actualizarBadge('cola-ventas-count', `${Number(totales.venta || 0)}`);
+            this._actualizarBadge('cola-reparaciones-count', `${Number(totales.reparacion || 0)}`);
+            this._actualizarBadge('cola-cobros-credito-count', `${Number(totales.cobro_credito || 0)}`);
+            this._actualizarBadge('cola-pedidos-count', `${Number(totales.pedido || 0)}`);
+        },
+        _renderPendientesRows(items) {
+            const tbody = document.getElementById('cola-pendientes-tbody');
+            if (!tbody) return;
+            if (!Array.isArray(items) || !items.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            No hay pendientes de cobro en cola.
+                        </td>
+                    </tr>
+                `;
+                this.colaFilasFirmas = {};
+                if (typeof window.aplicarPermisosUI === 'function') window.aplicarPermisosUI();
+                return;
+            }
+            const firmasNuevas = {};
+            tbody.innerHTML = items.map((item) => {
+                const id = Number(item && item.id ? item.id : 0);
+                const firma = this._firmaFila(item);
+                let claseAnimacion = '';
+                if (id && this.colaFilasFirmas[id] === undefined) claseAnimacion = 'cola-row-enter';
+                else if (id && this.colaFilasFirmas[id] !== firma) claseAnimacion = 'cola-row-change';
+                if (id) firmasNuevas[id] = firma;
+                return this._filaPendienteHtml(item, claseAnimacion, firma);
+            }).join('');
+            this.colaFilasFirmas = firmasNuevas;
+            if (typeof window.aplicarPermisosUI === 'function') window.aplicarPermisosUI();
+        },
+        async refrescarPanelCola(mostrarNotificacion = false, marcarRefrescando = true) {
+            if (marcarRefrescando) this.colaUiRefrescando = true;
+            try {
+                const data = await this._obtenerResumenCola('1', '1');
+                if (!data) return;
+                if (data.firma) this.colaPollingFirma = data.firma;
+                this._actualizarBadgesCola(data);
+                this._renderPendientesRows(data.pendientes || []);
+                const url = this._estadoColaUrl();
+                const nuevoUrl = `${url.pathname}${url.search}${url.hash}`;
+                const actualUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+                if (nuevoUrl !== actualUrl) window.history.replaceState({}, document.title, nuevoUrl);
+                if (mostrarNotificacion && window.mostrarNotificacion) {
+                    window.mostrarNotificacion('Pendientes de caja actualizados', 'info');
+                }
+            } finally {
+                if (marcarRefrescando) this.colaUiRefrescando = false;
+            }
+        },
+        async aplicarFiltrosCola(event) {
+            this.actualizarFiltrosDesdeForm(event && event.target ? event.target : null);
+            await this.refrescarPanelCola(false, true);
+        },
+        async limpiarFiltrosCola() {
+            this.colaFiltros = { tipo: 'todas', estado: 'todas', scope: 'todas' };
+            await this.refrescarPanelCola(false, true);
+        },
+        initColaRealtime() {
+            if (!this.colaRealtimeActiva) return;
+            this.iniciarPollingCola();
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) this.detenerPollingCola();
+                else {
+                    this.iniciarPollingCola();
+                    this.verificarCambiosCola();
+                }
+            });
+        },
+        iniciarPollingCola() {
+            this.verificarCambiosCola();
+            if (this.colaPollingInterval) clearInterval(this.colaPollingInterval);
+            this.colaPollingInterval = setInterval(() => this.verificarCambiosCola(), this.colaPollingMs);
+        },
+        detenerPollingCola() {
+            if (!this.colaPollingInterval) return;
+            clearInterval(this.colaPollingInterval);
+            this.colaPollingInterval = null;
+        },
+        async verificarCambiosCola() {
+            if (!this.colaRealtimeActiva || this.colaPollingEnCurso) return;
+            this.colaPollingEnCurso = true;
+            try {
+                const data = await this._obtenerResumenCola('0', '1');
+                if (!data || !data.firma) return;
+                if (this.colaPollingFirma === null) {
+                    this.colaPollingFirma = data.firma;
+                    return;
+                }
+                if (this.colaPollingFirma !== data.firma) {
+                    this.colaPollingFirma = data.firma;
+                    await this.refrescarPanelCola(true, false);
+                }
+            } finally {
+                this.colaPollingEnCurso = false;
+            }
+        },
+        _setFilaAccionEstado(idCola, activa) {
+            const fila = document.querySelector(`tr[data-cola-row-id="${idCola}"]`);
+            if (!fila) return;
+            fila.querySelectorAll('button[data-cola-action]').forEach((btn) => {
+                btn.disabled = !!activa;
+                btn.classList.toggle('opacity-60', !!activa);
+                btn.classList.toggle('pointer-events-none', !!activa);
+                btn.classList.toggle('cursor-wait', !!activa);
+            });
+        },
+        async tomarPendienteCobro(idCola, tipoOrigen, idOrigen) {
+            if (this.colaAccionesEnCurso[idCola]) return;
+            this.colaAccionesEnCurso[idCola] = true;
+            this._setFilaAccionEstado(idCola, true);
+            const fd = new FormData();
+            fd.append('csrf_token', this.csrfToken);
+            try {
+                const response = await fetch(`/caja/api/cola-cobro/${idCola}/tomar`, {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok || !data || !data.success || !data.redirect_url) {
+                    if (window.mostrarNotificacion) {
+                        window.mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo tomar el pendiente', 'error');
+                    }
+                    return;
+                }
+                let titulo = tipoOrigen === 'reparacion' ? `POS - Reparación #${idOrigen}` : `POS - Venta #${idCola}`;
+                if (tipoOrigen === 'cobro_credito') titulo = `Cobro de crédito #${idOrigen || idCola}`;
+                if (tipoOrigen === 'pedido') titulo = `Cobro de pedido #${idOrigen || idCola}`;
+                if (typeof window.appOpenTab === 'function') {
+                    window.appOpenTab(data.redirect_url, titulo, 'fas fa-cash-register');
+                    return;
+                }
+                window.location.href = data.redirect_url;
+            } finally {
+                delete this.colaAccionesEnCurso[idCola];
+                this._setFilaAccionEstado(idCola, false);
+            }
+        },
+        async accionPendienteCobro(idCola, accion, mensajeExito) {
+            if (this.colaAccionesEnCurso[idCola]) return;
+            this.colaAccionesEnCurso[idCola] = true;
+            this._setFilaAccionEstado(idCola, true);
+            const fd = new FormData();
+            fd.append('csrf_token', this.csrfToken);
+            try {
+                const response = await fetch(`/caja/api/cola-cobro/${idCola}/${accion}`, {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok || !data || data.success === false) {
+                    if (window.mostrarNotificacion) {
+                        window.mostrarNotificacion((data && (data.error || data.message)) ? (data.error || data.message) : 'No se pudo completar la acción', 'error');
+                    }
+                    return;
+                }
+                if (window.mostrarNotificacion) window.mostrarNotificacion((data && (data.message || data.mensaje)) ? (data.message || data.mensaje) : mensajeExito, 'success');
+                await this.refrescarPanelCola(false, false);
+            } finally {
+                delete this.colaAccionesEnCurso[idCola];
+                this._setFilaAccionEstado(idCola, false);
+            }
+        },
+        async cancelarPendienteCobro(idCola) {
+            if (!window.confirm(`Cancelar el pendiente #${idCola}?`)) return;
+            await this.accionPendienteCobro(idCola, 'cancelar', `Pendiente #${idCola} cancelado`);
+        }
+    };
+}
+</script>
+{% endblock %}

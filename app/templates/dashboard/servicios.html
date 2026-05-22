@@ -7,6 +7,7 @@
     x-data='serviceDashboardCardsCustomizer({
         availableCards: {{ dashboard_service_cards_available|tojson }},
         visibleCards: {{ dashboard_service_cards_selected|tojson }},
+        cardOrder: {{ dashboard_service_cards_order|tojson }},
         saveUrl: "{{ url_for('main.api_dashboard_preferencias') }}"
     })'>
     <!-- Header -->
@@ -33,24 +34,42 @@
                 <div x-show="selectorOpen"
                     x-transition
                     @click.away="selectorOpen = false"
-                    class="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-xl shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/95 dark:shadow-black/30"
+                    class="absolute right-0 z-[9999] mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/70 ring-1 ring-slate-200 dark:border-white/10 dark:bg-slate-950 dark:shadow-black/50 dark:ring-white/10"
                     style="display: none;">
                     <div class="border-b border-slate-100 px-4 py-3 dark:border-white/5">
                         <p class="text-sm font-bold text-slate-950 dark:text-white">Personalizar dashboard</p>
-                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Marca las tarjetas que este cliente quiere ver.</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Marca las tarjetas y ordena las tarjetas del bloque principal.</p>
                     </div>
                     <div class="max-h-80 space-y-2 overflow-y-auto px-4 py-3">
                         <template x-for="card in availableCards" :key="card.id">
-                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-100 px-3 py-2.5 transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]">
-                                <input type="checkbox"
-                                    class="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                    :checked="isCardVisible(card.id)"
-                                    @change="toggleCard(card.id, $event.target.checked)">
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="card.title"></span>
-                                    <span class="block text-xs text-slate-500 dark:text-slate-400" x-text="card.description"></span>
-                                </span>
-                            </label>
+                            <div class="flex items-start justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]">
+                                <label class="flex min-w-0 cursor-pointer items-start gap-3">
+                                    <input type="checkbox"
+                                        class="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                        :checked="isCardVisible(card.id)"
+                                        @change="toggleCard(card.id, $event.target.checked)">
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="card.title"></span>
+                                        <span class="block text-xs text-slate-500 dark:text-slate-400" x-text="card.description"></span>
+                                    </span>
+                                </label>
+                                <div class="flex shrink-0 items-center gap-1" x-show="isCardMovable(card.id)" style="display: none;">
+                                    <button type="button"
+                                        class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+                                        :disabled="!canMoveCard(card.id, -1)"
+                                        @click.stop="moveCard(card.id, -1)"
+                                        title="Mover arriba">
+                                        <i class="fas fa-arrow-up text-[10px]"></i>
+                                    </button>
+                                    <button type="button"
+                                        class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+                                        :disabled="!canMoveCard(card.id, 1)"
+                                        @click.stop="moveCard(card.id, 1)"
+                                        title="Mover abajo">
+                                        <i class="fas fa-arrow-down text-[10px]"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </template>
                     </div>
                     <div class="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs dark:border-white/5">
@@ -119,21 +138,79 @@
     <!-- KPI Cards -->
     {% include "dashboard/components/servicios_kpi_cards.html" %}
 
-    <!-- Middle Section: Agenda + Profesionales + Caja -->
-    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-12">
-        <div class="xl:col-span-2 2xl:col-span-6" x-show="isCardVisible('agenda_hoy')" {% if 'agenda_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+    <!-- Main Cards -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-flow-dense xl:grid-cols-6 2xl:grid-cols-12">
+        <div class="lg:col-span-2 xl:col-span-6 2xl:col-span-6" x-show="isCardVisible('agenda_hoy')" {% if 'agenda_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
             {% include "dashboard/components/servicios_agenda_hoy.html" %}
         </div>
-        <div class="2xl:col-span-3" x-show="isCardVisible('profesionales_hoy')" {% if 'profesionales_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="xl:col-span-3 2xl:col-span-3" x-show="isCardVisible('profesionales_hoy')" {% if 'profesionales_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+            :style="cardStyle('profesionales_hoy')">
             {% include "dashboard/components/servicios_profesionales.html" %}
         </div>
-        <div class="2xl:col-span-3" x-show="isCardVisible('caja_dia')" {% if 'caja_dia' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="xl:col-span-3 2xl:col-span-3" x-show="isCardVisible('caja_dia')" {% if 'caja_dia' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+            :style="cardStyle('caja_dia')">
             {% include "dashboard/components/servicios_caja.html" %}
         </div>
+        {% include "dashboard/components/servicios_bottom_cards.html" %}
     </div>
 
-    <!-- Bottom Cards -->
-    {% include "dashboard/components/servicios_bottom_cards.html" %}
+    <div x-cloak x-show="enAtencionOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6" @click.self="enAtencionOpen = false" @keydown.escape.window="enAtencionOpen = false">
+        <div class="w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/5">
+                <div>
+                    <h2 class="text-base font-black text-slate-950 dark:text-white">En atención</h2>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Turnos activos que ya fueron iniciados. Desde aquí puedes finalizarlos.</p>
+                </div>
+                <button type="button" @click="enAtencionOpen = false" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="max-h-[70vh] overflow-y-auto px-5 py-4">
+                <div class="space-y-3">
+                    {% for item in dashboard_en_atencion_items %}
+                    <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">{{ item.hora_label }}</span>
+                                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">#{{ item.cliente_servicio_id }}</span>
+                                {% if item.cobrado %}
+                                <span class="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">Cobrado</span>
+                                {% else %}
+                                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Sin cobrar</span>
+                                {% endif %}
+                            </div>
+                            <p class="mt-2 text-sm font-bold text-slate-900 dark:text-white">{{ item.cliente_nombre }} · {{ item.servicio_nombre }}</p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ item.titulo }}</p>
+                        </div>
+                        <div class="flex shrink-0 gap-2">
+                            {% if can_crear_venta and not item.cobrado and item.cliente_servicio_id %}
+                            <a href="{{ url_for('ventas.pos', cliente_servicio_id=item.cliente_servicio_id) }}"
+                                data-tab-url="{{ url_for('ventas.pos', cliente_servicio_id=item.cliente_servicio_id) }}"
+                                data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register"
+                                class="app-tab-link inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/15">
+                                <i class="fas fa-cash-register"></i>Cobrar
+                            </a>
+                            {% endif %}
+                            {% if current_user.tiene_permiso('agenda_completar') %}
+                            <form method="POST" action="{{ url_for('agenda.completar_actividad', id_actividad=item.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+                                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700">
+                                    <i class="fas fa-check"></i>Finalizar
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300/75">
+                        No hay turnos marcados en atención ahora mismo.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -143,18 +220,130 @@ function serviceDashboardCardsCustomizer(config) {
     return {
         availableCards: Array.isArray(config.availableCards) ? config.availableCards : [],
         visibleCards: Array.isArray(config.visibleCards) ? config.visibleCards.slice() : [],
+        cardOrder: Array.isArray(config.cardOrder) ? config.cardOrder.slice() : [],
         saveUrl: config.saveUrl || '',
         selectorOpen: false,
+        enAtencionOpen: false,
         saving: false,
         saveError: false,
+        cardZones: {
+            kpi_turnos_hoy: 'locked',
+            kpi_en_atencion: 'locked',
+            kpi_profesionales: 'locked',
+            kpi_cobrado_hoy: 'locked',
+            kpi_caja: 'locked',
+            agenda_hoy: 'locked',
+            profesionales_hoy: 'standard',
+            caja_dia: 'standard',
+            cobros_pendientes: 'standard',
+            servicios_realizados: 'standard',
+            clientes_panel: 'standard',
+            insumos_criticos: 'standard',
+            comisiones_dia: 'standard',
+        },
+        zoneBaseOrder: {
+            locked: 0,
+            standard: 200,
+        },
+        zoneSortOrder: ['locked', 'standard'],
+        init() {
+            this.cardOrder = this.normalizeCardOrder(this.cardOrder);
+            this.syncAvailableCardsOrder();
+        },
+        cardZone(cardId) {
+            return this.cardZones[cardId] || 'standard';
+        },
         isCardVisible(cardId) {
             return this.visibleCards.includes(cardId);
+        },
+        isCardMovable(cardId) {
+            return this.cardZone(cardId) === 'standard' && this.visibleCardsInZone(cardId).length > 1;
         },
         hasVisibleCards() {
             return this.visibleCards.length > 0;
         },
         selectedCount() {
             return this.visibleCards.length;
+        },
+        normalizeCardOrder(nextOrder) {
+            const allowedIds = this.availableCards.map((card) => card.id);
+            const allowedLookup = new Set(allowedIds);
+            const ordered = [];
+            const seen = new Set();
+            if (Array.isArray(nextOrder)) {
+                nextOrder.forEach((cardId) => {
+                    const normalized = String(cardId || '').trim();
+                    if (allowedLookup.has(normalized) && !seen.has(normalized)) {
+                        ordered.push(normalized);
+                        seen.add(normalized);
+                    }
+                });
+            }
+            allowedIds.forEach((cardId) => {
+                if (!seen.has(cardId)) {
+                    ordered.push(cardId);
+                }
+            });
+            return this.sortOrderByZone(ordered);
+        },
+        sortOrderByZone(ordered) {
+            return this.zoneSortOrder.flatMap((zone) => ordered.filter((cardId) => this.cardZone(cardId) === zone));
+        },
+        syncAvailableCardsOrder() {
+            const positions = new Map(this.cardOrder.map((cardId, index) => [cardId, index]));
+            this.availableCards = [...this.availableCards].sort((a, b) => {
+                const aIndex = positions.has(a.id) ? positions.get(a.id) : Number.MAX_SAFE_INTEGER;
+                const bIndex = positions.has(b.id) ? positions.get(b.id) : Number.MAX_SAFE_INTEGER;
+                return aIndex - bIndex;
+            });
+        },
+        cardStyle(cardId) {
+            if (this.cardZone(cardId) !== 'standard') {
+                return '';
+            }
+            const zone = this.cardZone(cardId);
+            const zoneOrder = this.cardOrder.filter((currentCardId) => this.cardZone(currentCardId) === zone);
+            const index = zoneOrder.indexOf(cardId);
+            const baseOrder = this.zoneBaseOrder[zone] || this.zoneBaseOrder.standard;
+            return `order: ${baseOrder + (index >= 0 ? index : zoneOrder.length)};`;
+        },
+        visibleCardsInZone(cardId) {
+            const zone = this.cardZone(cardId);
+            return this.cardOrder.filter((currentCardId) => this.isCardVisible(currentCardId) && this.cardZone(currentCardId) === zone);
+        },
+        canMoveCard(cardId, direction) {
+            const visibleOrder = this.visibleCardsInZone(cardId);
+            const currentIndex = visibleOrder.indexOf(cardId);
+            if (currentIndex < 0) {
+                return false;
+            }
+            const nextIndex = currentIndex + direction;
+            return nextIndex >= 0 && nextIndex < visibleOrder.length;
+        },
+        async moveCard(cardId, direction) {
+            if (!this.canMoveCard(cardId, direction)) {
+                return;
+            }
+            const visibleOrder = this.visibleCardsInZone(cardId);
+            const currentIndex = visibleOrder.indexOf(cardId);
+            const nextIndex = currentIndex + direction;
+            const reorderedVisible = [...visibleOrder];
+            const [movedCardId] = reorderedVisible.splice(currentIndex, 1);
+            reorderedVisible.splice(nextIndex, 0, movedCardId);
+            this.applyVisibleZoneOrder(this.cardZone(cardId), reorderedVisible);
+            await this.persist();
+        },
+        applyVisibleZoneOrder(zone, reorderedVisible) {
+            let visibleIndex = 0;
+            this.cardOrder = this.normalizeCardOrder(this.cardOrder.map((cardId) => {
+                if (!this.isCardVisible(cardId) || this.cardZone(cardId) !== zone) {
+                    return cardId;
+                }
+                const nextCardId = reorderedVisible[visibleIndex] || cardId;
+                visibleIndex += 1;
+                return nextCardId;
+            }));
+            this.syncAvailableCardsOrder();
         },
         async toggleCard(cardId, checked) {
             if (!cardId) {
@@ -166,6 +355,8 @@ function serviceDashboardCardsCustomizer(config) {
                 : this.visibleCards.filter((currentId) => currentId !== cardId);
 
             this.visibleCards = next;
+            this.cardOrder = this.normalizeCardOrder(this.cardOrder);
+            this.syncAvailableCardsOrder();
             await this.persist();
         },
         async persist() {
@@ -178,7 +369,10 @@ function serviceDashboardCardsCustomizer(config) {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({ service_cards: this.visibleCards })
+                    body: JSON.stringify({
+                        service_cards: this.visibleCards,
+                        service_card_order: this.cardOrder,
+                    })
                 });
                 const data = await response.json();
                 if (!response.ok || data.ok !== true) {
@@ -187,6 +381,15 @@ function serviceDashboardCardsCustomizer(config) {
                 if (Array.isArray(data.service_cards_selected)) {
                     this.visibleCards = data.service_cards_selected;
                 }
+                if (Array.isArray(data.service_card_order)) {
+                    this.cardOrder = this.normalizeCardOrder(data.service_card_order);
+                } else {
+                    this.cardOrder = this.normalizeCardOrder(this.cardOrder);
+                }
+                if (Array.isArray(data.service_cards_available)) {
+                    this.availableCards = data.service_cards_available;
+                }
+                this.syncAvailableCardsOrder();
             } catch (error) {
                 this.saveError = true;
             } finally {

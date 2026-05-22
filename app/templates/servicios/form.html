@@ -21,20 +21,6 @@
         <form method="POST" id="servicioForm" class="space-y-6" action="{{ url_for('servicios.editar', id_servicio=servicio.id_servicio) if servicio else url_for('servicios.nuevo') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-            {% if clientes %}
-            <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Cliente *</label>
-                <select name="id_cliente" required class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
-                    <option value="">Seleccione cliente...</option>
-                    {% set selected_cliente = request.form.get('id_cliente', servicio.id_cliente if servicio else cliente_id) | string %}
-                    {% for cliente in clientes %}
-                    <option value="{{ cliente.id_cliente }}" {% if selected_cliente == (cliente.id_cliente|string) %}selected{% endif %}>{{ cliente.nombre }}</option>
-                    {% endfor %}
-                </select>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Este dato define a qué tenant pertenece el servicio.</p>
-            </div>
-            {% endif %}
-
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Código interno</label>
@@ -98,6 +84,18 @@
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Opcional. Una variante por línea con formato: Nombre | costo | precio.</p>
                 <textarea name="variantes" rows="4" class="mt-3 w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                     placeholder="Corte simple | 15000 | 30000&#10;Corte + barba | 25000 | 50000">{{ variantes_text }}</textarea>
+            </div>
+
+            <div class="rounded-lg border border-violet-100 bg-violet-50/80 p-4 transition-colors duration-300 dark:border-violet-800/30 dark:bg-violet-900/15">
+                <h3 class="mb-2 flex items-center gap-2 font-semibold text-violet-800 dark:text-violet-300"><i class="fas fa-bolt"></i>Turno rápido peluquería/barbería</h3>
+                <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">Vincula este servicio a un botón rápido específico para que la opción `Crear y cobrar` abra el POS con el servicio correcto.</p>
+                {% set turno_actual = request.form.get('turno_rapido_tipo', servicio.turno_rapido_tipo if servicio else '') %}
+                <select name="turno_rapido_tipo" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-violet-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    <option value="">No vincular al turno rápido</option>
+                    {% for tipo_id, tipo_label in turno_rapido_tipo_labels.items() %}
+                    <option value="{{ tipo_id }}" {% if turno_actual == tipo_id %}selected{% endif %}>{{ tipo_label }}</option>
+                    {% endfor %}
+                </select>
             </div>
 
             <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-4 transition-colors duration-300 dark:border-indigo-800/30 dark:bg-indigo-900/20">

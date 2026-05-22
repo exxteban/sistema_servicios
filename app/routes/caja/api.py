@@ -9,6 +9,14 @@ from sqlalchemy.exc import IntegrityError
 from app import db
 from app.models import ColaCobro, Configuracion, MetodoPago, SesionCaja
 from app.routes.caja import caja_bp
+from app.routes.caja.cola_cobro import (
+    VALID_QUEUE_STATES,
+    VALID_QUEUE_TYPES,
+    aplicar_filtros_cola_cobro,
+    construir_query_base_cola_cobro,
+    normalizar_filtros_cola_cobro,
+    puede_acceder_cola_cobro,
+)
 from app.routes.ventas import (
     _build_pos_data_from_cola_cobro,
     _build_venta_items_payload_from_pos_items,
@@ -232,20 +240,24 @@ def detalle_pagos_metodo(id_metodo):
 @caja_bp.route('/api/cola-cobro/resumen')
 @login_required
 def cola_cobro_resumen():
-    if not current_user.tiene_permiso('ver_cola_cobro'):
+    if not puede_acceder_cola_cobro(current_user):
         return jsonify({'error': 'Sin permisos'}), 403
 
-    alerta_activa = Configuracion.obtener_bool('caja_alerta_pendientes_activa', default=False)
+    forzar_activa = (request.args.get('forzar_activa', '0') or '0').strip().lower() in {'1', 'true', 'si', 'sí', 'yes'}
+    alerta_activa = Configuracion.obtener_bool('caja_alerta_pendientes_activa', default=False) or forzar_activa
     if not alerta_activa:
         return jsonify({'count': 0, 'pendientes': [], 'alerta_activa': False})
 
     incluir_detalle = (request.args.get('detalle', '1') or '1').strip().lower() not in {'0', 'false', 'no'}
     incluir_firma = (request.args.get('firma', '0') or '0').strip().lower() in {'1', 'true', 'si', 'sí', 'yes'}
-    cola_tipo = (request.args.get('cola_tipo', '') or '').strip().lower()
-    cola_estado = (request.args.get('cola_estado', '') or '').strip().lower()
-    cola_scope = (request.args.get('cola_scope', '') or '').strip().lower()
+    filtros = normalizar_filtros_cola_cobro(
+        cola_tipo=request.args.get('cola_tipo', 'todas'),
+        cola_estado=request.args.get('cola_estado', 'todas'),
+        cola_scope=request.args.get('cola_scope', 'todas'),
+        default_estado='todas',
+    )
 
-    query_base = ColaCobro.query.filter(ColaCobro.estado.in_(['pendiente', 'en_proceso']))
+    query_base = construir_query_base_cola_cobro()
     total, total_pendiente, total_en_proceso = (
         query_base.with_entities(
             func.count(ColaCobro.id),
@@ -271,24 +283,7 @@ def cola_cobro_resumen():
         'pedido': _safe_int(total_pedido),
     }
 
-    query = query_base
-    if cola_tipo in {'venta', 'reparacion', 'cobro_credito', 'pedido'}:
-        query = query.filter(ColaCobro.tipo_origen == cola_tipo)
-    else:
-        cola_tipo = 'todas'
-
-    if cola_estado in {'pendiente', 'en_proceso'}:
-        query = query.filter(ColaCobro.estado == cola_estado)
-    else:
-        cola_estado = 'todas'
-
-    if cola_scope == 'mias':
-        query = query.filter(ColaCobro.id_usuario_destino == int(current_user.id_usuario))
-    elif cola_scope == 'disponibles':
-        query = query.filter(ColaCobro.id_usuario_destino.is_(None))
-    else:
-        cola_scope = 'todas'
-
+    query = aplicar_filtros_cola_cobro(query_base, filtros, usuario=current_user)
     count = query.count()
 
     items = []
@@ -349,9 +344,9 @@ def cola_cobro_resumen():
         'alerta_activa': True,
         'totales': totales,
         'filtros': {
-            'cola_tipo': cola_tipo,
-            'cola_estado': cola_estado,
-            'cola_scope': cola_scope,
+            'cola_tipo': filtros['tipo'],
+            'cola_estado': filtros['estado'],
+            'cola_scope': filtros['scope'],
         },
     }
     if firma is not None:

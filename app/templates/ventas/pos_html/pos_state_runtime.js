@@ -31,6 +31,10 @@
                         } else {
                             this.cargarDatosReparacion();
                         }
+                    } else if (typeof CLIENTE_SERVICIO_DATA !== 'undefined' && CLIENTE_SERVICIO_DATA && CLIENTE_SERVICIO_DATA.id) {
+                        this.cargarDatosClienteServicio();
+                    } else if (typeof AGENDA_TURNO_DATA !== 'undefined' && AGENDA_TURNO_DATA && ((Array.isArray(AGENDA_TURNO_DATA.items) && AGENDA_TURNO_DATA.items.length > 0) || AGENDA_TURNO_DATA.cliente_id || AGENDA_TURNO_DATA.id_usuario_vendedor)) {
+                        this.cargarDatosAgendaTurno();
                     } else if (typeof COLA_COBRO_DATA !== 'undefined' && COLA_COBRO_DATA && COLA_COBRO_DATA.id) {
                         this.cargarDatosPendienteCaja();
                     } else {
@@ -187,6 +191,8 @@
                     this.creditoModo = 'cuenta_corriente';
                     this.beneficioFidelizacionId = null;
                     this.reparacionId = REPARACION_DATA.id || null;
+                    this.clienteServicioId = null;
+                    this.clienteServicioIds = [];
                     if (this.reparacionId) {
                         sessionStorage.removeItem(`pos_reparacion_skip_${this.reparacionId}`);
                         sessionStorage.removeItem(`pos_reparacion_skip_token_${this.reparacionId}`);
@@ -263,6 +269,11 @@
                     this.condicionVenta = 'contado';
                     this.creditoModo = 'cuenta_corriente';
                     this.reparacionId = null;
+                    const colaServicioIds = Array.isArray(COLA_COBRO_DATA.cliente_servicio_ids)
+                        ? COLA_COBRO_DATA.cliente_servicio_ids.map(id => Number(id || 0)).filter(id => id > 0)
+                        : [];
+                    this.clienteServicioIds = colaServicioIds;
+                    this.clienteServicioId = Number(COLA_COBRO_DATA.cliente_servicio_id || colaServicioIds[0] || 0) || null;
                     this.colaCobroId = Number(COLA_COBRO_DATA.id) || null;
                     this.beneficioFidelizacionId = Number(COLA_COBRO_DATA.beneficio_fidelizacion_id || 0) || null;
                     if (COLA_COBRO_DATA.reparacion_id) {
@@ -332,11 +343,169 @@
                 }
             },
 
+            cargarDatosClienteServicio() {
+                try {
+                    sessionStorage.removeItem(POS_STATE_KEY);
+                    this.condicionVenta = 'contado';
+                    this.creditoModo = 'cuenta_corriente';
+                    this.reparacionId = null;
+                    this.colaCobroId = null;
+                    this.beneficioFidelizacionId = null;
+                    const clienteServicioIds = Array.isArray(CLIENTE_SERVICIO_DATA.ids)
+                        ? CLIENTE_SERVICIO_DATA.ids.map(id => Number(id || 0)).filter(id => id > 0)
+                        : [];
+                    this.clienteServicioIds = clienteServicioIds;
+                    this.clienteServicioId = Number(CLIENTE_SERVICIO_DATA.id || clienteServicioIds[0] || 0) || null;
+
+                    if (CLIENTE_SERVICIO_DATA.items && Array.isArray(CLIENTE_SERVICIO_DATA.items)) {
+                        this.carrito = CLIENTE_SERVICIO_DATA.items.map(item => ({
+                            tipo: item.tipo || 'servicio',
+                            id_item: item.id,
+                            id_producto: item.id_producto || null,
+                            id_servicio: item.id_servicio || item.id || null,
+                            codigo: item.codigo || '',
+                            nombre: item.nombre,
+                            precio: parseFloat(item.precio),
+                            precio_base: parseFloat(item.precio_base || item.precio),
+                            precio_mayorista: null,
+                            precio_manual: item.precio_manual === true,
+                            precio_opcion_id: item.precio_opcion_id || null,
+                            cantidad: parseInt(item.cantidad),
+                            iva: parseInt(item.iva),
+                            stock_disponible: 0,
+                            stock_minimo: 0,
+                            stock_restante: null,
+                            es_servicio: true,
+                            stock_warning: false,
+                            low_stock_warning: false,
+                            green_stock_hint: false
+                        }));
+                    }
+
+                    if (CLIENTE_SERVICIO_DATA.cliente_id && CLIENTE_SERVICIO_DATA.cliente_id != 1) {
+                        this.clienteId = CLIENTE_SERVICIO_DATA.cliente_id;
+                        fetch(`/clientes/${this.clienteId}/historial_json`)
+                            .then(r => r.json())
+                            .then(d => {
+                                if (d.success && d.cliente) {
+                                    this.clienteSeleccionado = d.cliente;
+                                    this.actualizarAlertaClienteFiel(d.cliente);
+                                }
+                            })
+                            .catch(e => console.error('Error cargando cliente del servicio:', e));
+                    }
+
+                    this.actualizarTotal();
+                    const totalAsignaciones = this.clienteServicioIds.length || (this.clienteServicioId ? 1 : 0);
+                    if (totalAsignaciones > 1) {
+                        mostrarNotificacion(`${totalAsignaciones} servicios del cliente cargados`, 'success');
+                    } else {
+                        mostrarNotificacion(`Servicio del cliente #${this.clienteServicioId} cargado`, 'success');
+                    }
+                } catch (e) {
+                    console.error('Error cargando servicio del cliente:', e);
+                    mostrarNotificacion('Error al cargar el servicio del cliente', 'error');
+                }
+            },
+
+            cargarDatosAgendaTurno() {
+                try {
+                    sessionStorage.removeItem(POS_STATE_KEY);
+                    this.condicionVenta = 'contado';
+                    this.creditoModo = 'cuenta_corriente';
+                    this.reparacionId = null;
+                    this.clienteServicioId = null;
+                    this.clienteServicioIds = [];
+                    this.colaCobroId = null;
+                    this.beneficioFidelizacionId = null;
+
+                    if (AGENDA_TURNO_DATA.items && Array.isArray(AGENDA_TURNO_DATA.items)) {
+                        this.carrito = AGENDA_TURNO_DATA.items.map(item => ({
+                            tipo: item.tipo || 'servicio',
+                            id_item: item.id,
+                            id_producto: item.id_producto || null,
+                            id_servicio: item.id_servicio || item.id || null,
+                            codigo: item.codigo || '',
+                            nombre: item.nombre,
+                            precio: parseFloat(item.precio),
+                            precio_base: parseFloat(item.precio_base || item.precio),
+                            precio_mayorista: null,
+                            precio_manual: item.precio_manual === true,
+                            precio_opcion_id: item.precio_opcion_id || null,
+                            cantidad: parseInt(item.cantidad),
+                            iva: parseInt(item.iva),
+                            stock_disponible: 0,
+                            stock_minimo: 0,
+                            stock_restante: null,
+                            es_servicio: true,
+                            stock_warning: false,
+                            low_stock_warning: false,
+                            green_stock_hint: false
+                        }));
+                    }
+
+                    if (AGENDA_TURNO_DATA.cliente_id && AGENDA_TURNO_DATA.cliente_id != 1) {
+                        this.clienteId = AGENDA_TURNO_DATA.cliente_id;
+                        fetch(`/clientes/${this.clienteId}/historial_json`)
+                            .then(r => r.json())
+                            .then(d => {
+                                if (d.success && d.cliente) {
+                                    this.clienteSeleccionado = d.cliente;
+                                    this.actualizarAlertaClienteFiel(d.cliente);
+                                }
+                            })
+                            .catch(e => console.error('Error cargando cliente del turno:', e));
+                    }
+
+                    if (AGENDA_TURNO_DATA.id_usuario_vendedor) {
+                        const candidato = Number(AGENDA_TURNO_DATA.id_usuario_vendedor);
+                        if (this.vendedoresCajeros.some(v => Number(v.id_usuario) === candidato)) {
+                            this.vendedorId = candidato;
+                        }
+                    }
+
+                    this.limpiarAgendaTurnoDeUrl();
+                    this.actualizarTotal();
+                    mostrarNotificacion(
+                        this.carrito.length > 0
+                            ? 'Turno cargado en POS para cobrar'
+                            : 'Turno creado. Agrega el servicio para cobrar',
+                        'success'
+                    );
+                } catch (e) {
+                    console.error('Error cargando turno de agenda en POS:', e);
+                    mostrarNotificacion('Error al cargar el turno en POS', 'error');
+                }
+            },
+
             limpiarColaCobroDeUrl() {
                 try {
                     const url = new URL(window.location.href);
                     if (!url.searchParams.has('cola_id')) return;
                     url.searchParams.delete('cola_id');
+                    const nuevaUrl = `${url.pathname}${url.search}${url.hash}`;
+                    window.history.replaceState({}, document.title, nuevaUrl);
+                } catch (e) {
+                }
+            },
+
+            limpiarClienteServicioDeUrl() {
+                try {
+                    const url = new URL(window.location.href);
+                    if (!url.searchParams.has('cliente_servicio_id')) return;
+                    url.searchParams.delete('cliente_servicio_id');
+                    const nuevaUrl = `${url.pathname}${url.search}${url.hash}`;
+                    window.history.replaceState({}, document.title, nuevaUrl);
+                } catch (e) {
+                }
+            },
+
+            limpiarAgendaTurnoDeUrl() {
+                try {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('agenda_turno_cliente_id');
+                    url.searchParams.delete('agenda_turno_servicio_id');
+                    url.searchParams.delete('agenda_turno_vendedor_id');
                     const nuevaUrl = `${url.pathname}${url.search}${url.hash}`;
                     window.history.replaceState({}, document.title, nuevaUrl);
                 } catch (e) {

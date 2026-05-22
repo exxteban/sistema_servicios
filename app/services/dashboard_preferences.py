@@ -18,6 +18,7 @@ DASHBOARD_VIEW_NEW = 'new'
 DASHBOARD_VIEW_PREF_KEY = 'dashboard_view'
 DASHBOARD_QUICK_ACTIONS_PREF_KEY = 'dashboard_quick_actions'
 DASHBOARD_SERVICE_CARDS_PREF_PREFIX = 'dashboard_service_cards_'
+DASHBOARD_SERVICE_CARD_ORDER_PREF_PREFIX = 'dashboard_service_card_order_'
 DASHBOARD_QUICK_ACTION_SLOTS = 4
 
 _SERVICE_CARD_DEFINITIONS = (
@@ -35,6 +36,23 @@ _SERVICE_CARD_DEFINITIONS = (
     ('insumos_criticos', 'Insumos criticos', 'Alertas de stock bajo'),
     ('comisiones_dia', 'Comisiones del dia', 'Resumen rapido de comisiones'),
 )
+
+_SERVICE_CARD_ZONES = {
+    'kpi_turnos_hoy': 'locked',
+    'kpi_en_atencion': 'locked',
+    'kpi_profesionales': 'locked',
+    'kpi_cobrado_hoy': 'locked',
+    'kpi_caja': 'locked',
+    'agenda_hoy': 'locked',
+    'profesionales_hoy': 'standard',
+    'caja_dia': 'standard',
+    'cobros_pendientes': 'standard',
+    'servicios_realizados': 'standard',
+    'clientes_panel': 'standard',
+    'insumos_criticos': 'standard',
+    'comisiones_dia': 'standard',
+}
+_SERVICE_CARD_ZONE_ORDER = ('locked', 'standard')
 
 
 def normalize_dashboard_view(value: str | None) -> str:
@@ -71,22 +89,36 @@ def set_dashboard_quick_actions(user: Any, action_ids: list[str] | None) -> tupl
     return available, selected
 
 
-def get_dashboard_service_cards(user: Any) -> tuple[list[dict], list[str]]:
+def get_dashboard_service_cards(user: Any) -> tuple[list[dict], list[str], list[str]]:
     available = _build_available_service_cards()
     selected_ids = _load_service_card_ids(user)
     selected = _select_service_cards(available, selected_ids)
-    return available, selected
+    ordered = _select_service_card_order(available, _load_service_card_order_ids(user))
+    return _sort_service_cards(available, ordered), selected, ordered
 
 
-def set_dashboard_service_cards(user: Any, card_ids: list[str] | None) -> tuple[list[dict], list[str]]:
+def set_dashboard_service_cards(user: Any, card_ids: list[str] | None) -> tuple[list[dict], list[str], list[str]]:
     available = _build_available_service_cards()
     selected = _select_service_cards(available, card_ids or [])
+    ordered = _select_service_card_order(available, _load_service_card_order_ids(user))
     _set_client_configuration(
         _service_cards_pref_key(user),
         json.dumps(selected, ensure_ascii=False),
         description='Tarjetas visibles del dashboard de servicios por cliente',
     )
-    return available, selected
+    return _sort_service_cards(available, ordered), selected, ordered
+
+
+def set_dashboard_service_card_order(user: Any, card_ids: list[str] | None) -> tuple[list[dict], list[str], list[str]]:
+    available = _build_available_service_cards()
+    ordered = _select_service_card_order(available, card_ids)
+    selected = _select_service_cards(available, _load_service_card_ids(user))
+    _set_client_configuration(
+        _service_cards_order_pref_key(user),
+        json.dumps(ordered, ensure_ascii=False),
+        description='Orden de tarjetas del dashboard de servicios por cliente',
+    )
+    return _sort_service_cards(available, ordered), selected, ordered
 
 
 def _build_available_actions(user: Any) -> list[dict]:
@@ -251,6 +283,19 @@ def _load_service_card_ids(user: Any) -> list[str] | None:
     return [str(item) for item in data]
 
 
+def _load_service_card_order_ids(user: Any) -> list[str] | None:
+    raw = _get_client_configuration(_service_cards_order_pref_key(user), '')
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(data, list):
+        return None
+    return [str(item) for item in data]
+
+
 def _select_service_cards(available: list[dict], requested_ids: list[str] | None) -> list[str]:
     allowed_ids = [card['id'] for card in available]
     if requested_ids is None:
@@ -264,6 +309,38 @@ def _select_service_cards(available: list[dict], requested_ids: list[str] | None
             selected.append(normalized)
             seen.add(normalized)
     return selected if selected or not requested_ids else allowed_ids
+
+
+def _select_service_card_order(available: list[dict], requested_ids: list[str] | None) -> list[str]:
+    allowed_ids = [card['id'] for card in available]
+    if requested_ids is None:
+        return allowed_ids
+    allowed_lookup = set(allowed_ids)
+    ordered = []
+    seen = set()
+    for card_id in requested_ids:
+        normalized = str(card_id or '').strip()
+        if normalized in allowed_lookup and normalized not in seen:
+            ordered.append(normalized)
+            seen.add(normalized)
+    for card_id in allowed_ids:
+        if card_id not in seen:
+            ordered.append(card_id)
+    return _sort_service_card_order_by_zone(ordered)
+
+
+def _sort_service_cards(available: list[dict], ordered_ids: list[str]) -> list[dict]:
+    cards_by_id = {card['id']: card for card in available}
+    return [cards_by_id[card_id] for card_id in ordered_ids if card_id in cards_by_id]
+
+
+def _sort_service_card_order_by_zone(ordered_ids: list[str]) -> list[str]:
+    return [
+        card_id
+        for zone in _SERVICE_CARD_ZONE_ORDER
+        for card_id in ordered_ids
+        if _SERVICE_CARD_ZONES.get(card_id, 'standard') == zone
+    ]
 
 
 def _get_preference(user: Any, key: str, default: str = '') -> str:
@@ -311,6 +388,15 @@ def _service_cards_pref_key(user: Any) -> str:
         cliente_id = 0
     suffix = str(cliente_id) if cliente_id > 0 else 'global'
     return f'{DASHBOARD_SERVICE_CARDS_PREF_PREFIX}{suffix}'
+
+
+def _service_cards_order_pref_key(user: Any) -> str:
+    try:
+        cliente_id = int(getattr(user, 'id_cliente', 0) or 0)
+    except Exception:
+        cliente_id = 0
+    suffix = str(cliente_id) if cliente_id > 0 else 'global'
+    return f'{DASHBOARD_SERVICE_CARD_ORDER_PREF_PREFIX}{suffix}'
 
 
 def _module_enabled(key: str, default: bool = False) -> bool:
