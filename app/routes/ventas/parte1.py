@@ -354,6 +354,7 @@ def _build_pos_data_from_cola_cobro(item_cola):
         'cliente_id': int(item_cola.id_cliente or 1),
         'cliente_servicio_id': metadata.get('cliente_servicio_id'),
         'cliente_servicio_ids': metadata.get('cliente_servicio_ids') if isinstance(metadata.get('cliente_servicio_ids'), list) else [],
+        'agenda_actividad_id': metadata.get('agenda_actividad_id'),
         'reparacion_id': reparacion_id,
         'id_usuario_vendedor': int(metadata.get('id_usuario_vendedor') or item_cola.id_usuario_origen),
         'descuento': float(metadata.get('descuento') or 0),

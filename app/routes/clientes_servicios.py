@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from app import db
-from app.models import Cliente, ClienteServicio, Servicio
+from app.models import Cliente, ClienteServicio, Servicio, ServicioPrecioOpcion
 from app.models.servicio import CLIENTE_SERVICIO_ESTADOS
 from app.services.clientes_servicios import get_cliente_servicios_cobrables, parse_cliente_servicio_ids
 
@@ -53,6 +53,32 @@ def _parse_cantidad(raw):
     return max(cantidad, 1)
 
 
+def _servicios_catalogo_payload(servicios):
+    payload = []
+    for servicio in servicios:
+        opciones = (
+            servicio.opciones.filter_by(activo=True)
+            .order_by(ServicioPrecioOpcion.orden.asc(), ServicioPrecioOpcion.id_opcion_precio.asc())
+            .all()
+        )
+        payload.append({
+            'id': int(servicio.id_servicio),
+            'nombre': servicio.nombre or '',
+            'costo': float(servicio.costo or 0),
+            'precio': float(servicio.precio or 0),
+            'opciones': [
+                {
+                    'id': int(opcion.id_opcion_precio),
+                    'etiqueta': opcion.etiqueta or '',
+                    'costo': float(opcion.costo or 0),
+                    'precio': float(opcion.precio or 0),
+                }
+                for opcion in opciones
+            ],
+        })
+    return payload
+
+
 def _require_ver_clientes():
     if current_user.tiene_permiso('ver_clientes'):
         return None
@@ -94,6 +120,7 @@ def detalle(id_cliente):
         'clientes/servicios.html',
         cliente=cliente,
         servicios_catalogo=servicios_catalogo,
+        servicios_catalogo_payload=_servicios_catalogo_payload(servicios_catalogo),
         asignaciones=asignaciones,
         estados=CLIENTE_SERVICIO_ESTADOS,
     )
@@ -171,11 +198,34 @@ def asignar(id_cliente):
         flash('Selecciona un servicio válido del catálogo.', 'danger')
         return _redirect_target(cliente.id_cliente, 'clientes_servicios.detalle')
 
-    precio_pactado = _parse_decimal(request.form.get('precio_pactado'), servicio.precio or 0)
-    costo_pactado = _parse_decimal(request.form.get('costo_pactado'), servicio.costo or 0)
+    opciones_activas = servicio.opciones.filter_by(activo=True).count()
+    precio_opcion_id = request.form.get('servicio_precio_opcion_id')
+    opcion_precio = None
+    if precio_opcion_id:
+        try:
+            precio_opcion_id = int(precio_opcion_id)
+        except (TypeError, ValueError):
+            precio_opcion_id = 0
+        opcion_precio = ServicioPrecioOpcion.query.filter_by(
+            id_opcion_precio=precio_opcion_id,
+            id_servicio=servicio.id_servicio,
+            activo=True,
+        ).first()
+    if opciones_activas and opcion_precio is None:
+        flash('Selecciona el subtipo o variante del servicio antes de asignarlo.', 'warning')
+        return _redirect_target(cliente.id_cliente, 'clientes_servicios.detalle')
+
+    costo_base = opcion_precio.costo if opcion_precio is not None else (servicio.costo or 0)
+    precio_base = opcion_precio.precio if opcion_precio is not None else (servicio.precio or 0)
+    precio_pactado = _parse_decimal(request.form.get('precio_pactado'), precio_base)
+    costo_pactado = _parse_decimal(request.form.get('costo_pactado'), costo_base)
     estado = (request.form.get('estado') or 'solicitado').strip().lower()
     if estado not in CLIENTE_SERVICIO_ESTADOS:
         estado = 'solicitado'
+    observaciones = (request.form.get('observaciones') or '').strip()
+    if opcion_precio is not None:
+        tipo_label = (opcion_precio.etiqueta or '').strip()
+        observaciones = f'Tipo: {tipo_label}' + (f'\n{observaciones}' if observaciones else '')
 
     asignacion = ClienteServicio(
         id_cliente=cliente.id_cliente,
@@ -185,7 +235,7 @@ def asignar(id_cliente):
         precio_pactado=precio_pactado,
         estado=estado,
         fecha_programada=_parse_datetime_local(request.form.get('fecha_programada')),
-        observaciones=(request.form.get('observaciones') or '').strip() or None,
+        observaciones=observaciones or None,
         id_usuario_registro=current_user.id_usuario,
     )
     db.session.add(asignacion)

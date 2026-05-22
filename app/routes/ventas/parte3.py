@@ -22,6 +22,7 @@ from app.services.clientes_fidelizacion import (
     resolver_descuento_beneficio_pos,
 )
 from app.services.clientes_servicios import get_cliente_servicios_cobrables, parse_cliente_servicio_ids
+from app.services.agenda_cobros import vincular_venta_a_agenda_cobrada
 
 
 def _procesar_venta_payload(data):
@@ -64,6 +65,7 @@ def _procesar_venta_payload(data):
     id_cliente = data.get('id_cliente', 1)
     id_usuario_vendedor_raw = data.get('id_usuario_vendedor')
     reparacion_id = data.get('reparacion_id')
+    agenda_actividad_id = data.get('agenda_actividad_id')
     cliente_servicio_id = data.get('cliente_servicio_id')
     cliente_servicio_ids = parse_cliente_servicio_ids([
         data.get('cliente_servicio_ids'),
@@ -129,6 +131,7 @@ def _procesar_venta_payload(data):
             cola_cobro_data.get('cliente_servicio_id'),
         ])
         cliente_servicio_id = cliente_servicio_ids[0] if cliente_servicio_ids else None
+        agenda_actividad_id = cola_cobro_data.get('agenda_actividad_id') or agenda_actividad_id
         usar_precio_mayorista_raw = cola_metadata.get('usar_precio_mayorista', None)
         forzar_precio_mayorista_raw = cola_metadata.get('forzar_precio_mayorista', False)
         if not (observaciones or '').strip():
@@ -609,6 +612,12 @@ def _procesar_venta_payload(data):
                 )
         except Exception:
             pass
+
+    vincular_venta_a_agenda_cobrada(
+        venta=venta,
+        agenda_actividad_id=agenda_actividad_id,
+        cliente_servicio_objs=cliente_servicio_objs,
+    )
 
     if cola_cobro is not None:
         estado_anterior_cola = cola_cobro.estado

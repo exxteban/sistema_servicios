@@ -193,6 +193,7 @@
                     this.reparacionId = REPARACION_DATA.id || null;
                     this.clienteServicioId = null;
                     this.clienteServicioIds = [];
+                    this.agendaActividadId = null;
                     if (this.reparacionId) {
                         sessionStorage.removeItem(`pos_reparacion_skip_${this.reparacionId}`);
                         sessionStorage.removeItem(`pos_reparacion_skip_token_${this.reparacionId}`);
@@ -274,6 +275,7 @@
                         : [];
                     this.clienteServicioIds = colaServicioIds;
                     this.clienteServicioId = Number(COLA_COBRO_DATA.cliente_servicio_id || colaServicioIds[0] || 0) || null;
+                    this.agendaActividadId = Number(COLA_COBRO_DATA.agenda_actividad_id || 0) || null;
                     this.colaCobroId = Number(COLA_COBRO_DATA.id) || null;
                     this.beneficioFidelizacionId = Number(COLA_COBRO_DATA.beneficio_fidelizacion_id || 0) || null;
                     if (COLA_COBRO_DATA.reparacion_id) {
@@ -351,6 +353,7 @@
                     this.reparacionId = null;
                     this.colaCobroId = null;
                     this.beneficioFidelizacionId = null;
+                    this.agendaActividadId = null;
                     const clienteServicioIds = Array.isArray(CLIENTE_SERVICIO_DATA.ids)
                         ? CLIENTE_SERVICIO_DATA.ids.map(id => Number(id || 0)).filter(id => id > 0)
                         : [];
@@ -416,6 +419,7 @@
                     this.reparacionId = null;
                     this.clienteServicioId = null;
                     this.clienteServicioIds = [];
+                    this.agendaActividadId = Number(AGENDA_TURNO_DATA.agenda_actividad_id || 0) || null;
                     this.colaCobroId = null;
                     this.beneficioFidelizacionId = null;
 

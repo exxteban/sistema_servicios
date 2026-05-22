@@ -74,6 +74,7 @@
 
 <!-- Servicios realizados hoy -->
 <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
+        data-dashboard-servicios-realizados-root="1"
         x-show="isCardVisible('servicios_realizados')" {% if 'servicios_realizados' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
         :style="cardStyle('servicios_realizados')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
@@ -87,58 +88,31 @@
                data-tab-url="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
                class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver reporte</a>
         </div>
-        <div class="px-5 py-4 space-y-4">
+        <div class="px-5 py-4 space-y-4" id="dashboard-servicios-realizados-list">
+            {% for item in dashboard_servicios_realizados %}
             <div>
                 <div class="flex items-center justify-between text-xs">
-                    <span class="text-slate-600 dark:text-slate-300">Corte hombre</span>
-                    <span class="font-bold text-slate-900 dark:text-white">8 <span class="font-normal text-slate-500 dark:text-slate-400">Gs. 640.000</span></span>
+                    <span class="truncate pr-3 text-slate-600 dark:text-slate-300">{{ item.nombre }}</span>
+                    <span class="shrink-0 font-bold text-slate-900 dark:text-white">{{ item.cantidad }} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. {{ "{:,.0f}".format(item.total or 0).replace(",", ".") }}</span></span>
                 </div>
                 <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div class="h-full rounded-full bg-violet-500" style="width: 100%"></div>
+                    <div class="h-full rounded-full {{ item.color_class }}" style="width: {{ item.porcentaje }}%"></div>
                 </div>
             </div>
-            <div>
-                <div class="flex items-center justify-between text-xs">
-                    <span class="text-slate-600 dark:text-slate-300">Barba</span>
-                    <span class="font-bold text-slate-900 dark:text-white">6 <span class="font-normal text-slate-500 dark:text-slate-400">Gs. 240.000</span></span>
-                </div>
-                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div class="h-full rounded-full bg-indigo-500" style="width: 75%"></div>
-                </div>
+            {% else %}
+            <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300/75">
+                No hay servicios facturados hoy.
             </div>
-            <div>
-                <div class="flex items-center justify-between text-xs">
-                    <span class="text-slate-600 dark:text-slate-300">Coloración</span>
-                    <span class="font-bold text-slate-900 dark:text-white">4 <span class="font-normal text-slate-500 dark:text-slate-400">Gs. 360.000</span></span>
-                </div>
-                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div class="h-full rounded-full bg-blue-500" style="width: 50%"></div>
-                </div>
-            </div>
-            <div>
-                <div class="flex items-center justify-between text-xs">
-                    <span class="text-slate-600 dark:text-slate-300">Lavado + peinado</span>
-                    <span class="font-bold text-slate-900 dark:text-white">3 <span class="font-normal text-slate-500 dark:text-slate-400">Gs. 150.000</span></span>
-                </div>
-                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div class="h-full rounded-full bg-cyan-500" style="width: 38%"></div>
-                </div>
-            </div>
-            <div>
-                <div class="flex items-center justify-between text-xs">
-                    <span class="text-slate-600 dark:text-slate-300">Tratamiento capilar</span>
-                    <span class="font-bold text-slate-900 dark:text-white">2 <span class="font-normal text-slate-500 dark:text-slate-400">Gs. 140.000</span></span>
-                </div>
-                <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div class="h-full rounded-full bg-slate-400" style="width: 25%"></div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
         <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
             <div class="flex items-center justify-between text-sm">
                 <span class="font-semibold text-slate-600 dark:text-slate-400">Total</span>
-                <span class="font-bold text-slate-900 dark:text-white">{{ ventas_hoy or 0 }} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</span></span>
+                <span id="dashboard-servicios-realizados-total" class="font-bold text-slate-900 dark:text-white">{{ dashboard_servicios_realizados_total_count or 0 }} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. {{ "{:,.0f}".format(dashboard_servicios_realizados_total_monto or 0).replace(",", ".") }}</span></span>
             </div>
+            <p id="dashboard-servicios-realizados-total-meta" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ dashboard_servicios_realizados_total_count or 0 }} servicio{% if (dashboard_servicios_realizados_total_count or 0) != 1 %}s{% endif %} realizados hoy.
+            </p>
         </div>
 </section>
 

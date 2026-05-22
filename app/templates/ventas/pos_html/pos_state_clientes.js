@@ -99,6 +99,7 @@
             reparacionId: null,
             clienteServicioId: null,
             clienteServicioIds: [],
+            agendaActividadId: null,
             colaCobroId: null,
             reparacionToken: (typeof REPARACION_TOKEN !== 'undefined' && REPARACION_TOKEN !== null) ? String(REPARACION_TOKEN) : '',
 

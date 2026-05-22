@@ -22,18 +22,6 @@
             <span class="leading-5 text-slate-500 dark:text-slate-400">Productos vendidos</span>
             <b class="text-right text-slate-900 dark:text-white">Gs. {{ "{:,.0f}".format(cobrado_en_pedidos_display or 0).replace(",", ".") }}</b>
         </div>
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
-            <span class="leading-5 text-slate-500 dark:text-slate-400">Propinas</span>
-            <b class="text-right text-slate-900 dark:text-white">Gs. 0</b>
-        </div>
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/5 dark:bg-white/[0.03]">
-            <span class="leading-5 text-slate-500 dark:text-slate-400">Adelantos / Señas</span>
-            <b class="text-right text-slate-900 dark:text-white">Gs. {{ "{:,.0f}".format(cobrado_en_creditos_display or 0).replace(",", ".") }}</b>
-        </div>
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-2.5 dark:border-rose-500/10 dark:bg-rose-500/5">
-            <span class="leading-5 text-slate-500 dark:text-slate-400">Gastos del día</span>
-            <b class="text-right text-rose-600 dark:text-rose-400">-Gs. {{ "{:,.0f}".format(gastos_corrientes_resumen.total_pendiente|float if gastos_corrientes_resumen else 0).replace(",", ".") }}</b>
-        </div>
         <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50 px-4 py-3 text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
             <div class="flex items-center justify-between">
                 <span class="text-sm font-bold text-emerald-900 dark:text-emerald-100">Total neto</span>

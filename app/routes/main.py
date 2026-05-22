@@ -34,7 +34,9 @@ from app.services.dashboard_preferences import (
 )
 from app.services.dashboard_negocio import obtener_dashboard_negocio_actual
 from app.services.dashboard_servicios import (
+    obtener_estado_profesionales_dashboard,
     obtener_resumen_cobros_pendientes_dashboard,
+    obtener_resumen_servicios_realizados_dashboard,
     resolver_destino_cobros_pendientes_dashboard,
     serializar_resumen_cobros_pendientes_dashboard,
 )
@@ -421,12 +423,25 @@ def dashboard():
         **dashboard_cobros_pendientes_destino['params'],
     )
     dashboard_servicios_cobros_pendientes = obtener_resumen_cobros_pendientes_dashboard(limit=3)
+    dashboard_servicios_realizados = obtener_resumen_servicios_realizados_dashboard(
+        today=today,
+        limit=5,
+        puede_ver_otras_cajas=puede_ver_otras_cajas,
+        sesion_caja_id=(int(sesion_caja.id_sesion) if sesion_caja else None),
+    )
 
     profesionales_activos = 0
     usuarios_activos_lista = []
+    usuarios_ocupados_ids = set()
+    dashboard_profesionales_detalle = {}
     if dashboard_negocio.get('full_template'):
         profesionales_activos = Usuario.query.filter_by(activo=True).count()
         usuarios_activos_lista = Usuario.query.options(joinedload(Usuario.rol)).filter_by(activo=True).order_by(Usuario.nombre_completo.asc()).limit(5).all()
+        usuarios_ocupados_ids, dashboard_profesionales_detalle = obtener_estado_profesionales_dashboard(
+            usuarios_activos_lista,
+            can_ver_agenda=can_ver_agenda,
+            today=today,
+        )
 
     template_dashboard = dashboard_negocio.get('full_template') or 'dashboard.html'
 
@@ -475,6 +490,9 @@ def dashboard():
         dashboard_servicios_cobros_pendientes=dashboard_servicios_cobros_pendientes['items'],
         dashboard_servicios_cobros_pendientes_total_count=dashboard_servicios_cobros_pendientes['total_count'],
         dashboard_servicios_cobros_pendientes_total_monto=dashboard_servicios_cobros_pendientes['total_monto'],
+        dashboard_servicios_realizados=dashboard_servicios_realizados['items'],
+        dashboard_servicios_realizados_total_count=dashboard_servicios_realizados['total_count'],
+        dashboard_servicios_realizados_total_monto=dashboard_servicios_realizados['total_monto'],
         mostrar_alerta_sin_caja=mostrar_alerta_sin_caja,
         can_ver_agenda=can_ver_agenda,
         agenda_total_pendientes=agenda_resumen['total_pendientes'],
@@ -484,6 +502,8 @@ def dashboard():
         agenda_fecha_hoy_iso=agenda_resumen['fecha_hoy_iso'],
         dashboard_en_atencion_count=en_atencion_resumen['count'],
         dashboard_en_atencion_items=en_atencion_resumen['items'],
+        usuarios_ocupados_ids=usuarios_ocupados_ids,
+        dashboard_profesionales_detalle=dashboard_profesionales_detalle,
     )
 
 
@@ -617,6 +637,12 @@ def api_dashboard_totales():
     agenda_resumen = _obtener_resumen_agenda_dashboard(can_ver_agenda, today)
     gastos_corrientes_resumen = _obtener_resumen_gastos_dashboard(can_ver_gastos_corrientes, today)
     cobros_pendientes_resumen = obtener_resumen_cobros_pendientes_dashboard(limit=3)
+    servicios_realizados_resumen = obtener_resumen_servicios_realizados_dashboard(
+        today=today,
+        limit=5,
+        puede_ver_otras_cajas=puede_ver_otras_cajas,
+        sesion_caja_id=(int(sesion_caja.id_sesion) if sesion_caja else None),
+    )
 
     return jsonify({
         'ventas_hoy': ventas_hoy,
@@ -636,6 +662,11 @@ def api_dashboard_totales():
             'items': serializar_resumen_cobros_pendientes_dashboard(cobros_pendientes_resumen['items']),
             'total_count': int(cobros_pendientes_resumen['total_count'] or 0),
             'total_monto': float(cobros_pendientes_resumen['total_monto'] or 0),
+        },
+        'servicios_realizados': {
+            'items': servicios_realizados_resumen['items'],
+            'total_count': int(servicios_realizados_resumen['total_count'] or 0),
+            'total_monto': float(servicios_realizados_resumen['total_monto'] or 0),
         },
         'gastos_corrientes': (
             {

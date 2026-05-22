@@ -594,6 +594,9 @@
             } else if (this.clienteServicioId) {
                 payload.cliente_servicio_id = this.clienteServicioId;
             }
+            if (this.agendaActividadId) {
+                payload.agenda_actividad_id = this.agendaActividadId;
+            }
 
             const response = await fetch('/ventas/enviar-a-caja', {
                 method: 'POST',

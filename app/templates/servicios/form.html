@@ -18,52 +18,83 @@
             </div>
         </div>
 
-        <form method="POST" id="servicioForm" class="space-y-6" action="{{ url_for('servicios.editar', id_servicio=servicio.id_servicio) if servicio else url_for('servicios.nuevo') }}">
+        <form method="POST" id="servicioForm" class="space-y-6" action="{{ url_for('servicios.editar', id_servicio=servicio.id_servicio) if servicio else url_for('servicios.nuevo') }}" data-servicio-form>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% set turno_actual = request.form.get('turno_rapido_tipo', servicio.turno_rapido_tipo if servicio else '') %}
+            {% set categoria_actual = request.form.get('categoria', servicio.categoria if servicio else '') %}
+            <input type="hidden" name="categoria" value="{{ categoria_actual }}" data-categoria-hidden>
+
+            <div class="rounded-lg border border-violet-100 bg-violet-50/80 p-4 transition-colors duration-300 dark:border-violet-800/30 dark:bg-violet-900/15">
+                <h3 class="mb-2 flex items-center gap-2 font-semibold text-violet-800 dark:text-violet-300"><i class="fas fa-layer-group"></i>Categoria del servicio</h3>
+                <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">Elegir una categoria rapida como Corte o Barba crea un servicio base y deja las variantes abajo como sus tipos/precios.</p>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Categoria rapida</label>
+                        <select name="turno_rapido_tipo" data-turno-select class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-violet-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                            <option value="" data-label="">Servicio general</option>
+                            {% for tipo_id, tipo_label in turno_rapido_tipo_labels.items() %}
+                            <option value="{{ tipo_id }}" data-label="{{ tipo_label }}" {% if turno_actual == tipo_id %}selected{% endif %}>{{ tipo_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div data-categoria-general>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Categoria general</label>
+                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <select data-categoria-select class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                                <option value="">Sin categoria</option>
+                                {% for categoria in categorias_servicio %}
+                                <option value="{{ categoria }}" {% if categoria_actual == categoria and not turno_actual %}selected{% endif %}>{{ categoria }}</option>
+                                {% endfor %}
+                                <option value="__custom__" {% if categoria_actual and categoria_actual not in categorias_servicio and not turno_actual %}selected{% endif %}>Nueva categoria</option>
+                            </select>
+                            <input type="text" maxlength="100" value="{% if categoria_actual and categoria_actual not in categorias_servicio and not turno_actual %}{{ categoria_actual }}{% endif %}"
+                                data-categoria-custom class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                placeholder="Ej: Estetica">
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Código interno</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Codigo interno</label>
                     <input type="text" name="codigo" maxlength="50" value="{{ request.form.get('codigo', servicio.codigo if servicio else '') }}"
                         class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                         placeholder="Opcional. Ej: CORTE01">
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Categoría</label>
-                    <input type="text" name="categoria" maxlength="100" value="{{ request.form.get('categoria', servicio.categoria if servicio else '') }}"
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre visible *</label>
+                    <input type="text" name="nombre" required maxlength="200" value="{{ request.form.get('nombre', servicio.nombre if servicio else '') }}"
+                        data-servicio-nombre
                         class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                        placeholder="Ej: Peluquería, Técnico, Estética">
+                        placeholder="Ej: Corte, Barba, Color">
                 </div>
             </div>
 
             <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del servicio *</label>
-                <input type="text" name="nombre" required maxlength="200" value="{{ request.form.get('nombre', servicio.nombre if servicio else '') }}"
-                    class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                    placeholder="Ej: Corte clásico, diagnóstico técnico, manicura">
-            </div>
-
-            <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción</label>
+                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Descripcion</label>
                 <textarea name="descripcion" rows="3" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                     placeholder="Detalle del servicio ofrecido, alcance, condiciones o materiales incluidos...">{{ request.form.get('descripcion', servicio.descripcion if servicio else '') }}</textarea>
             </div>
 
             <div class="rounded-lg bg-gray-50 p-4 transition-colors duration-300 dark:bg-gray-700/40">
                 <h3 class="mb-4 font-semibold text-gray-700 dark:text-gray-200">Costo y precio</h3>
+                <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">Acepta formatos como 50000, 50.000 o 50000.00. Al guardar, el sistema conserva el valor real.</p>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Costo interno</label>
-                        <input type="number" name="costo" min="0" step="0.01" value="{{ request.form.get('costo', servicio.costo if servicio else 0) }}"
+                        <input type="text" name="costo" inputmode="decimal" value="{{ request.form.get('costo', decimal_to_str(servicio.costo) if servicio else '0') }}"
+                            data-money-input
                             class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Precio al cliente *</label>
-                        <input type="number" name="precio" min="0" step="0.01" required value="{{ request.form.get('precio', servicio.precio if servicio else '') }}"
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Precio base</label>
+                        <input type="text" name="precio" inputmode="decimal" value="{{ request.form.get('precio', decimal_to_str(servicio.precio) if servicio else '') }}"
+                            data-money-input
                             class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Duración</label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Duracion</label>
                         <input type="number" name="duracion_minutos" min="0" step="5" value="{{ request.form.get('duracion_minutos', servicio.duracion_minutos if servicio else 30) }}"
                             class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                     </div>
@@ -79,24 +110,48 @@
                 </div>
             </div>
 
-            <div class="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-800/30 dark:bg-emerald-900/10">
-                <h3 class="font-semibold text-emerald-800 dark:text-emerald-300">Variantes de costo/precio</h3>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Opcional. Una variante por línea con formato: Nombre | costo | precio.</p>
-                <textarea name="variantes" rows="4" class="mt-3 w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                    placeholder="Corte simple | 15000 | 30000&#10;Corte + barba | 25000 | 50000">{{ variantes_text }}</textarea>
+            <div class="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-800/30 dark:bg-emerald-900/10" data-variantes-builder>
+                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <h3 class="font-semibold text-emerald-800 dark:text-emerald-300">Variantes de costo/precio</h3>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Opcional. Carga cada variante en su propia fila, sin usar separadores manuales.</p>
+                    </div>
+                    <button type="button" class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700" data-variantes-add>
+                        <i class="fas fa-plus mr-2"></i>Agregar variante
+                    </button>
+                </div>
+
+                <textarea name="variantes" hidden data-variantes-hidden>{{ variantes_text }}</textarea>
+
+                <div class="mt-4 space-y-3" data-variantes-list></div>
+
+                <div class="mt-4 rounded-lg border border-dashed border-emerald-200 bg-white/70 p-4 text-sm text-gray-500 dark:border-emerald-800/40 dark:bg-gray-900/30 dark:text-gray-400" data-variantes-empty>
+                    Todavia no agregaste variantes. Usa "Agregar variante" para cargar opciones como "Corte simple" o "Corte + barba".
+                </div>
+
+                <template data-variantes-template>
+                    <div class="grid grid-cols-1 gap-3 rounded-xl border border-emerald-100 bg-white p-4 shadow-sm transition-colors dark:border-emerald-800/30 dark:bg-gray-900/60 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                        <div>
+                            <label class="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Nombre</label>
+                            <input type="text" maxlength="100" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" data-variantes-etiqueta placeholder="Ej: Corte simple">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Costo</label>
+                            <input type="text" inputmode="decimal" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" data-variantes-costo data-money-input placeholder="15000">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Precio</label>
+                            <input type="text" inputmode="decimal" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-emerald-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" data-variantes-precio data-money-input placeholder="30000">
+                        </div>
+                        <div class="flex items-end">
+                            <button type="button" class="inline-flex w-full items-center justify-center rounded-lg bg-red-100 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-200 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50" data-variantes-remove>
+                                <i class="fas fa-trash mr-2"></i>Quitar
+                            </button>
+                        </div>
+                    </div>
+                </template>
             </div>
 
-            <div class="rounded-lg border border-violet-100 bg-violet-50/80 p-4 transition-colors duration-300 dark:border-violet-800/30 dark:bg-violet-900/15">
-                <h3 class="mb-2 flex items-center gap-2 font-semibold text-violet-800 dark:text-violet-300"><i class="fas fa-bolt"></i>Turno rápido peluquería/barbería</h3>
-                <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">Vincula este servicio a un botón rápido específico para que la opción `Crear y cobrar` abra el POS con el servicio correcto.</p>
-                {% set turno_actual = request.form.get('turno_rapido_tipo', servicio.turno_rapido_tipo if servicio else '') %}
-                <select name="turno_rapido_tipo" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-violet-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">
-                    <option value="">No vincular al turno rápido</option>
-                    {% for tipo_id, tipo_label in turno_rapido_tipo_labels.items() %}
-                    <option value="{{ tipo_id }}" {% if turno_actual == tipo_id %}selected{% endif %}>{{ tipo_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
 
             <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-4 transition-colors duration-300 dark:border-indigo-800/30 dark:bg-indigo-900/20">
                 <h3 class="mb-4 flex items-center gap-2 font-semibold text-indigo-800 dark:text-indigo-300"><i class="fas fa-store"></i>Tienda Online</h3>
@@ -106,7 +161,7 @@
                     Publicar servicio en Tienda Web
                 </label>
                 <div class="mt-4">
-                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción extendida para tienda</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Descripcion extendida para tienda</label>
                     <textarea name="descripcion_tienda" rows="3" class="w-full rounded-lg border-2 border-gray-200 bg-white px-4 py-2 text-gray-800 transition-colors focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white">{{ request.form.get('descripcion_tienda', servicio.descripcion_tienda if servicio else '') }}</textarea>
                 </div>
             </div>
@@ -118,4 +173,256 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    function parseMoneyValue(raw) {
+        const text = String(raw || '').trim();
+        if (!text) return null;
+
+        const cleaned = text.replace(/[^\d,.\-]/g, '').replace(/--+/g, '-');
+        if (!cleaned || ['-', '.', ',', '-.', '-,'].includes(cleaned)) return null;
+
+        const negative = cleaned.startsWith('-');
+        const unsigned = cleaned.replace(/-/g, '');
+        if (!unsigned) return null;
+
+        let normalized = unsigned;
+
+        if (unsigned.includes('.') && unsigned.includes(',')) {
+            const decimalSep = unsigned.lastIndexOf('.') > unsigned.lastIndexOf(',') ? '.' : ',';
+            const thousandsSep = decimalSep === '.' ? ',' : '.';
+            normalized = unsigned.split(thousandsSep).join('').replace(decimalSep, '.');
+        } else if (unsigned.includes('.') || unsigned.includes(',')) {
+            const sep = unsigned.includes('.') ? '.' : ',';
+            const chunks = unsigned.split(sep);
+            const lastChunk = chunks[chunks.length - 1];
+
+            if (chunks.length === 2 && lastChunk.length >= 1 && lastChunk.length <= 2) {
+                normalized = chunks[0] + '.' + lastChunk;
+            } else if (chunks.length > 1 && lastChunk.length >= 1 && lastChunk.length <= 2) {
+                normalized = chunks.slice(0, -1).join('') + '.' + lastChunk;
+            } else {
+                normalized = chunks.join('');
+            }
+        }
+
+        const amount = Number((negative ? '-' : '') + normalized);
+        return Number.isFinite(amount) ? amount : null;
+    }
+
+    function formatMoneyValue(raw) {
+        const amount = parseMoneyValue(raw);
+        if (amount === null) return String(raw || '').trim();
+
+        const negative = amount < 0 ? '-' : '';
+        const absolute = Math.abs(amount);
+        const hasDecimals = Math.round(absolute * 100) !== Math.round(absolute) * 100;
+
+        if (hasDecimals) {
+            const fixed = absolute.toFixed(2);
+            const parts = fixed.split('.');
+            return negative + parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + parts[1];
+        }
+
+        return negative + Math.round(absolute).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    function normalizeMoneyFieldValue(input) {
+        if (!input) return;
+        const value = String(input.value || '').trim();
+        if (!value) return;
+        input.value = formatMoneyValue(value);
+    }
+
+    function initMoneyInputs(root) {
+        const scope = root || document;
+        const inputs = scope.querySelectorAll('[data-money-input]');
+        inputs.forEach(function (input) {
+            if (input.dataset.moneyReady === '1') return;
+            input.dataset.moneyReady = '1';
+
+            input.addEventListener('blur', function () {
+                normalizeMoneyFieldValue(input);
+            });
+
+            normalizeMoneyFieldValue(input);
+        });
+    }
+
+    function initServicioCategoryForm(root) {
+        const scope = root || document;
+        const form = scope.querySelector('[data-servicio-form]');
+        if (!form || form.dataset.categoryReady === '1') return;
+        form.dataset.categoryReady = '1';
+
+        const quickSelect = form.querySelector('[data-turno-select]');
+        const generalWrap = form.querySelector('[data-categoria-general]');
+        const categorySelect = form.querySelector('[data-categoria-select]');
+        const customCategory = form.querySelector('[data-categoria-custom]');
+        const hiddenCategory = form.querySelector('[data-categoria-hidden]');
+        const nameInput = form.querySelector('[data-servicio-nombre]');
+
+        if (!quickSelect || !hiddenCategory || !nameInput) return;
+
+        function selectedQuickLabel() {
+            const option = quickSelect.options[quickSelect.selectedIndex];
+            return option ? (option.dataset.label || option.textContent || '').trim() : '';
+        }
+
+        function generalCategoryValue() {
+            if (!categorySelect) return '';
+            if (categorySelect.value === '__custom__') {
+                return customCategory ? customCategory.value.trim() : '';
+            }
+            return categorySelect.value.trim();
+        }
+
+        function syncCategory() {
+            const quickLabel = selectedQuickLabel();
+            const hasQuick = !!quickSelect.value;
+            if (generalWrap) generalWrap.classList.toggle('hidden', hasQuick);
+            if (customCategory && categorySelect) {
+                customCategory.classList.toggle('hidden', categorySelect.value !== '__custom__');
+            }
+            hiddenCategory.value = hasQuick ? quickLabel : generalCategoryValue();
+            if (hasQuick && (!nameInput.value.trim() || nameInput.dataset.autoName === '1')) {
+                nameInput.value = quickLabel;
+                nameInput.dataset.autoName = '1';
+            }
+        }
+
+        quickSelect.addEventListener('change', syncCategory);
+        if (categorySelect) categorySelect.addEventListener('change', syncCategory);
+        if (customCategory) customCategory.addEventListener('input', syncCategory);
+        nameInput.addEventListener('input', function () {
+            nameInput.dataset.autoName = '0';
+        });
+        form.addEventListener('submit', syncCategory);
+        syncCategory();
+    }
+
+    function splitVariantLine(line) {
+        const text = String(line || '').trim();
+        if (!text) return null;
+
+        let parts = text.split('|').map(function (part) { return part.trim(); }).filter(Boolean);
+        if (parts.length < 3) {
+            parts = text.split(';').map(function (part) { return part.trim(); }).filter(Boolean);
+        }
+        if (parts.length < 3) {
+            parts = text.split(',').map(function (part) { return part.trim(); }).filter(Boolean);
+        }
+        if (parts.length < 3) return null;
+
+        return {
+            etiqueta: parts[0] || '',
+            costo: parts[1] || '',
+            precio: parts[2] || ''
+        };
+    }
+
+    function initVariantesBuilder(root) {
+        const scope = root || document;
+        const builder = scope.querySelector('[data-variantes-builder]');
+        if (!builder || builder.dataset.ready === '1') return;
+        builder.dataset.ready = '1';
+
+        const hiddenInput = builder.querySelector('[data-variantes-hidden]');
+        const list = builder.querySelector('[data-variantes-list]');
+        const emptyState = builder.querySelector('[data-variantes-empty]');
+        const addButton = builder.querySelector('[data-variantes-add]');
+        const template = builder.querySelector('[data-variantes-template]');
+        const form = builder.closest('form');
+
+        if (!hiddenInput || !list || !emptyState || !addButton || !template || !form) return;
+
+        function syncHiddenInput() {
+            const rows = Array.from(list.querySelectorAll('[data-variantes-row]'));
+            const lines = rows.map(function (row) {
+                const etiquetaInput = row.querySelector('[data-variantes-etiqueta]');
+                const costoInput = row.querySelector('[data-variantes-costo]');
+                const precioInput = row.querySelector('[data-variantes-precio]');
+                const etiqueta = etiquetaInput.value.trim();
+                normalizeMoneyFieldValue(costoInput);
+                normalizeMoneyFieldValue(precioInput);
+                const costo = costoInput.value.trim();
+                const precio = precioInput.value.trim();
+                if (!etiqueta && !costo && !precio) return '';
+                return [etiqueta, costo, precio].join(' | ');
+            }).filter(Boolean);
+
+            hiddenInput.value = lines.join('\n');
+            emptyState.classList.toggle('hidden', rows.length > 0);
+        }
+
+        function createRow(data) {
+            const fragment = template.content.cloneNode(true);
+            const row = fragment.firstElementChild;
+            row.setAttribute('data-variantes-row', '1');
+
+            row.querySelector('[data-variantes-etiqueta]').value = data && data.etiqueta ? data.etiqueta : '';
+            row.querySelector('[data-variantes-costo]').value = data && data.costo ? data.costo : '';
+            row.querySelector('[data-variantes-precio]').value = data && data.precio ? data.precio : '';
+
+            list.appendChild(row);
+            initMoneyInputs(row);
+            syncHiddenInput();
+        }
+
+        function loadExistingRows() {
+            const parsed = String(hiddenInput.value || '')
+                .split(/\r?\n/)
+                .map(splitVariantLine)
+                .filter(Boolean);
+
+            if (!parsed.length) {
+                createRow();
+                return;
+            }
+
+            parsed.forEach(createRow);
+        }
+
+        addButton.addEventListener('click', function () {
+            createRow();
+        });
+
+        list.addEventListener('click', function (event) {
+            const removeButton = event.target.closest('[data-variantes-remove]');
+            if (!removeButton) return;
+
+            const row = removeButton.closest('[data-variantes-row]');
+            if (!row) return;
+            row.remove();
+
+            if (!list.querySelector('[data-variantes-row]')) {
+                createRow();
+                return;
+            }
+
+            syncHiddenInput();
+        });
+
+        list.addEventListener('input', syncHiddenInput);
+        form.addEventListener('submit', syncHiddenInput);
+
+        loadExistingRows();
+    }
+
+    function boot() {
+        initMoneyInputs(document);
+        initServicioCategoryForm(document);
+        initVariantesBuilder(document);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
+</script>
 {% endblock %}

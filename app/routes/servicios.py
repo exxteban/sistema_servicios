@@ -12,13 +12,55 @@ from app.services.agenda_turnos_peluqueria import TURNO_PELUQUERIA_TIPO_LABELS
 servicios_bp = Blueprint('servicios', __name__)
 
 
-def _decimal_form(name, default='0'):
-    raw = (request.form.get(name, default) or default).strip()
-    raw = raw.replace('₲', '').replace('.', '').replace(',', '.')
+def _parse_decimal_value(raw, default='0'):
+    if raw is None:
+        return Decimal(default)
+
+    if isinstance(raw, Decimal):
+        return raw
+
+    text = str(raw).strip()
+    if not text:
+        return Decimal(default)
+
+    text = re.sub(r'[^0-9,.\-]', '', text).replace('--', '-')
+    if not text or text in {'-', '.', ',', '-.', '-,'}:
+        return Decimal(default)
+
+    negative = text.startswith('-')
+    text = text.lstrip('-').replace('-', '')
+    if not text:
+        return Decimal(default)
+
+    if '.' in text and ',' in text:
+        decimal_sep = '.' if text.rfind('.') > text.rfind(',') else ','
+        thousands_sep = ',' if decimal_sep == '.' else '.'
+        normalized = text.replace(thousands_sep, '').replace(decimal_sep, '.')
+    elif '.' in text or ',' in text:
+        sep = '.' if '.' in text else ','
+        chunks = text.split(sep)
+        last_chunk = chunks[-1]
+
+        if len(chunks) == 2 and len(last_chunk) in (1, 2):
+            normalized = f'{chunks[0]}.{last_chunk}'
+        elif len(chunks) > 1 and len(last_chunk) in (1, 2):
+            normalized = f'{"".join(chunks[:-1])}.{last_chunk}'
+        else:
+            normalized = ''.join(chunks)
+    else:
+        normalized = text
+
+    if negative:
+        normalized = f'-{normalized}'
+
     try:
-        return Decimal(raw)
+        return Decimal(normalized)
     except Exception:
         return Decimal(default)
+
+
+def _decimal_form(name, default='0'):
+    return _parse_decimal_value(request.form.get(name, default), default=default)
 
 
 def _int_form(name, default=0):
@@ -36,6 +78,14 @@ def _decimal_to_str(value) -> str:
     return s.rstrip('0').rstrip('.') if '.' in s else s
 
 
+def _currency_gs(value) -> str:
+    try:
+        amount = Decimal(str(value or 0))
+    except Exception:
+        amount = Decimal('0')
+    return f'₲ {format(amount, ",.0f").replace(",", ".")}'
+
+
 def _parsear_variantes(raw: str):
     variantes = []
     for line in (raw or '').splitlines():
@@ -48,11 +98,8 @@ def _parsear_variantes(raw: str):
         if len(parts) < 3:
             continue
         etiqueta = parts[0][:100]
-        try:
-            costo = Decimal(parts[1].replace('₲', '').replace('.', '').replace(',', '.'))
-            precio = Decimal(parts[2].replace('₲', '').replace('.', '').replace(',', '.'))
-        except Exception:
-            continue
+        costo = _parse_decimal_value(parts[1], default='-1')
+        precio = _parse_decimal_value(parts[2], default='-1')
         if precio <= 0 or costo < 0:
             continue
         variantes.append({'etiqueta': etiqueta, 'costo': costo, 'precio': precio})
@@ -89,12 +136,29 @@ def _query_servicios_activos():
     return Servicio.query.filter(Servicio.activo.is_(True))
 
 
+def _categorias_servicio_options():
+    existentes = [
+        row[0].strip()
+        for row in db.session.query(Servicio.categoria)
+        .filter(Servicio.activo.is_(True), Servicio.categoria.isnot(None), Servicio.categoria != '')
+        .distinct()
+        .order_by(Servicio.categoria.asc())
+        .all()
+        if row[0] and row[0].strip()
+    ]
+    sugeridas = list(TURNO_PELUQUERIA_TIPO_LABELS.values())
+    return sorted(set(existentes + sugeridas), key=lambda item: item.lower())
+
+
 def _render_form(servicio=None, variantes_text=''):
     return render_template(
         'servicios/form.html',
+        currency_gs=_currency_gs,
+        decimal_to_str=_decimal_to_str,
         servicio=servicio,
         variantes_text=variantes_text,
         turno_rapido_tipo_labels=TURNO_PELUQUERIA_TIPO_LABELS,
+        categorias_servicio=_categorias_servicio_options(),
     )
 
 
@@ -126,6 +190,7 @@ def listar():
         'servicios/listar.html',
         servicios=servicios,
         buscar=buscar,
+        currency_gs=_currency_gs,
         turno_rapido_tipo_labels=TURNO_PELUQUERIA_TIPO_LABELS,
     )
 
@@ -218,15 +283,21 @@ def buscar_api():
 
 
 def _guardar_desde_form(servicio):
+    variantes = _parsear_variantes(request.form.get('variantes', ''))
+    turno_rapido_tipo = (request.form.get('turno_rapido_tipo') or '').strip().lower()
+    turno_label = TURNO_PELUQUERIA_TIPO_LABELS.get(turno_rapido_tipo, '')
+
     servicio.codigo = (request.form.get('codigo') or '').strip() or None
-    servicio.nombre = (request.form.get('nombre') or '').strip()
-    servicio.categoria = (request.form.get('categoria') or '').strip() or None
+    servicio.nombre = (request.form.get('nombre') or '').strip() or turno_label
+    servicio.categoria = (request.form.get('categoria') or '').strip() or turno_label or None
     servicio.descripcion = (request.form.get('descripcion') or '').strip() or None
     servicio.costo = _decimal_form('costo')
     servicio.precio = _decimal_form('precio')
+    if variantes and servicio.precio <= 0:
+        servicio.costo = variantes[0]['costo']
+        servicio.precio = variantes[0]['precio']
     servicio.duracion_minutos = max(0, _int_form('duracion_minutos', 30))
     servicio.porcentaje_iva = _int_form('porcentaje_iva', 10)
-    turno_rapido_tipo = (request.form.get('turno_rapido_tipo') or '').strip().lower()
     servicio.turno_rapido_tipo = turno_rapido_tipo or None
     servicio.publicado_tienda = bool(request.form.get('publicado_tienda'))
     servicio.descripcion_tienda = (request.form.get('descripcion_tienda') or '').strip() or None

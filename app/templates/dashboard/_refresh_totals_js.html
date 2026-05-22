@@ -23,7 +23,11 @@
         const cobrosPendientesMontoEl = cobrosPendientesRoot ? cobrosPendientesRoot.querySelector('#dashboard-cobros-pendientes-total-monto') : null;
         const cobrosPendientesCountEl = cobrosPendientesRoot ? cobrosPendientesRoot.querySelector('#dashboard-cobros-pendientes-total-count') : null;
         const cobrosPendientesCanCrearVenta = cobrosPendientesRoot ? String(cobrosPendientesRoot.getAttribute('data-can-crear-venta') || '0') === '1' : false;
-        if (!ventasHoyEl && !ventasHoyNuevoEl && !totalVendidoEl && !totalCobradoNuevoEl && !totalVendidoLabelEl && !agendaRoot && !agendaPendientesNuevoEl && !cobrosPendientesRoot) return;
+        const serviciosRealizadosRoot = scope.querySelector('[data-dashboard-servicios-realizados-root="1"]');
+        const serviciosRealizadosListEl = serviciosRealizadosRoot ? serviciosRealizadosRoot.querySelector('#dashboard-servicios-realizados-list') : null;
+        const serviciosRealizadosTotalEl = serviciosRealizadosRoot ? serviciosRealizadosRoot.querySelector('#dashboard-servicios-realizados-total') : null;
+        const serviciosRealizadosTotalMetaEl = serviciosRealizadosRoot ? serviciosRealizadosRoot.querySelector('#dashboard-servicios-realizados-total-meta') : null;
+        if (!ventasHoyEl && !ventasHoyNuevoEl && !totalVendidoEl && !totalCobradoNuevoEl && !totalVendidoLabelEl && !agendaRoot && !agendaPendientesNuevoEl && !cobrosPendientesRoot && !serviciosRealizadosRoot) return;
 
         let inFlight = false;
         let timerId = null;
@@ -105,6 +109,15 @@
             return `${count} servicio${count === 1 ? '' : 's'} sin cobrar.`;
         }
 
+        function pluralizeServiciosRealizados(count) {
+            return `${count} servicio${count === 1 ? '' : 's'} realizados hoy.`;
+        }
+
+        function serviceBarClass(index) {
+            const classes = ['bg-violet-500', 'bg-indigo-500', 'bg-blue-500', 'bg-cyan-500', 'bg-slate-400'];
+            return classes[index % classes.length];
+        }
+
         function renderCobrosPendientes(resumen) {
             if (!cobrosPendientesRoot || !resumen || typeof resumen !== 'object') {
                 return;
@@ -123,7 +136,7 @@
                 return;
             }
             if (!items.length) {
-                cobrosPendientesListEl.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300/75">No hay servicios pendientes de cobro ahora mismo.</div>';
+                cobrosPendientesListEl.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300/75">No hay servicios pendientes de cobro ahora mismo' + '.</div>';
                 return;
             }
 
@@ -154,6 +167,48 @@
                     return `<a href="${cobrarUrl}" data-tab-url="${cobrarUrl}" data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register" class="app-tab-link flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 transition hover:bg-slate-50 dark:border-white/5 dark:hover:bg-white/[0.03]">${contenido}</a>`;
                 }
                 return `<div class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 dark:border-white/5">${contenido}</div>`;
+            }).join('');
+        }
+
+        function renderServiciosRealizados(resumen) {
+            if (!serviciosRealizadosRoot || !resumen || typeof resumen !== 'object') {
+                return;
+            }
+            const items = Array.isArray(resumen.items) ? resumen.items : [];
+            const totalCount = Number(resumen.total_count || 0);
+            const totalMonto = Number(resumen.total_monto || 0);
+
+            if (serviciosRealizadosTotalEl) {
+                serviciosRealizadosTotalEl.innerHTML = `${totalCount} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. ${new Intl.NumberFormat('es-PY').format(totalMonto)}</span>`;
+            }
+            if (serviciosRealizadosTotalMetaEl) {
+                serviciosRealizadosTotalMetaEl.textContent = pluralizeServiciosRealizados(totalCount);
+            }
+            if (!serviciosRealizadosListEl) {
+                return;
+            }
+            if (!items.length) {
+                serviciosRealizadosListEl.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300/75">No hay servicios facturados hoy.</div>';
+                return;
+            }
+
+            serviciosRealizadosListEl.innerHTML = items.map((item, index) => {
+                const nombre = escapeHtml(item && item.nombre ? item.nombre : 'Servicio');
+                const cantidad = Number(item && item.cantidad ? item.cantidad : 0);
+                const total = Number(item && item.total ? item.total : 0);
+                const porcentaje = Math.max(0, Math.min(100, Number(item && item.porcentaje ? item.porcentaje : 0)));
+                const colorClass = String(item && item.color_class ? item.color_class : serviceBarClass(index));
+                return `
+                    <div>
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="truncate pr-3 text-slate-600 dark:text-slate-300">${nombre}</span>
+                            <span class="shrink-0 font-bold text-slate-900 dark:text-white">${cantidad} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. ${new Intl.NumberFormat('es-PY').format(total)}</span></span>
+                        </div>
+                        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                            <div class="h-full rounded-full ${colorClass}" style="width: ${porcentaje}%"></div>
+                        </div>
+                    </div>
+                `;
             }).join('');
         }
 
@@ -205,6 +260,7 @@
                 }
                 renderAgenda(data.agenda);
                 renderCobrosPendientes(data.cobros_pendientes);
+                renderServiciosRealizados(data.servicios_realizados);
             } catch (e) {
             } finally {
                 inFlight = false;

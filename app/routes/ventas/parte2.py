@@ -174,6 +174,10 @@ def _render_pos_interface(sesion=None, solo_registro_vendedor=False):
         cliente_id=request.args.get('agenda_turno_cliente_id', type=int),
         servicio_id=request.args.get('agenda_turno_servicio_id', type=int),
         vendedor_id=request.args.get('agenda_turno_vendedor_id', type=int),
+        actividad_id=request.args.get('agenda_turno_actividad_id', type=int),
+        manual_price=request.args.get('agenda_turno_precio_manual'),
+        title=request.args.get('agenda_turno_titulo'),
+        price_option_id=request.args.get('agenda_turno_precio_opcion_id', type=int),
     )
 
     cola_id = None if solo_registro_vendedor else request.args.get('cola_id', type=int)
@@ -457,6 +461,7 @@ def enviar_a_caja():
             data.get('cliente_servicio_ids'),
             data.get('cliente_servicio_id'),
         ])
+        agenda_actividad_id = data.get('agenda_actividad_id')
         descuento_monto = Decimal(str(data.get('descuento', 0) or 0))
         beneficio_fidelizacion_id = data.get('beneficio_fidelizacion_id')
         usar_precio_mayorista_raw = data.get('usar_precio_mayorista', None)
@@ -554,6 +559,7 @@ def enviar_a_caja():
             'beneficio_fidelizacion_resumen': beneficio_descuento_ctx['beneficio_resumen'] or '',
             'cliente_servicio_id': cliente_servicio_ids[0] if len(cliente_servicio_ids) == 1 else None,
             'cliente_servicio_ids': cliente_servicio_ids,
+            'agenda_actividad_id': agenda_actividad_id,
             'usar_precio_mayorista': bool(usar_precio_mayorista),
             'forzar_precio_mayorista': bool(usar_precio_mayorista),
             'observaciones': observaciones,

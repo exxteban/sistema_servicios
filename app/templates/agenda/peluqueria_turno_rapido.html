@@ -63,6 +63,7 @@
     clientesUrl: "{{ url_for('agenda.buscar_clientes_relacion') }}",
     profesionales: {{ profesionales|tojson }},
     servicios: {{ servicios|tojson }},
+    serviciosCatalogo: {{ servicios_cobrables_catalogo|tojson }},
     horarios: {{ horarios|tojson }}
 })'>
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -89,7 +90,8 @@
         </div>
     </div>
 
-    <form method="POST" action="{{ url_for('agenda.crear_turno_peluqueria') }}" class="turno-rapido-form">
+    <form method="POST" action="{{ url_for('agenda.crear_turno_peluqueria') }}" class="turno-rapido-form"
+        @submit="if (!puedeCrearTurno()) { $event.preventDefault(); window.alert(mensajeTurnoNoDisponible()); }">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="titulo" :value="tituloTurno()">
         <input type="hidden" name="tipo" value="cita">
@@ -106,6 +108,8 @@
         <input type="hidden" name="servicio_turno_id" :value="servicioId">
         <input type="hidden" name="servicio_turno_nombre" :value="nombreServicio()">
         <input type="hidden" name="servicio_catalogo_id" :value="servicioCatalogoId()">
+        <input type="hidden" name="servicio_precio_opcion_id" :value="servicioPrecioOpcionFormValue()">
+        <input type="hidden" name="precio_manual" :value="precioManualFormValue()">
 
         <div class="turno-rapido-main space-y-5">
             <section class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-slate-900/95 dark:shadow-none">
@@ -143,9 +147,36 @@
                             <i :class="servicio.icono" class="mb-3 text-lg" :style="estiloIconoServicio(servicio)"></i>
                             <span class="block text-sm font-black" x-text="servicio.nombre"></span>
                             <span class="mt-1 block text-[11px] font-semibold" :class="servicio.catalogo_id ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'" x-text="servicio.catalogo_id ? ('Vinculado: ' + servicio.catalogo_nombre) : 'Sin vincular al catálogo'"></span>
+                            <span class="mt-1 block text-[11px] opacity-80" x-show="servicio.catalogo_opciones && servicio.catalogo_opciones.length" x-text="servicio.catalogo_opciones.length === 1 ? '1 tipo disponible' : `${servicio.catalogo_opciones.length} tipos disponibles`"></span>
+                            <span class="mt-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300" x-show="servicio.catalogo_id && !(servicio.catalogo_opciones && servicio.catalogo_opciones.length)" x-text="servicio.catalogo_precio_label ? `Base: ${servicio.catalogo_precio_label}` : 'Precio base disponible'"></span>
+                            <span class="mt-1 block text-[11px] font-bold text-violet-700 dark:text-violet-300"
+                                x-show="servicioId === servicio.id && tipoServicioLabel()"
+                                x-text="tipoServicioLabel()"></span>
                             <span class="mt-1 block text-xs opacity-70" x-text="servicio.duracion + ' min'"></span>
                         </button>
                     </template>
+                </div>
+                <div class="mt-4 rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.03]"
+                    x-show="servicioActualPuedeAbrirModal()" x-cloak>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm font-black text-slate-900 dark:text-white">Tipo / variante</p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                x-show="servicioActualTieneVariantes() && !tipoServicioLabel()">
+                                Este servicio tiene varias opciones. Elige una para usar su precio y nombre correctos.
+                            </p>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                                x-show="!servicioActualTieneVariantes()">
+                                Este servicio usa el precio base del catalogo. Puedes revisarlo antes de crear el turno.
+                            </p>
+                            <p class="mt-1 text-sm font-semibold text-violet-700 dark:text-violet-300"
+                                x-show="tipoServicioLabel()"
+                                x-text="`${tipoServicioLabel()} · ${precioTipoServicioLabel()}`"></p>
+                        </div>
+                        <button type="button" @click="abrirModalServicio()"
+                            class="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-white px-4 py-2 text-xs font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-50 dark:border-violet-400/30 dark:bg-slate-950 dark:text-violet-200 dark:hover:bg-violet-500/10"
+                            x-text="servicioActualTieneVariantes() ? (tipoServicioLabel() ? 'Cambiar tipo' : 'Elegir tipo') : 'Ver precio'"></button>
+                    </div>
                 </div>
                 <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div x-show="servicioId === 'otro'" x-cloak>
@@ -221,244 +252,123 @@
                     <div class="flex items-center gap-2"><i class="fas fa-stopwatch w-5" :style="estiloTextoResumen()"></i><span x-text="duracion + ' minutos'"></span></div>
                     <div class="flex items-center gap-2"><i class="fas fa-bell w-5" :style="estiloTextoResumen()"></i><span>Recordatorio 15 min antes</span></div>
                 </div>
+                {% if puede_crear_venta %}
+                <div class="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-4">
+                    <div>
+                        <p class="text-sm font-black text-white">Cobro rapido</p>
+                        <p class="mt-1 text-xs text-slate-300">Puedes usar el servicio vinculado o elegir una base cobrable con precio manual opcional.</p>
+                    </div>
+                    <div x-show="!servicioTieneVinculoDirecto()" x-cloak>
+                        <label class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-300">Servicio base a cobrar</label>
+                        <select x-model="servicioCatalogoManualId"
+                            @change="sincronizarOpcionServicio()"
+                            class="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20">
+                            <option value="">Seleccionar servicio del catalogo</option>
+                            <template x-for="servicio in serviciosCatalogo" :key="servicio.id">
+                                <option :value="String(servicio.id)" x-text="`${servicio.nombre} · ${servicio.precio_label}`"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2">
+                        <div>
+                            <p class="text-sm font-semibold text-white">Usar precio manual</p>
+                            <p class="text-xs text-slate-300">Sobrescribe el precio del servicio base para este turno.</p>
+                        </div>
+                        <input type="checkbox" x-model="usarPrecioManual" class="h-4 w-4 rounded border-white/20 bg-slate-950/60 text-violet-500 focus:ring-violet-400">
+                    </div>
+                    <div x-show="usarPrecioManual" x-cloak>
+                        <label class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-300">Precio a cobrar</label>
+                        <input type="number" x-model="precioManual" min="1" step="1000" placeholder="Ej: 35000"
+                            class="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20">
+                    </div>
+                    <p class="text-xs text-slate-300" x-show="servicioBaseSeleccionado()" x-cloak>
+                        Base cobrable: <span class="font-bold text-white" x-text="servicioBaseSeleccionadoLabel()"></span>
+                    </p>
+                    <p class="text-xs text-slate-300" x-show="tipoServicioLabel()" x-cloak>
+                        Tipo elegido: <span class="font-bold text-white" x-text="tipoServicioLabel()"></span>
+                    </p>
+                </div>
+                {% endif %}
                 <label class="mt-5 block text-sm font-bold text-slate-200 dark:text-slate-300">Observaciones</label>
                 <textarea name="observaciones" x-model="observaciones" rows="3" placeholder="Notas internas: seña, preferencia, color, etc."
                     class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-slate-400 dark:focus:border-violet-400 dark:focus:ring-violet-500/20"></textarea>
-                <button type="submit" name="accion" value="crear" class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-slate-950 transition" :style="estiloBotonResumen()">
+                <button type="submit" name="accion" value="crear" class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-60" :style="estiloBotonResumen()"
+                    :disabled="!puedeCrearTurno()"
+                    :title="puedeCrearTurno() ? 'Crear turno' : mensajeTurnoNoDisponible()">
                     <i class="fas fa-calendar-plus"></i> Crear turno
                 </button>
                 {% if puede_crear_venta %}
-                <button type="submit" name="accion" value="crear_y_cobrar" class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15">
+                <button type="submit" name="accion" value="crear_y_cobrar"
+                    class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="!puedeCrearTurno() || !puedeCrearYCobrar()"
+                    :title="puedeCrearTurno() && puedeCrearYCobrar() ? 'Crear el turno y abrir POS' : mensajeCobroNoDisponible()">
                     <i class="fas fa-cash-register"></i> Crear y cobrar
                 </button>
+                <p class="mt-2 text-xs text-slate-300" x-show="!puedeCrearTurno() || !puedeCrearYCobrar()" x-cloak x-text="mensajeCobroNoDisponible()">
+                </p>
                 {% endif %}
             </div>
         </aside>
     </form>
+
+    <div x-show="modalServicioAbierto" x-cloak x-transition.opacity
+        @keydown.escape.window="cerrarModalServicio()"
+        class="fixed inset-0 z-[80] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" @click="cerrarModalServicio()"></div>
+        <div class="relative z-10 w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-950/20 dark:border-white/10 dark:bg-slate-900">
+            <div class="border-b border-slate-200/80 px-6 py-5 dark:border-white/10">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[0.22em] text-violet-500">Tipo de servicio</p>
+                        <h3 class="mt-2 text-xl font-black text-slate-950 dark:text-white" x-text="servicioNombre || 'Servicio'"></h3>
+                        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                            Elegí la variante exacta para usar su nombre y costo al crear el turno o cobrarlo.
+                        </p>
+                    </div>
+                    <button type="button" @click="cerrarModalServicio()"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/[0.03]">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="max-h-[70vh] overflow-y-auto px-6 py-5">
+                <div class="space-y-3" x-show="opcionesServicioModal().length" x-cloak>
+                    <template x-for="opcion in opcionesServicioModal()" :key="opcionServicioModalKey(opcion)">
+                        <button type="button" @click="seleccionarOpcionModal(opcion)"
+                            class="flex w-full items-center justify-between gap-4 rounded-2xl border px-4 py-4 text-left transition"
+                            :class="String(servicioPrecioOpcionModalId) === opcionServicioModalKey(opcion) ? 'border-violet-500 bg-violet-50 dark:border-violet-300 dark:bg-violet-500/15' : 'border-slate-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/[0.03]'">
+                            <span class="min-w-0">
+                                <span class="block text-sm font-black text-slate-950 dark:text-white" x-text="opcion.etiqueta"></span>
+                                <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400" x-text="opcion.es_base ? 'Precio base del servicio vinculado.' : 'Esta variante define el precio final del turno.'"></span>
+                                <span class="mt-1 block text-[11px] font-semibold text-slate-500 dark:text-slate-400" x-show="opcion.costo_label" x-text="`Costo interno: ${opcion.costo_label}`"></span>
+                            </span>
+                            <span class="shrink-0 text-sm font-black text-violet-700 dark:text-violet-300" x-text="opcion.precio_label"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+            <div class="border-t border-slate-200/80 px-6 py-4 dark:border-white/10">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-xs text-slate-500 dark:text-slate-400"
+                        x-text="opcionServicioModalSeleccionada() ? `Seleccionado: ${opcionServicioModalSeleccionada().etiqueta} · ${opcionServicioModalSeleccionada().precio_label}` : 'Selecciona una variante para continuar.'"></p>
+                    <div class="flex gap-2">
+                        <button type="button" @click="cerrarModalServicio()"
+                            class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.03]">
+                            Cancelar
+                        </button>
+                        <button type="button" @click="confirmarOpcionServicioModal()"
+                            class="rounded-xl bg-violet-600 px-4 py-2 text-xs font-black text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="!opcionServicioModalSeleccionada()">
+                            Usar variante
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-function peluqueriaTurnoRapido(config) {
-    return {
-        clientesUrl: config.clientesUrl || '',
-        profesionales: Array.isArray(config.profesionales) ? config.profesionales : [],
-        servicios: Array.isArray(config.servicios) ? config.servicios : [],
-        horarios: Array.isArray(config.horarios) ? config.horarios : [],
-        profesionalId: '',
-        servicioId: '',
-        servicioNombre: '',
-        servicioPersonalizado: '',
-        duracion: 30,
-        fecha: '',
-        hora: '',
-        clienteSeleccionado: null,
-        clienteId: '',
-        clienteBusqueda: '',
-        clientes: [],
-        mostrarClientes: false,
-        cargandoClientes: false,
-        clienteFetchId: 0,
-        observaciones: '',
-        paleta: [
-            { solid: '#7c3aed', soft: 'rgba(124, 58, 237, 0.12)', border: 'rgba(124, 58, 237, 0.28)', ring: 'rgba(124, 58, 237, 0.18)' },
-            { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.12)', border: 'rgba(37, 99, 235, 0.28)', ring: 'rgba(37, 99, 235, 0.18)' },
-            { solid: '#db2777', soft: 'rgba(219, 39, 119, 0.12)', border: 'rgba(219, 39, 119, 0.28)', ring: 'rgba(219, 39, 119, 0.18)' },
-            { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.28)', ring: 'rgba(234, 88, 12, 0.18)' },
-            { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)', border: 'rgba(8, 145, 178, 0.28)', ring: 'rgba(8, 145, 178, 0.18)' },
-            { solid: '#65a30d', soft: 'rgba(101, 163, 13, 0.12)', border: 'rgba(101, 163, 13, 0.28)', ring: 'rgba(101, 163, 13, 0.18)' },
-            { solid: '#dc2626', soft: 'rgba(220, 38, 38, 0.12)', border: 'rgba(220, 38, 38, 0.28)', ring: 'rgba(220, 38, 38, 0.18)' },
-        ],
-        coloresServicio: {
-            corte: { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.12)', border: 'rgba(37, 99, 235, 0.28)', ring: 'rgba(37, 99, 235, 0.18)' },
-            barba: { solid: '#16a34a', soft: 'rgba(22, 163, 74, 0.12)', border: 'rgba(22, 163, 74, 0.28)', ring: 'rgba(22, 163, 74, 0.18)' },
-            corte_barba: { solid: '#7c3aed', soft: 'rgba(124, 58, 237, 0.12)', border: 'rgba(124, 58, 237, 0.28)', ring: 'rgba(124, 58, 237, 0.18)' },
-            color: { solid: '#db2777', soft: 'rgba(219, 39, 119, 0.12)', border: 'rgba(219, 39, 119, 0.28)', ring: 'rgba(219, 39, 119, 0.18)' },
-            peinado: { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.28)', ring: 'rgba(234, 88, 12, 0.18)' },
-            lavado: { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)', border: 'rgba(8, 145, 178, 0.28)', ring: 'rgba(8, 145, 178, 0.18)' },
-            otro: { solid: '#475569', soft: 'rgba(71, 85, 105, 0.12)', border: 'rgba(71, 85, 105, 0.28)', ring: 'rgba(71, 85, 105, 0.18)' },
-        },
-        init() {
-            const hoy = new Date();
-            this.fecha = this.formatearFecha(hoy);
-            this.hora = this.horaInicial(hoy);
-            if (this.profesionales.length) this.seleccionarProfesional(this.profesionales[0]);
-            if (this.servicios.length) this.seleccionarServicio(this.servicios[0]);
-        },
-        colorItem(seed) {
-            const valor = String(seed || 'item');
-            let hash = 0;
-            for (let index = 0; index < valor.length; index += 1) {
-                hash = ((hash << 5) - hash) + valor.charCodeAt(index);
-                hash |= 0;
-            }
-            return this.paleta[Math.abs(hash) % this.paleta.length];
-        },
-        estiloTarjetaProfesional(profesional) {
-            const color = this.colorItem(profesional ? profesional.id : 'profesional');
-            if (this.profesionalId === (profesional ? profesional.id : '')) {
-                return {
-                    borderColor: color.border,
-                    backgroundColor: color.soft,
-                    boxShadow: `0 0 0 3px ${color.ring}`,
-                };
-            }
-            return {
-                borderColor: color.ring,
-            };
-        },
-        estiloAvatarProfesional(profesional) {
-            const color = this.colorItem(profesional ? profesional.id : 'profesional');
-            return {
-                backgroundColor: color.solid,
-                boxShadow: this.profesionalId === (profesional ? profesional.id : '') ? `0 0 0 4px ${color.ring}` : 'none',
-            };
-        },
-        seleccionarProfesional(profesional) {
-            this.profesionalId = profesional ? profesional.id : '';
-        },
-        colorServicio(servicioId) {
-            return this.coloresServicio[servicioId] || this.colorItem(servicioId || 'servicio');
-        },
-        colorResumen() {
-            return this.colorServicio(this.servicioId || 'corte');
-        },
-        hexToRgba(hex, alpha) {
-            const valor = String(hex || '').replace('#', '');
-            if (valor.length !== 6) return `rgba(124, 58, 237, ${alpha})`;
-            const red = Number.parseInt(valor.slice(0, 2), 16);
-            const green = Number.parseInt(valor.slice(2, 4), 16);
-            const blue = Number.parseInt(valor.slice(4, 6), 16);
-            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-        },
-        estiloResumenPanel() {
-            const color = this.colorResumen();
-            return {
-                borderColor: color.border,
-                boxShadow: `0 14px 40px ${this.hexToRgba(color.solid, 0.20)}`,
-                backgroundImage: `linear-gradient(135deg, #020617 0%, #0f172a 58%, ${this.hexToRgba(color.solid, 0.42)} 100%)`,
-            };
-        },
-        estiloTextoResumen() {
-            const color = this.colorResumen();
-            return {
-                color: color.solid,
-            };
-        },
-        estiloBotonResumen() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: color.solid,
-                boxShadow: `0 10px 24px ${this.hexToRgba(color.solid, 0.24)}`,
-                color: '#ffffff',
-            };
-        },
-        estiloTarjetaServicio(servicio) {
-            const color = this.colorServicio(servicio ? servicio.id : 'servicio');
-            if (this.servicioId === (servicio ? servicio.id : '')) {
-                return {
-                    borderColor: color.border,
-                    backgroundColor: color.soft,
-                    boxShadow: `0 0 0 3px ${color.ring}`,
-                };
-            }
-            return {
-                borderColor: color.ring,
-            };
-        },
-        estiloIconoServicio(servicio) {
-            const color = this.colorServicio(servicio ? servicio.id : 'servicio');
-            return {
-                color: color.solid,
-            };
-        },
-        seleccionarServicio(servicio) {
-            if (!servicio) return;
-            this.servicioId = servicio.id;
-            this.servicioNombre = servicio.nombre;
-            this.duracion = Number(servicio.duracion || 30);
-        },
-        nombreServicio() {
-            if (this.servicioId === 'otro' && this.servicioPersonalizado.trim()) {
-                return this.servicioPersonalizado.trim();
-            }
-            return this.servicioNombre || 'Turno';
-        },
-        servicioCatalogoId() {
-            const servicio = this.servicios.find((item) => item.id === this.servicioId);
-            return servicio && servicio.catalogo_id ? servicio.catalogo_id : '';
-        },
-        profesionalNombre() {
-            const profesional = this.profesionales.find((item) => item.id === this.profesionalId);
-            return profesional ? profesional.nombre : 'Sin profesional';
-        },
-        tituloTurno() {
-            const cliente = this.clienteSeleccionado ? ` - ${this.clienteSeleccionado.nombre}` : '';
-            return `${this.nombreServicio()}${cliente}`;
-        },
-        descripcionTurno() {
-            return `Turno peluquería/barbería: ${this.nombreServicio()} con ${this.profesionalNombre()}.`;
-        },
-        get fechaInicio() {
-            return this.fecha && this.hora ? `${this.fecha}T${this.hora}` : '';
-        },
-        get fechaFin() {
-            if (!this.fechaInicio) return '';
-            const fin = new Date(this.fechaInicio);
-            fin.setMinutes(fin.getMinutes() + Number(this.duracion || 30));
-            return this.formatearDatetimeLocal(fin);
-        },
-        horarioResumen() {
-            if (!this.fecha || !this.hora) return 'Sin horario';
-            return `${this.fecha} ${this.hora} a ${this.fechaFin.slice(11, 16)}`;
-        },
-        formatearFecha(fecha) {
-            return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-        },
-        formatearDatetimeLocal(fecha) {
-            return `${this.formatearFecha(fecha)}T${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`;
-        },
-        horaInicial(fecha) {
-            const siguiente = new Date(fecha);
-            const minutos = siguiente.getMinutes();
-            siguiente.setMinutes(minutos <= 30 ? 30 : 60, 0, 0);
-            const hora = `${String(siguiente.getHours()).padStart(2, '0')}:${String(siguiente.getMinutes()).padStart(2, '0')}`;
-            return this.horarios.includes(hora) ? hora : '09:00';
-        },
-        detalleCliente(cliente) {
-            if (!cliente) return '';
-            return [cliente.ruc_ci, cliente.telefono, cliente.email].filter(Boolean).join(' · ') || 'Sin datos extra';
-        },
-        limpiarCliente() {
-            this.clienteSeleccionado = null;
-            this.clienteId = '';
-            this.clienteBusqueda = '';
-        },
-        seleccionarCliente(cliente) {
-            this.clienteSeleccionado = cliente;
-            this.clienteId = cliente ? cliente.id_cliente : '';
-            this.clienteBusqueda = '';
-            this.clientes = [];
-            this.mostrarClientes = false;
-        },
-        async buscarClientes(query = '', abrir = false) {
-            if (abrir) this.mostrarClientes = true;
-            const fetchId = ++this.clienteFetchId;
-            this.cargandoClientes = true;
-            try {
-                const url = new URL(this.clientesUrl, window.location.origin);
-                if ((query || '').trim()) url.searchParams.set('q', query.trim());
-                const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
-                const data = await response.json();
-                if (fetchId === this.clienteFetchId) this.clientes = Array.isArray(data.items) ? data.items : [];
-            } catch (_error) {
-                if (fetchId === this.clienteFetchId) this.clientes = [];
-            } finally {
-                if (fetchId === this.clienteFetchId) this.cargandoClientes = false;
-            }
-        },
-    };
-}
-</script>
+{% include "agenda/_peluqueria_turno_rapido_js.html" %}
 {% endblock %}

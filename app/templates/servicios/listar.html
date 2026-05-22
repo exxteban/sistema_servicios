@@ -56,8 +56,8 @@
                             {% if servicio.descripcion %}<div class="mt-0.5 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{{ servicio.descripcion }}</div>{% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ servicio.categoria or 'Sin categoría' }}</td>
-                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">₲ {{ "{:,.0f}".format(servicio.costo or 0).replace(",", ".") }}</td>
-                        <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300">₲ {{ "{:,.0f}".format(servicio.precio or 0).replace(",", ".") }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">{{ currency_gs(servicio.costo) }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300">{{ currency_gs(servicio.precio) }}</td>
                         <td class="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-300">{{ servicio.duracion_minutos }} min</td>
                         <td class="px-4 py-3 text-center">
                             {% if servicio.publicado_tienda %}
