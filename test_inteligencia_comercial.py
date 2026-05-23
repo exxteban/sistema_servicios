@@ -11,6 +11,7 @@ from app.models import (
     CrmPlantilla,
     DetalleVenta,
     Producto,
+    Servicio,
     SesionCaja,
     TiendaLead,
     TiendaVisitaEvento,
@@ -92,6 +93,27 @@ class TestInteligenciaComercial(unittest.TestCase):
         db.session.flush()
         return producto
 
+    def _crear_servicio(
+        self,
+        codigo: str,
+        nombre: str,
+        precio: int,
+        categoria: str = 'General',
+    ) -> Servicio:
+        servicio = Servicio(
+            codigo=codigo,
+            nombre=nombre,
+            categoria=categoria,
+            costo=precio / 2,
+            precio=precio,
+            duracion_minutos=30,
+            porcentaje_iva=10,
+            activo=True,
+        )
+        db.session.add(servicio)
+        db.session.flush()
+        return servicio
+
     def _crear_venta(self, cliente: Cliente, sesion: SesionCaja, producto: Producto, fecha_venta: datetime, total: int) -> Venta:
         venta = Venta(
             id_cliente=cliente.id_cliente,
@@ -110,6 +132,42 @@ class TestInteligenciaComercial(unittest.TestCase):
         detalle = DetalleVenta(
             id_venta=venta.id_venta,
             id_producto=producto.id_producto,
+            cantidad=1,
+            precio_unitario=total,
+            precio_original=total,
+            porcentaje_iva=10,
+            monto_iva=round(total / 11, 2),
+            subtotal=total,
+        )
+        db.session.add(detalle)
+        db.session.flush()
+        return venta
+
+    def _crear_venta_servicio(
+        self,
+        cliente: Cliente,
+        sesion: SesionCaja,
+        servicio: Servicio,
+        fecha_venta: datetime,
+        total: int,
+    ) -> Venta:
+        venta = Venta(
+            id_cliente=cliente.id_cliente,
+            id_sesion_caja=sesion.id_sesion,
+            fecha_venta=fecha_venta,
+            subtotal=total,
+            total=total,
+            total_iva_10=round(total / 11, 2),
+            total_iva_5=0,
+            total_exenta=0,
+            estado='completada',
+        )
+        db.session.add(venta)
+        db.session.flush()
+
+        detalle = DetalleVenta(
+            id_venta=venta.id_venta,
+            id_servicio=servicio.id_servicio,
             cantidad=1,
             precio_unitario=total,
             precio_original=total,
@@ -434,6 +492,31 @@ class TestInteligenciaComercial(unittest.TestCase):
         self.assertEqual(len(panel['ventas']['tendencia']), 6)
         self.assertTrue(any('Accesorios' in insight['titulo'] for insight in panel['ventas']['insights']))
 
+    def test_inteligencia_ventas_incluye_categorias_de_servicios(self):
+        self._preparar_escenario_ventas()
+        cliente = Cliente(nombre='Cliente Servicio Ventas', tipo='minorista', activo=True)
+        db.session.add(cliente)
+        db.session.flush()
+        sesion = SesionCaja.query.filter_by(estado='abierta').first()
+        self.assertIsNotNone(sesion)
+        servicio = self._crear_servicio('SRV-CAT-001', 'Corte premium', 400000, categoria='Spa')
+        self._crear_venta_servicio(
+            cliente,
+            sesion,
+            servicio,
+            datetime(2026, 3, 19, 13, 0, 0),
+            400000,
+        )
+        db.session.commit()
+
+        panel = obtener_panel_inteligencia_comercial(self.fecha_corte)
+        categorias = panel['ventas']['categorias']
+        categoria_spa = next((item for item in categorias if item['nombre'] == 'Spa'), None)
+
+        self.assertIsNotNone(categoria_spa)
+        self.assertAlmostEqual(float(categoria_spa['facturacion']), 400000.0)
+        self.assertEqual(int(categoria_spa['unidades']), 1)
+
     def test_inteligencia_soporta_periodos_estables_en_servicio_y_ruta(self):
         self._preparar_escenario_ventas()
 
@@ -522,6 +605,38 @@ class TestInteligenciaComercial(unittest.TestCase):
         self.assertEqual(panel['inventario']['riesgo_quiebre'][0]['codigo'], 'INV-RUN-001')
         self.assertEqual(panel['inventario']['stock_inmovilizado'][0]['codigo'], 'INV-IDLE-001')
         self.assertTrue(any('quebrar' in insight['titulo'].lower() or 'miradas' in insight['titulo'].lower() for insight in panel['inventario']['insights']))
+
+    def test_inteligencia_inventario_ignora_ventas_solo_servicio(self):
+        id_cliente_tienda = self._preparar_escenario_inventario()
+        cliente_servicio = Cliente(nombre='Cliente Servicio', tipo='minorista', activo=True)
+        db.session.add(cliente_servicio)
+        db.session.flush()
+        sesion = SesionCaja.query.filter_by(estado='abierta').first()
+        self.assertIsNotNone(sesion)
+        servicio = self._crear_servicio('SRV-ONLY-001', 'Servicio técnico', 60000)
+        self._crear_venta_servicio(
+            cliente_servicio,
+            sesion,
+            servicio,
+            datetime(2026, 3, 19, 9, 0, 0),
+            60000,
+        )
+        db.session.commit()
+
+        panel = obtener_panel_inteligencia_comercial(
+            self.fecha_corte,
+            id_cliente_tienda=id_cliente_tienda,
+        )
+        resumen = obtener_resumen_dashboard_inteligencia(
+            self.fecha_corte,
+            id_cliente_tienda=id_cliente_tienda,
+        )
+
+        self.assertIsNotNone(panel)
+        self.assertIsNotNone(resumen)
+        self.assertIn('inventario', panel)
+        self.assertEqual(panel['inventario']['resumen']['riesgo_quiebre'], 1)
+        self.assertEqual(panel['inventario']['riesgo_quiebre'][0]['codigo'], 'INV-RUN-001')
 
     def test_campanas_sugiere_segmentos_y_reutiliza_plantillas(self):
         self._preparar_escenario_base()

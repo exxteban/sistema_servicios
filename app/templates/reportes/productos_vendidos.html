@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Productos Más Vendidos{% endblock %}
+{% block title %}Productos y Servicios Más Vendidos{% endblock %}
 {% block content %}
 <div class="space-y-6" x-data="{ showChart: true }">
     <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
-        <i class="fas fa-trophy text-blue-600 dark:text-blue-400 mr-2"></i>Productos Más Vendidos
+        <i class="fas fa-trophy text-blue-600 dark:text-blue-400 mr-2"></i>Productos y Servicios Más Vendidos
     </h1>
 
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
@@ -41,7 +41,7 @@
         x-transition:leave-end="opacity-0 transform scale-95"
         class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-colors duration-300">
         <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-            <i class="fas fa-chart-bar text-purple-600 dark:text-purple-400 mr-2"></i>Top 20 Productos
+            <i class="fas fa-chart-bar text-purple-600 dark:text-purple-400 mr-2"></i>Top 20 Items
         </h2>
         <div class="relative" style="height: 600px;">
             <canvas id="productosChart"></canvas>
@@ -58,7 +58,8 @@
             <thead class="bg-gray-50 dark:bg-gray-700/60">
                 <tr>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">#</th>
-                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Producto</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Item</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Tipo</th>
                     <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Cantidad
                         Vendida</th>
                     <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Total
@@ -66,17 +67,18 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                {% for producto, cantidad, total in productos %}
+                {% for item in items_vendidos %}
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
                     <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ loop.index }}</td>
-                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ producto.nombre }}</td>
-                    <td class="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-100">{{ cantidad }}</td>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ item.nombre }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ item.tipo }}</td>
+                    <td class="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-100">{{ item.cantidad_vendida }}</td>
                     <td class="px-4 py-3 text-right font-semibold text-green-600 dark:text-green-400">₲ {{
-                        "{:,.0f}".format(total).replace(",", ".") }}</td>
+                        "{:,.0f}".format(item.total_vendido).replace(",", ".") }}</td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No hay datos</td>
+                    <td colspan="5" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No hay datos</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -101,9 +103,9 @@
 
             const isDark = document.documentElement.classList.contains('dark');
 
-            const data = [{% for producto, cantidad, total in productos %} {{ total }} {% if not loop.last %}, {% endif %} {% endfor %}];
-        const labels = [{% for producto, cantidad, total in productos %}{{ producto.nombre | tojson }} {% if not loop.last %}, {% endif %} {% endfor %}];
-    const cantidades = [{% for producto, cantidad, total in productos %}{{ cantidad }} {% if not loop.last %}, {% endif %} {% endfor %}];
+            const data = [{% for item in items_vendidos %} {{ item.total_vendido }} {% if not loop.last %}, {% endif %} {% endfor %}];
+        const labels = [{% for item in items_vendidos %}{{ item.nombre | tojson }} {% if not loop.last %}, {% endif %} {% endfor %}];
+    const cantidades = [{% for item in items_vendidos %}{{ item.cantidad_vendida }} {% if not loop.last %}, {% endif %} {% endfor %}];
 
     const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 600, 0);
     gradient.addColorStop(0, isDark ? 'rgba(59, 130, 246, 0.8)' : 'rgba(59, 130, 246, 0.9)');

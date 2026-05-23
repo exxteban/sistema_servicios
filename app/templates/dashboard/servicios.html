@@ -13,7 +13,7 @@
         saveUrl: "{{ url_for('main.api_dashboard_preferencias') }}"
     })'>
     <!-- Header -->
-    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div>
             <h1 class="text-2xl font-black tracking-tight text-slate-950 dark:text-white">
                 Turnos, atención y caja del día
@@ -22,14 +22,14 @@
                 Vista principal para gestionar agenda, profesionales, cobros y operación diaria{% if dashboard_negocio.id == 'peluqueria_barberia' %} de peluquería/barbería{% endif %}.
             </p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap xl:flex-nowrap gap-2">
             <div class="relative" @keydown.escape.window="selectorOpen = false">
                 <button type="button"
                     @click="selectorOpen = !selectorOpen"
-                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
+                    class="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-800 shadow-sm shadow-sky-200/60 transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-600/50 dark:bg-sky-800 dark:text-white dark:shadow-none dark:hover:bg-sky-700">
                     <i class="fas fa-sliders-h text-xs"></i>
                     Tarjetas visibles
-                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                    <span class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-900 dark:text-sky-100"
                         x-text="`${selectedCount()}/${availableCards.length}`"></span>
                 </button>
 
@@ -86,7 +86,7 @@
             <a href="{{ nuevo_turno_url }}"
                data-tab-url="{{ nuevo_turno_url }}"
                data-tab-title="Nuevo turno" data-tab-icon="fas fa-plus"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-slate-300/50 transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:shadow-none dark:hover:bg-slate-100">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-violet-300/60 transition hover:bg-violet-600 dark:border-violet-500/50 dark:bg-violet-600 dark:text-white dark:shadow-none dark:hover:bg-violet-500">
                 <i class="fas fa-plus"></i>Nuevo turno
             </a>
             {% endif %}
@@ -94,7 +94,7 @@
             <a href="{{ url_for('servicios.nuevo') }}"
                data-tab-url="{{ url_for('servicios.nuevo') }}"
                data-tab-title="Nuevo servicio" data-tab-icon="fas fa-concierge-bell"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-300/50 transition hover:bg-emerald-700 dark:bg-emerald-500 dark:shadow-none dark:hover:bg-emerald-400">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-300/60 transition hover:bg-emerald-600 dark:border-emerald-500/50 dark:bg-emerald-600 dark:text-white dark:shadow-none dark:hover:bg-emerald-500">
                 <i class="fas fa-concierge-bell"></i>Cargar servicio
             </a>
             {% endif %}
@@ -102,7 +102,7 @@
             <a href="{{ url_for('servicios.listar') }}"
                data-tab-url="{{ url_for('servicios.listar') }}"
                data-tab-title="Servicios y costos" data-tab-icon="fas fa-list-ul"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 shadow-sm shadow-amber-200/60 transition hover:border-amber-300 hover:bg-amber-100 dark:border-amber-600/50 dark:bg-amber-700 dark:text-white dark:shadow-none dark:hover:bg-amber-600">
                 <i class="fas fa-list-ul"></i>Servicios y costos
             </a>
             {% endif %}
@@ -110,7 +110,7 @@
             <a href="{{ url_for('agenda.dashboard') }}"
                data-tab-url="{{ url_for('agenda.dashboard') }}"
                data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-5 py-2.5 text-sm font-semibold text-cyan-800 shadow-sm shadow-cyan-200/60 transition hover:border-cyan-300 hover:bg-cyan-100 dark:border-cyan-600/50 dark:bg-cyan-700 dark:text-white dark:shadow-none dark:hover:bg-cyan-600">
                 <i class="far fa-calendar"></i>Agenda
             </a>
             {% endif %}
@@ -118,14 +118,14 @@
             <a href="{{ url_for('ventas.pos') }}"
                data-tab-url="{{ url_for('ventas.pos') }}"
                data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-sm font-semibold text-rose-800 shadow-sm shadow-rose-200/60 transition hover:border-rose-300 hover:bg-rose-100 dark:border-rose-600/50 dark:bg-rose-700 dark:text-white dark:shadow-none dark:hover:bg-rose-600">
                 <i class="fas fa-dollar-sign"></i>Cobrar servicio
             </a>
             {% endif %}
             <a href="{{ url_for('clientes.nuevo') }}"
                data-tab-url="{{ url_for('clientes.nuevo') }}"
                data-tab-title="Cliente nuevo" data-tab-icon="fas fa-user-plus"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/50 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-none dark:hover:bg-white/10">
+               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-5 py-2.5 text-sm font-semibold text-fuchsia-800 shadow-sm shadow-fuchsia-200/60 transition hover:border-fuchsia-300 hover:bg-fuchsia-100 dark:border-fuchsia-600/50 dark:bg-fuchsia-700 dark:text-white dark:shadow-none dark:hover:bg-fuchsia-600">
                 <i class="fas fa-user-plus"></i>Cliente nuevo
             </a>
         </div>

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from sqlalchemy import func
 
 from app import db
-from app.models import Categoria, DetalleVenta, Producto, Venta
+from app.models import Categoria, DetalleVenta, Producto, Servicio, Venta
 from app.services.inteligencia.common import (
     SEMANAS_TENDENCIA_VENTAS,
     calcular_variacion,
@@ -61,7 +61,7 @@ def _obtener_resumen_periodo(desde: date, hasta: date) -> dict:
 
 def _obtener_categorias_periodo(desde: date, hasta: date) -> list[dict]:
     inicio_utc, fin_utc = utc_bounds_for_local_dates(desde, hasta)
-    filas = (
+    filas_productos = (
         db.session.query(
             Categoria.nombre.label('categoria'),
             func.coalesce(func.sum(DetalleVenta.subtotal), 0).label('facturacion'),
@@ -79,14 +79,50 @@ def _obtener_categorias_periodo(desde: date, hasta: date) -> list[dict]:
         .order_by(func.sum(DetalleVenta.subtotal).desc(), Categoria.nombre.asc())
         .all()
     )
-    return [
-        {
-            'categoria': (fila.categoria or 'Sin categoría').strip() or 'Sin categoría',
+    filas_servicios = (
+        db.session.query(
+            Servicio.categoria.label('categoria'),
+            func.coalesce(func.sum(DetalleVenta.subtotal), 0).label('facturacion'),
+            func.coalesce(func.sum(DetalleVenta.cantidad), 0).label('unidades'),
+        )
+        .join(DetalleVenta, DetalleVenta.id_servicio == Servicio.id_servicio)
+        .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
+        .filter(
+            Venta.estado == 'completada',
+            Venta.fecha_venta >= inicio_utc,
+            Venta.fecha_venta < fin_utc,
+        )
+        .group_by(Servicio.categoria)
+        .order_by(func.sum(DetalleVenta.subtotal).desc(), Servicio.categoria.asc())
+        .all()
+    )
+
+    categorias: dict[str, dict] = {}
+    for fila in filas_productos:
+        nombre = (fila.categoria or 'Sin categoría').strip() or 'Sin categoría'
+        categorias[nombre] = {
+            'categoria': nombre,
             'facturacion': float(getattr(fila, 'facturacion', 0) or 0),
             'unidades': int(getattr(fila, 'unidades', 0) or 0),
         }
-        for fila in filas
-    ]
+
+    for fila in filas_servicios:
+        nombre = (fila.categoria or 'Servicios').strip() or 'Servicios'
+        acumulado = categorias.setdefault(
+            nombre,
+            {
+                'categoria': nombre,
+                'facturacion': 0.0,
+                'unidades': 0,
+            },
+        )
+        acumulado['facturacion'] += float(getattr(fila, 'facturacion', 0) or 0)
+        acumulado['unidades'] += int(getattr(fila, 'unidades', 0) or 0)
+
+    return sorted(
+        categorias.values(),
+        key=lambda item: (-item['facturacion'], item['categoria'].lower()),
+    )
 
 
 def _obtener_tendencia_semanal(fecha_corte: date, semanas: int = SEMANAS_TENDENCIA_VENTAS) -> list[dict]:

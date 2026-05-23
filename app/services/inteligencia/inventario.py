@@ -200,6 +200,7 @@ def _mapa_ventas_producto(desde: date, hasta: date) -> dict[int, dict]:
             Venta.estado == 'completada',
             Venta.fecha_venta >= inicio_utc,
             Venta.fecha_venta < fin_utc,
+            DetalleVenta.id_producto.isnot(None),
         )
         .group_by(DetalleVenta.id_producto)
         .all()

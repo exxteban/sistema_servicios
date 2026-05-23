@@ -36,7 +36,17 @@
                     } else if (typeof AGENDA_TURNO_DATA !== 'undefined' && AGENDA_TURNO_DATA && ((Array.isArray(AGENDA_TURNO_DATA.items) && AGENDA_TURNO_DATA.items.length > 0) || AGENDA_TURNO_DATA.cliente_id || AGENDA_TURNO_DATA.id_usuario_vendedor)) {
                         this.cargarDatosAgendaTurno();
                     } else if (typeof COLA_COBRO_DATA !== 'undefined' && COLA_COBRO_DATA && COLA_COBRO_DATA.id) {
-                        this.cargarDatosPendienteCaja();
+                        const colaId = Number(COLA_COBRO_DATA.id) || null;
+                        const skipKey = colaId ? `pos_cola_skip_${colaId}` : '';
+                        const skipTokenKey = colaId ? `pos_cola_skip_token_${colaId}` : '';
+                        const skip = skipKey ? sessionStorage.getItem(skipKey) === '1' : false;
+                        const tokenActual = this.reparacionToken || '';
+                        const tokenSkip = skipTokenKey ? (sessionStorage.getItem(skipTokenKey) || '') : '';
+                        if (skip && tokenSkip === tokenActual) {
+                            this.restaurarEstado();
+                        } else {
+                            this.cargarDatosPendienteCaja();
+                        }
                     } else {
                         // DespuÃ©s de cargar clientes, intentar restaurar estado guardado
                         this.restaurarEstado();
@@ -278,6 +288,10 @@
                     this.agendaActividadId = Number(COLA_COBRO_DATA.agenda_actividad_id || 0) || null;
                     this.colaCobroId = Number(COLA_COBRO_DATA.id) || null;
                     this.beneficioFidelizacionId = Number(COLA_COBRO_DATA.beneficio_fidelizacion_id || 0) || null;
+                    if (this.colaCobroId) {
+                        sessionStorage.removeItem(`pos_cola_skip_${this.colaCobroId}`);
+                        sessionStorage.removeItem(`pos_cola_skip_token_${this.colaCobroId}`);
+                    }
                     if (COLA_COBRO_DATA.reparacion_id) {
                         this.reparacionId = Number(COLA_COBRO_DATA.reparacion_id) || null;
                     }

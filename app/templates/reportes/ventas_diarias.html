@@ -24,7 +24,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-5 flex flex-col gap-1">
             <span class="block text-green-600 dark:text-green-400 font-medium text-sm">
-                {% if desde == hasta %}Recaudacion del dia{% else %}Recaudacion del periodo{% endif %}
+                {% if desde == hasta %}Cobrado del dia{% else %}Cobrado del periodo{% endif %}
             </span>
             <span class="block text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-300 leading-tight">
                 Gs {{ "{:,.0f}".format(recaudacion_total_dia).replace(",", ".") }}
@@ -54,7 +54,7 @@
         </div>
         <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-5 flex flex-col gap-1">
             <span class="block text-amber-600 dark:text-amber-400 font-medium text-sm">
-                {% if desde == hasta %}Ventas cerradas del dia{% else %}Ventas cerradas del periodo{% endif %}
+                {% if desde == hasta %}Ventas registradas{% else %}Ventas registradas del periodo{% endif %}
             </span>
             <span class="block text-2xl sm:text-3xl font-bold text-amber-700 dark:text-amber-300 leading-tight">
                 Gs {{ "{:,.0f}".format(ventas_cerradas_dia).replace(",", ".") }}
@@ -75,7 +75,7 @@
     </div>
 
     <div class="rounded-xl border border-amber-200 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-100">
-        `Recaudacion` suma solo cobros recibidos en el {{ periodo_label }}. `Ventas cerradas` muestra mercaderia entregada/facturada en ese mismo {{ periodo_label }}. Son metricas separadas y no deben sumarse entre si.
+        Caja solo considera cobros registrados. `Cobrado` suma solo cobros recibidos en el {{ periodo_label }}. `Ventas registradas` muestra mercaderia entregada/facturada en ese mismo {{ periodo_label }}. Son metricas separadas y no deben sumarse entre si.
     </div>
 
     <!-- Toggle Button -->

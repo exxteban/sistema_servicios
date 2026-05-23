@@ -1,13 +1,22 @@
 from datetime import datetime, timedelta, timezone
 
-from flask import flash, jsonify, redirect, render_template, request, url_for
+from flask import render_template, request
 from flask_login import current_user, login_required
-from sqlalchemy import String, and_, cast, or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload, load_only
 
 from app import db
-from app.models import AgendaActividad, Cliente, CrmContacto, Reparacion, Usuario, Venta
+from app.models import (
+    AgendaActividad,
+    Usuario,
+)
 from app.routes.agenda import agenda_bp
+from app.routes.agenda.visibilidad import (
+    filtro_mostrar_agenda_para_usuario,
+    obtener_root_user_id_sistema,
+    query_usuarios_agenda_visibles,
+    usuarios_agenda_visibles_para,
+)
 from app.utils.helpers import get_app_timezone, local_strftime, parse_iso_date, utc_bounds_for_local_dates, utc_naive_to_local
 
 TIPOS_ACTIVIDAD = ('cita', 'llamada', 'entrega', 'cobro', 'seguimiento', 'tarea_interna', 'recordatorio')
@@ -54,18 +63,7 @@ def _parse_user_ids_list(values):
 
 
 def _filtro_mostrar_agenda_para_usuario(user_id: int):
-    return or_(
-        AgendaActividad.creado_por_id == user_id,
-        AgendaActividad.mostrar_agenda_en == 'todos',
-        and_(
-            AgendaActividad.mostrar_agenda_en == 'solo_responsable',
-            AgendaActividad.usuario_id == user_id,
-        ),
-        and_(
-            AgendaActividad.mostrar_agenda_en == 'usuarios_especificos',
-            AgendaActividad.usuarios_agenda.any(Usuario.id_usuario == user_id),
-        ),
-    )
+    return filtro_mostrar_agenda_para_usuario(user_id)
 
 
 def _filtro_recordatorio_para_usuario(user_id: int):
@@ -112,8 +110,8 @@ def _cargar_usuarios_por_ids(ids):
     if not ids:
         return []
     usuarios = (
-        Usuario.query
-        .filter(Usuario.activo.is_(True), Usuario.id_usuario.in_(ids))
+        query_usuarios_agenda_visibles()
+        .filter(Usuario.id_usuario.in_(ids))
         .order_by(Usuario.nombre_completo.asc())
         .all()
     )
@@ -154,8 +152,13 @@ def _puede_ver_todo() -> bool:
 def _query_visible():
     query = AgendaActividad.query
     if _puede_ver_todo():
-        return query
-    return query.filter(_filtro_mostrar_agenda_para_usuario(current_user.id_usuario))
+        visible_query = query
+    else:
+        visible_query = query.filter(_filtro_mostrar_agenda_para_usuario(current_user.id_usuario))
+    root_id = obtener_root_user_id_sistema()
+    if root_id:
+        visible_query = visible_query.filter(AgendaActividad.usuario_id != root_id)
+    return visible_query
 
 
 def _wants_json_response() -> bool:
@@ -196,6 +199,11 @@ def _parse_optional_int(value):
         return int(value)
     except Exception:
         return None
+
+
+def _parse_positive_int(value):
+    parsed = _parse_optional_int(value)
+    return parsed if parsed and parsed > 0 else None
 
 
 def _utc_now_naive():
@@ -378,186 +386,6 @@ def _proximo_cambio_alerta_actividad(actividad: AgendaActividad, now_utc=None):
     return None
 
 
-def _serializar_cliente(cliente: Cliente | None):
-    if not cliente:
-        return None
-    return {
-        'id_cliente': cliente.id_cliente,
-        'nombre': cliente.nombre,
-        'ruc_ci': cliente.ruc_ci or '',
-        'telefono': cliente.telefono or '',
-        'email': cliente.email or '',
-    }
-
-
-def _serializar_venta(venta: Venta | None):
-    if not venta:
-        return None
-    return {
-        'id_venta': venta.id_venta,
-        'id_cliente': venta.id_cliente,
-        'fecha_venta': local_strftime(venta.fecha_venta),
-        'total': float(venta.total or 0),
-        'estado': venta.estado or '',
-        'numero_comprobante': venta.numero_comprobante or '',
-        'cliente': _serializar_cliente(getattr(venta, 'cliente', None)),
-    }
-
-
-def _serializar_reparacion(reparacion: Reparacion | None):
-    if not reparacion:
-        return None
-    return {
-        'id_reparacion': reparacion.id_reparacion,
-        'cliente_id': reparacion.cliente_id,
-        'tipo_equipo': reparacion.tipo_equipo or '',
-        'marca_modelo': reparacion.marca_modelo or '',
-        'estado': reparacion.estado or '',
-        'fecha_ingreso': local_strftime(reparacion.fecha_ingreso),
-        'cliente': _serializar_cliente(getattr(reparacion, 'cliente', None)),
-    }
-
-
-def _obtener_relaciones_iniciales(data=None, actividad=None):
-    cliente_id = _parse_optional_int(data.get('cliente_id') if data else None)
-    reparacion_id = _parse_optional_int(data.get('reparacion_id') if data else None)
-    venta_id = _parse_optional_int(data.get('venta_id') if data else None)
-
-    if cliente_id is None and actividad:
-        cliente_id = actividad.cliente_id
-    if reparacion_id is None and actividad:
-        reparacion_id = actividad.reparacion_id
-    if venta_id is None and actividad:
-        venta_id = actividad.venta_id
-
-    cliente = None
-    reparacion = None
-    venta = None
-    if cliente_id:
-        cliente = (
-            Cliente.query.options(
-                load_only(
-                    Cliente.id_cliente,
-                    Cliente.nombre,
-                    Cliente.ruc_ci,
-                    Cliente.telefono,
-                    Cliente.email,
-                )
-            )
-            .filter(Cliente.id_cliente == cliente_id)
-            .first()
-        )
-    if reparacion_id:
-        reparacion = (
-            Reparacion.query.options(
-                load_only(
-                    Reparacion.id_reparacion,
-                    Reparacion.cliente_id,
-                    Reparacion.tipo_equipo,
-                    Reparacion.marca_modelo,
-                    Reparacion.estado,
-                    Reparacion.fecha_ingreso,
-                ),
-                joinedload(Reparacion.cliente).load_only(
-                    Cliente.id_cliente,
-                    Cliente.nombre,
-                    Cliente.ruc_ci,
-                    Cliente.telefono,
-                    Cliente.email,
-                ),
-            )
-            .filter(Reparacion.id_reparacion == reparacion_id)
-            .first()
-        )
-    if venta_id:
-        venta = (
-            Venta.query.options(
-                load_only(
-                    Venta.id_venta,
-                    Venta.id_cliente,
-                    Venta.fecha_venta,
-                    Venta.total,
-                    Venta.estado,
-                    Venta.numero_comprobante,
-                ),
-                joinedload(Venta.cliente).load_only(
-                    Cliente.id_cliente,
-                    Cliente.nombre,
-                    Cliente.ruc_ci,
-                    Cliente.telefono,
-                    Cliente.email,
-                ),
-            )
-            .filter(Venta.id_venta == venta_id)
-            .first()
-        )
-    return _serializar_cliente(cliente), _serializar_reparacion(reparacion), _serializar_venta(venta)
-
-
-def _obtener_opciones_formulario():
-    usuarios = Usuario.query.filter_by(activo=True).order_by(Usuario.nombre_completo.asc()).all()
-    contactos = CrmContacto.query.order_by(CrmContacto.id.desc()).limit(120).all()
-    return usuarios, contactos
-
-
-def _render_formulario_actividad(
-    modo,
-    actividad,
-    data,
-    usuarios,
-    contactos,
-    cliente_inicial,
-    reparacion_inicial,
-    venta_inicial,
-):
-    mostrar_agenda_en, usuarios_agenda_ids, recordatorio_a, usuarios_recordatorio_ids = _resolver_destinatarios_formulario(
-        data=data,
-        actividad=actividad,
-    )
-    return render_template(
-        'agenda/form.html',
-        modo=modo,
-        actividad=actividad,
-        data=data or {},
-        usuarios=usuarios,
-        contactos=contactos,
-        tipos_actividad=TIPOS_ACTIVIDAD,
-        prioridades_actividad=PRIORIDADES_ACTIVIDAD,
-        alcances_destinatarios=ALCANCES_DESTINATARIOS,
-        mostrar_agenda_en=mostrar_agenda_en,
-        usuarios_agenda_ids=usuarios_agenda_ids,
-        recordatorio_a=recordatorio_a,
-        usuarios_recordatorio_ids=usuarios_recordatorio_ids,
-        cliente_inicial=cliente_inicial,
-        reparacion_inicial=reparacion_inicial,
-        venta_inicial=venta_inicial,
-        to_datetime_local_input=_to_datetime_local_input,
-    )
-
-
-def _cargar_actividad_visible_o_404(id_actividad: int):
-    return _query_visible().filter(AgendaActividad.id == id_actividad).first_or_404()
-
-
-def _redirect_agenda_next(default_endpoint='agenda.lista_actividades'):
-    next_url = (request.form.get('next') or request.args.get('next') or '').strip()
-    if next_url.startswith('/') and not next_url.startswith('//'):
-        return next_url
-    return url_for(default_endpoint)
-
-
-def _sincronizar_cliente_servicio_desde_actividad(actividad: AgendaActividad, *, accion: str):
-    asignacion = getattr(actividad, 'cliente_servicio', None)
-    if asignacion is None:
-        return
-    if accion == 'iniciar' and (asignacion.estado or '').strip().lower() in {'solicitado', 'agendado', 'presupuestado'}:
-        asignacion.estado = 'en_proceso'
-        return
-    if accion == 'completar' and (asignacion.estado or '').strip().lower() != 'cancelado':
-        asignacion.estado = 'completado'
-        if not asignacion.fecha_cierre:
-            asignacion.fecha_cierre = datetime.utcnow()
-
 
 def _resolver_filtros_lista_actividades(args=None):
     args = args or request.args
@@ -663,11 +491,7 @@ def lista_actividades():
 
     actividades = _construir_query_lista_actividades(filtros).paginate(page=page, per_page=25, error_out=False)
 
-    responsables = (
-        Usuario.query.filter_by(activo=True).order_by(Usuario.nombre_completo.asc()).all()
-        if _puede_ver_todo()
-        else [current_user]
-    )
+    responsables = usuarios_agenda_visibles_para(current_user, _puede_ver_todo())
     now_utc = _utc_now_naive()
     alert_states = {actividad.id: _resolver_estado_alerta(actividad, now_utc=now_utc) for actividad in actividades.items}
 
@@ -689,540 +513,3 @@ def lista_actividades():
         prioridades_actividad=PRIORIDADES_ACTIVIDAD,
         puede_ver_todo=_puede_ver_todo(),
     )
-
-
-@agenda_bp.route('/api/alertas/resumen', methods=['GET'])
-@login_required
-def resumen_alertas():
-    now_utc = _utc_now_naive()
-    limit = min(max(request.args.get('limit', 50, type=int), 1), 200)
-
-    actividades = (
-        AgendaActividad.query
-        .options(
-            load_only(
-                AgendaActividad.id,
-                AgendaActividad.titulo,
-                AgendaActividad.tipo,
-                AgendaActividad.prioridad,
-                AgendaActividad.estado,
-                AgendaActividad.fecha_inicio,
-                AgendaActividad.fecha_fin,
-                AgendaActividad.recordatorio_minutos,
-            )
-        )
-        .filter(AgendaActividad.estado == 'pendiente')
-        .filter(_filtro_recordatorio_para_usuario(current_user.id_usuario))
-        .order_by(AgendaActividad.fecha_inicio.asc(), AgendaActividad.id.desc())
-        .all()
-    )
-
-    alert_items = []
-    total_count = 0
-    overdue_count = 0
-    alert_count = 0
-    next_check_at = None
-    for actividad in actividades:
-        next_change_at = _proximo_cambio_alerta_actividad(actividad, now_utc=now_utc)
-        if next_change_at and (next_check_at is None or next_change_at < next_check_at):
-            next_check_at = next_change_at
-
-        item = _serializar_alerta_actividad(actividad, now_utc=now_utc)
-        if not item:
-            continue
-        total_count += 1
-        if item['estado_alerta'] == 'overdue':
-            overdue_count += 1
-        elif item['estado_alerta'] == 'alert':
-            alert_count += 1
-        alert_items.append(item)
-
-    alert_items.sort(
-        key=lambda item: (
-            0 if item.get('estado_alerta') == 'overdue' else 1,
-            item.get('trigger_at_utc') or item.get('fecha_inicio_utc') or '',
-            str(item.get('titulo') or '').lower(),
-            item.get('id') or 0,
-        )
-    )
-    items = alert_items[:limit]
-
-    return jsonify(
-        {
-            'count': total_count,
-            'has_alerts': total_count > 0,
-            'overdue_count': overdue_count,
-            'alert_count': alert_count,
-            'server_time_utc': f'{now_utc.isoformat()}Z',
-            'next_check_at_utc': f'{next_check_at.isoformat()}Z' if next_check_at else None,
-            'items': items,
-        }
-    )
-
-
-@agenda_bp.route('/api/actividades/estado', methods=['GET'])
-@login_required
-def estado_actividades_lista():
-    filtros = _resolver_filtros_lista_actividades()
-    page = filtros['page']
-    ids = _parse_user_ids_list(request.args.getlist('ids'))
-    now_utc = _utc_now_naive()
-    query_base = _construir_query_lista_actividades(filtros, include_options=False, include_sort=False)
-    actividades_pagina = (
-        _construir_query_lista_actividades(filtros, include_options=False)
-        .options(load_only(AgendaActividad.id))
-        .paginate(page=page, per_page=25, error_out=False)
-    )
-    page_ids = [actividad.id for actividad in actividades_pagina.items]
-    query_ids = ids if ids else page_ids
-
-    if not query_ids:
-        return jsonify(
-            {
-                'items': [],
-                'missing_ids': [],
-                'page_ids': page_ids,
-                'page': actividades_pagina.page,
-                'pages': actividades_pagina.pages,
-                'total': actividades_pagina.total,
-                'server_time_utc': f'{now_utc.isoformat()}Z',
-            }
-        )
-
-    actividades = (
-        query_base
-        .options(
-            load_only(
-                AgendaActividad.id,
-                AgendaActividad.estado,
-                AgendaActividad.fecha_inicio,
-                AgendaActividad.fecha_fin,
-                AgendaActividad.recordatorio_minutos,
-                AgendaActividad.updated_at,
-            )
-        )
-        .filter(AgendaActividad.id.in_(query_ids))
-        .all()
-    )
-    items = []
-    visibles = set()
-    for actividad in actividades:
-        visibles.add(actividad.id)
-        items.append(
-            {
-                'id': actividad.id,
-                'estado': actividad.estado,
-                'estado_alerta': _resolver_estado_alerta(actividad, now_utc=now_utc),
-                'updated_at_utc': f'{actividad.updated_at.isoformat()}Z' if actividad.updated_at else None,
-            }
-        )
-    missing_ids = [actividad_id for actividad_id in query_ids if actividad_id not in visibles]
-    return jsonify(
-        {
-            'items': items,
-            'missing_ids': missing_ids,
-            'page_ids': page_ids,
-            'page': actividades_pagina.page,
-            'pages': actividades_pagina.pages,
-            'total': actividades_pagina.total,
-            'server_time_utc': f'{now_utc.isoformat()}Z',
-        }
-    )
-
-
-@agenda_bp.route('/api/clientes/buscar', methods=['GET'])
-@login_required
-def buscar_clientes_relacion():
-    q = (request.args.get('q') or '').strip()
-    query = Cliente.query.options(
-        load_only(
-            Cliente.id_cliente,
-            Cliente.nombre,
-            Cliente.ruc_ci,
-            Cliente.telefono,
-            Cliente.email,
-        )
-    ).filter(Cliente.activo.is_(True))
-
-    if q:
-        query = query.filter(
-            or_(
-                Cliente.nombre.ilike(f'%{q}%'),
-                Cliente.ruc_ci.ilike(f'%{q}%'),
-                Cliente.telefono.ilike(f'%{q}%'),
-            )
-        )
-
-    clientes = query.order_by(Cliente.nombre.asc()).limit(10).all()
-    return jsonify({'items': [_serializar_cliente(cliente) for cliente in clientes]})
-
-
-@agenda_bp.route('/api/ventas/buscar', methods=['GET'])
-@login_required
-def buscar_ventas_relacion():
-    q = (request.args.get('q') or '').strip()
-    cliente_id = request.args.get('cliente_id', type=int)
-
-    query = (
-        Venta.query.join(Cliente, Venta.id_cliente == Cliente.id_cliente)
-        .options(
-            load_only(
-                Venta.id_venta,
-                Venta.id_cliente,
-                Venta.fecha_venta,
-                Venta.total,
-                Venta.estado,
-                Venta.numero_comprobante,
-            ),
-            joinedload(Venta.cliente).load_only(
-                Cliente.id_cliente,
-                Cliente.nombre,
-                Cliente.ruc_ci,
-                Cliente.telefono,
-                Cliente.email,
-            ),
-        )
-        .filter(Cliente.activo.is_(True))
-    )
-
-    if cliente_id:
-        query = query.filter(Venta.id_cliente == cliente_id)
-
-    if q:
-        condiciones = [
-            cast(Venta.id_venta, String).ilike(f'%{q}%'),
-            Cliente.nombre.ilike(f'%{q}%'),
-            Cliente.ruc_ci.ilike(f'%{q}%'),
-        ]
-        if q.isdigit():
-            condiciones.append(Venta.id_venta == int(q))
-        if q:
-            condiciones.append(Venta.numero_comprobante.ilike(f'%{q}%'))
-        query = query.filter(or_(*condiciones))
-
-    # Sin búsqueda explícita, devolvemos las ventas más recientes para usar como sugerencias iniciales.
-    ventas = query.order_by(Venta.fecha_venta.desc(), Venta.id_venta.desc()).limit(10).all()
-    return jsonify({'items': [_serializar_venta(venta) for venta in ventas]})
-
-
-@agenda_bp.route('/api/reparaciones/buscar', methods=['GET'])
-@login_required
-def buscar_reparaciones_relacion():
-    q = (request.args.get('q') or '').strip()
-    cliente_id = request.args.get('cliente_id', type=int)
-
-    query = (
-        Reparacion.query.join(Cliente, Reparacion.cliente_id == Cliente.id_cliente)
-        .options(
-            load_only(
-                Reparacion.id_reparacion,
-                Reparacion.cliente_id,
-                Reparacion.tipo_equipo,
-                Reparacion.marca_modelo,
-                Reparacion.estado,
-                Reparacion.fecha_ingreso,
-            ),
-            joinedload(Reparacion.cliente).load_only(
-                Cliente.id_cliente,
-                Cliente.nombre,
-                Cliente.ruc_ci,
-                Cliente.telefono,
-                Cliente.email,
-            ),
-        )
-        .filter(Cliente.activo.is_(True))
-    )
-
-    if cliente_id:
-        query = query.filter(Reparacion.cliente_id == cliente_id)
-
-    if q:
-        condiciones = [
-            cast(Reparacion.id_reparacion, String).ilike(f'%{q}%'),
-            Reparacion.tipo_equipo.ilike(f'%{q}%'),
-            Reparacion.marca_modelo.ilike(f'%{q}%'),
-            Cliente.nombre.ilike(f'%{q}%'),
-        ]
-        if q.isdigit():
-            condiciones.append(Reparacion.id_reparacion == int(q))
-        query = query.filter(or_(*condiciones))
-
-    reparaciones = query.order_by(Reparacion.fecha_ingreso.desc(), Reparacion.id_reparacion.desc()).limit(10).all()
-    return jsonify({'items': [_serializar_reparacion(reparacion) for reparacion in reparaciones]})
-
-
-@agenda_bp.route('/actividades/nueva', methods=['GET', 'POST'])
-@login_required
-def nueva_actividad():
-    if not current_user.tiene_permiso('agenda_crear'):
-        flash('No tienes permiso para crear actividades.', 'danger')
-        return redirect(url_for('agenda.lista_actividades'))
-
-    usuarios, contactos = _obtener_opciones_formulario()
-    cliente_inicial, reparacion_inicial, venta_inicial = _obtener_relaciones_iniciales()
-    if request.method == 'POST':
-        titulo = (request.form.get('titulo') or '').strip()
-        tipo = (request.form.get('tipo') or '').strip().lower() or 'tarea_interna'
-        prioridad = (request.form.get('prioridad') or '').strip().lower() or 'media'
-        fecha_inicio = _parse_datetime_local(request.form.get('fecha_inicio'))
-        fecha_fin = _parse_datetime_local(request.form.get('fecha_fin'))
-        recordatorio_minutos = _parse_optional_int(request.form.get('recordatorio_minutos'))
-        cliente_inicial, reparacion_inicial, venta_inicial = _obtener_relaciones_iniciales(data=request.form)
-        mostrar_agenda_en, usuarios_agenda_ids, recordatorio_a, usuarios_recordatorio_ids = _resolver_destinatarios_formulario(data=request.form)
-        error_destinatarios = _validar_destinatarios(
-            mostrar_agenda_en,
-            usuarios_agenda_ids,
-            recordatorio_a,
-            usuarios_recordatorio_ids,
-        )
-        error_temporalidad = _validar_temporalidad_actividad(fecha_inicio, fecha_fin, recordatorio_minutos)
-
-        if not titulo or not fecha_inicio or error_destinatarios or error_temporalidad:
-            if error_destinatarios:
-                flash(error_destinatarios, 'warning')
-            elif error_temporalidad:
-                flash(error_temporalidad, 'warning')
-            else:
-                flash('Título y fecha de inicio son obligatorios.', 'warning')
-            return _render_formulario_actividad(
-                modo='crear',
-                actividad=None,
-                data=request.form,
-                usuarios=usuarios,
-                contactos=contactos,
-                cliente_inicial=cliente_inicial,
-                reparacion_inicial=reparacion_inicial,
-                venta_inicial=venta_inicial,
-            )
-
-        usuario_id = request.form.get('usuario_id', type=int) or current_user.id_usuario
-        if not _puede_ver_todo():
-            usuario_id = current_user.id_usuario
-
-        actividad = AgendaActividad(
-            titulo=titulo,
-            tipo=tipo if tipo in TIPOS_ACTIVIDAD else 'tarea_interna',
-            descripcion=(request.form.get('descripcion') or '').strip() or None,
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            estado='pendiente',
-            prioridad=prioridad if prioridad in PRIORIDADES_ACTIVIDAD else 'media',
-            usuario_id=usuario_id,
-            creado_por_id=current_user.id_usuario,
-            cliente_id=_parse_optional_int(request.form.get('cliente_id')),
-            reparacion_id=_parse_optional_int(request.form.get('reparacion_id')),
-            venta_id=_parse_optional_int(request.form.get('venta_id')),
-            crm_contacto_id=_parse_optional_int(request.form.get('crm_contacto_id')),
-            origen_modulo='agenda',
-            recordatorio_minutos=recordatorio_minutos,
-            es_todo_el_dia=bool(request.form.get('es_todo_el_dia')),
-            observaciones=(request.form.get('observaciones') or '').strip() or None,
-        )
-        _aplicar_destinatarios_a_actividad(
-            actividad,
-            mostrar_agenda_en,
-            usuarios_agenda_ids,
-            recordatorio_a,
-            usuarios_recordatorio_ids,
-        )
-        db.session.add(actividad)
-        db.session.commit()
-        flash('Actividad creada correctamente.', 'success')
-        return redirect(url_for('agenda.lista_actividades'))
-
-    return _render_formulario_actividad(
-        modo='crear',
-        actividad=None,
-        data={},
-        usuarios=usuarios,
-        contactos=contactos,
-        cliente_inicial=cliente_inicial,
-        reparacion_inicial=reparacion_inicial,
-        venta_inicial=venta_inicial,
-    )
-
-
-@agenda_bp.route('/actividades/<int:id_actividad>/editar', methods=['GET', 'POST'])
-@login_required
-def editar_actividad(id_actividad: int):
-    if not current_user.tiene_permiso('agenda_editar'):
-        flash('No tienes permiso para editar actividades.', 'danger')
-        return redirect(url_for('agenda.lista_actividades'))
-
-    actividad = _cargar_actividad_visible_o_404(id_actividad)
-    usuarios, contactos = _obtener_opciones_formulario()
-    cliente_inicial, reparacion_inicial, venta_inicial = _obtener_relaciones_iniciales(actividad=actividad)
-
-    if request.method == 'POST':
-        titulo = (request.form.get('titulo') or '').strip()
-        fecha_inicio = _parse_datetime_local(request.form.get('fecha_inicio'))
-        fecha_fin = _parse_datetime_local(request.form.get('fecha_fin'))
-        recordatorio_minutos = _parse_optional_int(request.form.get('recordatorio_minutos'))
-        cliente_inicial, reparacion_inicial, venta_inicial = _obtener_relaciones_iniciales(data=request.form, actividad=actividad)
-        mostrar_agenda_en, usuarios_agenda_ids, recordatorio_a, usuarios_recordatorio_ids = _resolver_destinatarios_formulario(data=request.form)
-        error_destinatarios = _validar_destinatarios(
-            mostrar_agenda_en,
-            usuarios_agenda_ids,
-            recordatorio_a,
-            usuarios_recordatorio_ids,
-        )
-        error_temporalidad = _validar_temporalidad_actividad(fecha_inicio, fecha_fin, recordatorio_minutos)
-        if not titulo or not fecha_inicio or error_destinatarios or error_temporalidad:
-            if error_destinatarios:
-                flash(error_destinatarios, 'warning')
-            elif error_temporalidad:
-                flash(error_temporalidad, 'warning')
-            else:
-                flash('Título y fecha de inicio son obligatorios.', 'warning')
-            return _render_formulario_actividad(
-                modo='editar',
-                actividad=actividad,
-                data=request.form,
-                usuarios=usuarios,
-                contactos=contactos,
-                cliente_inicial=cliente_inicial,
-                reparacion_inicial=reparacion_inicial,
-                venta_inicial=venta_inicial,
-            )
-
-        actividad.titulo = titulo
-        actividad.tipo = (request.form.get('tipo') or '').strip().lower() or actividad.tipo
-        if actividad.tipo not in TIPOS_ACTIVIDAD:
-            actividad.tipo = 'tarea_interna'
-        actividad.descripcion = (request.form.get('descripcion') or '').strip() or None
-        actividad.fecha_inicio = fecha_inicio
-        actividad.fecha_fin = fecha_fin
-        actividad.prioridad = (request.form.get('prioridad') or '').strip().lower() or actividad.prioridad
-        if actividad.prioridad not in PRIORIDADES_ACTIVIDAD:
-            actividad.prioridad = 'media'
-        if _puede_ver_todo():
-            actividad.usuario_id = request.form.get('usuario_id', type=int) or actividad.usuario_id
-        actividad.cliente_id = _parse_optional_int(request.form.get('cliente_id'))
-        actividad.reparacion_id = _parse_optional_int(request.form.get('reparacion_id'))
-        actividad.venta_id = _parse_optional_int(request.form.get('venta_id'))
-        actividad.crm_contacto_id = _parse_optional_int(request.form.get('crm_contacto_id'))
-        actividad.recordatorio_minutos = recordatorio_minutos
-        actividad.es_todo_el_dia = bool(request.form.get('es_todo_el_dia'))
-        actividad.observaciones = (request.form.get('observaciones') or '').strip() or None
-        _aplicar_destinatarios_a_actividad(
-            actividad,
-            mostrar_agenda_en,
-            usuarios_agenda_ids,
-            recordatorio_a,
-            usuarios_recordatorio_ids,
-        )
-        db.session.commit()
-        flash('Actividad actualizada correctamente.', 'success')
-        return redirect(url_for('agenda.lista_actividades'))
-
-    return _render_formulario_actividad(
-        modo='editar',
-        actividad=actividad,
-        data={},
-        usuarios=usuarios,
-        contactos=contactos,
-        cliente_inicial=cliente_inicial,
-        reparacion_inicial=reparacion_inicial,
-        venta_inicial=venta_inicial,
-    )
-
-
-@agenda_bp.post('/actividades/<int:id_actividad>/iniciar')
-@login_required
-def iniciar_actividad(id_actividad: int):
-    if not (current_user.tiene_permiso('agenda_editar') or current_user.tiene_permiso('agenda_completar')):
-        mensaje = 'No tienes permiso para iniciar actividades.'
-        if _wants_json_response():
-            return jsonify({'ok': False, 'mensaje': mensaje}), 403
-        flash(mensaje, 'danger')
-        return redirect(_redirect_agenda_next())
-    actividad = _cargar_actividad_visible_o_404(id_actividad)
-    _sincronizar_cliente_servicio_desde_actividad(actividad, accion='iniciar')
-    db.session.commit()
-    mensaje = 'Actividad iniciada.'
-    if _wants_json_response():
-        return jsonify({'ok': True, 'mensaje': mensaje, 'id': actividad.id, 'estado': actividad.estado})
-    flash(mensaje, 'success')
-    return redirect(_redirect_agenda_next())
-
-
-@agenda_bp.post('/actividades/<int:id_actividad>/completar')
-@login_required
-def completar_actividad(id_actividad: int):
-    if not current_user.tiene_permiso('agenda_completar'):
-        mensaje = 'No tienes permiso para completar actividades.'
-        if _wants_json_response():
-            return jsonify({'ok': False, 'mensaje': mensaje}), 403
-        flash(mensaje, 'danger')
-        return redirect(_redirect_agenda_next())
-    actividad = _cargar_actividad_visible_o_404(id_actividad)
-    estado_alerta = _resolver_estado_alerta(actividad)
-    actividad.estado = 'hecha'
-    _sincronizar_cliente_servicio_desde_actividad(actividad, accion='completar')
-    db.session.commit()
-    mensaje = 'Actividad marcada como hecha.'
-    if _wants_json_response():
-        return jsonify({'ok': True, 'mensaje': mensaje, 'id': actividad.id, 'estado_alerta': estado_alerta, 'estado': actividad.estado})
-    flash(mensaje, 'success')
-    return redirect(_redirect_agenda_next())
-
-
-@agenda_bp.post('/actividades/<int:id_actividad>/cancelar')
-@login_required
-def cancelar_actividad(id_actividad: int):
-    if not current_user.tiene_permiso('agenda_cancelar'):
-        mensaje = 'No tienes permiso para cancelar actividades.'
-        if _wants_json_response():
-            return jsonify({'ok': False, 'mensaje': mensaje}), 403
-        flash(mensaje, 'danger')
-        return redirect(url_for('agenda.lista_actividades'))
-    actividad = _cargar_actividad_visible_o_404(id_actividad)
-    estado_alerta = _resolver_estado_alerta(actividad)
-    actividad.estado = 'cancelada'
-    db.session.commit()
-    mensaje = 'Actividad cancelada.'
-    if _wants_json_response():
-        return jsonify({'ok': True, 'mensaje': mensaje, 'id': actividad.id, 'estado_alerta': estado_alerta, 'estado': actividad.estado})
-    flash(mensaje, 'success')
-    return redirect(url_for('agenda.lista_actividades'))
-
-
-@agenda_bp.post('/actividades/<int:id_actividad>/eliminar')
-@login_required
-def eliminar_actividad(id_actividad: int):
-    if not current_user.tiene_permiso('agenda_cancelar'):
-        mensaje = 'No tienes permiso para eliminar actividades.'
-        if _wants_json_response():
-            return jsonify({'ok': False, 'mensaje': mensaje}), 403
-        flash(mensaje, 'danger')
-        return redirect(url_for('agenda.lista_actividades'))
-    actividad = _cargar_actividad_visible_o_404(id_actividad)
-    estado_alerta = _resolver_estado_alerta(actividad)
-    actividad_id = actividad.id
-    _limpiar_destinatarios_actividad(actividad)
-    db.session.flush()
-    db.session.delete(actividad)
-    db.session.commit()
-    mensaje = 'Actividad eliminada.'
-    if _wants_json_response():
-        return jsonify({'ok': True, 'mensaje': mensaje, 'id': actividad_id, 'estado_alerta': estado_alerta, 'estado': 'eliminada', 'eliminada': True})
-    flash(mensaje, 'success')
-    return redirect(url_for('agenda.lista_actividades'))
-
-
-@agenda_bp.post('/actividades/<int:id_actividad>/reprogramar')
-@login_required
-def reprogramar_actividad(id_actividad: int):
-    if not current_user.tiene_permiso('agenda_editar'):
-        flash('No tienes permiso para reprogramar actividades.', 'danger')
-        return redirect(url_for('agenda.lista_actividades'))
-    actividad = _cargar_actividad_visible_o_404(id_actividad)
-    fecha_inicio = _parse_datetime_local(request.form.get('fecha_inicio'))
-    if not fecha_inicio:
-        flash('La nueva fecha de inicio es obligatoria.', 'warning')
-        return redirect(url_for('agenda.lista_actividades'))
-    actividad.fecha_inicio = fecha_inicio
-    actividad.estado = 'pendiente'
-    db.session.commit()
-    flash('Actividad reprogramada.', 'success')
-    return redirect(url_for('agenda.lista_actividades'))

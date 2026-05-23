@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import text, literal
 from sqlalchemy.orm import joinedload, aliased
 from app import db
-from app.models import Venta, DetalleVenta, Producto, Categoria, SesionCaja, Reparacion, Usuario, Rol, Cliente
+from app.models import Venta, DetalleVenta, Producto, Categoria, SesionCaja, Reparacion, Usuario, Rol, Cliente, PagoCuentaCobrar, Servicio
 from app.routes.reportes_ventas_diarias import construir_contexto_ventas_diarias
 from app.utils.helpers import today_local, parse_iso_date, utc_bounds_for_local_dates, local_strftime
 
@@ -383,8 +383,27 @@ def detalle_venta(id_venta):
     for pago in venta.pagos:
         pagos.append({
             'metodo': pago.metodo.nombre,
-            'monto': float(pago.monto)
+            'monto': float(pago.monto),
+            'origen': 'venta',
         })
+
+    cuenta_por_cobrar = getattr(venta, 'cuenta_por_cobrar', None)
+    if cuenta_por_cobrar is not None:
+        pagos_credito = (
+            PagoCuentaCobrar.query.options(joinedload(PagoCuentaCobrar.metodo))
+            .filter(
+                PagoCuentaCobrar.id_cuenta_cobrar == cuenta_por_cobrar.id_cuenta_cobrar,
+                PagoCuentaCobrar.estado != 'anulado',
+            )
+            .order_by(PagoCuentaCobrar.fecha_pago.asc(), PagoCuentaCobrar.id_pago_cuenta.asc())
+            .all()
+        )
+        for pago in pagos_credito:
+            pagos.append({
+                'metodo': pago.metodo.nombre if pago.metodo else 'Sin metodo',
+                'monto': float(pago.monto),
+                'origen': 'cobranza',
+            })
 
     vendedor = _nombre_vendedor_venta(venta)
     total_pagado_inmediato = sum(float(p.monto or 0) for p in venta.pagos)
@@ -465,27 +484,58 @@ def productos_vendidos():
     hasta = parse_iso_date(fecha_hasta) or today_local()
     start_utc, end_utc = utc_bounds_for_local_dates(desde, hasta)
     
-    # Consulta de productos más vendidos
-    productos = db.session.query(
-        Producto,
-        db.func.sum(DetalleVenta.cantidad).label('cantidad_vendida'),
-        db.func.sum(DetalleVenta.subtotal).label('total_vendido')
-    ).join(
-        DetalleVenta, Producto.id_producto == DetalleVenta.id_producto
-    ).join(
-        Venta, DetalleVenta.id_venta == Venta.id_venta
-    ).filter(
-        Venta.estado == 'completada',
-        Venta.fecha_venta >= start_utc,
-        Venta.fecha_venta < end_utc
-    ).group_by(
-        Producto.id_producto
-    ).order_by(
-        db.desc('cantidad_vendida')
-    ).limit(50).all()
+    # Incluye productos y servicios vendidos en un mismo ranking comercial.
+    rows = (
+        db.session.query(
+            DetalleVenta.id_producto,
+            DetalleVenta.id_servicio,
+            Producto.nombre.label('producto_nombre'),
+            Servicio.nombre.label('servicio_nombre'),
+            db.func.sum(DetalleVenta.cantidad).label('cantidad_vendida'),
+            db.func.sum(DetalleVenta.subtotal).label('total_vendido'),
+        )
+        .outerjoin(Producto, Producto.id_producto == DetalleVenta.id_producto)
+        .outerjoin(Servicio, Servicio.id_servicio == DetalleVenta.id_servicio)
+        .join(Venta, DetalleVenta.id_venta == Venta.id_venta)
+        .filter(
+            Venta.estado == 'completada',
+            Venta.fecha_venta >= start_utc,
+            Venta.fecha_venta < end_utc,
+        )
+        .group_by(
+            DetalleVenta.id_producto,
+            DetalleVenta.id_servicio,
+            Producto.nombre,
+            Servicio.nombre,
+        )
+        .order_by(
+            db.desc('cantidad_vendida'),
+            db.desc('total_vendido'),
+        )
+        .limit(50)
+        .all()
+    )
+
+    items_vendidos = []
+    for row in rows:
+        es_servicio = bool(getattr(row, 'id_servicio', None))
+        nombre = (
+            getattr(row, 'servicio_nombre', None)
+            if es_servicio
+            else getattr(row, 'producto_nombre', None)
+        )
+        nombre = (nombre or '').strip()
+        if not nombre:
+            continue
+        items_vendidos.append({
+            'nombre': nombre,
+            'tipo': 'Servicio' if es_servicio else 'Producto',
+            'cantidad_vendida': int(getattr(row, 'cantidad_vendida', 0) or 0),
+            'total_vendido': float(getattr(row, 'total_vendido', 0) or 0),
+        })
     
     return render_template('reportes/productos_vendidos.html',
-        productos=productos,
+        items_vendidos=items_vendidos,
         desde=desde,
         hasta=hasta
     )

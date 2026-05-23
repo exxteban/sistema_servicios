@@ -2,71 +2,322 @@
 
 {% block title %}Agenda | {% endblock %}
 
-{% block content %}
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">
-            <i class="fas fa-calendar-check text-indigo-500 mr-2"></i>Agenda
-        </h1>
+{% macro estado_badge(estado) %}
+<span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold
+    {% if estado == 'pendiente' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300
+    {% elif estado == 'hecha' %}bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300
+    {% else %}bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300{% endif %}">
+    {{ estado|capitalize }}
+</span>
+{% endmacro %}
+
+{% macro prioridad_badge(prioridad) %}
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold
+    {% if prioridad == 'baja' %}bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300
+    {% elif prioridad == 'media' %}bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300
+    {% elif prioridad == 'alta' %}bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300
+    {% elif prioridad == 'critica' %}bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300
+    {% else %}bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300{% endif %}">
+    <span class="w-2 h-2 rounded-full
+        {% if prioridad == 'baja' %}bg-emerald-500
+        {% elif prioridad == 'media' %}bg-sky-500
+        {% elif prioridad == 'alta' %}bg-orange-500
+        {% elif prioridad == 'critica' %}bg-rose-500
+        {% else %}bg-gray-500{% endif %}"></span>
+    {{ prioridad|capitalize }}
+</span>
+{% endmacro %}
+
+{% macro actividad_card(item) %}
+<article class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+            <div class="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                {{ item.fecha_label }} - {{ item.hora_inicio }}{% if item.hora_fin %} - {{ item.hora_fin }}{% endif %}
+            </div>
+            <h3 class="mt-1 text-sm font-bold text-gray-900 dark:text-white break-words">{{ item.titulo }}</h3>
+        </div>
+        {{ estado_badge(item.estado) }}
+    </div>
+
+    <div class="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-700 dark:text-gray-200">
         <div class="flex items-center gap-2">
+            <i class="fas fa-user text-gray-400 w-4"></i>
+            <span class="truncate">{{ item.cliente }}</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <i class="fas fa-briefcase text-gray-400 w-4"></i>
+            <span class="truncate">{{ item.servicio }}</span>
+        </div>
+        {% if item.servicio_estado %}
+        <div class="flex items-center gap-2">
+            <i class="fas fa-clipboard-check text-gray-400 w-4"></i>
+            <span class="truncate">{{ item.servicio_estado|replace('_', ' ')|title }}</span>
+        </div>
+        {% endif %}
+        {% if item.telefono %}
+        <a href="https://wa.me/{{ item.telefono|replace(' ', '')|replace('+', '') }}"
+            target="_blank"
+            class="inline-flex items-center gap-2 text-emerald-700 hover:text-emerald-800 dark:text-emerald-300">
+            <i class="fab fa-whatsapp w-4"></i>
+            <span class="truncate">{{ item.telefono }}</span>
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+        {{ prioridad_badge(item.prioridad) }}
+        <span class="inline-flex items-center px-2 py-1 rounded bg-gray-100 text-xs font-semibold text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+            {{ item.tipo_label }}
+        </span>
+        {% if item.monto > 0 %}
+        <span class="inline-flex items-center px-2 py-1 rounded bg-indigo-50 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+            Gs. {{ "{:,.0f}".format(item.monto).replace(",", ".") }}
+        </span>
+        {% endif %}
+    </div>
+
+    {% if item.observaciones %}
+    <p class="mt-3 rounded bg-gray-50 px-2 py-1 text-xs text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
+        {{ item.observaciones }}
+    </p>
+    {% endif %}
+
+    <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
+        {% if current_user.tiene_permiso('agenda_editar') %}
+        <a href="{{ url_for('agenda.editar_actividad', id_actividad=item.id) }}"
+            class="inline-flex h-8 w-8 items-center justify-center rounded border border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-900/30"
+            title="Editar">
+            <i class="fas fa-edit"></i>
+        </a>
+        {% endif %}
+        {% if current_user.tiene_permiso('agenda_editar') and item.estado == 'pendiente' %}
+        <form method="POST" action="{{ url_for('agenda.iniciar_actividad', id_actividad=item.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button type="submit"
+                class="inline-flex h-8 w-8 items-center justify-center rounded border border-sky-200 text-sky-700 hover:bg-sky-50 dark:border-sky-900 dark:text-sky-300 dark:hover:bg-sky-900/30"
+                title="Iniciar">
+                <i class="fas fa-play"></i>
+            </button>
+        </form>
+        {% endif %}
+        {% if current_user.tiene_permiso('agenda_completar') and item.estado == 'pendiente' %}
+        <form method="POST" action="{{ url_for('agenda.completar_actividad', id_actividad=item.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button type="submit"
+                class="inline-flex h-8 w-8 items-center justify-center rounded border border-green-200 text-green-700 hover:bg-green-50 dark:border-green-900 dark:text-green-300 dark:hover:bg-green-900/30"
+                title="Completar">
+                <i class="fas fa-check"></i>
+            </button>
+        </form>
+        {% endif %}
+        {% if current_user.tiene_permiso('agenda_cancelar') and item.estado == 'pendiente' %}
+        <form method="POST" action="{{ url_for('agenda.cancelar_actividad', id_actividad=item.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button type="submit"
+                class="inline-flex h-8 w-8 items-center justify-center rounded border border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-900/30"
+                title="Cancelar">
+                <i class="fas fa-ban"></i>
+            </button>
+        </form>
+        {% endif %}
+        {% if current_user.tiene_permiso('agenda_editar') %}
+        <form method="POST" action="{{ url_for('agenda.reprogramar_actividad', id_actividad=item.id) }}"
+            class="flex min-w-[190px] flex-1 items-center gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <input type="datetime-local" name="fecha_inicio" value="{{ item.fecha_reprogramar }}"
+                class="h-8 min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            <button type="submit"
+                class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900"
+                title="Reprogramar">
+                <i class="fas fa-clock"></i>
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</article>
+{% endmacro %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                <i class="fas fa-calendar-check text-indigo-500 mr-2"></i>Agenda operativa
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ rango_label }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ navegacion.prev_url }}"
+                class="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                title="Anterior">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            <a href="{{ navegacion.today_url }}"
+                class="rounded border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                Hoy
+            </a>
+            <a href="{{ navegacion.next_url }}"
+                class="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                title="Siguiente">
+                <i class="fas fa-chevron-right"></i>
+            </a>
             <a href="{{ url_for('agenda.lista_actividades') }}"
-                class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm">
-                <i class="fas fa-list mr-1"></i> Ver lista
+                class="rounded bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+                <i class="fas fa-list mr-1"></i>Lista
             </a>
             {% if current_user.tiene_permiso('agenda_crear') %}
             <a href="{{ url_for('agenda.nueva_actividad') }}"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition text-sm">
-                <i class="fas fa-plus mr-1"></i> Nueva
+                class="rounded bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+                <i class="fas fa-plus mr-1"></i>Nueva
             </a>
             {% endif %}
-            <span class="text-sm text-gray-500 dark:text-gray-400">{{ fecha_hoy.strftime('%d/%m/%Y') }}</span>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border-t-4 border-blue-500">
-            <p class="text-sm text-gray-500 dark:text-gray-400">Pendientes hoy</p>
-            <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ pendientes_hoy }}</p>
+    <form method="GET" class="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 md:grid-cols-5">
+        <div>
+            <label class="mb-1 block text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Vista</label>
+            <select name="vista" class="w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                <option value="dia" {% if vista == 'dia' %}selected{% endif %}>Dia</option>
+                <option value="semana" {% if vista == 'semana' %}selected{% endif %}>Semana</option>
+            </select>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border-t-4 border-red-500">
-            <p class="text-sm text-gray-500 dark:text-gray-400">Vencidas</p>
-            <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ vencidas }}</p>
+        <div>
+            <label class="mb-1 block text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Fecha</label>
+            <input type="date" name="fecha" value="{{ fecha_base.isoformat() }}"
+                class="w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border-t-4 border-amber-500">
-            <p class="text-sm text-gray-500 dark:text-gray-400">Próximas</p>
-            <p class="text-3xl font-bold text-gray-800 dark:text-white mt-1">{{ proximas }}</p>
+        <div>
+            <label class="mb-1 block text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Estado</label>
+            <select name="estado" class="w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                <option value="todos" {% if filtros.estado == 'todos' %}selected{% endif %}>Todos</option>
+                <option value="pendiente" {% if filtros.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="hecha" {% if filtros.estado == 'hecha' %}selected{% endif %}>Hecha</option>
+                <option value="cancelada" {% if filtros.estado == 'cancelada' %}selected{% endif %}>Cancelada</option>
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Tipo</label>
+            <select name="tipo" class="w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                <option value="">Todos</option>
+                {% for tipo in tipos_actividad %}
+                <option value="{{ tipo }}" {% if filtros.tipo == tipo %}selected{% endif %}>{{ tipo_labels.get(tipo, tipo|replace('_', ' ')|title) }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Responsable</label>
+            <div class="flex gap-2">
+                <select name="responsable_id" class="min-w-0 flex-1 rounded border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    {% if not current_user.es_admin() and not current_user.tiene_permiso('agenda_ver_todas') %}disabled{% endif %}>
+                    <option value="">Todos</option>
+                    {% for responsable in responsables %}
+                    <option value="{{ responsable.id_usuario }}" {% if filtros.responsable_id == responsable.id_usuario %}selected{% endif %}>
+                        {{ responsable.nombre_completo or responsable.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <button type="submit"
+                    class="inline-flex h-10 w-10 items-center justify-center rounded bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+                    title="Filtrar">
+                    <i class="fas fa-filter"></i>
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-6">
+        <a href="{{ url_for('agenda.lista_actividades', estado='pendiente') }}" class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/60 dark:bg-blue-900/20">
+            <p class="text-xs font-semibold uppercase text-blue-700 dark:text-blue-300">Pendientes hoy</p>
+            <p class="mt-1 text-2xl font-bold text-blue-950 dark:text-blue-100">{{ pendientes_hoy }}</p>
+        </a>
+        <a href="{{ url_for('agenda.lista_actividades', estado='pendiente') }}" class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-900/20">
+            <p class="text-xs font-semibold uppercase text-red-700 dark:text-red-300">Vencidas</p>
+            <p class="mt-1 text-2xl font-bold text-red-950 dark:text-red-100">{{ vencidas }}</p>
+        </a>
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-900/20">
+            <p class="text-xs font-semibold uppercase text-amber-700 dark:text-amber-300">Proximas</p>
+            <p class="mt-1 text-2xl font-bold text-amber-950 dark:text-amber-100">{{ proximas }}</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <p class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">En rango</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ total_actividades }}</p>
+        </div>
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-900/20">
+            <p class="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-300">Disponibles</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-950 dark:text-emerald-100">{{ responsables_libres }}</p>
+        </div>
+        <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-900/20">
+            <p class="text-xs font-semibold uppercase text-indigo-700 dark:text-indigo-300">Estimado</p>
+            <p class="mt-1 text-2xl font-bold text-indigo-950 dark:text-indigo-100">Gs. {{ "{:,.0f}".format(ingresos_estimados).replace(",", ".") }}</p>
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-            <p class="text-gray-700 dark:text-gray-200 font-semibold">Actividades por prioridad</p>
-            <span class="text-sm text-gray-500 dark:text-gray-400">
-                Total: {{ prioridades_pendientes.values()|sum }}
-            </span>
-        </div>
-        <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <a href="{{ url_for('agenda.lista_actividades', prioridad='baja') }}"
-                class="rounded-lg ring-1 ring-inset ring-emerald-500/40 dark:ring-emerald-400/35 bg-emerald-50/80 dark:bg-emerald-900/20 p-3 block transition hover:shadow-md hover:-translate-y-0.5 hover:ring-emerald-500/60 dark:hover:ring-emerald-300/55">
-                <p class="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300 font-semibold">Baja</p>
-                <p class="mt-1 text-2xl font-bold text-emerald-800 dark:text-emerald-200">{{ prioridades_pendientes.get('baja', 0) }}</p>
-            </a>
-            <a href="{{ url_for('agenda.lista_actividades', prioridad='media') }}"
-                class="rounded-lg ring-1 ring-inset ring-sky-500/40 dark:ring-sky-400/35 bg-sky-50/80 dark:bg-sky-900/20 p-3 block transition hover:shadow-md hover:-translate-y-0.5 hover:ring-sky-500/60 dark:hover:ring-sky-300/55">
-                <p class="text-xs uppercase tracking-wide text-sky-700 dark:text-sky-300 font-semibold">Media</p>
-                <p class="mt-1 text-2xl font-bold text-sky-800 dark:text-sky-200">{{ prioridades_pendientes.get('media', 0) }}</p>
-            </a>
-            <a href="{{ url_for('agenda.lista_actividades', prioridad='alta') }}"
-                class="rounded-lg ring-1 ring-inset ring-orange-500/40 dark:ring-orange-400/35 bg-orange-50/80 dark:bg-orange-900/20 p-3 block transition hover:shadow-md hover:-translate-y-0.5 hover:ring-orange-500/60 dark:hover:ring-orange-300/55">
-                <p class="text-xs uppercase tracking-wide text-orange-700 dark:text-orange-300 font-semibold">Alta</p>
-                <p class="mt-1 text-2xl font-bold text-orange-800 dark:text-orange-200">{{ prioridades_pendientes.get('alta', 0) }}</p>
-            </a>
-            <a href="{{ url_for('agenda.lista_actividades', prioridad='critica') }}"
-                class="rounded-lg ring-1 ring-inset ring-rose-500/40 dark:ring-rose-400/35 bg-rose-50/80 dark:bg-rose-900/20 p-3 block transition hover:shadow-md hover:-translate-y-0.5 hover:ring-rose-500/60 dark:hover:ring-rose-300/55">
-                <p class="text-xs uppercase tracking-wide text-rose-700 dark:text-rose-300 font-semibold">Crítica</p>
-                <p class="mt-1 text-2xl font-bold text-rose-800 dark:text-rose-200">{{ prioridades_pendientes.get('critica', 0) }}</p>
-            </a>
-        </div>
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <section class="min-w-0">
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                {% for grupo in grupos_responsables %}
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div class="mb-3 flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <h2 class="truncate text-sm font-bold text-gray-900 dark:text-white">{{ grupo.nombre }}</h2>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ grupo['items']|length }} actividades</p>
+                        </div>
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded bg-white text-sm font-bold text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700">
+                            {{ grupo['items']|length }}
+                        </span>
+                    </div>
+                    <div class="space-y-3">
+                        {% for item in grupo['items'] %}
+                            {{ actividad_card(item) }}
+                        {% else %}
+                        <div class="rounded-lg border border-dashed border-gray-300 bg-white px-3 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                            Disponible
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                <h2 class="text-sm font-bold text-gray-900 dark:text-white">Estados</h2>
+                <div class="mt-3 space-y-2 text-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600 dark:text-gray-300">Pendientes</span>
+                        <strong class="text-gray-900 dark:text-white">{{ estados_rango.get('pendiente', 0) }}</strong>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600 dark:text-gray-300">Hechas</span>
+                        <strong class="text-gray-900 dark:text-white">{{ estados_rango.get('hecha', 0) }}</strong>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600 dark:text-gray-300">Canceladas</span>
+                        <strong class="text-gray-900 dark:text-white">{{ estados_rango.get('cancelada', 0) }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                <h2 class="text-sm font-bold text-gray-900 dark:text-white">Prioridad pendiente</h2>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    {% for prioridad, total in prioridades_pendientes.items() %}
+                    <a href="{{ url_for('agenda.lista_actividades', prioridad=prioridad) }}"
+                        class="rounded border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900">
+                        <span class="block text-xs text-gray-500 dark:text-gray-400">{{ prioridad|capitalize }}</span>
+                        <strong class="text-gray-900 dark:text-white">{{ total }}</strong>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </aside>
     </div>
 </div>
 {% endblock %}

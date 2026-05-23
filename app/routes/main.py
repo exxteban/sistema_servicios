@@ -4,25 +4,24 @@ Rutas principales (Dashboard)
 from flask import Blueprint, render_template, request, jsonify, current_app, g, url_for
 from datetime import timedelta
 from flask_login import login_required, current_user
-from sqlalchemy import and_, case
-from sqlalchemy.orm import load_only, noload, joinedload
+from sqlalchemy.orm import joinedload
 from app import db
 from app.models import (
-    AgendaActividad,
-    Cliente,
-    ClienteServicio,
     Configuracion,
     PagoCuentaCobrar,
     PedidoClientePago,
     PagoVenta,
     Producto,
-    Servicio,
     SesionCaja,
     Usuario,
     Venta,
 )
-from app.routes.agenda.actividades import _filtro_mostrar_agenda_para_usuario
-from app.utils.helpers import today_local, utc_bounds_for_local_dates, parse_iso_date, local_strftime
+from app.routes.agenda.visibilidad import query_usuarios_agenda_visibles
+from app.utils.helpers import today_local, utc_bounds_for_local_dates, parse_iso_date
+from app.services.dashboard_agenda import (
+    obtener_resumen_agenda_dashboard,
+    obtener_resumen_en_atencion_dashboard,
+)
 from app.services.dashboard_preferences import (
     set_dashboard_service_card_order,
     get_dashboard_service_cards,
@@ -33,6 +32,7 @@ from app.services.dashboard_preferences import (
     set_dashboard_view_preference,
 )
 from app.services.dashboard_negocio import obtener_dashboard_negocio_actual
+from app.services.dashboard_clientes import obtener_resumen_clientes_dashboard
 from app.services.dashboard_servicios import (
     obtener_estado_profesionales_dashboard,
     obtener_resumen_cobros_pendientes_dashboard,
@@ -49,143 +49,11 @@ main_bp = Blueprint('main', __name__)
 
 
 def _obtener_resumen_agenda_dashboard(can_ver_agenda, today):
-    agenda_total_pendientes = 0
-    agenda_pendientes_hoy = 0
-    agenda_vencidas = 0
-    agenda_proximas_actividades = []
-    agenda_fecha_hoy_iso = today.isoformat()
-
-    if not can_ver_agenda:
-        return {
-            'can_ver_agenda': False,
-            'total_pendientes': agenda_total_pendientes,
-            'pendientes_hoy': agenda_pendientes_hoy,
-            'vencidas': agenda_vencidas,
-            'proximas_actividades': agenda_proximas_actividades,
-            'fecha_hoy_iso': agenda_fecha_hoy_iso,
-        }
-
-    start_utc, end_utc = utc_bounds_for_local_dates(today, today)
-    agenda_pendiente_query = AgendaActividad.query.filter(AgendaActividad.estado == 'pendiente')
-    if not (current_user.es_admin() or current_user.tiene_permiso('agenda_ver_todas')):
-        agenda_pendiente_query = agenda_pendiente_query.filter(
-            _filtro_mostrar_agenda_para_usuario(current_user.id_usuario)
-        )
-
-    rango_hoy = and_(AgendaActividad.fecha_inicio >= start_utc, AgendaActividad.fecha_inicio < end_utc)
-    agenda_total_pendientes, agenda_pendientes_hoy, agenda_vencidas = (
-        agenda_pendiente_query.with_entities(
-            db.func.count(AgendaActividad.id),
-            db.func.coalesce(db.func.sum(case((rango_hoy, 1), else_=0)), 0),
-            db.func.coalesce(db.func.sum(case((AgendaActividad.fecha_inicio < start_utc, 1), else_=0)), 0),
-        ).one()
-    )
-    proximas_actividades = (
-        agenda_pendiente_query
-        .options(
-            load_only(
-                AgendaActividad.id,
-                AgendaActividad.titulo,
-                AgendaActividad.tipo,
-                AgendaActividad.prioridad,
-                AgendaActividad.fecha_inicio,
-                AgendaActividad.cliente_servicio_id,
-            ),
-            joinedload(AgendaActividad.cliente_servicio).load_only(
-                ClienteServicio.id_cliente_servicio,
-                ClienteServicio.id_venta,
-                ClienteServicio.estado,
-            ),
-            noload(AgendaActividad.usuarios_agenda),
-            noload(AgendaActividad.usuarios_recordatorio),
-        )
-        .filter(rango_hoy)
-        .order_by(AgendaActividad.fecha_inicio.asc(), AgendaActividad.id.desc())
-        .limit(5)
-        .all()
-    )
-
-    agenda_proximas_actividades = [
-        {
-            'id': actividad.id,
-            'titulo': actividad.titulo or '',
-            'tipo': actividad.tipo or '',
-            'tipo_label': (actividad.tipo or '').replace('_', ' ').title(),
-            'prioridad': actividad.prioridad or 'baja',
-            'prioridad_label': (actividad.prioridad or 'baja').title(),
-            'hora_label': local_strftime(actividad.fecha_inicio, '%H:%M'),
-            'cliente_servicio_id': int(actividad.cliente_servicio_id) if actividad.cliente_servicio_id else None,
-            'cliente_servicio_estado': ((actividad.cliente_servicio.estado or '').strip().lower() if actividad.cliente_servicio else ''),
-            'cliente_servicio_cobrado': bool(actividad.cliente_servicio and actividad.cliente_servicio.id_venta),
-        }
-        for actividad in proximas_actividades
-    ]
-
-    return {
-        'can_ver_agenda': True,
-        'total_pendientes': agenda_total_pendientes,
-        'pendientes_hoy': agenda_pendientes_hoy,
-        'vencidas': agenda_vencidas,
-        'proximas_actividades': agenda_proximas_actividades,
-        'fecha_hoy_iso': agenda_fecha_hoy_iso,
-    }
+    return obtener_resumen_agenda_dashboard(can_ver_agenda, today, usuario=current_user)
 
 
 def _obtener_resumen_en_atencion_dashboard(can_ver_agenda, today):
-    if not can_ver_agenda:
-        return {'count': 0, 'items': []}
-
-    start_utc, end_utc = utc_bounds_for_local_dates(today, today)
-    query = (
-        AgendaActividad.query
-        .join(ClienteServicio, ClienteServicio.id_cliente_servicio == AgendaActividad.cliente_servicio_id)
-        .filter(
-            AgendaActividad.estado == 'pendiente',
-            AgendaActividad.fecha_inicio >= start_utc,
-            AgendaActividad.fecha_inicio < end_utc,
-            ClienteServicio.estado == 'en_proceso',
-        )
-    )
-    if not (current_user.es_admin() or current_user.tiene_permiso('agenda_ver_todas')):
-        query = query.filter(_filtro_mostrar_agenda_para_usuario(current_user.id_usuario))
-
-    items = (
-        query.options(
-            load_only(
-                AgendaActividad.id,
-                AgendaActividad.titulo,
-                AgendaActividad.fecha_inicio,
-                AgendaActividad.cliente_servicio_id,
-            ),
-            joinedload(AgendaActividad.cliente_servicio).load_only(
-                ClienteServicio.id_cliente_servicio,
-                ClienteServicio.id_cliente,
-                ClienteServicio.id_servicio,
-                ClienteServicio.id_venta,
-                ClienteServicio.estado,
-                ClienteServicio.precio_pactado,
-                ClienteServicio.cantidad,
-            ).joinedload(ClienteServicio.cliente).load_only(Cliente.id_cliente, Cliente.nombre),
-            joinedload(AgendaActividad.cliente_servicio).joinedload(ClienteServicio.servicio).load_only(Servicio.id_servicio, Servicio.nombre),
-        )
-        .order_by(AgendaActividad.fecha_inicio.asc(), AgendaActividad.id.asc())
-        .all()
-    )
-    return {
-        'count': len(items),
-        'items': [
-            {
-                'id': int(actividad.id),
-                'titulo': actividad.titulo or '',
-                'hora_label': local_strftime(actividad.fecha_inicio, '%H:%M'),
-                'cliente_nombre': (actividad.cliente_servicio.cliente.nombre if actividad.cliente_servicio and actividad.cliente_servicio.cliente else 'Consumidor Final'),
-                'servicio_nombre': (actividad.cliente_servicio.servicio.nombre if actividad.cliente_servicio and actividad.cliente_servicio.servicio else 'Servicio'),
-                'cliente_servicio_id': int(actividad.cliente_servicio_id) if actividad.cliente_servicio_id else None,
-                'cobrado': bool(actividad.cliente_servicio and actividad.cliente_servicio.id_venta),
-            }
-            for actividad in items
-        ],
-    }
+    return obtener_resumen_en_atencion_dashboard(can_ver_agenda, today, usuario=current_user)
 
 
 def _obtener_resumen_gastos_dashboard(can_ver_gastos_corrientes, today):
@@ -429,14 +297,21 @@ def dashboard():
         puede_ver_otras_cajas=puede_ver_otras_cajas,
         sesion_caja_id=(int(sesion_caja.id_sesion) if sesion_caja else None),
     )
+    dashboard_clientes_resumen = obtener_resumen_clientes_dashboard(
+        today=today,
+        can_ver_agenda=can_ver_agenda,
+        puede_ver_otras_cajas=puede_ver_otras_cajas,
+        sesion_caja_id=(int(sesion_caja.id_sesion) if sesion_caja else None),
+    )
 
     profesionales_activos = 0
     usuarios_activos_lista = []
     usuarios_ocupados_ids = set()
     dashboard_profesionales_detalle = {}
     if dashboard_negocio.get('full_template'):
-        profesionales_activos = Usuario.query.filter_by(activo=True).count()
-        usuarios_activos_lista = Usuario.query.options(joinedload(Usuario.rol)).filter_by(activo=True).order_by(Usuario.nombre_completo.asc()).limit(5).all()
+        profesionales_query = query_usuarios_agenda_visibles()
+        profesionales_activos = profesionales_query.count()
+        usuarios_activos_lista = profesionales_query.options(joinedload(Usuario.rol)).limit(5).all()
         usuarios_ocupados_ids, dashboard_profesionales_detalle = obtener_estado_profesionales_dashboard(
             usuarios_activos_lista,
             can_ver_agenda=can_ver_agenda,
@@ -493,6 +368,7 @@ def dashboard():
         dashboard_servicios_realizados=dashboard_servicios_realizados['items'],
         dashboard_servicios_realizados_total_count=dashboard_servicios_realizados['total_count'],
         dashboard_servicios_realizados_total_monto=dashboard_servicios_realizados['total_monto'],
+        dashboard_clientes_resumen=dashboard_clientes_resumen,
         mostrar_alerta_sin_caja=mostrar_alerta_sin_caja,
         can_ver_agenda=can_ver_agenda,
         agenda_total_pendientes=agenda_resumen['total_pendientes'],

@@ -406,6 +406,59 @@ class TestVentasContadoRegresion(unittest.TestCase):
         self.assertAlmostEqual(float(data.get('cobrado_al_momento') or 0), 30000.0)
         self.assertAlmostEqual(float(data.get('saldo_pendiente') or 0), 70000.0)
 
+    def test_reporte_detalle_venta_incluye_cobros_posteriores_de_credito(self):
+        from app.models import Cliente, Configuracion, CuentaPorCobrar
+        from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO
+        from cobranzas.services.cobranza_service import registrar_cobro_credito
+
+        producto = self._crear_producto_simple('TEST-REPORTE-DETALLE-COBRO-POST-001', 90000)
+        cliente_credito = Cliente(
+            nombre='Cliente Cobro Posterior',
+            ruc_ci='8000101-9',
+            tipo='minorista',
+            limite_credito=500000,
+            activo=True,
+        )
+        db.session.add(cliente_credito)
+        db.session.commit()
+        Configuracion.establecer_bool(CLAVE_VENTAS_CREDITO_ACTIVO, True)
+
+        resp = self.client.post(
+            '/ventas/procesar',
+            json={
+                'items': [{'id_producto': int(producto.id_producto), 'cantidad': 1}],
+                'pagos': [{'id_metodo_pago': int(self.metodo_credito.id_metodo_pago), 'monto': 90000}],
+                'id_cliente': int(cliente_credito.id_cliente),
+                'id_usuario_vendedor': int(self.admin.id_usuario),
+                'client_request_id': 'venta-reporte-detalle-cobro-posterior-001',
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        venta_id = int((resp.get_json() or {})['id_venta'])
+
+        cuenta = CuentaPorCobrar.query.filter_by(id_venta=venta_id).first()
+        self.assertIsNotNone(cuenta)
+
+        registrar_cobro_credito(
+            cuenta,
+            id_usuario=int(self.admin.id_usuario),
+            id_metodo_pago=int(self.metodo_efectivo.id_metodo_pago),
+            monto=90000,
+            sesion=self.sesion,
+        )
+        db.session.commit()
+
+        detalle_resp = self.client.get(f'/reportes/ventas/{venta_id}/detalle')
+        self.assertEqual(detalle_resp.status_code, 200)
+        data = detalle_resp.get_json() or {}
+
+        self.assertEqual(data.get('estado_cobro'), 'Pagada')
+        self.assertAlmostEqual(float(data.get('saldo_pendiente') or 0), 0.0)
+        self.assertEqual(len(data.get('pagos') or []), 1)
+        self.assertEqual(data['pagos'][0].get('metodo'), self.metodo_efectivo.nombre)
+        self.assertEqual(data['pagos'][0].get('origen'), 'cobranza')
+        self.assertAlmostEqual(float(data['pagos'][0].get('monto') or 0), 90000.0)
+
     def test_estado_caja_resume_creditos_separado_de_cobros_en_ventas(self):
         from app.models import Cliente, Configuracion, CuentaPorCobrar, PagoCuentaCobrar
         from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO

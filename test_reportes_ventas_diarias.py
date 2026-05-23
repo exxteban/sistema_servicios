@@ -38,6 +38,10 @@ class TestReportesVentasDiarias(unittest.TestCase):
         )
         db.session.add(self.sesion)
         db.session.commit()
+        self.client = self.app.test_client()
+        with self.client.session_transaction() as sess:
+            sess['_user_id'] = str(self.admin.id_usuario)
+            sess['_fresh'] = True
 
     def tearDown(self):
         db.session.remove()
@@ -119,6 +123,122 @@ class TestReportesVentasDiarias(unittest.TestCase):
         self.assertAlmostEqual(float(desglose[0]['total_cobrado']), 145000.0)
         self.assertAlmostEqual(float(desglose[1]['total_cobrado']), 6300.0)
         self.assertEqual(int(desglose[0]['id_venta_generada']), int(venta.id_venta))
+
+    def test_detalle_txt_incluye_servicios_en_ventas_diarias(self):
+        from app.models import DetalleVenta, Servicio, Venta
+        from app.routes.reportes_ventas_diarias import construir_contexto_ventas_diarias
+        from app.utils.helpers import utc_naive_to_local
+
+        ahora = datetime.now(UTC).replace(tzinfo=None)
+        servicio = Servicio(
+            codigo='SRV-REP-001',
+            nombre='Service premium',
+            categoria='General',
+            costo=30000,
+            precio=60000,
+            duracion_minutos=30,
+            porcentaje_iva=10,
+            activo=True,
+        )
+        db.session.add(servicio)
+        db.session.flush()
+
+        venta = Venta(
+            id_cliente=int(self.cliente.id_cliente),
+            id_sesion_caja=int(self.sesion.id_sesion),
+            id_usuario_vendedor=int(self.admin.id_usuario),
+            fecha_venta=ahora,
+            subtotal=120000,
+            total=120000,
+            total_iva_10=0,
+            total_iva_5=0,
+            total_exenta=0,
+            estado='completada',
+            tipo_venta='contado',
+            saldo_pendiente=0,
+        )
+        db.session.add(venta)
+        db.session.flush()
+
+        db.session.add(
+            DetalleVenta(
+                id_venta=int(venta.id_venta),
+                id_servicio=int(servicio.id_servicio),
+                cantidad=2,
+                precio_unitario=60000,
+                precio_original=60000,
+                porcentaje_iva=10,
+                monto_iva=0,
+                subtotal=120000,
+            )
+        )
+        db.session.commit()
+
+        fecha_local = utc_naive_to_local(ahora).date().isoformat()
+        contexto = construir_contexto_ventas_diarias(raw_fecha=fecha_local)
+        detalle_txt = contexto['detalles_por_venta'][int(venta.id_venta)]
+
+        self.assertEqual(detalle_txt, 'Service premium x2')
+
+    def test_productos_vendidos_muestra_servicios(self):
+        from app.models import DetalleVenta, Servicio, Venta
+        from app.utils.helpers import utc_naive_to_local
+
+        ahora = datetime.now(UTC).replace(tzinfo=None)
+        servicio = Servicio(
+            codigo='SRV-RPT-001',
+            nombre='Lavado premium',
+            categoria='Spa',
+            costo=20000,
+            precio=45000,
+            duracion_minutos=30,
+            porcentaje_iva=10,
+            activo=True,
+        )
+        db.session.add(servicio)
+        db.session.flush()
+
+        venta = Venta(
+            id_cliente=int(self.cliente.id_cliente),
+            id_sesion_caja=int(self.sesion.id_sesion),
+            id_usuario_vendedor=int(self.admin.id_usuario),
+            fecha_venta=ahora,
+            subtotal=45000,
+            total=45000,
+            total_iva_10=0,
+            total_iva_5=0,
+            total_exenta=0,
+            estado='completada',
+            tipo_venta='contado',
+            saldo_pendiente=0,
+        )
+        db.session.add(venta)
+        db.session.flush()
+
+        db.session.add(
+            DetalleVenta(
+                id_venta=int(venta.id_venta),
+                id_servicio=int(servicio.id_servicio),
+                cantidad=1,
+                precio_unitario=45000,
+                precio_original=45000,
+                porcentaje_iva=10,
+                monto_iva=0,
+                subtotal=45000,
+            )
+        )
+        db.session.commit()
+
+        fecha_local = utc_naive_to_local(ahora).date().isoformat()
+        response = self.client.get(
+            f'/reportes/productos-vendidos?desde={fecha_local}&hasta={fecha_local}',
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('Lavado premium', html)
+        self.assertIn('Servicio', html)
 
 
 if __name__ == '__main__':

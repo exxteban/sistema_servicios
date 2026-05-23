@@ -7,6 +7,7 @@ from app import db
 from app.models import AgendaActividad, ClienteServicio, Usuario
 from app.routes.agenda import agenda_bp
 from app.routes.agenda.actividades import _parse_datetime_local
+from app.routes.agenda.visibilidad import usuarios_agenda_visibles_para
 from app.services.agenda_turnos_peluqueria import (
     build_turno_peluqueria_chargeable_catalog_services,
     build_turno_peluqueria_services,
@@ -45,9 +46,7 @@ def _iniciales_usuario(usuario):
 
 
 def _obtener_profesionales_disponibles():
-    if not _puede_asignar_profesional():
-        return [current_user]
-    return Usuario.query.filter_by(activo=True).order_by(Usuario.nombre_completo.asc()).all()
+    return usuarios_agenda_visibles_para(current_user, _puede_asignar_profesional())
 
 
 def _parse_positive_int(value):

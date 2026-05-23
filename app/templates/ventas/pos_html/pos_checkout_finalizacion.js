@@ -418,6 +418,7 @@
 
     limpiarVenta() {
         const rid = this.reparacionId;
+        const colaId = this.colaCobroId;
         this.carrito = [];
         this.descuento = 0;
         this.pagos = [];
@@ -445,6 +446,10 @@
         if (rid) {
             sessionStorage.setItem(`pos_reparacion_skip_${rid}`, '1');
             sessionStorage.setItem(`pos_reparacion_skip_token_${rid}`, this.reparacionToken || '');
+        }
+        if (colaId) {
+            sessionStorage.setItem(`pos_cola_skip_${colaId}`, '1');
+            sessionStorage.setItem(`pos_cola_skip_token_${colaId}`, this.reparacionToken || '');
         }
         this.enfocarBusqueda();
     },

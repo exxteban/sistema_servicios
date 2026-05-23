@@ -207,14 +207,17 @@ def obtener_resumen_servicios_realizados_dashboard(
             Venta.fecha_venta >= start_utc,
             Venta.fecha_venta < end_utc,
         )
-        .group_by(Servicio.id_servicio, Servicio.nombre)
-        .order_by(cantidad_expr.desc(), total_expr.desc(), Servicio.nombre.asc())
-        .limit(limit)
     )
     servicios_query = _filtrar_query_ventas_dashboard_por_sesion(
         servicios_query,
         puede_ver_otras_cajas=puede_ver_otras_cajas,
         sesion_caja_id=sesion_caja_id,
+    )
+    servicios_query = (
+        servicios_query
+        .group_by(Servicio.id_servicio, Servicio.nombre)
+        .order_by(cantidad_expr.desc(), total_expr.desc(), Servicio.nombre.asc())
+        .limit(limit)
     )
     rows = servicios_query.all()
 
@@ -292,7 +295,7 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
     for actividad in agenda_items:
         turno_tipo = infer_turno_peluqueria_tipo_from_title(actividad.titulo)
         servicio = servicios_por_actividad.get(int(actividad.id))
-        if not is_turno_peluqueria_catalog_service_chargeable(servicio):
+        if servicio is not None and not is_turno_peluqueria_catalog_service_chargeable(servicio):
             continue
         if _consumir_si_turno_ya_fue_cobrado(actividad, servicio, vendidos_por_key):
             continue
@@ -300,14 +303,17 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
             'agenda_turno_cliente_id': int(actividad.cliente_id),
             'agenda_turno_actividad_id': int(actividad.id),
         }
-        params['agenda_turno_servicio_id'] = int(servicio.id_servicio)
+        if servicio is not None:
+            params['agenda_turno_servicio_id'] = int(servicio.id_servicio)
+        else:
+            params['agenda_turno_titulo'] = actividad.titulo or TURNO_PELUQUERIA_TIPO_LABELS.get(turno_tipo, 'Turno')
         items_agenda.append({
             'id_cliente_servicio': None,
             'agenda_actividad_id': int(actividad.id),
             'cliente': {'nombre': actividad.cliente.nombre if actividad.cliente else 'Consumidor Final'},
             'servicio': {'nombre': (servicio.nombre if servicio is not None else TURNO_PELUQUERIA_TIPO_LABELS.get(turno_tipo, actividad.titulo or 'Turno'))},
             'estado_display': 'Turno sin cobrar',
-            'subtotal': float(servicio.precio or 0),
+            'subtotal': float(servicio.precio or 0) if servicio is not None else 0,
             'fecha_solicitud': actividad.fecha_inicio,
             'cobrar_url': url_for('ventas.pos', **params),
         })

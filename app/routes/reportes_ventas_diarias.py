@@ -9,6 +9,7 @@ from app.models import (
     PedidoCliente,
     PedidoClientePago,
     Producto,
+    Servicio,
     SesionCaja,
     Venta,
 )
@@ -55,13 +56,21 @@ def _armar_detalles_por_venta(ventas):
     rows = (
         db.session.query(
             DetalleVenta.id_venta,
-            Producto.nombre,
+            func.coalesce(Producto.nombre, Servicio.nombre).label('item_nombre'),
             db.func.sum(DetalleVenta.cantidad).label('cantidad'),
         )
-        .join(Producto, Producto.id_producto == DetalleVenta.id_producto)
+        .outerjoin(Producto, Producto.id_producto == DetalleVenta.id_producto)
+        .outerjoin(Servicio, Servicio.id_servicio == DetalleVenta.id_servicio)
         .filter(DetalleVenta.id_venta.in_(venta_ids))
-        .group_by(DetalleVenta.id_venta, Producto.nombre)
-        .order_by(DetalleVenta.id_venta.asc(), Producto.nombre.asc())
+        .group_by(
+            DetalleVenta.id_venta,
+            Producto.nombre,
+            Servicio.nombre,
+        )
+        .order_by(
+            DetalleVenta.id_venta.asc(),
+            func.coalesce(Producto.nombre, Servicio.nombre).asc(),
+        )
         .all()
     )
 
