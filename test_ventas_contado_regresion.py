@@ -459,6 +459,60 @@ class TestVentasContadoRegresion(unittest.TestCase):
         self.assertEqual(data['pagos'][0].get('origen'), 'cobranza')
         self.assertAlmostEqual(float(data['pagos'][0].get('monto') or 0), 90000.0)
 
+    def test_cobro_posterior_parcial_marca_estado_parcial_en_detalle_y_reportes(self):
+        from app.models import Cliente, Configuracion, CuentaPorCobrar
+        from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO
+        from cobranzas.services.cobranza_service import registrar_cobro_credito
+
+        producto = self._crear_producto_simple('TEST-REPORTE-DETALLE-COBRO-PARCIAL-001', 90000)
+        cliente_credito = Cliente(
+            nombre='Cliente Cobro Parcial Posterior',
+            ruc_ci='8000101-8',
+            tipo='minorista',
+            limite_credito=500000,
+            activo=True,
+        )
+        db.session.add(cliente_credito)
+        db.session.commit()
+        Configuracion.establecer_bool(CLAVE_VENTAS_CREDITO_ACTIVO, True)
+
+        resp = self.client.post(
+            '/ventas/procesar',
+            json={
+                'items': [{'id_producto': int(producto.id_producto), 'cantidad': 1}],
+                'pagos': [{'id_metodo_pago': int(self.metodo_credito.id_metodo_pago), 'monto': 90000}],
+                'id_cliente': int(cliente_credito.id_cliente),
+                'id_usuario_vendedor': int(self.admin.id_usuario),
+                'client_request_id': 'venta-reporte-detalle-cobro-parcial-001',
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        venta_id = int((resp.get_json() or {})['id_venta'])
+
+        cuenta = CuentaPorCobrar.query.filter_by(id_venta=venta_id).first()
+        self.assertIsNotNone(cuenta)
+
+        registrar_cobro_credito(
+            cuenta,
+            id_usuario=int(self.admin.id_usuario),
+            id_metodo_pago=int(self.metodo_efectivo.id_metodo_pago),
+            monto=30000,
+            sesion=self.sesion,
+        )
+        db.session.commit()
+
+        detalle_reportes_resp = self.client.get(f'/reportes/ventas/{venta_id}/detalle')
+        self.assertEqual(detalle_reportes_resp.status_code, 200)
+        detalle_reportes = detalle_reportes_resp.get_json() or {}
+        self.assertEqual(detalle_reportes.get('estado_cobro'), 'Parcial')
+        self.assertAlmostEqual(float(detalle_reportes.get('saldo_pendiente') or 0), 60000.0)
+
+        detalle_venta_resp = self.client.get(f'/ventas/{venta_id}')
+        self.assertEqual(detalle_venta_resp.status_code, 200)
+        html = detalle_venta_resp.get_data(as_text=True)
+        self.assertIn('Estado de cobro', html)
+        self.assertIn('Parcial', html)
+
     def test_estado_caja_resume_creditos_separado_de_cobros_en_ventas(self):
         from app.models import Cliente, Configuracion, CuentaPorCobrar, PagoCuentaCobrar
         from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO

@@ -169,7 +169,7 @@ def detalle_pagos_metodo(id_metodo):
         return jsonify({'error': 'No hay sesión abierta'}), 404
 
     from sqlalchemy.orm import joinedload
-    from app.models import PagoVenta, Venta
+    from app.models import CuentaPorCobrar, PagoCuentaCobrar, PagoVenta, Venta
     from pedidos.models import PedidoCliente, PedidoClientePago
 
     pagos_ventas = db.session.query(
@@ -195,6 +195,17 @@ def detalle_pagos_metodo(id_metodo):
         PedidoClientePago.estado == 'activo',
         PedidoClientePago.id_metodo_pago == id_metodo
     ).order_by(PedidoClientePago.fecha_pago.desc()).all()
+    pagos_credito = db.session.query(
+        PagoCuentaCobrar, CuentaPorCobrar
+    ).join(
+        CuentaPorCobrar, PagoCuentaCobrar.id_cuenta_cobrar == CuentaPorCobrar.id_cuenta_cobrar
+    ).options(
+        joinedload(CuentaPorCobrar.cliente)
+    ).filter(
+        PagoCuentaCobrar.id_sesion_caja == sesion.id_sesion,
+        PagoCuentaCobrar.estado != 'anulado',
+        PagoCuentaCobrar.id_metodo_pago == id_metodo
+    ).order_by(PagoCuentaCobrar.fecha_pago.desc()).all()
 
     resultado = []
     for pago, venta in pagos_ventas:
@@ -229,6 +240,24 @@ def detalle_pagos_metodo(id_metodo):
             'monto': float(pago.monto or 0),
             'cliente': cliente_nombre,
             'referencia_label': pedido.numero_pedido_display,
+            'referencia': pago.referencia or ''
+        }))
+
+    for pago, cuenta in pagos_credito:
+        cliente_nombre = 'Consumidor Final'
+        if cuenta.cliente:
+            cliente_nombre = cuenta.cliente.nombre or 'Consumidor Final'
+
+        venta_id = int(cuenta.id_venta) if cuenta.id_venta else None
+        resultado.append((pago.fecha_pago, {
+            'row_key': f'credito-{int(cuenta.id_cuenta_cobrar)}-{int(pago.id_pago_cuenta)}',
+            'tipo_origen': 'cobro_credito',
+            'id_venta': venta_id,
+            'id_referencia': int(cuenta.id_cuenta_cobrar),
+            'fecha': local_strftime(pago.fecha_pago),
+            'monto': float(pago.monto or 0),
+            'cliente': cliente_nombre,
+            'referencia_label': f'Cuenta #{int(cuenta.id_cuenta_cobrar)}',
             'referencia': pago.referencia or ''
         }))
 

@@ -253,23 +253,30 @@ def build_turno_peluqueria_chargeable_catalog_services() -> list[dict[str, Any]]
         Servicio.query
         .filter(
             Servicio.activo.is_(True),
-            Servicio.precio > 0,
         )
         .order_by(Servicio.nombre.asc(), Servicio.id_servicio.asc())
         .all()
     )
-    return [
-        {
+    items = []
+    for servicio in servicios:
+        precios_opciones = _catalog_service_price_options(servicio)
+        tiene_precio_base = is_turno_peluqueria_catalog_service_chargeable(servicio)
+        tiene_variante_cobrable = any(
+            float(opcion.get('precio') or 0) > 0
+            for opcion in precios_opciones
+        )
+        if not (tiene_precio_base or tiene_variante_cobrable):
+            continue
+        items.append({
             'id': int(servicio.id_servicio),
             'nombre': (servicio.nombre or '').strip(),
             'costo': float(servicio.costo or 0),
             'costo_label': _money_label(servicio.costo or 0),
             'precio': float(servicio.precio or 0),
             'precio_label': _money_label(servicio.precio or 0),
-            'precios_opciones': _catalog_service_price_options(servicio),
-        }
-        for servicio in servicios
-    ]
+            'precios_opciones': precios_opciones,
+        })
+    return items
 
 
 def build_pos_data_from_agenda_turno(*, cliente_id=None, servicio_id=None, vendedor_id=None, actividad_id=None, manual_price=None, title=None, price_option_id=None) -> dict[str, Any] | None:

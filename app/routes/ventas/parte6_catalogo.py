@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import jsonify, request
 from flask_login import current_user, login_required
 
@@ -38,6 +40,39 @@ def buscar_catalogo_exacto_pos():
         return jsonify(producto)
     servicio = _buscar_servicio_exacto(q)
     return jsonify(servicio or {})
+
+
+@ventas_bp.route('/catalogo/bootstrap')
+@login_required
+def bootstrap_catalogo_pos():
+    if not _puede_buscar_catalogo():
+        return jsonify({'error': 'Sin permisos'}), 403
+
+    productos = (
+        Producto.query.join(Categoria, Producto.id_categoria == Categoria.id_categoria)
+        .filter(Producto.activo.is_(True))
+        .order_by(Categoria.nombre.asc(), Producto.nombre.asc(), Producto.id_producto.asc())
+        .limit(2500)
+        .all()
+    )
+    servicios = (
+        Servicio.query.filter(Servicio.activo.is_(True))
+        .order_by(Servicio.nombre.asc(), Servicio.id_servicio.asc())
+        .limit(1000)
+        .all()
+    )
+
+    producto_opciones = _producto_opciones([p.id_producto for p in productos])
+    servicio_opciones = _servicio_opciones([s.id_servicio for s in servicios])
+
+    return jsonify({
+        'success': True,
+        'generated_at': datetime.utcnow().isoformat(timespec='seconds') + 'Z',
+        'items': (
+            [_producto_dict(p, producto_opciones.get(int(p.id_producto), [])) for p in productos]
+            + [_servicio_dict(s, servicio_opciones.get(int(s.id_servicio), [])) for s in servicios]
+        ),
+    })
 
 
 def _buscar_productos(q):
@@ -128,7 +163,11 @@ def _producto_dict(producto, opciones):
         'tipo': 'producto',
         'id': int(producto.id_producto),
         'codigo': producto.codigo,
+        'codigo_barras': producto.codigo_barras,
+        'codigo_proveedor': producto.codigo_proveedor,
         'nombre': producto.nombre,
+        'marca': producto.marca,
+        'modelo': producto.modelo,
         'precio': float(producto.precio_venta or 0),
         'precio_mayorista': float(producto.precio_mayorista) if producto.precio_mayorista else None,
         'precios_opciones': [{'id': int(o.id_opcion_precio), 'etiqueta': (o.etiqueta or '').strip() or None, 'precio': float(o.precio or 0)} for o in opciones],

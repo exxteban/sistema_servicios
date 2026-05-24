@@ -76,9 +76,11 @@ def detalle(id):
         getattr(getattr(venta, 'cuenta_por_cobrar', None), 'saldo_pendiente', venta.saldo_pendiente) or 0
     )
     tipo_venta = (venta.tipo_venta or 'contado').strip().lower()
+    total_venta = float(venta.total or 0)
+    cobro_parcial_credito = tipo_venta == 'credito' and 0 < saldo_pendiente_actual < total_venta
     if saldo_pendiente_actual <= 0:
         estado_cobro = 'pagada'
-    elif total_pagado_inmediato > 0:
+    elif total_pagado_inmediato > 0 or cobro_parcial_credito:
         estado_cobro = 'parcial'
     elif tipo_venta == 'credito':
         estado_cobro = 'pendiente'
@@ -517,5 +519,4 @@ def crear_devolucion(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
 

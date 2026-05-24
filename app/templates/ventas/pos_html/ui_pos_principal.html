@@ -19,11 +19,12 @@
             </span>
             {% endif %}
             <span class="text-xs px-2 py-1 rounded-full font-semibold"
-                :class="isOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-                x-text="isOnline ? 'Online' : 'Offline'"></span>
+                :class="typeof estadoConexionClase === 'function' ? estadoConexionClase() : (isOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')"
+                x-text="typeof estadoConexionTexto === 'function' ? estadoConexionTexto() : (isOnline ? 'Online' : 'Offline')"></span>
             <button type="button" x-show="ventasPendientes.length > 0" @click="sincronizarVentasPendientes()"
-                class="rounded-full border border-blue-700 bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 dark:border-blue-500">
-                <span x-text="`Sincronizar (${ventasPendientes.length})`"></span>
+                :disabled="sincronizandoPendientes"
+                class="rounded-full border border-blue-700 bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70 dark:border-blue-500">
+                <span x-text="sincronizandoPendientes ? `Sincronizando (${ventasPendientes.length})` : `Sincronizar (${ventasPendientes.length})`"></span>
             </button>
         </div>
     </div>

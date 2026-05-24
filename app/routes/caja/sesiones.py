@@ -83,6 +83,21 @@ def _construir_estado_caja_payload(sesion):
         .group_by(MetodoPago.id_metodo_pago, MetodoPago.nombre)
         .all()
     )
+    desglose_creditos_rows = (
+        db.session.query(
+            MetodoPago.id_metodo_pago,
+            MetodoPago.nombre,
+            func.sum(PagoCuentaCobrar.monto).label('total'),
+            func.count(PagoCuentaCobrar.id_pago_cuenta).label('cantidad'),
+        )
+        .join(MetodoPago, PagoCuentaCobrar.id_metodo_pago == MetodoPago.id_metodo_pago)
+        .filter(
+            PagoCuentaCobrar.id_sesion_caja == sesion.id_sesion,
+            PagoCuentaCobrar.estado != 'anulado',
+        )
+        .group_by(MetodoPago.id_metodo_pago, MetodoPago.nombre)
+        .all()
+    )
     desglose_por_metodo = {}
     for row in desglose_ventas_rows:
         key = int(getattr(row, 'id_metodo_pago', 0) or 0)
@@ -93,6 +108,19 @@ def _construir_estado_caja_payload(sesion):
             'cantidad': int(getattr(row, 'cantidad', 0) or 0),
         }
     for row in desglose_pedidos_rows:
+        key = int(getattr(row, 'id_metodo_pago', 0) or 0)
+        actual = desglose_por_metodo.setdefault(
+            key,
+            {
+                'id_metodo_pago': key,
+                'nombre': str(getattr(row, 'nombre', '') or ''),
+                'total': 0.0,
+                'cantidad': 0,
+            },
+        )
+        actual['total'] += float(getattr(row, 'total', 0) or 0)
+        actual['cantidad'] += int(getattr(row, 'cantidad', 0) or 0)
+    for row in desglose_creditos_rows:
         key = int(getattr(row, 'id_metodo_pago', 0) or 0)
         actual = desglose_por_metodo.setdefault(
             key,

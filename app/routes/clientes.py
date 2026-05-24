@@ -1003,7 +1003,13 @@ def detalle(id):
         monto = _a_float_seguro(venta.total_raw)
         saldo_pendiente = _a_float_seguro(getattr(venta, 'saldo_pendiente_raw', 0))
         tipo_venta = ((venta.tipo_venta or 'contado') if hasattr(venta, 'tipo_venta') else 'contado').strip().lower()
-        estado_cobro = 'Pendiente' if saldo_pendiente > 0 else 'Pagada'
+        cobro_parcial_credito = tipo_venta == 'credito' and 0 < saldo_pendiente < monto
+        if saldo_pendiente <= 0:
+            estado_cobro = 'Pagada'
+        elif cobro_parcial_credito:
+            estado_cobro = 'Parcial'
+        else:
+            estado_cobro = 'Pendiente'
         detalle_partes = [
             venta.numero_comprobante or f'Venta #{venta.id_venta}',
             f'Tipo: {"Credito" if tipo_venta == "credito" else "Contado"}',

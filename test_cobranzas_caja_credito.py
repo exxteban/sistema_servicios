@@ -315,3 +315,60 @@ class TestCobranzasCajaCredito(unittest.TestCase):
         pendientes = data.get('pendientes') or []
         self.assertTrue(pendientes)
         self.assertEqual((pendientes[0].get('tipo_origen') or '').strip().lower(), 'cobro_credito')
+
+    def test_estado_resumen_integra_cobros_credito_en_desglose_por_metodo(self):
+        from cobranzas.services.cobranza_service import registrar_cobro_credito
+
+        cuenta = self._crear_venta_credito_cuotas(request_id='cola-credito-resumen-metodo-001')
+        registrar_cobro_credito(
+            cuenta,
+            id_usuario=int(self.admin.id_usuario),
+            id_metodo_pago=int(self.metodo_efectivo.id_metodo_pago),
+            monto=45000,
+            referencia='REC-RESUMEN-001',
+            sesion=self.sesion,
+        )
+        db.session.commit()
+
+        response = self.client.get('/caja/api/estado/resumen')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json() or {}
+        self.assertTrue(data.get('success'))
+        self.assertAlmostEqual(float(data.get('total_cobros_creditos_sesion') or 0), 45000.0)
+
+        desglose = data.get('desglose_pagos') or []
+        fila_efectivo = next(
+            (item for item in desglose if int(item.get('id_metodo_pago') or 0) == int(self.metodo_efectivo.id_metodo_pago)),
+            None,
+        )
+        self.assertIsNotNone(fila_efectivo)
+        self.assertAlmostEqual(float(fila_efectivo.get('total') or 0), 45000.0)
+        self.assertEqual(int(fila_efectivo.get('cantidad') or 0), 1)
+
+    def test_detalle_pagos_metodo_incluye_cobros_credito(self):
+        from cobranzas.services.cobranza_service import registrar_cobro_credito
+
+        cuenta = self._crear_venta_credito_cuotas(request_id='cola-credito-detalle-metodo-001')
+        registrar_cobro_credito(
+            cuenta,
+            id_usuario=int(self.admin.id_usuario),
+            id_metodo_pago=int(self.metodo_efectivo.id_metodo_pago),
+            monto=30000,
+            referencia='REC-DETALLE-001',
+            sesion=self.sesion,
+        )
+        db.session.commit()
+
+        response = self.client.get(f'/caja/api/pagos-detalle/{int(self.metodo_efectivo.id_metodo_pago)}')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json() or []
+
+        fila_credito = next(
+            (item for item in data if (item.get('tipo_origen') or '').strip().lower() == 'cobro_credito'),
+            None,
+        )
+        self.assertIsNotNone(fila_credito)
+        self.assertEqual(fila_credito.get('cliente'), self.cliente.nombre)
+        self.assertEqual(fila_credito.get('referencia_label'), f'Cuenta #{int(cuenta.id_cuenta_cobrar)}')
+        self.assertEqual(fila_credito.get('referencia'), 'REC-DETALLE-001')
+        self.assertAlmostEqual(float(fila_credito.get('monto') or 0), 30000.0)

@@ -411,9 +411,11 @@ def detalle_venta(id_venta):
         getattr(getattr(venta, 'cuenta_por_cobrar', None), 'saldo_pendiente', venta.saldo_pendiente) or 0
     )
     tipo_venta = (venta.tipo_venta or 'contado').strip().lower()
+    total_venta = float(venta.total or 0)
+    cobro_parcial_credito = tipo_venta == 'credito' and 0 < saldo_pendiente < total_venta
     if saldo_pendiente <= 0:
         estado_cobro = 'Pagada'
-    elif total_pagado_inmediato > 0:
+    elif total_pagado_inmediato > 0 or cobro_parcial_credito:
         estado_cobro = 'Parcial'
     elif tipo_venta == 'credito':
         estado_cobro = 'Pendiente'
