@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}POS Gastronomia{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl" data-gastro-pos data-mesa-inicial="{{ mesa_inicial }}">
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+
+    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300">Gastronomia</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">POS Touch</h1>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('gastronomia.dashboard') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-arrow-left"></i>Volver
+            </a>
+            <a href="{{ url_for('gastronomia.menu_config') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-utensils"></i>Cargar menu
+            </a>
+            <a href="{{ url_for('gastronomia.salon') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-chair"></i>Salon
+            </a>
+        </div>
+    </div>
+
+    <div id="pos-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+
+    <div class="grid gap-5 xl:grid-cols-[1fr_380px]">
+        <section class="space-y-4">
+            <div class="flex gap-2 overflow-x-auto pb-1" id="category-tabs">
+                <button type="button" data-category="" class="pos-category active">Todo</button>
+                {% for categoria in categorias %}
+                <button type="button" data-category="{{ categoria.id_categoria }}" class="pos-category">{{ categoria.nombre }}</button>
+                {% endfor %}
+            </div>
+            <div id="products-grid" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+        </section>
+
+        <aside class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Pedido</h2>
+                <button type="button" id="clear-cart" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                    Limpiar
+                </button>
+            </div>
+            <div class="mt-4">
+                <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Tipo</p>
+                <input type="hidden" id="order-type" value="mostrador">
+                <div id="order-type-buttons" class="mt-2 grid grid-cols-3 gap-2">
+                    <button type="button" data-order-type="mostrador" class="tipo-pedido-btn activa">Mostrador</button>
+                    <button type="button" data-order-type="mesa" class="tipo-pedido-btn">Mesa</button>
+                    <button type="button" data-order-type="retiro" class="tipo-pedido-btn">Retiro</button>
+                </div>
+            </div>
+            <div id="table-picker-section" class="mt-4 hidden">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Mesa</p>
+                    <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">Rojo seleccionada, verde disponible</span>
+                </div>
+                <input type="hidden" id="table-name">
+                <div id="table-grid" class="mt-2 grid grid-cols-4 gap-2"></div>
+            </div>
+            <div id="cart-items" class="mt-4 space-y-3"></div>
+            <label class="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Notas
+                <textarea id="order-notes" rows="2" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
+            </label>
+            <div class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
+                <span class="text-sm font-semibold text-gray-500">Total</span>
+                <strong id="cart-total" class="text-2xl text-gray-900 dark:text-white">Gs. 0</strong>
+            </div>
+            <div class="mt-4 grid gap-3">
+                <button type="button" id="save-order" class="rounded-xl bg-emerald-600 px-4 py-4 text-base font-bold text-white hover:bg-emerald-700">
+                    Guardar pedido
+                </button>
+                <button type="button" id="send-kitchen" class="rounded-xl bg-amber-500 px-4 py-4 text-base font-bold text-white hover:bg-amber-600">
+                    Enviar a cocina
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <div id="modifier-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h2 id="modal-product-name" class="text-xl font-bold text-gray-900 dark:text-white"></h2>
+                    <p id="modal-product-price" class="mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300"></p>
+                </div>
+                <button type="button" id="close-modal" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:text-gray-200">Cerrar</button>
+            </div>
+            <div id="modifier-groups" class="mt-5 space-y-4"></div>
+            <div class="mt-5 grid gap-3 sm:grid-cols-[140px_1fr]">
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    Cantidad
+                    <input id="modal-qty" type="number" min="1" value="1" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                </label>
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    Nota item
+                    <input id="modal-note" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                </label>
+            </div>
+            <button type="button" id="add-configured-product" class="mt-5 w-full rounded-xl bg-emerald-600 px-4 py-4 text-base font-bold text-white hover:bg-emerald-700">
+                Agregar
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pos-category {
+        min-width: 96px;
+        border: 1px solid rgb(229 231 235);
+        border-radius: 10px;
+        padding: 12px 16px;
+        font-weight: 800;
+        background: white;
+        color: rgb(55 65 81);
+    }
+    .pos-category.active {
+        border-color: rgb(245 158 11);
+        background: rgb(255 251 235);
+        color: rgb(146 64 14);
+    }
+    .tipo-pedido-btn,
+    .mesa-selector-btn {
+        border: 1px solid rgb(209 213 219);
+        border-radius: 12px;
+        min-height: 56px;
+        padding: 10px 12px;
+        font-weight: 800;
+        background: white;
+        color: rgb(55 65 81);
+    }
+    .tipo-pedido-btn.activa {
+        background: rgb(254 243 199);
+        border-color: rgb(245 158 11);
+        color: rgb(146 64 14);
+    }
+    .mesa-selector-btn {
+        min-height: 72px;
+        background: rgb(240 253 244);
+        color: rgb(22 101 52);
+    }
+    .mesa-selector-btn.activa {
+        background: rgb(254 226 226);
+        border-color: rgb(239 68 68);
+        color: rgb(153 27 27);
+    }
+    .dark .tipo-pedido-btn,
+    .dark .mesa-selector-btn {
+        border-color: rgb(75 85 99);
+        background: rgb(17 24 39);
+        color: rgb(229 231 235);
+    }
+    .dark .tipo-pedido-btn.activa {
+        background: rgb(120 53 15 / 0.45);
+        border-color: rgb(251 191 36);
+        color: rgb(253 230 138);
+    }
+    .dark .mesa-selector-btn {
+        background: rgb(20 83 45 / 0.35);
+        color: rgb(187 247 208);
+    }
+    .dark .mesa-selector-btn.activa {
+        background: rgb(127 29 29 / 0.45);
+        border-color: rgb(248 113 113);
+        color: rgb(254 202 202);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js') }}"></script>
+{% endblock %}

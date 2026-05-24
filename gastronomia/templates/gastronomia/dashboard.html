@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Gastronomia{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-6xl space-y-6">
+    <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300">
+                    Modo operativo
+                </p>
+                <h1 class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                    Gastronomia
+                </h1>
+                <p class="mt-3 max-w-2xl text-sm text-gray-600 dark:text-gray-300">
+                    Base inicial aislada para restaurante, pedidos touch, cocina, caja y salon.
+                </p>
+            </div>
+            <div class="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">
+                {% if modo_disponible %}Activo en esta instalacion{% else %}Modo inactivo{% endif %}
+            </div>
+        </div>
+    </section>
+
+    {% if not contexto_operativo %}
+    <section class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+        Este usuario no tiene un contexto operativo asignado para usar las pantallas de Gastronomia.
+        El modo ya es global, pero para operar pedidos, salon, cocina o caja debes entrar con un usuario del negocio que tenga acceso operativo.
+    </section>
+    {% endif %}
+
+    <section class="space-y-4">
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Menu operativo</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Accesos directos para trabajar en el dia a dia.</p>
+            </div>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {% if permisos.pos %}
+        <a href="{{ url_for('gastronomia.pos') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
+            <i class="fas fa-tablet-alt text-2xl text-sky-500"></i>
+            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">POS Touch</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Toma rapida de pedidos para mesa o mostrador.</p>
+        </a>
+        {% endif %}
+        {% if permisos.salon %}
+        <a href="{{ url_for('gastronomia.salon') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
+            <i class="fas fa-chair text-2xl text-indigo-500"></i>
+            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Salon</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Mesas, ocupacion y movimientos.</p>
+        </a>
+        {% endif %}
+        {% if permisos.cocina %}
+        <a href="{{ url_for('gastronomia.cocina') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
+            <i class="fas fa-fire text-2xl text-rose-500"></i>
+            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Cocina</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Pantalla KDS para pedidos pendientes.</p>
+        </a>
+        {% endif %}
+        {% if permisos.caja %}
+        <a href="{{ url_for('gastronomia.caja') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
+            <i class="fas fa-cash-register text-2xl text-emerald-500"></i>
+            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Caja</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Cobro y cierre del flujo operativo.</p>
+        </a>
+        {% endif %}
+        {% if permisos.reportes %}
+        <a href="{{ url_for('gastronomia.reportes') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
+            <i class="fas fa-chart-line text-2xl text-violet-500"></i>
+            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Reportes</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Ventas, productos y tiempos de cocina.</p>
+        </a>
+        {% endif %}
+        </div>
+    </section>
+
+    <section class="space-y-4">
+        <div>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Carga y configuracion</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Altas y ajustes fuera del flujo operativo.</p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+            {% if permisos.menu %}
+            <a href="{{ url_for('gastronomia.menu_config') if contexto_operativo else '#' }}" class="inline-flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
+                <span>
+                    <span class="block text-base font-semibold text-gray-900 dark:text-white">Cargar menu</span>
+                    <span class="mt-1 block text-sm text-gray-600 dark:text-gray-400">Categorias, productos y disponibilidad.</span>
+                </span>
+                <i class="fas fa-utensils text-xl text-amber-500"></i>
+            </a>
+            {% endif %}
+            {% if permisos.salon %}
+            <a href="{{ url_for('gastronomia.salon_config') if contexto_operativo else '#' }}" class="inline-flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
+                <span>
+                    <span class="block text-base font-semibold text-gray-900 dark:text-white">Configurar salon</span>
+                    <span class="mt-1 block text-sm text-gray-600 dark:text-gray-400">Mesas, ubicacion, capacidad y orden.</span>
+                </span>
+                <i class="fas fa-chair text-xl text-indigo-500"></i>
+            </a>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}

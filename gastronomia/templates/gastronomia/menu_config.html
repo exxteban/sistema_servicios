@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Menu Gastronomia{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6" data-gastro-menu>
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300">Gastronomia</p>
+            <h1 class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">Menu</h1>
+        </div>
+        <a href="{{ url_for('gastronomia.dashboard') }}"
+           class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+            <i class="fas fa-arrow-left"></i>Volver
+        </a>
+    </div>
+
+    <div id="gastro-menu-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+
+    <div class="grid gap-5 xl:grid-cols-[360px_1fr]">
+        <section class="space-y-5">
+            <form id="categoria-form" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Categoria</h2>
+                <input type="hidden" name="id_categoria">
+                <div class="mt-4 space-y-3">
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Nombre
+                        <input name="nombre" required maxlength="120"
+                               class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    </label>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Descripcion
+                        <textarea name="descripcion" rows="2"
+                                  class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            Orden
+                            <input name="orden" type="number" value="0"
+                                   class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                        </label>
+                        <label class="flex items-center gap-2 pt-7 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            <input name="visible" type="checkbox" checked> Visible
+                        </label>
+                    </div>
+                    <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                        <i class="fas fa-save"></i>Guardar categoria
+                    </button>
+                </div>
+            </form>
+
+            <form id="producto-form" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Producto</h2>
+                <input type="hidden" name="id_producto">
+                <div class="mt-4 space-y-3">
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Categoria
+                        <select name="categoria_id" required
+                                class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id_categoria }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Nombre
+                        <input name="nombre" required maxlength="160"
+                               class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    </label>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Descripcion
+                        <textarea name="descripcion" rows="2"
+                                  class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            Precio
+                            <input name="precio" type="number" min="0" step="0.01" required
+                                   class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                        </label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            Orden
+                            <input name="orden" type="number" value="0"
+                                   class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                        </label>
+                    </div>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Imagen URL
+                        <input name="imagen_url" maxlength="500"
+                               class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    </label>
+                    <div class="flex flex-wrap gap-4 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        <label class="inline-flex items-center gap-2"><input name="disponible" type="checkbox" checked> Disponible</label>
+                        <label class="inline-flex items-center gap-2"><input name="visible" type="checkbox" checked> Visible</label>
+                    </div>
+                    <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+                        <i class="fas fa-save"></i>Guardar producto
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <section class="space-y-5">
+            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Categorias cargadas</h2>
+                <div class="mt-4 overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="text-xs uppercase text-gray-500">
+                            <tr><th class="py-2">Nombre</th><th>Orden</th><th>Estado</th></tr>
+                        </thead>
+                        <tbody id="categorias-body">
+                            {% for categoria in categorias %}
+                            <tr data-id="{{ categoria.id_categoria }}" class="border-t border-gray-100 dark:border-gray-700">
+                                <td class="py-3 font-semibold text-gray-900 dark:text-white">{{ categoria.nombre }}</td>
+                                <td>{{ categoria.orden }}</td>
+                                <td>{% if categoria.visible %}Visible{% else %}Oculta{% endif %}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" class="py-6 text-center text-gray-500">Sin categorias.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Productos cargados</h2>
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    {% for producto in productos %}
+                    <article class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</h3>
+                                <p class="mt-1 text-xs text-gray-500">{{ producto.categoria.nombre if producto.categoria else 'Sin categoria' }}</p>
+                            </div>
+                            <span class="text-sm font-bold text-emerald-700 dark:text-emerald-300">Gs. {{ "{:,.0f}".format(producto.precio or 0).replace(",", ".") }}</span>
+                        </div>
+                        <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                            <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.visible %}Visible{% else %}Oculto{% endif %}</span>
+                            <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.disponible %}Disponible{% else %}Agotado{% endif %}</span>
+                        </div>
+                    </article>
+                    {% else %}
+                    <div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700 md:col-span-2">
+                        Sin productos.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const csrf = document.getElementById('csrf-token')?.value || '';
+  const alertBox = document.getElementById('gastro-menu-alert');
+  const showAlert = (message, ok) => {
+    alertBox.textContent = message;
+    alertBox.className = `rounded-lg border px-4 py-3 text-sm font-semibold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
+  };
+  const formData = (form) => Object.fromEntries(new FormData(form).entries());
+  const postJson = async (url, body) => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.mensaje || data.error || 'No se pudo guardar.');
+    return data;
+  };
+  document.getElementById('categoria-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      const data = formData(event.currentTarget);
+      data.visible = event.currentTarget.visible.checked;
+      await postJson('/api/gastronomia/categorias', data);
+      showAlert('Categoria guardada.', true);
+      window.location.reload();
+    } catch (error) {
+      showAlert(error.message, false);
+    }
+  });
+  document.getElementById('producto-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      const data = formData(event.currentTarget);
+      data.visible = event.currentTarget.visible.checked;
+      data.disponible = event.currentTarget.disponible.checked;
+      await postJson('/api/gastronomia/productos', data);
+      showAlert('Producto guardado.', true);
+      window.location.reload();
+    } catch (error) {
+      showAlert(error.message, false);
+    }
+  });
+}());
+</script>
+{% endblock %}

@@ -11,6 +11,8 @@
     const HEALTH_GOOD_MS = 1400;
     const SYNC_RETRY_MS = 10000;
     const SYNC_RETRY_MAX_MS = 60000;
+    const PENDING_DB_NAME = 'pos_offline_queue_v1';
+    const PENDING_STORE = 'ventas';
 
     function now() {
         return Date.now();
@@ -36,6 +38,56 @@
         }
     }
 
+    function openPendingDb() {
+        return new Promise((resolve, reject) => {
+            if (!window.indexedDB) {
+                reject(new Error('indexedDB unavailable'));
+                return;
+            }
+            const request = indexedDB.open(PENDING_DB_NAME, 1);
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains(PENDING_STORE)) {
+                    db.createObjectStore(PENDING_STORE, { keyPath: 'client_request_id' });
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error || new Error('indexedDB open failed'));
+        });
+    }
+
+    async function readPendingIdb() {
+        const db = await openPendingDb();
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(PENDING_STORE, 'readonly');
+            const request = tx.objectStore(PENDING_STORE).getAll();
+            request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+            request.onerror = () => reject(request.error || new Error('indexedDB read failed'));
+            tx.oncomplete = () => db.close();
+            tx.onerror = () => db.close();
+        });
+    }
+
+    async function replacePendingIdb(items) {
+        const db = await openPendingDb();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(PENDING_STORE, 'readwrite');
+            const store = tx.objectStore(PENDING_STORE);
+            store.clear();
+            for (const item of items || []) {
+                if (item && item.client_request_id) store.put(item);
+            }
+            tx.oncomplete = () => {
+                db.close();
+                resolve();
+            };
+            tx.onerror = () => {
+                db.close();
+                reject(tx.error || new Error('indexedDB write failed'));
+            };
+        });
+    }
+
     window.posApp = function posAppOfflineResilience() {
         const app = originalPosApp();
         if (!app || typeof app !== 'object') return app;
@@ -50,6 +102,8 @@
         app.posSyncRetryTimeoutId = null;
         app.posSyncRetryDelayMs = SYNC_RETRY_MS;
         app.medicionConexionMs = null;
+        app.colaPersistencia = window.indexedDB ? 'indexedDB' : 'localStorage';
+        app.pendingIdbSavePromise = Promise.resolve();
 
         app.estadoConexionTexto = function estadoConexionTexto() {
             if (this.connectionStatus === 'slow') return this.connectionMessage || 'Conexion lenta';
@@ -140,6 +194,75 @@
             const actual = Number(this.posSyncRetryDelayMs || SYNC_RETRY_MS);
             this.posSyncRetryDelayMs = Math.min(SYNC_RETRY_MAX_MS, Math.max(SYNC_RETRY_MS, actual * 2));
         };
+
+        app.resumenColaLocalTexto = function resumenColaLocalTexto() {
+            const total = Array.isArray(this.ventasPendientes) ? this.ventasPendientes.length : 0;
+            if (total <= 0) return '';
+            const conError = this.ventasPendientes.filter(v => (v.estado_sync || '') === 'error').length;
+            if (conError > 0) return `${total} venta(s) en cola local. ${conError} requiere(n) revision.`;
+            if (this.sincronizandoPendientes) return `${total} venta(s) en cola local, enviando al servidor...`;
+            return `${total} venta(s) guardada(s) en este equipo para enviar al servidor cuando la conexion este estable.`;
+        };
+
+        app.estadoVentaPendienteTexto = function estadoVentaPendienteTexto(venta) {
+            const estado = String((venta && venta.estado_sync) || 'pendiente');
+            if (estado === 'sincronizando') return 'Enviando';
+            if (estado === 'error') return 'Revisar';
+            return 'En cola';
+        };
+
+        app.fechaVentaPendienteTexto = function fechaVentaPendienteTexto(venta) {
+            const ts = Number(venta && venta.created_at ? venta.created_at : 0);
+            if (!ts) return '';
+            try {
+                return new Date(ts).toLocaleString('es-PY');
+            } catch (e) {
+                return '';
+            }
+        };
+
+        app.totalVentaPendiente = function totalVentaPendiente(venta) {
+            const payload = (venta && venta.payload) || {};
+            const items = Array.isArray(payload.items) ? payload.items : [];
+            const subtotal = items.reduce((sum, item) => sum + ((parseFloat(item.precio) || 0) * (parseInt(item.cantidad) || 0)), 0);
+            return Math.max(0, subtotal - (parseFloat(payload.descuento) || 0));
+        };
+
+        const originalGuardarVentasPendientes = app.guardarVentasPendientes;
+        if (typeof originalGuardarVentasPendientes === 'function') {
+            app.guardarVentasPendientes = function guardarVentasPendientesPersistente() {
+                originalGuardarVentasPendientes.call(this);
+                const snapshot = Array.isArray(this.ventasPendientes) ? this.ventasPendientes : [];
+                this.pendingIdbSavePromise = this.pendingIdbSavePromise
+                    .catch(() => {})
+                    .then(() => replacePendingIdb(snapshot));
+                this.pendingIdbSavePromise
+                    .then(() => { this.colaPersistencia = 'indexedDB'; })
+                    .catch(() => { this.colaPersistencia = 'localStorage'; });
+            };
+        }
+
+        const originalCargarVentasPendientes = app.cargarVentasPendientes;
+        if (typeof originalCargarVentasPendientes === 'function') {
+            app.cargarVentasPendientes = function cargarVentasPendientesPersistente() {
+                originalCargarVentasPendientes.call(this);
+                readPendingIdb()
+                    .then((itemsDb) => {
+                        const merged = new Map();
+                        for (const item of itemsDb || []) {
+                            if (item && item.client_request_id) merged.set(item.client_request_id, item);
+                        }
+                        for (const item of this.ventasPendientes || []) {
+                            if (item && item.client_request_id) merged.set(item.client_request_id, item);
+                        }
+                        this.ventasPendientes = [...merged.values()].sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
+                        this.colaPersistencia = 'indexedDB';
+                        this.guardarVentasPendientes();
+                        this.programarSincronizacionPendientes(1500);
+                    })
+                    .catch(() => { this.colaPersistencia = 'localStorage'; });
+            };
+        }
 
         app.fetchResponseConTimeout = async function fetchResponseConTimeout(input, init = {}, options = {}, fetchImpl = window.fetch) {
             const timeoutMs = Number(options.timeoutMs || REQUEST_TIMEOUT_MS);

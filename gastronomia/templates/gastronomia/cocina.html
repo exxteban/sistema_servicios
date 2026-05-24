@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Cocina Gastronomia{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl" data-gastro-kds>
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+
+    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-300">Gastronomia</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Cocina</h1>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('gastronomia.dashboard') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-arrow-left"></i>Volver
+            </a>
+            <a href="{{ url_for('gastronomia.pos') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-tablet-alt"></i>POS
+            </a>
+        </div>
+    </div>
+
+    <div id="kds-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+
+    <div class="grid gap-4 lg:grid-cols-2" id="kds-board"></div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kds-card {
+        border: 1px solid rgb(229 231 235);
+        border-radius: 12px;
+        background: white;
+        padding: 18px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+    .dark .kds-card {
+        border-color: rgb(55 65 81);
+        background: rgb(31 41 55);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/cocina.js') }}"></script>
+{% endblock %}

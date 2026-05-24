@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes Gastronomia{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl" data-gastro-reportes>
+    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">Gastronomia</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Reportes</h1>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('gastronomia.dashboard') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-arrow-left"></i>Volver
+            </a>
+            <a href="{{ url_for('gastronomia.caja') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-cash-register"></i>Caja
+            </a>
+        </div>
+    </div>
+
+    <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div class="grid gap-3 sm:grid-cols-[180px_180px_1fr] sm:items-end">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Desde
+                <input id="report-from" type="date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            </label>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Hasta
+                <input id="report-to" type="date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            </label>
+            <button type="button" id="load-report" class="rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white hover:bg-violet-700 sm:w-36">
+                Actualizar
+            </button>
+        </div>
+    </div>
+
+    <div id="report-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" id="report-kpis"></section>
+
+    <section class="mt-5 grid gap-5 xl:grid-cols-2">
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Productos mas vendidos</h2>
+            <div id="top-products" class="mt-4 space-y-3"></div>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Ventas por metodo</h2>
+            <div id="sales-methods" class="mt-4 space-y-3"></div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/reportes.js') }}"></script>
+{% endblock %}

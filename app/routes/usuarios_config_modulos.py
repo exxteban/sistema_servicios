@@ -10,6 +10,10 @@ from app.services.dashboard_negocio import (
 )
 from app.services.ia_backoffice.security import es_usuario_root
 from app.services.system_modules import iter_system_modules, list_system_modules_with_state
+from gastronomia.services.modo_operacion import (
+    establecer_modo_operacion,
+    obtener_modo_operacion,
+)
 
 
 def _checkbox_bool(form_key: str, default: bool = False) -> bool:
@@ -56,6 +60,7 @@ def modulos_sistema():
         modulos=list_system_modules_with_state(),
         dashboards_negocio=listar_dashboards_negocio(),
         dashboard_negocio_actual=obtener_dashboard_negocio_actual(),
+        modo_operacion_gastronomia=obtener_modo_operacion(),
     )
 
 
@@ -65,4 +70,19 @@ def configuracion_modulos():
     _require_root()
     mensajes = _guardar_modulos()
     flash(f"Configuracion de modulos actualizada: {', '.join(mensajes)}.", 'success')
+    return redirect(url_for('usuarios.modulos_sistema'))
+
+
+@usuarios_bp.route('/modulos-sistema/gastronomia-modo', methods=['POST'])
+@login_required
+def modulos_sistema_gastronomia_modo():
+    _require_root()
+    modo_operacion = request.form.get('modo_operacion')
+    config = establecer_modo_operacion(
+        modo_operacion,
+        usuario_id=getattr(current_user, 'id_usuario', None),
+    )
+
+    estado = 'Gastronomia' if config['gastronomia_activo'] else 'Servicios'
+    flash(f'Modo operativo global actualizado: {estado}.', 'success')
     return redirect(url_for('usuarios.modulos_sistema'))

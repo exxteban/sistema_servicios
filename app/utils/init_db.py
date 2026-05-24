@@ -64,6 +64,12 @@ def inicializar_datos_base(config_name=None):
         recepcion.descripcion = 'Rol obsoleto: usar Tecnico'
     elif not tecnico:
         db.session.add(Rol(nombre='Tecnico', descripcion='Recepción de equipos para reparación', nivel_jerarquia=5))
+    if not Rol.query.filter_by(nombre='Cocina').first():
+        db.session.add(Rol(nombre='Cocina', descripcion='Operacion de pantalla KDS gastronomica', nivel_jerarquia=12))
+    if not Rol.query.filter_by(nombre='Mozo').first():
+        db.session.add(Rol(nombre='Mozo', descripcion='Toma de pedidos y gestion de salon gastronomico', nivel_jerarquia=12))
+    if not Rol.query.filter_by(nombre='Caja Gastronomia').first():
+        db.session.add(Rol(nombre='Caja Gastronomia', descripcion='Cobro de pedidos gastronomicos', nivel_jerarquia=15))
 
     permisos = [
         {'codigo': 'crear_venta', 'nombre': 'Crear Venta', 'descripcion': 'Permite realizar ventas', 'modulo': 'ventas', 'requiere_autorizacion': False},
@@ -160,6 +166,13 @@ def inicializar_datos_base(config_name=None):
         {'codigo': 'registrar_pago_gasto_corriente', 'nombre': 'Registrar Pago de Gasto Corriente', 'descripcion': 'Permite registrar pagos de gastos corrientes', 'modulo': 'gastos_corrientes', 'requiere_autorizacion': False},
         {'codigo': 'anular_pago_gasto_corriente', 'nombre': 'Anular Pago de Gasto Corriente', 'descripcion': 'Permite anular pagos de gastos corrientes', 'modulo': 'gastos_corrientes', 'requiere_autorizacion': True},
         {'codigo': 'ver_reportes_gastos_corrientes', 'nombre': 'Ver Reportes de Gastos Corrientes', 'descripcion': 'Permite acceder a reportes del módulo de gastos corrientes', 'modulo': 'gastos_corrientes', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_acceso', 'nombre': 'Gastronomia - Acceso', 'descripcion': 'Permite acceder al dashboard del modo Gastronomia', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_menu', 'nombre': 'Gastronomia - Menu', 'descripcion': 'Permite configurar categorias, productos y modificadores gastronomicos', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_pos', 'nombre': 'Gastronomia - POS', 'descripcion': 'Permite tomar pedidos desde el POS touch gastronomico', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_cocina', 'nombre': 'Gastronomia - Cocina', 'descripcion': 'Permite operar la pantalla de cocina/KDS', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_caja', 'nombre': 'Gastronomia - Caja', 'descripcion': 'Permite cobrar pedidos gastronomicos', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_salon', 'nombre': 'Gastronomia - Salon', 'descripcion': 'Permite gestionar mesas y mover pedidos entre mesas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_reportes', 'nombre': 'Gastronomia - Reportes', 'descripcion': 'Permite ver reportes y metricas gastronomicas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
     ]
     for p in permisos:
         existe = Permiso.query.filter_by(codigo=p['codigo']).first()
@@ -408,6 +421,9 @@ def inicializar_datos_base(config_name=None):
             'ver_gastos_corrientes', 'crear_gastos_corrientes', 'editar_gastos_corrientes',
             'registrar_pago_gasto_corriente', 'anular_pago_gasto_corriente',
             'ver_reportes_gastos_corrientes', 'ver_flujo_caja', 'gestionar_flujo_caja',
+            'gastronomia_acceso', 'gastronomia_menu', 'gastronomia_pos',
+            'gastronomia_cocina', 'gastronomia_caja', 'gastronomia_salon',
+            'gastronomia_reportes',
     ]
     cajero_codigos = [
         'crear_venta', 'ver_ventas', 'ver_detalle_venta', 'aplicar_descuento',
@@ -425,6 +441,7 @@ def inicializar_datos_base(config_name=None):
             'ver_cobranzas', 'registrar_cobro_credito',
             'ver_gastos_corrientes', 'crear_gastos_corrientes', 'editar_gastos_corrientes',
             'registrar_pago_gasto_corriente',
+            'gastronomia_acceso', 'gastronomia_pos', 'gastronomia_caja',
         ]
     vendedor_codigos = [
         'ver_inventario',
@@ -435,6 +452,7 @@ def inicializar_datos_base(config_name=None):
         'ver_recepcion_usados', 'crear_recepcion_usados',
         'ver_presupuestos_empresariales', 'crear_presupuestos_empresariales',
         'agenda_acceso', 'agenda_crear', 'agenda_editar', 'agenda_completar', 'agenda_cancelar',
+        'gastronomia_acceso', 'gastronomia_pos', 'gastronomia_salon',
     ]
     tecnico_codigos = [
         'ver_clientes', 'crear_cliente',
@@ -442,6 +460,9 @@ def inicializar_datos_base(config_name=None):
         'cambiar_estado_reparacion',
         'agenda_acceso', 'agenda_crear', 'agenda_editar', 'agenda_completar', 'agenda_cancelar',
     ]
+    cocina_codigos = ['gastronomia_acceso', 'gastronomia_cocina']
+    mozo_codigos = ['gastronomia_acceso', 'gastronomia_pos', 'gastronomia_salon']
+    caja_gastronomia_codigos = ['gastronomia_acceso', 'gastronomia_caja']
     auditoria_codigos = ['ver_auditoria']
 
     admin_id = rol_ids.get('Administrador')
@@ -450,6 +471,9 @@ def inicializar_datos_base(config_name=None):
     auditoria_id = rol_ids.get('Auditoria')
     vendedor_id = rol_ids.get('Vendedor')
     tecnico_id = rol_ids.get('Tecnico')
+    cocina_id = rol_ids.get('Cocina')
+    mozo_id = rol_ids.get('Mozo')
+    caja_gastronomia_id = rol_ids.get('Caja Gastronomia')
     root_id = rol_ids.get('Root')
 
     if admin_id:
@@ -559,6 +583,26 @@ def inicializar_datos_base(config_name=None):
                     db.session.execute(
                         text("INSERT INTO rol_permisos (id_rol, id_permiso) VALUES (:id_rol, :id_permiso)"),
                         {"id_rol": tecnico_id, "id_permiso": permiso_id},
+                    )
+
+    for role_id, codigos in (
+        (cocina_id, cocina_codigos),
+        (mozo_id, mozo_codigos),
+        (caja_gastronomia_id, caja_gastronomia_codigos),
+    ):
+        if not role_id:
+            continue
+        for codigo in codigos:
+            permiso_id = permiso_ids.get(codigo)
+            if permiso_id:
+                existe = db.session.execute(
+                    text("SELECT 1 FROM rol_permisos WHERE id_rol = :id_rol AND id_permiso = :id_permiso LIMIT 1"),
+                    {"id_rol": role_id, "id_permiso": permiso_id},
+                ).first()
+                if not existe:
+                    db.session.execute(
+                        text("INSERT INTO rol_permisos (id_rol, id_permiso) VALUES (:id_rol, :id_permiso)"),
+                        {"id_rol": role_id, "id_permiso": permiso_id},
                     )
 
     from sqlalchemy.exc import SQLAlchemyError

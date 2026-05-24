@@ -1,0 +1,149 @@
+import re
+
+from app import create_app, db
+from app.models import Cliente, Usuario
+from gastronomia.models import (
+    GastronomiaCategoria,
+    GastronomiaClienteConfig,
+    GastronomiaPedido,
+    GastronomiaPedidoEvento,
+    GastronomiaProducto,
+)
+
+
+def _loguear(client, app, username: str):
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username=username).first()
+        assert usuario is not None
+        user_id = usuario.id_usuario
+    with client.session_transaction() as session:
+        session['_user_id'] = str(user_id)
+        session['_fresh'] = True
+
+
+def _csrf(html: str) -> str:
+    match = re.search(r'id="csrf-token" value="([^"]+)"', html)
+    assert match is not None
+    return match.group(1)
+
+
+def _crear_producto(app, nombre_cliente: str, username: str):
+    with app.app_context():
+        cliente = Cliente(nombre=nombre_cliente, ruc_ci=username, tipo='minorista', activo=True)
+        db.session.add(cliente)
+        db.session.flush()
+        usuario = Usuario(
+            id_cliente=cliente.id_cliente,
+            username=username,
+            nombre_completo=f'Admin {nombre_cliente}',
+            id_rol=1,
+            activo=True,
+        )
+        usuario.set_password('clave123')
+        categoria = GastronomiaCategoria(cliente_id=cliente.id_cliente, nombre='Cocina')
+        db.session.add_all([
+            usuario,
+            categoria,
+            GastronomiaClienteConfig(
+                cliente_id=cliente.id_cliente,
+                modo_operacion='gastronomia',
+                gastronomia_activo=True,
+            ),
+        ])
+        db.session.flush()
+        producto = GastronomiaProducto(
+            cliente_id=cliente.id_cliente,
+            categoria_id=categoria.id_categoria,
+            nombre='Milanesa',
+            precio=25000,
+        )
+        db.session.add(producto)
+        db.session.commit()
+        return cliente.id_cliente, producto.id_producto
+
+
+def _crear_pedido_enviado(client, csrf, producto_id):
+    pedido_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 1}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert pedido_resp.status_code == 201
+    pedido_id = pedido_resp.get_json()['pedido']['id_pedido']
+    enviar_resp = client.post(
+        f'/api/gastronomia/pedidos/{pedido_id}/enviar-cocina',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert enviar_resp.status_code == 200
+    return pedido_id
+
+
+def test_cocina_lista_pedidos_eventos_y_cambia_estados():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto(app, 'Resto Uno', 'resto_uno')
+    _loguear(client, app, 'resto_uno')
+
+    page = client.get('/gastronomia/cocina')
+    assert page.status_code == 200
+    assert 'Cocina' in page.get_data(as_text=True)
+    csrf = _csrf(page.get_data(as_text=True))
+    pedido_id = _crear_pedido_enviado(client, csrf, producto_id)
+
+    cocina_resp = client.get('/api/gastronomia/cocina/pedidos')
+    assert cocina_resp.status_code == 200
+    pedidos = cocina_resp.get_json()['pedidos']
+    assert [pedido['id_pedido'] for pedido in pedidos] == [pedido_id]
+
+    tomar_resp = client.post(
+        f'/api/gastronomia/cocina/pedidos/{pedido_id}/tomar',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert tomar_resp.status_code == 200
+    assert tomar_resp.get_json()['pedido']['estado'] == 'preparando'
+
+    listo_resp = client.post(
+        f'/api/gastronomia/cocina/pedidos/{pedido_id}/listo',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert listo_resp.status_code == 200
+    assert listo_resp.get_json()['pedido']['estado'] == 'listo'
+
+    with app.app_context():
+        pedido = GastronomiaPedido.query.filter_by(cliente_id=cliente_id, id_pedido=pedido_id).first()
+        assert pedido.fecha_inicio_preparacion is not None
+        assert pedido.fecha_listo is not None
+        eventos = GastronomiaPedidoEvento.query.filter_by(cliente_id=cliente_id).order_by(
+            GastronomiaPedidoEvento.id_evento.asc()
+        ).all()
+        assert [evento.tipo for evento in eventos] == [
+            'pedido_creado',
+            'pedido_enviado_cocina',
+            'pedido_preparando',
+            'pedido_listo',
+        ]
+
+
+def test_cocina_no_muestra_eventos_de_otro_cliente():
+    app = create_app('testing')
+    client_uno = app.test_client()
+    client_dos = app.test_client()
+    _cliente_uno_id, producto_uno_id = _crear_producto(app, 'Resto Uno', 'resto_uno')
+    _cliente_dos_id, producto_dos_id = _crear_producto(app, 'Resto Dos', 'resto_dos')
+
+    _loguear(client_uno, app, 'resto_uno')
+    csrf_uno = _csrf(client_uno.get('/gastronomia/cocina').get_data(as_text=True))
+    pedido_uno_id = _crear_pedido_enviado(client_uno, csrf_uno, producto_uno_id)
+
+    _loguear(client_dos, app, 'resto_dos')
+    csrf_dos = _csrf(client_dos.get('/gastronomia/cocina').get_data(as_text=True))
+    pedido_dos_id = _crear_pedido_enviado(client_dos, csrf_dos, producto_dos_id)
+
+    eventos_dos = client_dos.get('/api/gastronomia/cocina/eventos').get_json()['eventos']
+    assert {evento['pedido_id'] for evento in eventos_dos} == {pedido_dos_id}
+    pedidos_dos = client_dos.get('/api/gastronomia/cocina/pedidos').get_json()['pedidos']
+    assert [pedido['id_pedido'] for pedido in pedidos_dos] == [pedido_dos_id]
+    assert pedido_uno_id not in {pedido['id_pedido'] for pedido in pedidos_dos}

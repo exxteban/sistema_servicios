@@ -1,0 +1,303 @@
+"""API interna para configuracion de menu gastronomico."""
+from flask import Blueprint, jsonify, request
+from flask_login import login_required
+
+from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.menu_service import (
+    eliminar_categoria,
+    eliminar_producto,
+    guardar_categoria,
+    guardar_producto,
+    listar_categorias,
+    listar_productos,
+    obtener_categoria,
+    obtener_producto,
+)
+from gastronomia.services.modificadores_service import (
+    eliminar_grupo,
+    eliminar_opcion,
+    guardar_grupo,
+    guardar_opcion,
+    listar_grupos_producto,
+    obtener_grupo,
+    obtener_opcion,
+    producto_con_modificadores,
+    validar_selecciones_producto,
+)
+from gastronomia.services.permisos import (
+    PERMISO_ACCESO,
+    PERMISO_MENU,
+    PERMISO_POS,
+    requiere_permiso_gastronomia,
+)
+
+
+gastronomia_api_bp = Blueprint('gastronomia_api', __name__)
+
+
+def _cliente_o_error():
+    cliente_id = cliente_id_actual_gastronomia()
+    if not cliente_id:
+        return None, (jsonify({'error': 'gastronomia_no_activa'}), 403)
+    return cliente_id, None
+
+
+def _payload():
+    if request.is_json:
+        return request.get_json(silent=True) or {}
+    return request.form.to_dict()
+
+
+@gastronomia_api_bp.route('/config', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_ACCESO)
+def config():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    return jsonify({'ok': True, 'cliente_id': cliente_id})
+
+
+@gastronomia_api_bp.route('/categorias', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU, PERMISO_POS)
+def categorias():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    incluir_ocultas = request.args.get('publico') != '1'
+    items = listar_categorias(cliente_id, incluir_ocultas=incluir_ocultas)
+    return jsonify({'ok': True, 'categorias': [item.to_dict() for item in items]})
+
+
+@gastronomia_api_bp.route('/categorias', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def crear_categoria():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        categoria = guardar_categoria(cliente_id, _payload())
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'categoria': categoria.to_dict()}), 201
+
+
+@gastronomia_api_bp.route('/categorias/<int:categoria_id>', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def actualizar_categoria(categoria_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    categoria = obtener_categoria(cliente_id, categoria_id)
+    if not categoria:
+        return jsonify({'error': 'not_found'}), 404
+    try:
+        categoria = guardar_categoria(cliente_id, _payload(), categoria=categoria)
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'categoria': categoria.to_dict()})
+
+
+@gastronomia_api_bp.route('/categorias/<int:categoria_id>', methods=['DELETE'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def borrar_categoria(categoria_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    if not eliminar_categoria(cliente_id, categoria_id):
+        return jsonify({'error': 'not_found'}), 404
+    return jsonify({'ok': True})
+
+
+@gastronomia_api_bp.route('/productos', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU, PERMISO_POS)
+def productos():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    categoria_id = request.args.get('categoria_id', type=int)
+    incluir_ocultos = request.args.get('publico') != '1'
+    items = listar_productos(cliente_id, categoria_id=categoria_id, incluir_ocultos=incluir_ocultos)
+    if request.args.get('modificadores') == '1':
+        productos_data = [producto_con_modificadores(cliente_id, item.id_producto) for item in items]
+    else:
+        productos_data = [item.to_dict() for item in items]
+    return jsonify({'ok': True, 'productos': productos_data})
+
+
+@gastronomia_api_bp.route('/productos', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def crear_producto():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        producto = guardar_producto(cliente_id, _payload())
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'producto': producto.to_dict()}), 201
+
+
+@gastronomia_api_bp.route('/productos/<int:producto_id>', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU, PERMISO_POS)
+def producto_detalle(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    producto = obtener_producto(cliente_id, producto_id)
+    if not producto:
+        return jsonify({'error': 'not_found'}), 404
+    incluir_modificadores = request.args.get('modificadores') == '1'
+    if incluir_modificadores:
+        return jsonify({'ok': True, 'producto': producto_con_modificadores(cliente_id, producto_id)})
+    return jsonify({'ok': True, 'producto': producto.to_dict()})
+
+
+@gastronomia_api_bp.route('/productos/<int:producto_id>', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def actualizar_producto(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    producto = obtener_producto(cliente_id, producto_id)
+    if not producto:
+        return jsonify({'error': 'not_found'}), 404
+    try:
+        producto = guardar_producto(cliente_id, _payload(), producto=producto)
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'producto': producto.to_dict()})
+
+
+@gastronomia_api_bp.route('/productos/<int:producto_id>', methods=['DELETE'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def borrar_producto(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    if not eliminar_producto(cliente_id, producto_id):
+        return jsonify({'error': 'not_found'}), 404
+    return jsonify({'ok': True})
+
+
+@gastronomia_api_bp.route('/productos/<int:producto_id>/grupos-opciones', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU, PERMISO_POS)
+def grupos_producto(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    if not obtener_producto(cliente_id, producto_id):
+        return jsonify({'error': 'not_found'}), 404
+    grupos = listar_grupos_producto(cliente_id, producto_id)
+    return jsonify({'ok': True, 'grupos': [grupo.to_dict() for grupo in grupos]})
+
+
+@gastronomia_api_bp.route('/productos/<int:producto_id>/grupos-opciones', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def crear_grupo_producto(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        grupo = guardar_grupo(cliente_id, producto_id, _payload())
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'grupo': grupo.to_dict()}), 201
+
+
+@gastronomia_api_bp.route('/grupos-opciones/<int:grupo_id>', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def actualizar_grupo(grupo_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    grupo = obtener_grupo(cliente_id, grupo_id)
+    if not grupo:
+        return jsonify({'error': 'not_found'}), 404
+    try:
+        grupo = guardar_grupo(cliente_id, grupo.producto_id, _payload(), grupo=grupo)
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'grupo': grupo.to_dict()})
+
+
+@gastronomia_api_bp.route('/grupos-opciones/<int:grupo_id>', methods=['DELETE'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def borrar_grupo(grupo_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    if not eliminar_grupo(cliente_id, grupo_id):
+        return jsonify({'error': 'not_found'}), 404
+    return jsonify({'ok': True})
+
+
+@gastronomia_api_bp.route('/grupos-opciones/<int:grupo_id>/opciones', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def crear_opcion_grupo(grupo_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        opcion = guardar_opcion(cliente_id, grupo_id, _payload())
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'opcion': opcion.to_dict()}), 201
+
+
+@gastronomia_api_bp.route('/opciones/<int:opcion_id>', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def actualizar_opcion(opcion_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    opcion = obtener_opcion(cliente_id, opcion_id)
+    if not opcion:
+        return jsonify({'error': 'not_found'}), 404
+    try:
+        opcion = guardar_opcion(cliente_id, opcion.grupo_id, _payload(), opcion=opcion)
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'opcion': opcion.to_dict()})
+
+
+@gastronomia_api_bp.route('/opciones/<int:opcion_id>', methods=['DELETE'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def borrar_opcion(opcion_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    if not eliminar_opcion(cliente_id, opcion_id):
+        return jsonify({'error': 'not_found'}), 404
+    return jsonify({'ok': True})
+
+
+@gastronomia_api_bp.route('/productos/<int:producto_id>/validar-selecciones', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU, PERMISO_POS)
+def validar_modificadores_producto(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    data = _payload()
+    try:
+        resultado = validar_selecciones_producto(cliente_id, producto_id, data.get('opciones') or [])
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, **resultado})

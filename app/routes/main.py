@@ -1,7 +1,7 @@
 """
 Rutas principales (Dashboard)
 """
-from flask import Blueprint, render_template, request, jsonify, current_app, g, url_for
+from flask import Blueprint, render_template, request, jsonify, current_app, g, url_for, redirect
 from datetime import timedelta
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
@@ -44,6 +44,7 @@ from gastos_corrientes.services import (
     obtener_dashboard_detallado_gastos_corrientes,
     obtener_resumen_dashboard_gastos_corrientes,
 )
+from gastronomia.services.modo_operacion import gastronomia_activa
 
 main_bp = Blueprint('main', __name__)
 
@@ -156,6 +157,8 @@ def dashboard():
         current_app.logger.info(f"{prefix}Dashboard: cierre_id={cierre_id} user_id={getattr(current_user, 'id_usuario', None)}")
     except Exception:
         pass
+    if gastronomia_activa():
+        return redirect(url_for('gastronomia.dashboard'))
     can_crear_venta = current_user.tiene_permiso('crear_venta')
     can_ver_ventas = current_user.tiene_permiso('ver_ventas')
     can_ver_reporte_ventas = current_user.tiene_permiso('ver_reporte_ventas')

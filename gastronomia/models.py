@@ -1,0 +1,403 @@
+"""Modelos base del modulo Gastronomia."""
+from datetime import datetime
+
+from app import db
+import json
+
+
+class GastronomiaClienteConfig(db.Model):
+    __tablename__ = 'gastronomia_cliente_config'
+
+    id_config = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    modo_operacion = db.Column(db.String(30), nullable=False, default='servicios')
+    gastronomia_activo = db.Column(db.Boolean, nullable=False, default=False)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_modificacion = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+    actualizado_por_id = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=True)
+
+    cliente = db.relationship('Cliente', backref=db.backref('gastronomia_config', uselist=False))
+    actualizado_por = db.relationship('Usuario', foreign_keys=[actualizado_por_id])
+
+    def __repr__(self):
+        return f'<GastronomiaClienteConfig cliente={self.cliente_id} modo={self.modo_operacion}>'
+
+
+class GastronomiaCategoria(db.Model):
+    __tablename__ = 'gastronomia_categorias'
+
+    id_categoria = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    nombre = db.Column(db.String(120), nullable=False)
+    descripcion = db.Column(db.Text)
+    orden = db.Column(db.Integer, nullable=False, default=0)
+    visible = db.Column(db.Boolean, nullable=False, default=True)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_modificacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cliente = db.relationship('Cliente', backref=db.backref('gastronomia_categorias', lazy='dynamic'))
+    productos = db.relationship('GastronomiaProducto', backref='categoria', lazy='dynamic')
+
+    __table_args__ = (
+        db.UniqueConstraint('cliente_id', 'nombre', name='uq_gastronomia_categoria_cliente_nombre'),
+    )
+
+    def to_dict(self):
+        return {
+            'id_categoria': self.id_categoria,
+            'cliente_id': self.cliente_id,
+            'nombre': self.nombre,
+            'descripcion': self.descripcion,
+            'orden': int(self.orden or 0),
+            'visible': bool(self.visible),
+            'activo': bool(self.activo),
+        }
+
+
+class GastronomiaProducto(db.Model):
+    __tablename__ = 'gastronomia_productos'
+
+    id_producto = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    categoria_id = db.Column(db.Integer, db.ForeignKey('gastronomia_categorias.id_categoria'), nullable=False, index=True)
+    nombre = db.Column(db.String(160), nullable=False)
+    descripcion = db.Column(db.Text)
+    precio = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    imagen_url = db.Column(db.String(500))
+    disponible = db.Column(db.Boolean, nullable=False, default=True)
+    visible = db.Column(db.Boolean, nullable=False, default=True)
+    orden = db.Column(db.Integer, nullable=False, default=0)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_modificacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cliente = db.relationship('Cliente', backref=db.backref('gastronomia_productos', lazy='dynamic'))
+    grupos_opciones = db.relationship('GastronomiaGrupoOpciones', backref='producto', lazy='dynamic')
+
+    __table_args__ = (
+        db.UniqueConstraint('cliente_id', 'nombre', name='uq_gastronomia_producto_cliente_nombre'),
+    )
+
+    def to_dict(self):
+        return {
+            'id_producto': self.id_producto,
+            'cliente_id': self.cliente_id,
+            'categoria_id': self.categoria_id,
+            'nombre': self.nombre,
+            'descripcion': self.descripcion,
+            'precio': float(self.precio or 0),
+            'imagen_url': self.imagen_url,
+            'disponible': bool(self.disponible),
+            'visible': bool(self.visible),
+            'activo': bool(self.activo),
+            'orden': int(self.orden or 0),
+        }
+
+
+class GastronomiaGrupoOpciones(db.Model):
+    __tablename__ = 'gastronomia_grupos_opciones'
+
+    id_grupo = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey('gastronomia_productos.id_producto', ondelete='CASCADE'), nullable=False, index=True)
+    nombre = db.Column(db.String(140), nullable=False)
+    tipo = db.Column(db.String(40), nullable=False, default='extra')
+    obligatorio = db.Column(db.Boolean, nullable=False, default=False)
+    min_selecciones = db.Column(db.Integer, nullable=False, default=0)
+    max_selecciones = db.Column(db.Integer, nullable=False, default=1)
+    orden = db.Column(db.Integer, nullable=False, default=0)
+    visible = db.Column(db.Boolean, nullable=False, default=True)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_modificacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cliente = db.relationship('Cliente')
+    opciones = db.relationship('GastronomiaOpcionProducto', backref='grupo', lazy='dynamic')
+
+    def to_dict(self, incluir_opciones=True):
+        data = {
+            'id_grupo': self.id_grupo,
+            'cliente_id': self.cliente_id,
+            'producto_id': self.producto_id,
+            'nombre': self.nombre,
+            'tipo': self.tipo,
+            'obligatorio': bool(self.obligatorio),
+            'min_selecciones': int(self.min_selecciones or 0),
+            'max_selecciones': int(self.max_selecciones or 0),
+            'orden': int(self.orden or 0),
+            'visible': bool(self.visible),
+            'activo': bool(self.activo),
+        }
+        if incluir_opciones:
+            data['opciones'] = [opcion.to_dict() for opcion in self.opciones_ordenadas()]
+        return data
+
+    def opciones_ordenadas(self):
+        return (
+            self.opciones
+            .filter_by(activo=True)
+            .order_by(GastronomiaOpcionProducto.orden.asc(), GastronomiaOpcionProducto.nombre.asc())
+            .all()
+        )
+
+
+class GastronomiaOpcionProducto(db.Model):
+    __tablename__ = 'gastronomia_opciones_producto'
+
+    id_opcion = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    grupo_id = db.Column(db.Integer, db.ForeignKey('gastronomia_grupos_opciones.id_grupo', ondelete='CASCADE'), nullable=False, index=True)
+    nombre = db.Column(db.String(140), nullable=False)
+    precio_delta = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    disponible = db.Column(db.Boolean, nullable=False, default=True)
+    visible = db.Column(db.Boolean, nullable=False, default=True)
+    orden = db.Column(db.Integer, nullable=False, default=0)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_modificacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cliente = db.relationship('Cliente')
+
+    def to_dict(self):
+        return {
+            'id_opcion': self.id_opcion,
+            'cliente_id': self.cliente_id,
+            'grupo_id': self.grupo_id,
+            'nombre': self.nombre,
+            'precio_delta': float(self.precio_delta or 0),
+            'disponible': bool(self.disponible),
+            'visible': bool(self.visible),
+            'orden': int(self.orden or 0),
+            'activo': bool(self.activo),
+        }
+
+
+class GastronomiaMesa(db.Model):
+    __tablename__ = 'gastronomia_mesas'
+
+    id_mesa = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    nombre = db.Column(db.String(40), nullable=False)
+    capacidad = db.Column(db.Integer, nullable=False, default=4)
+    ubicacion = db.Column(db.String(80))
+    orden = db.Column(db.Integer, nullable=False, default=0)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_modificacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cliente = db.relationship('Cliente')
+
+    __table_args__ = (
+        db.UniqueConstraint('cliente_id', 'nombre', name='uq_gastronomia_mesa_cliente_nombre'),
+    )
+
+    def to_dict(self):
+        return {
+            'id_mesa': self.id_mesa,
+            'cliente_id': self.cliente_id,
+            'nombre': self.nombre,
+            'capacidad': int(self.capacidad or 0),
+            'ubicacion': self.ubicacion,
+            'orden': int(self.orden or 0),
+            'activo': bool(self.activo),
+        }
+
+
+class GastronomiaPedido(db.Model):
+    __tablename__ = 'gastronomia_pedidos'
+
+    id_pedido = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False, index=True)
+    tipo_pedido = db.Column(db.String(30), nullable=False, default='mostrador')
+    mesa = db.Column(db.String(40))
+    estado = db.Column(db.String(30), nullable=False, default='abierto', index=True)
+    notas = db.Column(db.Text)
+    subtotal = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    total = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    fecha_modificacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    fecha_envio_cocina = db.Column(db.DateTime)
+    fecha_inicio_preparacion = db.Column(db.DateTime)
+    fecha_listo = db.Column(db.DateTime)
+
+    cliente = db.relationship('Cliente')
+    usuario = db.relationship('Usuario')
+    items = db.relationship('GastronomiaPedidoItem', backref='pedido', lazy='dynamic', cascade='all, delete-orphan')
+    pago = db.relationship(
+        'GastronomiaPedidoPago',
+        backref='pedido',
+        uselist=False,
+        cascade='all, delete-orphan',
+    )
+
+    def to_dict(self):
+        return {
+            'id_pedido': self.id_pedido,
+            'cliente_id': self.cliente_id,
+            'usuario_id': self.usuario_id,
+            'tipo_pedido': self.tipo_pedido,
+            'mesa': self.mesa,
+            'estado': self.estado,
+            'notas': self.notas,
+            'subtotal': float(self.subtotal or 0),
+            'total': float(self.total or 0),
+            'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
+            'fecha_envio_cocina': self.fecha_envio_cocina.isoformat() if self.fecha_envio_cocina else None,
+            'fecha_inicio_preparacion': self.fecha_inicio_preparacion.isoformat() if self.fecha_inicio_preparacion else None,
+            'fecha_listo': self.fecha_listo.isoformat() if self.fecha_listo else None,
+            'pago': self.pago.to_dict() if self.pago else None,
+            'items': [item.to_dict() for item in self.items.order_by(GastronomiaPedidoItem.id_item.asc()).all()],
+        }
+
+
+class GastronomiaPedidoItem(db.Model):
+    __tablename__ = 'gastronomia_pedido_items'
+
+    id_item = db.Column(db.Integer, primary_key=True)
+    pedido_id = db.Column(db.Integer, db.ForeignKey('gastronomia_pedidos.id_pedido', ondelete='CASCADE'), nullable=False, index=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey('gastronomia_productos.id_producto'), nullable=False, index=True)
+    nombre_producto = db.Column(db.String(160), nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False, default=1)
+    precio_unitario = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    notas = db.Column(db.Text)
+    subtotal = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+
+    producto = db.relationship('GastronomiaProducto')
+    modificadores = db.relationship(
+        'GastronomiaPedidoItemModificador',
+        backref='item',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+    )
+
+    def to_dict(self):
+        return {
+            'id_item': self.id_item,
+            'producto_id': self.producto_id,
+            'nombre_producto': self.nombre_producto,
+            'cantidad': int(self.cantidad or 0),
+            'precio_unitario': float(self.precio_unitario or 0),
+            'notas': self.notas,
+            'subtotal': float(self.subtotal or 0),
+            'modificadores': [
+                item.to_dict()
+                for item in self.modificadores.order_by(GastronomiaPedidoItemModificador.id_modificador.asc()).all()
+            ],
+        }
+
+
+class GastronomiaPedidoItemModificador(db.Model):
+    __tablename__ = 'gastronomia_pedido_item_modificadores'
+
+    id_modificador = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('gastronomia_pedido_items.id_item', ondelete='CASCADE'), nullable=False, index=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    grupo_id = db.Column(db.Integer, db.ForeignKey('gastronomia_grupos_opciones.id_grupo'), nullable=False)
+    opcion_id = db.Column(db.Integer, db.ForeignKey('gastronomia_opciones_producto.id_opcion'), nullable=False)
+    nombre_grupo = db.Column(db.String(140), nullable=False)
+    nombre_opcion = db.Column(db.String(140), nullable=False)
+    tipo_grupo = db.Column(db.String(40), nullable=False)
+    precio_delta = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+
+    def to_dict(self):
+        return {
+            'id_modificador': self.id_modificador,
+            'grupo_id': self.grupo_id,
+            'opcion_id': self.opcion_id,
+            'nombre_grupo': self.nombre_grupo,
+            'nombre_opcion': self.nombre_opcion,
+            'tipo_grupo': self.tipo_grupo,
+            'precio_delta': float(self.precio_delta or 0),
+        }
+
+
+class GastronomiaPedidoEvento(db.Model):
+    __tablename__ = 'gastronomia_pedido_eventos'
+
+    id_evento = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    pedido_id = db.Column(db.Integer, db.ForeignKey('gastronomia_pedidos.id_pedido', ondelete='CASCADE'), nullable=False, index=True)
+    tipo = db.Column(db.String(60), nullable=False, index=True)
+    payload_json = db.Column(db.Text)
+    fecha_evento = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    def get_payload(self):
+        try:
+            return json.loads(self.payload_json or '{}')
+        except Exception:
+            return {}
+
+    def set_payload(self, data):
+        self.payload_json = json.dumps(data or {}, ensure_ascii=False)
+
+    def to_dict(self):
+        return {
+            'id_evento': self.id_evento,
+            'cliente_id': self.cliente_id,
+            'pedido_id': self.pedido_id,
+            'tipo': self.tipo,
+            'payload': self.get_payload(),
+            'fecha_evento': self.fecha_evento.isoformat() if self.fecha_evento else None,
+        }
+
+
+class GastronomiaPedidoPago(db.Model):
+    __tablename__ = 'gastronomia_pedido_pagos'
+
+    id_pago = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    pedido_id = db.Column(
+        db.Integer,
+        db.ForeignKey('gastronomia_pedidos.id_pedido', ondelete='CASCADE'),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False, index=True)
+    metodo_pago = db.Column(db.String(40), nullable=False, default='efectivo')
+    subtotal = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    descuento_monto = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    total_cobrado = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    observacion = db.Column(db.String(255))
+    fecha_pago = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    cliente = db.relationship('Cliente')
+    usuario = db.relationship('Usuario')
+
+    def to_dict(self):
+        return {
+            'id_pago': self.id_pago,
+            'cliente_id': self.cliente_id,
+            'pedido_id': self.pedido_id,
+            'usuario_id': self.usuario_id,
+            'metodo_pago': self.metodo_pago,
+            'subtotal': float(self.subtotal or 0),
+            'descuento_monto': float(self.descuento_monto or 0),
+            'total_cobrado': float(self.total_cobrado or 0),
+            'observacion': self.observacion,
+            'fecha_pago': self.fecha_pago.isoformat() if self.fecha_pago else None,
+        }

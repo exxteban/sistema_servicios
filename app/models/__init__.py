@@ -36,6 +36,19 @@ from app.models.tienda_promocion import TiendaPromocion, TiendaPromocionProducto
 from app.models.web_bot import WebBotSesion, WebBotMensaje, WebBotHandoff
 from app.models.asistente_ia import AsistenteIABackofficeAudit
 from app.models.publicidad_ads import PublicidadAdsEvento
+from gastronomia.models import (
+    GastronomiaCategoria,
+    GastronomiaClienteConfig,
+    GastronomiaGrupoOpciones,
+    GastronomiaMesa,
+    GastronomiaOpcionProducto,
+    GastronomiaPedido,
+    GastronomiaPedidoEvento,
+    GastronomiaPedidoItem,
+    GastronomiaPedidoItemModificador,
+    GastronomiaPedidoPago,
+    GastronomiaProducto,
+)
 from pedidos.models import PedidoCliente, PedidoClienteDetalle, PedidoClienteHistorial, PedidoClientePago
 from cobranzas.models import PlanCreditoVenta, CuotaCreditoVenta, PagoCuentaCobrarAplicacion
 from flujo_caja.models import FlujoCajaMovimiento, FlujoCajaPlantilla, FlujoCajaSemana
@@ -67,6 +80,10 @@ __all__ = [
     'WebBotSesion', 'WebBotMensaje', 'WebBotHandoff',
     'AsistenteIABackofficeAudit',
     'PublicidadAdsEvento',
+    'GastronomiaClienteConfig', 'GastronomiaCategoria', 'GastronomiaProducto',
+    'GastronomiaGrupoOpciones', 'GastronomiaOpcionProducto', 'GastronomiaMesa',
+    'GastronomiaPedido', 'GastronomiaPedidoItem', 'GastronomiaPedidoItemModificador',
+    'GastronomiaPedidoEvento', 'GastronomiaPedidoPago',
     'PedidoCliente', 'PedidoClienteDetalle', 'PedidoClienteHistorial', 'PedidoClientePago',
     'PlanCreditoVenta', 'CuotaCreditoVenta', 'PagoCuentaCobrarAplicacion',
     'FlujoCajaSemana', 'FlujoCajaMovimiento', 'FlujoCajaPlantilla',

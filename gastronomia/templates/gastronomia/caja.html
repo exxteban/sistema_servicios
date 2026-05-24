@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Caja Gastronomia{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl" data-gastro-caja>
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+
+    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Gastronomia</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Caja</h1>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('gastronomia.dashboard') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-arrow-left"></i>Volver
+            </a>
+            <a href="{{ url_for('gastronomia.pos') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-tablet-alt"></i>POS
+            </a>
+            <a href="{{ url_for('gastronomia.cocina') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-fire"></i>Cocina
+            </a>
+        </div>
+    </div>
+
+    <div id="caja-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+
+    <div class="grid gap-5 xl:grid-cols-[1fr_360px]">
+        <section>
+            <div id="caja-orders" class="grid gap-4 lg:grid-cols-2"></div>
+        </section>
+
+        <aside class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Cobro</h2>
+            <div id="selected-summary" class="mt-4 rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-500 dark:border-gray-700">
+                Selecciona un pedido pendiente.
+            </div>
+            <label class="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Metodo de pago
+                <select id="payment-method" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="qr">QR</option>
+                    <option value="mixto">Mixto</option>
+                </select>
+            </label>
+            <label class="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Descuento
+                <input id="discount-amount" type="number" min="0" step="100" value="0"
+                       class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            </label>
+            <label class="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Observacion
+                <textarea id="payment-note" rows="2" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
+            </label>
+            <div class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
+                <span class="text-sm font-semibold text-gray-500">A cobrar</span>
+                <strong id="payment-total" class="text-2xl text-gray-900 dark:text-white">Gs. 0</strong>
+            </div>
+            <button type="button" id="charge-order" class="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-4 text-base font-bold text-white hover:bg-emerald-700">
+                Cobrar pedido
+            </button>
+        </aside>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .caja-card {
+        border: 1px solid rgb(229 231 235);
+        border-radius: 12px;
+        background: white;
+        padding: 18px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+    .caja-card.active {
+        border-color: rgb(16 185 129);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+    }
+    .dark .caja-card {
+        border-color: rgb(55 65 81);
+        background: rgb(31 41 55);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/caja.js') }}"></script>
+{% endblock %}
