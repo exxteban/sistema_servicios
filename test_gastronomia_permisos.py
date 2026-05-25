@@ -1,7 +1,7 @@
 import re
 
 from app import create_app, db
-from app.models import Cliente, Rol, Usuario
+from app.models import Cliente, Configuracion, Rol, Usuario
 from gastronomia.models import GastronomiaClienteConfig
 
 
@@ -21,7 +21,7 @@ def _csrf(html: str) -> str:
     return match.group(1)
 
 
-def _crear_cliente_usuario(app, username: str, rol_nombre: str):
+def _crear_cliente_usuario(app, username: str, rol_nombre: str, *, gastronomia_activa: bool = True):
     with app.app_context():
         rol = Rol.query.filter_by(nombre=rol_nombre).first()
         assert rol is not None
@@ -40,8 +40,8 @@ def _crear_cliente_usuario(app, username: str, rol_nombre: str):
             usuario,
             GastronomiaClienteConfig(
                 cliente_id=cliente.id_cliente,
-                modo_operacion='gastronomia',
-                gastronomia_activo=True,
+                modo_operacion='gastronomia' if gastronomia_activa else 'servicios',
+                gastronomia_activo=gastronomia_activa,
             ),
         ])
         db.session.commit()
@@ -124,6 +124,29 @@ def test_cajero_sin_cliente_usa_contexto_operativo_unico():
     html = dashboard.get_data(as_text=True)
     assert 'Este usuario no tiene un contexto operativo asignado' not in html
 
+    assert client.get('/gastronomia/menu').status_code == 200
     assert client.get('/gastronomia/pos').status_code == 200
+    assert client.get('/gastronomia/cocina').status_code == 200
     assert client.get('/gastronomia/caja').status_code == 200
-    assert client.get('/gastronomia/salon', follow_redirects=False).status_code in (302, 303)
+    assert client.get('/gastronomia/salon').status_code == 200
+    assert client.get('/gastronomia/reportes').status_code == 200
+
+
+def test_admin_sin_cliente_usa_cliente_gastronomico_activo_unico():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_cliente_usuario(app, 'resto_demo_activo', 'Administrador', gastronomia_activa=True)
+    _crear_cliente_usuario(app, 'resto_demo_servicios', 'Administrador', gastronomia_activa=False)
+    _crear_usuario_sin_cliente(app, 'admin_gastro_demo', 'Administrador')
+    with app.app_context():
+        Configuracion.establecer('modo_operacion_principal', 'gastronomia')
+
+    _loguear(client, app, 'admin_gastro_demo')
+
+    dashboard = client.get('/gastronomia/')
+    assert dashboard.status_code == 200
+    html = dashboard.get_data(as_text=True)
+    assert 'Este usuario no tiene un contexto operativo asignado' not in html
+
+    assert client.get('/gastronomia/menu').status_code == 200
+    assert client.get('/gastronomia/pos').status_code == 200
