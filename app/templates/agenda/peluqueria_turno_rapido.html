@@ -263,55 +263,112 @@
         </div>
 
         <aside class="turno-rapido-summary">
-            <div class="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 p-5 text-white shadow-sm shadow-slate-300/50 dark:border-white/10 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 dark:shadow-none" :style="estiloResumenPanel()">
-                <p class="text-xs font-black uppercase tracking-[0.22em]" :style="estiloTextoResumen()">Resumen del turno</p>
-                <h2 class="mt-2 break-words text-2xl font-black" x-text="tituloTurno()"></h2>
-                <div class="mt-5 space-y-3 text-sm text-slate-200">
-                    <div class="flex items-center gap-2"><i class="fas fa-user-tie w-5" :style="estiloTextoResumen()"></i><span x-text="profesionalNombre()"></span></div>
-                    <div class="flex items-center gap-2"><i class="far fa-clock w-5" :style="estiloTextoResumen()"></i><span x-text="horarioResumen()"></span></div>
-                    <div class="flex items-center gap-2"><i class="fas fa-stopwatch w-5" :style="estiloTextoResumen()"></i><span x-text="duracion + ' minutos'"></span></div>
-                    <div class="flex items-center gap-2"><i class="fas fa-bell w-5" :style="estiloTextoResumen()"></i><span>Recordatorio 15 min antes</span></div>
+            <div class="relative overflow-hidden rounded-3xl border p-5 shadow-sm transition-colors dark:shadow-none" :style="estiloResumenPanel()">
+                <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent dark:via-white/10"></div>
+                <div class="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-70" :style="estiloGlowResumen()"></div>
+                <div class="pointer-events-none absolute -bottom-16 -left-10 h-36 w-36 rounded-full bg-white/40 blur-3xl dark:bg-white/[0.03]"></div>
+
+                <div class="relative">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em]" :style="estiloBadgeResumen()">
+                                <span class="h-2 w-2 rounded-full" :style="estiloPuntoResumen()"></span>
+                                Resumen del turno
+                            </span>
+                            <h2 class="mt-3 break-words text-2xl font-black text-slate-950 dark:text-white" x-text="tituloTurno()"></h2>
+                        </div>
+                        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm" :style="estiloIconoResumenCard()">
+                            <i class="fas fa-calendar-check text-sm"></i>
+                        </span>
+                    </div>
+
+                    <div class="mt-5 grid grid-cols-1 gap-3">
+                        <div class="flex items-center gap-3 rounded-2xl border px-3 py-3" :style="estiloItemResumen()">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" :style="estiloIconoResumenWrap()">
+                                <i class="fas fa-user-tie" :style="estiloTextoResumen()"></i>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Profesional</p>
+                                <p class="truncate text-sm font-bold text-slate-900 dark:text-white" x-text="profesionalNombre()"></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 rounded-2xl border px-3 py-3" :style="estiloItemResumen()">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" :style="estiloIconoResumenWrap()">
+                                <i class="far fa-clock" :style="estiloTextoResumen()"></i>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Horario</p>
+                                <p class="text-sm font-bold text-slate-900 dark:text-white" x-text="horarioResumen()"></p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div class="flex items-center gap-3 rounded-2xl border px-3 py-3" :style="estiloItemResumen()">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" :style="estiloIconoResumenWrap()">
+                                    <i class="fas fa-stopwatch" :style="estiloTextoResumen()"></i>
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Duración</p>
+                                    <p class="text-sm font-bold text-slate-900 dark:text-white" x-text="duracion + ' minutos'"></p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 rounded-2xl border px-3 py-3" :style="estiloItemResumen()">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" :style="estiloIconoResumenWrap()">
+                                    <i class="fas fa-bell" :style="estiloTextoResumen()"></i>
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Aviso</p>
+                                    <p class="text-sm font-bold text-slate-900 dark:text-white">Recordatorio 15 min antes</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
                 {% if puede_crear_venta %}
-                <div class="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-4">
-                    <div>
-                        <p class="text-sm font-black text-white">Cobro rapido</p>
-                        <p class="mt-1 text-xs text-slate-300">Puedes usar el servicio vinculado o elegir una base cobrable con precio manual opcional.</p>
+                <div class="relative mt-5 space-y-3 rounded-[1.5rem] border px-4 py-4" :style="estiloBloqueSecundarioResumen()">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-sm" :style="estiloIconoResumenCard()">
+                            <i class="fas fa-cash-register text-sm"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-black text-slate-950 dark:text-white">Cobro rápido</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">Puedes usar el servicio vinculado o elegir una base cobrable con precio manual opcional.</p>
+                        </div>
                     </div>
                     <div x-show="!servicioTieneVinculoDirecto()" x-cloak>
-                        <label class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-300">Servicio base a cobrar</label>
+                        <label class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Servicio base a cobrar</label>
                         <select x-model="servicioCatalogoManualId"
                             @change="sincronizarOpcionServicio()"
-                            class="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20">
+                            class="w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-900 shadow-sm shadow-slate-200/40 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/60 dark:text-white dark:shadow-none dark:focus:border-violet-300 dark:focus:ring-violet-500/20">
                             <option value="">Seleccionar servicio del catalogo</option>
                             <template x-for="servicio in serviciosCatalogo" :key="servicio.id">
                                 <option :value="String(servicio.id)" x-text="`${servicio.nombre} · ${servicio.precio_label}`"></option>
                             </template>
                         </select>
                     </div>
-                    <div class="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2">
+                    <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-white/60 px-3 py-3 dark:border-white/10 dark:bg-slate-950/30">
                         <div>
-                            <p class="text-sm font-semibold text-white">Usar precio manual</p>
-                            <p class="text-xs text-slate-300">Sobrescribe el precio del servicio base para este turno.</p>
+                            <p class="text-sm font-semibold text-slate-900 dark:text-white">Usar precio manual</p>
+                            <p class="text-xs text-slate-600 dark:text-slate-300">Sobrescribe el precio del servicio base para este turno.</p>
                         </div>
-                        <input type="checkbox" x-model="usarPrecioManual" class="h-4 w-4 rounded border-white/20 bg-slate-950/60 text-violet-500 focus:ring-violet-400">
+                        <input type="checkbox" x-model="usarPrecioManual" class="h-4 w-4 rounded border-slate-300 bg-white text-violet-500 focus:ring-violet-400 dark:border-white/20 dark:bg-slate-950/60">
                     </div>
                     <div x-show="usarPrecioManual" x-cloak>
-                        <label class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-300">Precio a cobrar</label>
+                        <label class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Precio a cobrar</label>
                         <input type="number" x-model="precioManual" min="1" step="1000" placeholder="Ej: 35000"
-                            class="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20">
+                            class="w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-900 shadow-sm shadow-slate-200/40 placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/60 dark:text-white dark:shadow-none dark:placeholder:text-slate-400 dark:focus:border-violet-300 dark:focus:ring-violet-500/20">
                     </div>
-                    <p class="text-xs text-slate-300" x-show="servicioBaseSeleccionado()" x-cloak>
-                        Base cobrable: <span class="font-bold text-white" x-text="servicioBaseSeleccionadoLabel()"></span>
+                    <p class="text-xs text-slate-600 dark:text-slate-300" x-show="servicioBaseSeleccionado()" x-cloak>
+                        Base cobrable: <span class="font-bold text-slate-900 dark:text-white" x-text="servicioBaseSeleccionadoLabel()"></span>
                     </p>
-                    <p class="text-xs text-slate-300" x-show="tipoServicioLabel()" x-cloak>
-                        Tipo elegido: <span class="font-bold text-white" x-text="tipoServicioLabel()"></span>
+                    <p class="text-xs text-slate-600 dark:text-slate-300" x-show="tipoServicioLabel()" x-cloak>
+                        Tipo elegido: <span class="font-bold text-slate-900 dark:text-white" x-text="tipoServicioLabel()"></span>
                     </p>
                 </div>
                 {% endif %}
-                <label class="mt-5 block text-sm font-bold text-slate-200 dark:text-slate-300">Observaciones</label>
+                <label class="mt-5 block text-sm font-bold text-slate-700 dark:text-slate-300">Observaciones</label>
                 <textarea name="observaciones" x-model="observaciones" rows="3" placeholder="Notas internas: seña, preferencia, color, etc."
-                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-slate-400 dark:focus:border-violet-400 dark:focus:ring-violet-500/20"></textarea>
+                    class="mt-1 w-full rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-slate-900 shadow-sm shadow-slate-200/40 placeholder:text-slate-400 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:shadow-none dark:placeholder:text-slate-400 dark:focus:border-violet-400 dark:focus:ring-violet-500/20"></textarea>
                 <button type="submit" name="accion" value="crear" class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-60" :style="estiloBotonResumen()"
                     :disabled="!puedeCrearTurno()"
                     :title="puedeCrearTurno() ? 'Crear turno' : mensajeTurnoNoDisponible()">
@@ -319,16 +376,16 @@
                 </button>
                 {% if puede_crear_venta %}
                 <button type="submit" name="accion" value="crear_y_cobrar"
-                    class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50"
+                    :style="estiloBotonSecundarioResumen()"
                     :disabled="!puedeCrearTurno() || !puedeCrearYCobrar()"
                     :title="puedeCrearTurno() && puedeCrearYCobrar() ? 'Crear el turno y abrir POS' : mensajeCobroNoDisponible()">
                     <i class="fas fa-cash-register"></i> Crear y cobrar
                 </button>
-                <p class="mt-2 text-xs text-slate-300" x-show="!puedeCrearTurno() || !puedeCrearYCobrar()" x-cloak x-text="mensajeCobroNoDisponible()">
+                <p class="mt-2 text-xs text-slate-500 dark:text-slate-300" x-show="!puedeCrearTurno() || !puedeCrearYCobrar()" x-cloak x-text="mensajeCobroNoDisponible()">
                 </p>
                 {% endif %}
             </div>
-        </aside>
     </form>
 
     <div x-show="modalServicioAbierto" x-cloak x-transition.opacity
