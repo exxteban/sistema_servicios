@@ -3,7 +3,10 @@ from flask_login import current_user
 
 from app.models import Cliente
 from gastronomia.models import GastronomiaClienteConfig
-from gastronomia.services.modo_operacion import gastronomia_activa
+from gastronomia.services.modo_operacion import (
+    asegurar_cliente_operativo_gastronomia,
+    gastronomia_activa,
+)
 
 
 def _puede_resolver_contexto_operativo_unico() -> bool:
@@ -38,6 +41,12 @@ def _cliente_id_config_unico(*, solo_gastronomia_activa: bool) -> int | None:
 def _cliente_id_unico_gastronomia() -> int | None:
     if not _puede_resolver_contexto_operativo_unico():
         return None
+
+    cliente_bootstrap = asegurar_cliente_operativo_gastronomia(
+        usuario_id=getattr(current_user, 'id_usuario', None),
+    )
+    if cliente_bootstrap:
+        return cliente_bootstrap
 
     cliente_id = _cliente_id_config_unico(solo_gastronomia_activa=True)
     if cliente_id:

@@ -11,6 +11,8 @@ MODO_GASTRONOMIA = 'gastronomia'
 MODOS_OPERACION = (MODO_SERVICIOS, MODO_GASTRONOMIA)
 CLAVE_MODO_OPERACION_PRINCIPAL = 'modo_operacion_principal'
 DESC_MODO_OPERACION_PRINCIPAL = 'Modo operativo principal de la instalacion'
+CLIENTE_OPERATIVO_DEFAULT_NOMBRE = 'Negocio principal'
+CLIENTE_OPERATIVO_DEFAULT_RUC = 'gastro-default'
 
 
 def normalizar_modo_operacion(valor: str | None) -> str:
@@ -60,6 +62,87 @@ def gastronomia_activa() -> bool:
     return obtener_modo_operacion() == MODO_GASTRONOMIA
 
 
+def _asegurar_config_gastronomia_activa(cliente_id: int, *, usuario_id: int | None = None) -> None:
+    config = GastronomiaClienteConfig.query.filter_by(cliente_id=cliente_id).first()
+    if not config:
+        config = GastronomiaClienteConfig(
+            cliente_id=cliente_id,
+            modo_operacion=MODO_GASTRONOMIA,
+            gastronomia_activo=True,
+            actualizado_por_id=usuario_id,
+        )
+        db.session.add(config)
+        return
+
+    config.modo_operacion = MODO_GASTRONOMIA
+    config.gastronomia_activo = True
+    if usuario_id:
+        config.actualizado_por_id = usuario_id
+
+
+def asegurar_cliente_operativo_gastronomia(*, usuario_id: int | None = None) -> int | None:
+    """Auto-bootstrap para instalaciones monocliente sin negocio operativo cargado."""
+    if not gastronomia_activa():
+        return None
+
+    clientes = (
+        Cliente.query
+        .filter(Cliente.activo.is_(True), Cliente.id_cliente != 1)
+        .order_by(Cliente.id_cliente.asc())
+        .limit(2)
+        .all()
+    )
+    if len(clientes) > 1:
+        return None
+
+    if len(clientes) == 1:
+        try:
+            cliente_id = int(clientes[0].id_cliente or 0)
+        except (TypeError, ValueError):
+            return None
+        if cliente_id <= 0:
+            return None
+        _asegurar_config_gastronomia_activa(cliente_id, usuario_id=usuario_id)
+        db.session.commit()
+        return cliente_id
+
+    cliente = (
+        Cliente.query
+        .filter(Cliente.id_cliente != 1, Cliente.ruc_ci == CLIENTE_OPERATIVO_DEFAULT_RUC)
+        .order_by(Cliente.id_cliente.asc())
+        .first()
+    )
+    if not cliente:
+        cliente = Cliente(
+            nombre=CLIENTE_OPERATIVO_DEFAULT_NOMBRE,
+            ruc_ci=CLIENTE_OPERATIVO_DEFAULT_RUC,
+            tipo='minorista',
+            activo=True,
+            notas='Bootstrap automatico para Gastronomia en instalacion monocliente.',
+        )
+        db.session.add(cliente)
+        db.session.flush()
+    else:
+        cliente.activo = True
+        if not (cliente.nombre or '').strip():
+            cliente.nombre = CLIENTE_OPERATIVO_DEFAULT_NOMBRE
+        if not (cliente.tipo or '').strip():
+            cliente.tipo = 'minorista'
+
+    try:
+        cliente_id = int(cliente.id_cliente or 0)
+    except (TypeError, ValueError):
+        db.session.rollback()
+        return None
+    if cliente_id <= 0:
+        db.session.rollback()
+        return None
+
+    _asegurar_config_gastronomia_activa(cliente_id, usuario_id=usuario_id)
+    db.session.commit()
+    return cliente_id
+
+
 def obtener_config_cliente(cliente_id: int | None, *, crear: bool = False) -> GastronomiaClienteConfig | None:
     return _obtener_config_legacy(cliente_id, crear=crear)
 
@@ -89,6 +172,8 @@ def establecer_modo_operacion(
         modo,
         descripcion=DESC_MODO_OPERACION_PRINCIPAL,
     )
+    if modo == MODO_GASTRONOMIA:
+        asegurar_cliente_operativo_gastronomia(usuario_id=usuario_id)
     return {
         'modo_operacion': modo,
         'gastronomia_activo': modo == MODO_GASTRONOMIA,

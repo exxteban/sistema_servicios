@@ -115,3 +115,33 @@ def test_root_sin_cliente_usa_contexto_unico_en_gastronomia():
 
     pos_response = client.get('/gastronomia/pos')
     assert pos_response.status_code == 200
+
+
+def test_root_sin_negocio_operativo_bootstrapea_cliente_gastronomia():
+    app = create_app('testing')
+    client = app.test_client()
+
+    with app.app_context():
+        Configuracion.establecer('modo_operacion_principal', MODO_GASTRONOMIA)
+
+    _loguear(client, app, 'root')
+
+    dashboard = client.get('/gastronomia/')
+    assert dashboard.status_code == 200
+    html = dashboard.get_data(as_text=True)
+    assert 'Este usuario no tiene un contexto operativo asignado' not in html
+
+    with app.app_context():
+        clientes = (
+            Cliente.query
+            .filter(Cliente.activo.is_(True), Cliente.id_cliente != 1)
+            .order_by(Cliente.id_cliente.asc())
+            .all()
+        )
+        assert len(clientes) == 1
+        cliente = clientes[0]
+        assert cliente.nombre == 'Negocio principal'
+        config = cliente.gastronomia_config
+        assert config is not None
+        assert config.gastronomia_activo is True
+        assert config.modo_operacion == MODO_GASTRONOMIA
