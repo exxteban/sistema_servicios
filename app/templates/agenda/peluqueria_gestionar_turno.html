@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Gestionar turno peluquería/barbería{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl space-y-5">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <p class="text-xs font-black uppercase tracking-[0.24em] text-violet-500">Peluquería / Barbería</p>
+            <h1 class="mt-1 text-3xl font-black tracking-tight text-slate-950 dark:text-white">Gestionar turno</h1>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Reprograma, registra seña o cierra el turno sin entrar al formulario completo.</p>
+        </div>
+        <a href="{{ url_for('main.dashboard') }}"
+            data-tab-url="{{ url_for('main.dashboard') }}"
+            data-tab-title="Dashboard"
+            class="app-tab-link inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/5">
+            <i class="fas fa-arrow-left text-xs"></i> Volver al dashboard
+        </a>
+    </div>
+
+    <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">#{{ actividad.id }}</span>
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ actividad.estado|title }}</span>
+                    {% if actividad.cliente_servicio and actividad.cliente_servicio.id_venta %}
+                    <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">Cobrado</span>
+                    {% endif %}
+                </div>
+                <h2 class="mt-3 text-2xl font-black text-slate-950 dark:text-white">{{ actividad.titulo }}</h2>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    {{ actividad.fecha_inicio|local_strftime('%d/%m/%Y %H:%M') }}{% if actividad.fecha_fin %} a {{ actividad.fecha_fin|local_strftime('%H:%M') }}{% endif %}
+                    · {{ actividad.usuario.nombre_completo or actividad.usuario.username if actividad.usuario else 'Sin profesional' }}
+                </p>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-white/10 dark:bg-white/[0.03]">
+                <p class="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</p>
+                <p class="mt-1 font-bold text-slate-950 dark:text-white">{{ actividad.cliente.nombre if actividad.cliente else 'Consumidor Final' }}</p>
+                {% if actividad.cliente_servicio and actividad.cliente_servicio.servicio %}
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ actividad.cliente_servicio.servicio.nombre }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+            <h2 class="text-base font-black text-slate-950 dark:text-white">Reprogramar rápido</h2>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Respeta los choques de horario del profesional asignado.</p>
+            {% if puede_reprogramar %}
+            <form method="POST" class="mt-4 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="accion" value="reprogramar">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                        <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Fecha</label>
+                        <input type="date" name="fecha" value="{{ fecha_actual }}" required class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Hora</label>
+                        <input type="time" name="hora" value="{{ hora_actual }}" required step="900" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Duración</label>
+                        <select name="duracion" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+                            {% for minutos in [15, 20, 30, 45, 60, 90] %}
+                            <option value="{{ minutos }}" {% if duracion_actual == minutos %}selected{% endif %}>{{ minutos }} minutos</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700">
+                    <i class="fas fa-calendar-alt"></i> Reprogramar turno
+                </button>
+            </form>
+            {% else %}
+            <p class="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">No tienes permiso para reprogramar turnos.</p>
+            {% endif %}
+        </section>
+
+        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+            <h2 class="text-base font-black text-slate-950 dark:text-white">Seña / anticipo</h2>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Registra la seña como nota visible del turno y del servicio pendiente.</p>
+            {% if puede_registrar_sena %}
+            <form method="POST" class="mt-4 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="accion" value="sena">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Monto</label>
+                        <input type="number" name="monto_sena" min="1" step="1000" placeholder="Ej: 20000" required class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Nota</label>
+                        <input type="text" name="nota_sena" placeholder="Efectivo, transferencia..." class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+                    </div>
+                </div>
+                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700">
+                    <i class="fas fa-money-bill-wave"></i> Registrar seña
+                </button>
+            </form>
+            {% else %}
+            <p class="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">No tienes permiso para registrar señas.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <section class="rounded-3xl border border-rose-200 bg-rose-50/80 p-5 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10">
+        <h2 class="text-base font-black text-rose-950 dark:text-rose-100">Cerrar turno sin atención</h2>
+        <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">Usa cancelado cuando avisan; usa no-show cuando el cliente no aparece.</p>
+        {% if puede_cancelar %}
+        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <form method="POST" class="space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="accion" value="cancelar">
+                <input type="text" name="motivo" placeholder="Motivo opcional" class="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-slate-900 dark:border-rose-500/20 dark:bg-slate-950 dark:text-white">
+                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-300 bg-white px-4 py-3 text-sm font-black text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-slate-950 dark:text-rose-200 dark:hover:bg-rose-500/10">
+                    <i class="fas fa-ban"></i> Cancelar turno
+                </button>
+            </form>
+            <form method="POST" class="space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="accion" value="no_show">
+                <input type="text" name="motivo" placeholder="Nota opcional" class="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-slate-900 dark:border-rose-500/20 dark:bg-slate-950 dark:text-white">
+                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-3 text-sm font-black text-white transition hover:bg-rose-700">
+                    <i class="fas fa-user-slash"></i> Marcar no-show
+                </button>
+            </form>
+        </div>
+        {% else %}
+        <p class="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm font-semibold text-rose-800 dark:bg-slate-950/60 dark:text-rose-200">No tienes permiso para cancelar turnos.</p>
+        {% endif %}
+    </section>
+
+    {% if actividad.observaciones %}
+    <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <h2 class="text-base font-black text-slate-950 dark:text-white">Notas del turno</h2>
+        <p class="mt-3 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">{{ actividad.observaciones }}</p>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

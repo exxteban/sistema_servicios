@@ -131,8 +131,8 @@
         </div>
     </div>
 
-    <div x-show="!hasVisibleCards()" {% if dashboard_service_cards_selected %}style="display: none;"{% endif %}
-        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-5 py-8 text-center dark:border-white/10 dark:bg-slate-900/60">
+    <div :class="{ 'hidden': hasVisibleCards() }"
+        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-5 py-8 text-center dark:border-white/10 dark:bg-slate-900/60 {% if dashboard_service_cards_selected %}hidden{% endif %}">
         <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">No hay tarjetas visibles en este dashboard.</p>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Usa el selector de arriba para volver a mostrar las que necesites.</p>
     </div>
@@ -140,16 +140,22 @@
     <!-- KPI Cards -->
     {% include "dashboard/components/servicios_kpi_cards.html" %}
 
+    {% if dashboard_negocio.id == 'peluqueria_barberia' and can_ver_agenda %}
+    <div :class="{ 'hidden': !isCardVisible('turnero_visual') }" class="{% if 'turnero_visual' not in dashboard_service_cards_selected %}hidden{% endif %}">
+        {% include "dashboard/components/servicios_turnero_visual.html" %}
+    </div>
+    {% endif %}
+
     <!-- Main Cards -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-flow-dense xl:grid-cols-6 2xl:grid-cols-12">
-        <div class="lg:col-span-2 xl:col-span-6 2xl:col-span-6" x-show="isCardVisible('agenda_hoy')" {% if 'agenda_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}>
+        <div class="lg:col-span-2 xl:col-span-6 2xl:col-span-6 {% if 'agenda_hoy' not in dashboard_service_cards_selected %}hidden{% endif %}" :class="{ 'hidden': !isCardVisible('agenda_hoy') }">
             {% include "dashboard/components/servicios_agenda_hoy.html" %}
         </div>
-        <div class="xl:col-span-3 2xl:col-span-3" x-show="isCardVisible('profesionales_hoy')" {% if 'profesionales_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        <div class="xl:col-span-3 2xl:col-span-3 {% if 'profesionales_hoy' not in dashboard_service_cards_selected %}hidden{% endif %}" :class="{ 'hidden': !isCardVisible('profesionales_hoy') }"
             :style="cardStyle('profesionales_hoy')">
             {% include "dashboard/components/servicios_profesionales.html" %}
         </div>
-        <div class="xl:col-span-3 2xl:col-span-3" x-show="isCardVisible('caja_dia')" {% if 'caja_dia' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        <div class="xl:col-span-3 2xl:col-span-3 {% if 'caja_dia' not in dashboard_service_cards_selected %}hidden{% endif %}" :class="{ 'hidden': !isCardVisible('caja_dia') }"
             :style="cardStyle('caja_dia')">
             {% include "dashboard/components/servicios_caja.html" %}
         </div>
@@ -185,6 +191,14 @@
                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ item.titulo }}</p>
                         </div>
                         <div class="flex shrink-0 gap-2">
+                            {% if dashboard_negocio.id == 'peluqueria_barberia' %}
+                            <a href="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=item.id) }}"
+                                data-tab-url="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=item.id) }}"
+                                data-tab-title="Gestionar turno" data-tab-icon="fas fa-pen"
+                                class="app-tab-link inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-100 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/15">
+                                <i class="fas fa-pen"></i>Gestionar
+                            </a>
+                            {% endif %}
                             {% if can_crear_venta and not item.cobrado and item.cliente_servicio_id %}
                             <a href="{{ url_for('ventas.pos', cliente_servicio_id=item.cliente_servicio_id) }}"
                                 data-tab-url="{{ url_for('ventas.pos', cliente_servicio_id=item.cliente_servicio_id) }}"
@@ -313,6 +327,7 @@ function serviceDashboardCardsCustomizer(config) {
             kpi_profesionales: 'locked',
             kpi_cobrado_hoy: 'locked',
             kpi_caja: 'locked',
+            turnero_visual: 'locked',
             agenda_hoy: 'locked',
             profesionales_hoy: 'standard',
             caja_dia: 'standard',

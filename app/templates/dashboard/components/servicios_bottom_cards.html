@@ -1,8 +1,8 @@
 <!-- Cobros pendientes -->
-<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900 {% if 'cobros_pendientes' not in dashboard_service_cards_selected %}hidden{% endif %}"
         data-dashboard-cobros-pendientes-root="1"
         data-can-crear-venta="{{ 1 if can_crear_venta else 0 }}"
-        x-show="isCardVisible('cobros_pendientes')" {% if 'cobros_pendientes' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        :class="{ 'hidden': !isCardVisible('cobros_pendientes') }"
         :style="cardStyle('cobros_pendientes')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
@@ -73,9 +73,9 @@
 </section>
 
 <!-- Servicios realizados hoy -->
-<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900 {% if 'servicios_realizados' not in dashboard_service_cards_selected %}hidden{% endif %}"
         data-dashboard-servicios-realizados-root="1"
-        x-show="isCardVisible('servicios_realizados')" {% if 'servicios_realizados' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+        :class="{ 'hidden': !isCardVisible('servicios_realizados') }"
         :style="cardStyle('servicios_realizados')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
@@ -117,8 +117,8 @@
 </section>
 
 <!-- Clientes -->
-<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
-        x-show="isCardVisible('clientes_panel')" {% if 'clientes_panel' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900 {% if 'clientes_panel' not in dashboard_service_cards_selected %}hidden{% endif %}"
+        :class="{ 'hidden': !isCardVisible('clientes_panel') }"
         :style="cardStyle('clientes_panel')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
@@ -175,8 +175,8 @@
 </section>
 
 <!-- Insumos criticos -->
-<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
-        x-show="isCardVisible('insumos_criticos')" {% if 'insumos_criticos' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900 {% if 'insumos_criticos' not in dashboard_service_cards_selected %}hidden{% endif %}"
+        :class="{ 'hidden': !isCardVisible('insumos_criticos') }"
         :style="cardStyle('insumos_criticos')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">
@@ -219,8 +219,8 @@
 </section>
 
 <!-- Comisiones del dia -->
-<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900"
-        x-show="isCardVisible('comisiones_dia')" {% if 'comisiones_dia' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
+<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900 {% if 'comisiones_dia' not in dashboard_service_cards_selected %}hidden{% endif %}"
+        :class="{ 'hidden': !isCardVisible('comisiones_dia') }"
         :style="cardStyle('comisiones_dia')">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
             <div class="flex items-center gap-2">

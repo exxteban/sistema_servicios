@@ -89,6 +89,69 @@ def guardar_opcion(cliente_id: int, grupo_id: int, data: dict, opcion=None) -> G
     return opcion
 
 
+def sincronizar_ingredientes_removibles(cliente_id: int, producto_id: int, ingredientes) -> GastronomiaGrupoOpciones | None:
+    """Crea/actualiza el grupo usado por el POS para quitar ingredientes."""
+    producto = obtener_producto(cliente_id, producto_id)
+    if not producto:
+        raise ValueError('El producto no existe para este cliente.')
+
+    nombres = _normalizar_nombres_ingredientes(ingredientes)
+    grupos = GastronomiaGrupoOpciones.query.filter(
+        GastronomiaGrupoOpciones.cliente_id == int(cliente_id),
+        GastronomiaGrupoOpciones.producto_id == int(producto_id),
+        GastronomiaGrupoOpciones.tipo == 'ingrediente_removible',
+        GastronomiaGrupoOpciones.activo.is_(True),
+    ).order_by(GastronomiaGrupoOpciones.id_grupo.asc()).all()
+    grupo = grupos[0] if grupos else None
+    for grupo_extra in grupos[1:]:
+        grupo_extra.activo = False
+        for opcion in grupo_extra.opciones.filter_by(activo=True).all():
+            opcion.activo = False
+
+    if not nombres:
+        if grupo:
+            grupo.activo = False
+            for opcion in grupo.opciones.filter_by(activo=True).all():
+                opcion.activo = False
+            db.session.commit()
+        return None
+
+    if not grupo:
+        grupo = GastronomiaGrupoOpciones(cliente_id=int(cliente_id), producto_id=int(producto_id))
+    grupo.nombre = 'Ingredientes removibles'
+    grupo.tipo = 'ingrediente_removible'
+    grupo.obligatorio = False
+    grupo.min_selecciones = 0
+    grupo.max_selecciones = max(1, len(nombres))
+    grupo.orden = -100
+    grupo.visible = True
+    grupo.activo = True
+    db.session.add(grupo)
+    db.session.flush()
+
+    opciones_activas = {
+        opcion.nombre.strip().lower(): opcion
+        for opcion in grupo.opciones.filter_by(activo=True).all()
+    }
+    nombres_activos = {nombre.lower() for nombre in nombres}
+    for orden, nombre in enumerate(nombres):
+        opcion = opciones_activas.get(nombre.lower())
+        if not opcion:
+            opcion = GastronomiaOpcionProducto(cliente_id=int(cliente_id), grupo_id=grupo.id_grupo)
+        opcion.nombre = nombre[:140]
+        opcion.precio_delta = 0
+        opcion.disponible = True
+        opcion.visible = True
+        opcion.orden = orden
+        opcion.activo = True
+        db.session.add(opcion)
+    for nombre, opcion in opciones_activas.items():
+        if nombre not in nombres_activos:
+            opcion.activo = False
+    db.session.commit()
+    return grupo
+
+
 def eliminar_grupo(cliente_id: int, grupo_id: int) -> bool:
     grupo = obtener_grupo(cliente_id, grupo_id)
     if not grupo:
@@ -127,7 +190,9 @@ def validar_selecciones_producto(cliente_id: int, producto_id: int, opciones_ids
         raise ValueError('Producto no encontrado.')
     grupos = listar_grupos_producto(cliente_id, producto_id, incluir_ocultos=False)
     opciones_por_id = {}
+    grupos_por_id = {}
     for grupo in grupos:
+        grupos_por_id[int(grupo.id_grupo)] = grupo
         for opcion in grupo.opciones_ordenadas():
             opciones_por_id[int(opcion.id_opcion)] = opcion
 
@@ -154,10 +219,39 @@ def validar_selecciones_producto(cliente_id: int, producto_id: int, opciones_ids
     total = precio_base + total_modificadores
     return {
         'producto': producto.to_dict(),
-        'selecciones': [opcion.to_dict() for opcion in seleccionadas],
+        'selecciones': [_opcion_con_grupo(opcion, grupos_por_id) for opcion in seleccionadas],
         'total_modificadores': float(total_modificadores),
         'total': float(total),
     }
+
+
+def _opcion_con_grupo(opcion: GastronomiaOpcionProducto, grupos_por_id: dict[int, GastronomiaGrupoOpciones]) -> dict:
+    data = opcion.to_dict()
+    grupo = grupos_por_id.get(int(opcion.grupo_id))
+    data['nombre_grupo'] = grupo.nombre if grupo else 'Opcion'
+    data['tipo_grupo'] = grupo.tipo if grupo else 'extra'
+    return data
+
+
+def _normalizar_nombres_ingredientes(ingredientes) -> list[str]:
+    if isinstance(ingredientes, str):
+        partes = ingredientes.replace(';', '\n').replace(',', '\n').splitlines()
+    elif isinstance(ingredientes, list):
+        partes = [item.get('nombre') if isinstance(item, dict) else item for item in ingredientes]
+    else:
+        partes = []
+    nombres = []
+    vistos = set()
+    for item in partes:
+        nombre = str(item or '').strip()
+        if not nombre:
+            continue
+        clave = nombre.lower()
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        nombres.append(nombre[:140])
+    return nombres
 
 
 def _normalizar_ids(opciones_ids: list[int]) -> list[int]:

@@ -22,6 +22,7 @@ from gastronomia.services.modificadores_service import (
     obtener_grupo,
     obtener_opcion,
     producto_con_modificadores,
+    sincronizar_ingredientes_removibles,
     validar_selecciones_producto,
 )
 from gastronomia.services.permisos import (
@@ -138,7 +139,14 @@ def crear_producto():
     if error:
         return error
     try:
-        producto = guardar_producto(cliente_id, _payload())
+        data = _payload()
+        producto = guardar_producto(cliente_id, data)
+        if 'ingredientes_removibles' in data:
+            sincronizar_ingredientes_removibles(
+                cliente_id,
+                producto.id_producto,
+                data.get('ingredientes_removibles'),
+            )
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'producto': producto.to_dict()}), 201
@@ -171,7 +179,14 @@ def actualizar_producto(producto_id):
     if not producto:
         return jsonify({'error': 'not_found'}), 404
     try:
-        producto = guardar_producto(cliente_id, _payload(), producto=producto)
+        data = _payload()
+        producto = guardar_producto(cliente_id, data, producto=producto)
+        if 'ingredientes_removibles' in data:
+            sincronizar_ingredientes_removibles(
+                cliente_id,
+                producto.id_producto,
+                data.get('ingredientes_removibles'),
+            )
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'producto': producto.to_dict()})

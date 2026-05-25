@@ -4,10 +4,10 @@ from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
-from app.models import AgendaActividad, ClienteServicio, Usuario
+from app.models import AgendaActividad, Cliente, ClienteServicio, Usuario
 from app.routes.agenda import agenda_bp
 from app.routes.agenda.actividades import _parse_datetime_local
-from app.routes.agenda.visibilidad import usuarios_agenda_visibles_para
+from app.routes.agenda.visibilidad import filtro_mostrar_agenda_para_usuario, usuarios_agenda_visibles_para
 from app.services.agenda_turnos_peluqueria import (
     build_turno_peluqueria_chargeable_catalog_services,
     build_turno_peluqueria_services,
@@ -19,6 +19,7 @@ from app.services.agenda_turnos_peluqueria import (
     parse_turno_manual_price,
     resolve_turno_peluqueria_catalog_service,
 )
+from app.utils.helpers import utc_naive_to_local
 
 HORARIOS_TURNO_PELUQUERIA = tuple(
     f'{hora:02d}:{minuto:02d}'
@@ -119,6 +120,84 @@ def _crear_cliente_servicio_turno(*, cliente_id, servicio_catalogo_id, fecha_ini
     return asignacion
 
 
+def _buscar_turno_solapado(*, profesional_id, fecha_inicio, fecha_fin, excluir_actividad_id=None):
+    if not profesional_id or not fecha_inicio or not fecha_fin:
+        return None
+    query = (
+        AgendaActividad.query
+        .filter(
+            AgendaActividad.usuario_id == profesional_id,
+            AgendaActividad.tipo == 'cita',
+            AgendaActividad.estado == 'pendiente',
+            AgendaActividad.fecha_inicio < fecha_fin,
+            db.or_(AgendaActividad.fecha_fin.is_(None), AgendaActividad.fecha_fin > fecha_inicio),
+        )
+    )
+    actividad_id = _parse_positive_int(excluir_actividad_id)
+    if actividad_id:
+        query = query.filter(AgendaActividad.id != actividad_id)
+    return query.order_by(AgendaActividad.fecha_inicio.asc(), AgendaActividad.id.asc()).first()
+
+
+def _crear_cliente_rapido_turno(form):
+    nombre = (form.get('cliente_nuevo_nombre') or '').strip()
+    if not nombre:
+        return None, None
+    if not current_user.tiene_permiso('crear_cliente'):
+        return None, 'No tienes permiso para crear clientes desde el turno.'
+
+    cliente = Cliente(
+        nombre=nombre,
+        telefono=(form.get('cliente_nuevo_telefono') or '').strip() or None,
+        tipo='minorista',
+        activo=True,
+    )
+    db.session.add(cliente)
+    db.session.flush()
+    return cliente, None
+
+
+def _query_turnos_peluqueria_visibles():
+    query = AgendaActividad.query.filter(AgendaActividad.tipo == 'cita')
+    if not _puede_asignar_profesional():
+        query = query.filter(filtro_mostrar_agenda_para_usuario(current_user.id_usuario))
+    return query
+
+
+def _cargar_turno_peluqueria_visible_o_404(id_actividad):
+    return _query_turnos_peluqueria_visibles().filter(AgendaActividad.id == id_actividad).first_or_404()
+
+
+def _to_date_input(value):
+    local_value = utc_naive_to_local(value)
+    return local_value.strftime('%Y-%m-%d') if local_value else ''
+
+
+def _to_time_input(value):
+    local_value = utc_naive_to_local(value)
+    return local_value.strftime('%H:%M') if local_value else ''
+
+
+def _duracion_minutos_actividad(actividad):
+    if actividad.fecha_inicio and actividad.fecha_fin and actividad.fecha_fin > actividad.fecha_inicio:
+        return max(int((actividad.fecha_fin - actividad.fecha_inicio).total_seconds() // 60), 1)
+    return 30
+
+
+def _append_turno_note(actividad, nota):
+    nota = (nota or '').strip()
+    if not nota:
+        return
+    actividad.observaciones = '\n'.join(filter(None, [(actividad.observaciones or '').strip(), nota]))
+    asignacion = getattr(actividad, 'cliente_servicio', None)
+    if asignacion is not None:
+        asignacion.observaciones = '\n'.join(filter(None, [(asignacion.observaciones or '').strip(), nota]))
+
+
+def _redirect_gestion_turno(actividad):
+    return redirect(url_for('agenda.gestionar_turno_peluqueria', id_actividad=int(actividad.id)))
+
+
 @agenda_bp.route('/turnos/peluqueria/nuevo', methods=['GET'])
 @login_required
 def nuevo_turno_peluqueria():
@@ -135,7 +214,83 @@ def nuevo_turno_peluqueria():
         horarios=HORARIOS_TURNO_PELUQUERIA,
         puede_ver_agenda=current_user.tiene_permiso('agenda_acceso'),
         puede_crear_venta=current_user.tiene_permiso('crear_venta'),
+        puede_crear_cliente=current_user.tiene_permiso('crear_cliente'),
     )
+
+
+@agenda_bp.route('/turnos/peluqueria/<int:id_actividad>/gestionar', methods=['GET', 'POST'])
+@login_required
+def gestionar_turno_peluqueria(id_actividad):
+    actividad = _cargar_turno_peluqueria_visible_o_404(id_actividad)
+    if request.method == 'GET':
+        return render_template(
+            'agenda/peluqueria_gestionar_turno.html',
+            actividad=actividad,
+            fecha_actual=_to_date_input(actividad.fecha_inicio),
+            hora_actual=_to_time_input(actividad.fecha_inicio),
+            duracion_actual=_duracion_minutos_actividad(actividad),
+            puede_reprogramar=current_user.tiene_permiso('agenda_editar'),
+            puede_cancelar=current_user.tiene_permiso('agenda_cancelar'),
+            puede_registrar_sena=(current_user.tiene_permiso('agenda_editar') or current_user.tiene_permiso('crear_venta')),
+        )
+
+    accion = (request.form.get('accion') or '').strip().lower()
+    if accion == 'reprogramar':
+        if not current_user.tiene_permiso('agenda_editar'):
+            flash('No tienes permiso para reprogramar turnos.', 'danger')
+            return _redirect_gestion_turno(actividad)
+        fecha_inicio = _parse_datetime_local(f"{request.form.get('fecha') or ''}T{request.form.get('hora') or ''}")
+        duracion = _parse_positive_int(request.form.get('duracion')) or _duracion_minutos_actividad(actividad)
+        if fecha_inicio is None:
+            flash('Completa una fecha y hora validas para reprogramar.', 'warning')
+            return _redirect_gestion_turno(actividad)
+        fecha_fin = fecha_inicio + timedelta(minutes=duracion)
+        turno_solapado = _buscar_turno_solapado(
+            profesional_id=actividad.usuario_id,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            excluir_actividad_id=actividad.id,
+        )
+        if turno_solapado is not None:
+            flash('Ese profesional ya tiene otro turno en ese horario.', 'warning')
+            return _redirect_gestion_turno(actividad)
+        actividad.fecha_inicio = fecha_inicio
+        actividad.fecha_fin = fecha_fin
+        actividad.estado = 'pendiente'
+        if actividad.cliente_servicio is not None:
+            actividad.cliente_servicio.fecha_programada = fecha_inicio
+            if (actividad.cliente_servicio.estado or '').strip().lower() in {'solicitado', 'presupuestado', 'cancelado'}:
+                actividad.cliente_servicio.estado = 'agendado'
+                actividad.cliente_servicio.fecha_cierre = None
+        flash('Turno reprogramado correctamente.', 'success')
+    elif accion == 'sena':
+        if not (current_user.tiene_permiso('agenda_editar') or current_user.tiene_permiso('crear_venta')):
+            flash('No tienes permiso para registrar señas.', 'danger')
+            return _redirect_gestion_turno(actividad)
+        monto = parse_turno_manual_price(request.form.get('monto_sena'))
+        if monto is None:
+            flash('Ingresa un monto de seña mayor a cero.', 'warning')
+            return _redirect_gestion_turno(actividad)
+        nota = (request.form.get('nota_sena') or '').strip()
+        _append_turno_note(actividad, f'Seña registrada: Gs. {int(monto):,}'.replace(',', '.') + (f' - {nota}' if nota else ''))
+        flash('Seña registrada como nota del turno.', 'success')
+    elif accion in {'cancelar', 'no_show'}:
+        if not current_user.tiene_permiso('agenda_cancelar'):
+            flash('No tienes permiso para cerrar turnos.', 'danger')
+            return _redirect_gestion_turno(actividad)
+        motivo = (request.form.get('motivo') or '').strip()
+        etiqueta = 'No-show' if accion == 'no_show' else 'Cancelado'
+        actividad.estado = 'cancelada'
+        if actividad.cliente_servicio is not None and not actividad.cliente_servicio.id_venta:
+            actividad.cliente_servicio.estado = 'cancelado'
+        _append_turno_note(actividad, f'{etiqueta} desde peluquería/barbería' + (f': {motivo}' if motivo else '.'))
+        flash('Turno marcado como no-show.' if accion == 'no_show' else 'Turno cancelado correctamente.', 'success')
+    else:
+        flash('Acción no válida para este turno.', 'warning')
+        return _redirect_gestion_turno(actividad)
+
+    db.session.commit()
+    return _redirect_gestion_turno(actividad)
 
 
 @agenda_bp.route('/turnos/peluqueria/crear', methods=['POST'])
@@ -159,7 +314,15 @@ def crear_turno_peluqueria():
         flash('Selecciona un profesional activo para el turno.', 'warning')
         return redirect(url_for('agenda.nuevo_turno_peluqueria'))
 
-    cliente_id = _parse_positive_int(request.form.get('cliente_id'))
+    turno_solapado = _buscar_turno_solapado(
+        profesional_id=profesional_id,
+        fecha_inicio=turno_data['fecha_inicio'],
+        fecha_fin=turno_data['fecha_fin'],
+    )
+    if turno_solapado is not None:
+        flash('Ese profesional ya tiene un turno en ese horario. Elige otra hora o profesional.', 'warning')
+        return redirect(url_for('agenda.nuevo_turno_peluqueria'))
+
     observaciones = (request.form.get('observaciones') or '').strip() or None
     precio_manual = parse_turno_manual_price(request.form.get('precio_manual'))
     servicio_precio_opcion_id = request.form.get('servicio_precio_opcion_id')
@@ -172,6 +335,16 @@ def crear_turno_peluqueria():
     if catalog_service_requires_price_option(servicio_resuelto) and servicio_precio_opcion is None:
         flash('Selecciona el tipo o variante del servicio antes de crear el turno.', 'warning')
         return redirect(url_for('agenda.nuevo_turno_peluqueria'))
+
+    cliente_id = _parse_positive_int(request.form.get('cliente_id'))
+    if not cliente_id:
+        cliente_nuevo, error_cliente = _crear_cliente_rapido_turno(request.form)
+        if error_cliente:
+            flash(error_cliente, 'warning')
+            return redirect(url_for('agenda.nuevo_turno_peluqueria'))
+        if cliente_nuevo is not None:
+            cliente_id = int(cliente_nuevo.id_cliente)
+
     asignacion = _crear_cliente_servicio_turno(
         cliente_id=cliente_id,
         servicio_catalogo_id=(int(servicio_resuelto.id_servicio) if servicio_resuelto else None),

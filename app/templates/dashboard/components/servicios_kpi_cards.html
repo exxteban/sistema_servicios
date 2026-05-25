@@ -3,8 +3,8 @@
     <a href="{{ url_for('agenda.lista_actividades', estado='pendiente', desde=agenda_fecha_hoy_iso, hasta=agenda_fecha_hoy_iso) }}"
         data-tab-url="{{ url_for('agenda.lista_actividades', estado='pendiente', desde=agenda_fecha_hoy_iso, hasta=agenda_fecha_hoy_iso) }}"
         data-tab-title="Turnos hoy" data-tab-icon="far fa-calendar"
-        x-show="isCardVisible('kpi_turnos_hoy')" {% if 'kpi_turnos_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
-        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+        :class="{ 'hidden': !isCardVisible('kpi_turnos_hoy') }"
+        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900 {% if 'kpi_turnos_hoy' not in dashboard_service_cards_selected %}hidden{% endif %}"
         :style="cardStyle('kpi_turnos_hoy')">
         <div class="h-1 bg-violet-500"></div>
         <div class="p-5">
@@ -24,8 +24,8 @@
     <!-- En atención -->
     <button type="button"
         @click="enAtencionOpen = true"
-        x-show="isCardVisible('kpi_en_atencion')" {% if 'kpi_en_atencion' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
-        class="overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+        :class="{ 'hidden': !isCardVisible('kpi_en_atencion') }"
+        class="overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900 {% if 'kpi_en_atencion' not in dashboard_service_cards_selected %}hidden{% endif %}"
         :style="cardStyle('kpi_en_atencion')">
         <div class="h-1 bg-emerald-500"></div>
         <div class="p-5">
@@ -46,8 +46,8 @@
     <a href="{{ url_for('control_empleados.index') if modulo_control_empleados_activo else url_for('usuarios.listar') }}"
        data-tab-url="{{ url_for('control_empleados.index') if modulo_control_empleados_activo else url_for('usuarios.listar') }}"
        data-tab-title="Profesionales" data-tab-icon="fas fa-users"
-       x-show="isCardVisible('kpi_profesionales')" {% if 'kpi_profesionales' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
-       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+       :class="{ 'hidden': !isCardVisible('kpi_profesionales') }"
+       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900 {% if 'kpi_profesionales' not in dashboard_service_cards_selected %}hidden{% endif %}"
        :style="cardStyle('kpi_profesionales')">
         <div class="h-1 bg-blue-500"></div>
         <div class="p-5">
@@ -68,8 +68,8 @@
     <a href="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
        data-tab-url="{{ url_for('ventas.listar', desde=date_from, hasta=date_to) }}"
        data-tab-title="Cobrado hoy" data-tab-icon="fas fa-money-bill-wave"
-       x-show="isCardVisible('kpi_cobrado_hoy')" {% if 'kpi_cobrado_hoy' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
-       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+       :class="{ 'hidden': !isCardVisible('kpi_cobrado_hoy') }"
+       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900 {% if 'kpi_cobrado_hoy' not in dashboard_service_cards_selected %}hidden{% endif %}"
        :style="cardStyle('kpi_cobrado_hoy')">
         <div class="h-1 bg-green-500"></div>
         <div class="p-5">
@@ -90,8 +90,8 @@
     <a href="{{ url_for('caja.estado') }}"
        data-tab-url="{{ url_for('caja.estado') }}"
        data-tab-title="Caja" data-tab-icon="fas fa-cash-register"
-       x-show="isCardVisible('kpi_caja')" {% if 'kpi_caja' not in dashboard_service_cards_selected %}style="display: none;"{% endif %}
-       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+       :class="{ 'hidden': !isCardVisible('kpi_caja') }"
+       class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900 {% if 'kpi_caja' not in dashboard_service_cards_selected %}hidden{% endif %}"
        :style="cardStyle('kpi_caja')">
         <div class="h-1 {% if sesion_caja %}bg-emerald-500{% else %}bg-amber-500{% endif %}"></div>
         <div class="p-5">

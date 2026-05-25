@@ -4,8 +4,10 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 
 from app import db
+from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
 from gastronomia.services.pedido_service import listar_pedidos, obtener_pedido, registrar_evento_pedido
+from gastronomia.services.venta_integration_service import crear_venta_central_desde_pedido
 
 
 METODOS_PAGO = {'efectivo', 'tarjeta', 'transferencia', 'qr', 'mixto'}
@@ -41,11 +43,26 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     if descuento > subtotal:
         raise ValueError('El descuento no puede superar el total del pedido.')
 
+    integracion = crear_venta_central_desde_pedido(
+        pedido,
+        usuario_id,
+        data,
+        descuento=descuento,
+    )
+    venta = integracion['venta']
+    sesion = integracion['sesion']
+    metodo = integracion['metodo']
+    movimiento = integracion['movimiento']
+
     pago = GastronomiaPedidoPago(
         cliente_id=int(cliente_id),
         pedido_id=int(pedido.id_pedido),
         usuario_id=int(usuario_id),
-        metodo_pago=metodo_pago,
+        id_sesion_caja=int(sesion.id_sesion),
+        id_metodo_pago=int(metodo.id_metodo_pago),
+        id_venta=int(venta.id_venta),
+        id_movimiento_caja=int(movimiento.id_movimiento_caja) if movimiento else None,
+        metodo_pago=integracion['metodo_slug'] or metodo_pago,
         subtotal=subtotal,
         descuento_monto=descuento,
         total_cobrado=subtotal - descuento,
@@ -53,6 +70,20 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     )
     pedido.estado = 'cobrado'
     db.session.add(pago)
+    registrar_auditoria(
+        accion='cobrar_pedido_gastronomia',
+        modulo='gastronomia',
+        descripcion=f'Cobro de pedido gastronomico #{pedido.id_pedido} como venta #{venta.id_venta}',
+        referencia_tipo='gastronomia_pedido',
+        referencia_id=int(pedido.id_pedido),
+        datos_nuevos={
+            'id_venta': int(venta.id_venta),
+            'id_sesion_caja': int(sesion.id_sesion),
+            'id_metodo_pago': int(metodo.id_metodo_pago),
+            'total_cobrado': float(subtotal - descuento),
+        },
+        commit=False,
+    )
     db.session.commit()
     registrar_evento_pedido(pedido, 'pedido_cobrado')
     return pedido

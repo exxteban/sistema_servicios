@@ -9,6 +9,13 @@ ORDER_COLUMN_MIGRATIONS = (
     ('fecha_listo', 'DATETIME'),
 )
 
+PAYMENT_COLUMN_MIGRATIONS = (
+    ('id_sesion_caja', 'INTEGER'),
+    ('id_metodo_pago', 'INTEGER'),
+    ('id_venta', 'INTEGER'),
+    ('id_movimiento_caja', 'INTEGER'),
+)
+
 
 def ensure_gastronomia_schema():
     dialect = db.engine.dialect.name
@@ -21,13 +28,21 @@ def ensure_gastronomia_schema():
 def _ensure_sqlite_columns():
     if not _sqlite_table_exists('gastronomia_pedidos'):
         return
-    columns = {
+    order_columns = {
         row[1]
         for row in db.session.execute(text('PRAGMA table_info(gastronomia_pedidos)')).fetchall()
     }
     for column, column_type in ORDER_COLUMN_MIGRATIONS:
-        if column not in columns:
+        if column not in order_columns:
             db.session.execute(text(f'ALTER TABLE gastronomia_pedidos ADD COLUMN {column} {column_type}'))
+    if _sqlite_table_exists('gastronomia_pedido_pagos'):
+        payment_columns = {
+            row[1]
+            for row in db.session.execute(text('PRAGMA table_info(gastronomia_pedido_pagos)')).fetchall()
+        }
+        for column, column_type in PAYMENT_COLUMN_MIGRATIONS:
+            if column not in payment_columns:
+                db.session.execute(text(f'ALTER TABLE gastronomia_pedido_pagos ADD COLUMN {column} {column_type}'))
     db.session.commit()
 
 
@@ -37,6 +52,10 @@ def _ensure_mysql_columns():
     for column, column_type in ORDER_COLUMN_MIGRATIONS:
         if not _mysql_column_exists('gastronomia_pedidos', column):
             db.session.execute(text(f'ALTER TABLE gastronomia_pedidos ADD COLUMN {column} {column_type} NULL'))
+    if _mysql_table_exists('gastronomia_pedido_pagos'):
+        for column, column_type in PAYMENT_COLUMN_MIGRATIONS:
+            if not _mysql_column_exists('gastronomia_pedido_pagos', column):
+                db.session.execute(text(f'ALTER TABLE gastronomia_pedido_pagos ADD COLUMN {column} {column_type} NULL'))
     db.session.commit()
 
 

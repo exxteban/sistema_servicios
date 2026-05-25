@@ -74,6 +74,12 @@
                         <textarea name="descripcion" rows="2"
                                   class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
                     </label>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Ingredientes removibles
+                        <textarea name="ingredientes_removibles" rows="3" placeholder="Ej: lechuga&#10;tomate&#10;cebolla"
+                                  class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
+                        <span class="mt-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Uno por linea. En el POS apareceran para marcar "sin ingrediente".</span>
+                    </label>
                     <div class="grid grid-cols-2 gap-3">
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
                             Precio
@@ -95,9 +101,14 @@
                         <label class="inline-flex items-center gap-2"><input name="disponible" type="checkbox" checked> Disponible</label>
                         <label class="inline-flex items-center gap-2"><input name="visible" type="checkbox" checked> Visible</label>
                     </div>
-                    <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-                        <i class="fas fa-save"></i>Guardar producto
-                    </button>
+                    <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <button id="producto-submit" type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+                            <i class="fas fa-save"></i>Guardar producto
+                        </button>
+                        <button id="producto-cancel-edit" type="button" class="hidden rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">
+                            Cancelar
+                        </button>
+                    </div>
                 </div>
             </form>
         </section>
@@ -141,6 +152,9 @@
                             <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.visible %}Visible{% else %}Oculto{% endif %}</span>
                             <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.disponible %}Disponible{% else %}Agotado{% endif %}</span>
                         </div>
+                        <button type="button" data-edit-product="{{ producto.id_producto }}" class="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-200 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-200 dark:hover:bg-amber-500/10">
+                            <i class="fas fa-pen"></i>Editar producto
+                        </button>
                     </article>
                     {% else %}
                     <div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700 md:col-span-2">
@@ -159,20 +173,54 @@
 (function () {
   const csrf = document.getElementById('csrf-token')?.value || '';
   const alertBox = document.getElementById('gastro-menu-alert');
+  const productoForm = document.getElementById('producto-form');
+  const productoSubmit = document.getElementById('producto-submit');
+  const productoCancelEdit = document.getElementById('producto-cancel-edit');
   const showAlert = (message, ok) => {
     alertBox.textContent = message;
     alertBox.className = `rounded-lg border px-4 py-3 text-sm font-semibold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
   };
   const formData = (form) => Object.fromEntries(new FormData(form).entries());
-  const postJson = async (url, body) => {
+  const apiJson = async (url, {method = 'GET', body = null} = {}) => {
     const response = await fetch(url, {
-      method: 'POST',
+      method,
       headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
-      body: JSON.stringify(body),
+      body: body ? JSON.stringify(body) : undefined,
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || data.error || 'No se pudo guardar.');
+    if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
     return data;
+  };
+  const postJson = (url, body) => apiJson(url, {method: 'POST', body});
+  const ingredientesRemovibles = (producto) => (producto.grupos_opciones || [])
+    .find((grupo) => grupo.tipo === 'ingrediente_removible')?.opciones
+    ?.map((opcion) => opcion.nombre)
+    .join('\n') || '';
+  const resetProductoForm = () => {
+    if (!productoForm) return;
+    productoForm.reset();
+    productoForm.id_producto.value = '';
+    productoForm.disponible.checked = true;
+    productoForm.visible.checked = true;
+    productoSubmit.innerHTML = '<i class="fas fa-save"></i>Guardar producto';
+    productoCancelEdit.classList.add('hidden');
+  };
+  const cargarProductoParaEditar = async (productoId) => {
+    const data = await apiJson(`/api/gastronomia/productos/${productoId}?modificadores=1`);
+    const producto = data.producto;
+    productoForm.id_producto.value = producto.id_producto;
+    productoForm.categoria_id.value = producto.categoria_id;
+    productoForm.nombre.value = producto.nombre || '';
+    productoForm.descripcion.value = producto.descripcion || '';
+    productoForm.ingredientes_removibles.value = ingredientesRemovibles(producto);
+    productoForm.precio.value = producto.precio || 0;
+    productoForm.orden.value = producto.orden || 0;
+    productoForm.imagen_url.value = producto.imagen_url || '';
+    productoForm.disponible.checked = Boolean(producto.disponible);
+    productoForm.visible.checked = Boolean(producto.visible);
+    productoSubmit.innerHTML = '<i class="fas fa-save"></i>Actualizar producto';
+    productoCancelEdit.classList.remove('hidden');
+    productoForm.scrollIntoView({behavior: 'smooth', block: 'start'});
   };
   document.getElementById('categoria-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -186,18 +234,26 @@
       showAlert(error.message, false);
     }
   });
-  document.getElementById('producto-form')?.addEventListener('submit', async (event) => {
+  productoForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
       const data = formData(event.currentTarget);
       data.visible = event.currentTarget.visible.checked;
       data.disponible = event.currentTarget.disponible.checked;
-      await postJson('/api/gastronomia/productos', data);
+      const productoId = data.id_producto;
+      const url = productoId ? `/api/gastronomia/productos/${productoId}` : '/api/gastronomia/productos';
+      await apiJson(url, {method: productoId ? 'PUT' : 'POST', body: data});
       showAlert('Producto guardado.', true);
       window.location.reload();
     } catch (error) {
       showAlert(error.message, false);
     }
+  });
+  productoCancelEdit?.addEventListener('click', resetProductoForm);
+  document.querySelector('[data-gastro-menu]')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-edit-product]');
+    if (!button) return;
+    cargarProductoParaEditar(button.dataset.editProduct).catch((error) => showAlert(error.message, false));
   });
 }());
 </script>

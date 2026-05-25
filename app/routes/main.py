@@ -378,6 +378,7 @@ def dashboard():
         agenda_pendientes_hoy=agenda_resumen['pendientes_hoy'],
         agenda_vencidas=agenda_resumen['vencidas'],
         agenda_proximas_actividades=agenda_resumen['proximas_actividades'],
+        agenda_turnero_actividades=agenda_resumen.get('turnero_actividades', []),
         agenda_fecha_hoy_iso=agenda_resumen['fecha_hoy_iso'],
         dashboard_en_atencion_count=en_atencion_resumen['count'],
         dashboard_en_atencion_items=en_atencion_resumen['items'],

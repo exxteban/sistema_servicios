@@ -39,16 +39,45 @@
             <div id="selected-summary" class="mt-4 rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-500 dark:border-gray-700">
                 Selecciona un pedido pendiente.
             </div>
-            <label class="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                Metodo de pago
-                <select id="payment-method" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                    <option value="efectivo">Efectivo</option>
-                    <option value="tarjeta">Tarjeta</option>
-                    <option value="transferencia">Transferencia</option>
-                    <option value="qr">QR</option>
-                    <option value="mixto">Mixto</option>
-                </select>
-            </label>
+            <div class="mt-4">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white">Metodos de pago</h3>
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">Selecciona como desea cobrar</p>
+                </div>
+                <input type="hidden" id="payment-method" value="efectivo">
+                <div class="payment-method-grid mt-3">
+                    <button type="button" class="payment-method-card active" data-payment-method="efectivo">
+                        <span class="payment-method-icon payment-method-icon--cash"><i class="fas fa-money-bill-wave"></i></span>
+                        <span class="payment-method-label">Efectivo</span>
+                        <i class="fas fa-chevron-right payment-method-arrow"></i>
+                    </button>
+                    <button type="button" class="payment-method-card" data-payment-method="tarjeta">
+                        <span class="payment-method-icon payment-method-icon--debit"><i class="fas fa-credit-card"></i></span>
+                        <span class="payment-method-label">Tarjeta de Debito</span>
+                        <i class="fas fa-chevron-right payment-method-arrow"></i>
+                    </button>
+                    <button type="button" class="payment-method-card" data-payment-method="tarjeta">
+                        <span class="payment-method-icon payment-method-icon--credit"><i class="fas fa-credit-card"></i></span>
+                        <span class="payment-method-label">Tarjeta de Credito</span>
+                        <i class="fas fa-chevron-right payment-method-arrow"></i>
+                    </button>
+                    <button type="button" class="payment-method-card" data-payment-method="transferencia">
+                        <span class="payment-method-icon payment-method-icon--bank"><i class="fas fa-building-columns"></i></span>
+                        <span class="payment-method-label">Transferencia</span>
+                        <i class="fas fa-chevron-right payment-method-arrow"></i>
+                    </button>
+                    <button type="button" class="payment-method-card" data-payment-method="qr">
+                        <span class="payment-method-icon payment-method-icon--qr"><i class="fas fa-qrcode"></i></span>
+                        <span class="payment-method-label">QR / Billetera</span>
+                        <i class="fas fa-chevron-right payment-method-arrow"></i>
+                    </button>
+                    <button type="button" class="payment-method-card" data-payment-method="mixto">
+                        <span class="payment-method-icon payment-method-icon--mixed"><i class="fas fa-layer-group"></i></span>
+                        <span class="payment-method-label">Pago mixto</span>
+                        <i class="fas fa-chevron-right payment-method-arrow"></i>
+                    </button>
+                </div>
+            </div>
             <label class="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-200">
                 Descuento
                 <input id="discount-amount" type="number" min="0" step="100" value="0"
@@ -86,6 +115,91 @@
     .dark .caja-card {
         border-color: rgb(55 65 81);
         background: rgb(31 41 55);
+    }
+    .payment-method-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+    .payment-method-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 52px;
+        border: 1px solid rgb(229 231 235);
+        border-radius: 12px;
+        background: white;
+        padding: 10px 12px;
+        text-align: left;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+        transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    }
+    .payment-method-card:hover {
+        border-color: rgb(16 185 129);
+        box-shadow: 0 12px 28px rgba(16, 185, 129, 0.12);
+        transform: translateY(-1px);
+    }
+    .payment-method-card.active {
+        border-color: rgb(16 185 129);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14), 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+    .payment-method-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        font-size: 14px;
+    }
+    .payment-method-icon--cash {
+        background: rgb(220 252 231);
+        color: rgb(34 197 94);
+    }
+    .payment-method-icon--debit {
+        background: rgb(219 234 254);
+        color: rgb(59 130 246);
+    }
+    .payment-method-icon--credit {
+        background: rgb(243 232 255);
+        color: rgb(147 51 234);
+    }
+    .payment-method-icon--bank {
+        background: rgb(254 243 199);
+        color: rgb(217 119 6);
+    }
+    .payment-method-icon--qr {
+        background: rgb(207 250 254);
+        color: rgb(6 182 212);
+    }
+    .payment-method-icon--mixed {
+        background: rgb(237 233 254);
+        color: rgb(124 58 237);
+    }
+    .payment-method-label {
+        flex: 1;
+        color: rgb(100 116 139);
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+    .payment-method-arrow {
+        color: rgb(148 163 184);
+        font-size: 11px;
+    }
+    .dark .payment-method-card {
+        border-color: rgb(55 65 81);
+        background: rgb(17 24 39);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.20);
+    }
+    .dark .payment-method-card:hover,
+    .dark .payment-method-card.active {
+        border-color: rgb(52 211 153);
+        box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.16), 0 12px 28px rgba(0, 0, 0, 0.24);
+    }
+    .dark .payment-method-label {
+        color: rgb(203 213 225);
     }
 </style>
 {% endblock %}

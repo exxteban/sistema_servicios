@@ -64,7 +64,8 @@
     profesionales: {{ profesionales|tojson }},
     servicios: {{ servicios|tojson }},
     serviciosCatalogo: {{ servicios_cobrables_catalogo|tojson }},
-    horarios: {{ horarios|tojson }}
+    horarios: {{ horarios|tojson }},
+    puedeCrearCliente: {{ puede_crear_cliente|tojson }}
 })'>
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -98,6 +99,8 @@
         <input type="hidden" name="prioridad" value="media">
         <input type="hidden" name="usuario_id" :value="profesionalId">
         <input type="hidden" name="cliente_id" :value="clienteId || ''">
+        <input type="hidden" name="cliente_nuevo_nombre" :value="clienteNuevoNombreFormValue()">
+        <input type="hidden" name="cliente_nuevo_telefono" :value="clienteNuevoTelefonoFormValue()">
         <input type="hidden" name="duracion" :value="duracion">
         <input type="hidden" name="fecha_inicio" :value="fechaInicio">
         <input type="hidden" name="fecha_fin" :value="fechaFin">
@@ -206,6 +209,13 @@
                         <input type="text" x-model="clienteBusqueda" @focus="buscarClientes(clienteBusqueda, true)" @input.debounce.250ms="buscarClientes(clienteBusqueda, true)"
                             placeholder="Buscar por nombre, teléfono o RUC..."
                             class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 transition focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/20">
+                        {% if puede_crear_cliente %}
+                        <button type="button" @click="prepararClienteNuevo()"
+                            x-show="puedePrepararClienteNuevo()" x-cloak
+                            class="mt-2 inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-200">
+                            <i class="fas fa-user-plus"></i> Crear cliente con este nombre
+                        </button>
+                        {% endif %}
                         <div x-show="mostrarClientes" x-cloak class="absolute z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-300/70 dark:border-white/10 dark:bg-slate-950 dark:shadow-black/40">
                             <div x-show="cargandoClientes" class="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">Buscando clientes...</div>
                             <template x-for="cliente in clientes" :key="cliente.id_cliente">
@@ -220,6 +230,16 @@
                             <span class="font-bold text-violet-800 dark:text-violet-100" x-text="clienteSeleccionado ? clienteSeleccionado.nombre : ''"></span>
                             <button type="button" @click="limpiarCliente()" class="text-xs font-bold text-violet-600 dark:text-violet-200">Quitar</button>
                         </div>
+                        {% if puede_crear_cliente %}
+                        <div x-show="crearClienteNuevo" x-cloak class="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm dark:border-emerald-400/20 dark:bg-emerald-500/10">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="font-bold text-emerald-800 dark:text-emerald-100" x-text="`Se creará: ${clienteNuevoNombre}`"></span>
+                                <button type="button" @click="cancelarClienteNuevo()" class="text-xs font-bold text-emerald-700 dark:text-emerald-200">Quitar</button>
+                            </div>
+                            <input type="text" x-model="clienteNuevoTelefono" placeholder="Teléfono opcional"
+                                class="mt-2 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:border-emerald-400/20 dark:bg-slate-950 dark:text-white dark:focus:ring-emerald-500/20">
+                        </div>
+                        {% endif %}
                     </div>
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>

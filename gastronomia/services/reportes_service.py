@@ -1,11 +1,12 @@
 """Metricas iniciales para reportes de Gastronomia."""
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
 from app import db
+from app.utils.helpers import parse_iso_date, today_local, utc_bounds_for_local_dates
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem, GastronomiaPedidoPago
 
 
@@ -122,17 +123,8 @@ def _pagos_periodo(cliente_id: int, inicio: datetime, fin: datetime):
 
 
 def _periodo(fecha_desde: str | None, fecha_hasta: str | None) -> tuple[datetime, datetime]:
-    desde = _parse_date(fecha_desde) or date.today()
-    hasta = _parse_date(fecha_hasta) or desde
+    desde = parse_iso_date(fecha_desde) or today_local()
+    hasta = parse_iso_date(fecha_hasta) or desde
     if hasta < desde:
         hasta = desde
-    return datetime.combine(desde, datetime.min.time()), datetime.combine(hasta + timedelta(days=1), datetime.min.time())
-
-
-def _parse_date(value: str | None) -> date | None:
-    if not value:
-        return None
-    try:
-        return date.fromisoformat(str(value)[:10])
-    except ValueError:
-        return None
+    return utc_bounds_for_local_dates(desde, hasta)

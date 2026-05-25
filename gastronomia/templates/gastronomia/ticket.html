@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ticket Pedido #{{ pedido.id_pedido }}</title>
+    {% set paper_width_value = paper_width_mm if paper_width_mm in [48, 58, 80] else 58 %}
+    <style>
+        @page {
+            size: {{ paper_width_value }}mm auto;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            width: {{ paper_width_value }}mm;
+            max-width: {{ paper_width_value }}mm;
+            background: #fff !important;
+            color: #000 !important;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            line-height: 1.35;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            padding: 2mm {{ 4 if paper_width_value == 80 else 3 }}mm;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        td,
+        th {
+            padding: 1px 0;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .left { text-align: left; }
+        .bold { font-weight: bold; }
+        .small { font-size: 10px; }
+        .muted { color: #333; }
+        .sep {
+            border: 0;
+            border-top: 1px dashed #000;
+            height: 0;
+            margin: 4px 0;
+        }
+        .header { margin-bottom: 4px; text-align: center; }
+        .header .nombre { font-size: 13px; font-weight: bold; }
+        .info-label { width: {{ 32 if paper_width_value == 80 else 38 }}%; }
+        .info-value { width: {{ 68 if paper_width_value == 80 else 62 }}%; }
+        .col-prod { width: {{ 58 if paper_width_value == 80 else 50 }}%; }
+        .col-cant { width: {{ 12 if paper_width_value == 80 else 15 }}%; text-align: right; }
+        .col-total { width: {{ 30 if paper_width_value == 80 else 35 }}%; text-align: right; }
+        .screen-actions {
+            position: fixed;
+            top: 10px;
+            left: calc({{ paper_width_value }}mm + 16px);
+            width: 210px;
+            display: grid;
+            gap: 8px;
+        }
+        .screen-actions button,
+        .screen-actions a {
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background: #111827;
+            color: #fff;
+            cursor: pointer;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 10px 12px;
+            text-align: center;
+            text-decoration: none;
+        }
+        .screen-actions a { background: #fff; color: #111827; }
+        .ticket-thermal-layout { display: none; }
+        .thermal-print {
+            margin: 0;
+            width: 100%;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            font-family: 'Lucida Console', 'Courier New', Courier, monospace;
+            font-size: {{ 10 if paper_width_value == 48 else 11 if paper_width_value == 58 else 12 }}px;
+            font-weight: 700;
+            line-height: 1.25;
+            padding: 2mm {{ 4 if paper_width_value == 80 else 3 }}mm 3mm;
+        }
+
+        @media print {
+            html,
+            body {
+                width: {{ paper_width_value }}mm !important;
+                max-width: {{ paper_width_value }}mm !important;
+                background: #fff !important;
+                color: #000 !important;
+            }
+            .screen-actions,
+            .ticket-preview-layout { display: none !important; }
+            .ticket-thermal-layout { display: block !important; }
+        }
+    </style>
+</head>
+
+<body>
+    {% set thermal_width = 24 if paper_width_value == 48 else 32 if paper_width_value == 58 else 44 %}
+    {% set fecha_ticket = pago.fecha_pago if pago else pedido.fecha_creacion %}
+    {% macro thermal_center(text, width=32) -%}
+    {%- set value = ((text or '')|string)|trim -%}
+    {%- if not value -%}{%- elif value|length >= width -%}{{ value }}{%- else -%}{{ ' ' * ((width - value|length) // 2) }}{{ value }}{%- endif -%}
+    {%- endmacro %}
+    {% macro thermal_pair(left, right, width=32) -%}
+    {%- set left_value = ((left or '')|string)|trim -%}
+    {%- set right_value = ((right or '')|string)|trim -%}
+    {%- set remaining = width - left_value|length - right_value|length -%}
+    {%- if not left_value and not right_value -%}{%- elif remaining < 1 -%}{{ left_value }}
+{{ right_value }}{%- else -%}{{ left_value }}{{ ' ' * remaining }}{{ right_value }}{%- endif -%}
+    {%- endmacro %}
+    {% macro thermal_amount(value) -%}Gs {{ "{:,.0f}".format(value or 0).replace(",", ".") }}{%- endmacro %}
+
+    <div class="screen-actions">
+        <button type="button" onclick="window.print()">Imprimir ticket</button>
+        <a href="{{ url_for('gastronomia.caja') }}">Volver a caja</a>
+    </div>
+
+    <div class="ticket-preview-layout">
+        <div class="header">
+            {% if empresa.nombre %}<div class="nombre">{{ empresa.nombre|thermal_safe }}</div>{% endif %}
+            {% if empresa.ruc %}<div class="small">RUC: {{ empresa.ruc|thermal_safe }}</div>{% endif %}
+            {% if empresa.telefono %}<div class="small">Tel: {{ empresa.telefono|thermal_safe }}</div>{% endif %}
+            {% if empresa.direccion %}<div class="small">{{ empresa.direccion|thermal_safe }}</div>{% endif %}
+        </div>
+        <hr class="sep">
+        <table>
+            <tr><td class="info-label">Pedido:</td><td class="info-value">#{{ pedido.id_pedido }}</td></tr>
+            <tr><td class="info-label">Fecha:</td><td class="info-value">{{ fecha_ticket|local_strftime('%d/%m/%Y %H:%M') }}</td></tr>
+            <tr><td class="info-label">Origen:</td><td class="info-value">{% if pedido.mesa %}Mesa {{ pedido.mesa|thermal_safe }}{% else %}{{ pedido.tipo_pedido|replace('_', ' ')|title|thermal_safe }}{% endif %}</td></tr>
+            <tr><td class="info-label">Estado:</td><td class="info-value">{{ pedido.estado|replace('_', ' ')|title|thermal_safe }}</td></tr>
+        </table>
+        <hr class="sep">
+        <table>
+            <thead><tr><th class="left col-prod">Producto</th><th class="col-cant">Cant</th><th class="col-total">Total</th></tr></thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="col-prod">
+                        {{ item.nombre|thermal_safe }}<br>
+                        <span class="small muted">{{ thermal_amount(item.precio_unitario) }}</span>
+                        {% for mod in item.modificadores %}<br><span class="small muted">{{ mod|thermal_safe }}</span>{% endfor %}
+                        {% if item.notas %}<br><span class="small muted">Nota: {{ item.notas|thermal_safe }}</span>{% endif %}
+                    </td>
+                    <td class="right col-cant">{{ item.cantidad }}</td>
+                    <td class="right col-total">{{ thermal_amount(item.subtotal) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <hr class="sep">
+        <table>
+            <tr><td class="left">Subtotal</td><td class="right">{{ thermal_amount(subtotal) }}</td></tr>
+            {% if descuento > 0 %}<tr><td class="left">Descuento</td><td class="right">- {{ thermal_amount(descuento) }}</td></tr>{% endif %}
+            <tr><td class="left bold">TOTAL</td><td class="right bold">{{ thermal_amount(total_cobrado) }}</td></tr>
+            <tr><td class="left">Pago</td><td class="right">{{ metodo_pago_label|thermal_safe }}</td></tr>
+        </table>
+        {% if pago and pago.observacion %}<hr class="sep"><div class="small">Obs: {{ pago.observacion|thermal_safe }}</div>{% endif %}
+        <hr class="sep">
+        <div class="center small">{{ footer_text|thermal_safe }}</div>
+    </div>
+
+    <div class="ticket-thermal-layout">
+        <pre class="thermal-print">{% if empresa.nombre %}{{ thermal_center(empresa.nombre|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.ruc %}{{ thermal_center('RUC: ' ~ empresa.ruc|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.telefono %}{{ thermal_center('Tel: ' ~ empresa.telefono|thermal_safe, thermal_width) }}
+{% endif %}{% if empresa.direccion %}{{ thermal_center(empresa.direccion|thermal_safe, thermal_width) }}
+{% endif %}{{ '-' * thermal_width }}
+{{ thermal_pair('Pedido:', '#' ~ pedido.id_pedido, thermal_width) }}
+{{ thermal_pair('Fecha:', fecha_ticket|local_strftime('%d/%m/%Y %H:%M'), thermal_width) }}
+{{ thermal_pair('Origen:', ('Mesa ' ~ pedido.mesa) if pedido.mesa else pedido.tipo_pedido|replace('_', ' ')|title, thermal_width) }}
+{{ '-' * thermal_width }}
+{{ thermal_pair('Producto', 'Cant    Total', thermal_width) }}
+{% for item in items %}{{ item.nombre|thermal_safe }}
+{{ thermal_amount(item.precio_unitario) }}
+{% for mod in item.modificadores %}{{ mod|thermal_safe }}
+{% endfor %}{% if item.notas %}Nota: {{ item.notas|thermal_safe }}
+{% endif %}{{ thermal_pair('', item.cantidad ~ '  ' ~ thermal_amount(item.subtotal), thermal_width) }}
+{% endfor %}{{ '-' * thermal_width }}
+{{ thermal_pair('Subtotal', thermal_amount(subtotal), thermal_width) }}
+{% if descuento > 0 %}{{ thermal_pair('Descuento', '- ' ~ thermal_amount(descuento), thermal_width) }}
+{% endif %}{{ thermal_pair('TOTAL', thermal_amount(total_cobrado), thermal_width) }}
+{{ thermal_pair('Pago', metodo_pago_label|thermal_safe, thermal_width) }}
+{% if pago and pago.observacion %}Obs: {{ pago.observacion|thermal_safe }}
+{% endif %}{{ '-' * thermal_width }}
+{{ footer_text|thermal_safe }}</pre>
+    </div>
+    <div style="height: 15mm;"></div>
+    {% if request.args.get('preview') != '1' and request.args.get('embedded') != '1' %}
+    <script>
+        window.onload = function () {
+            setTimeout(function () { window.print(); }, 500);
+        };
+        window.onafterprint = function () { window.close(); };
+    </script>
+    {% endif %}
+</body>
+
+</html>

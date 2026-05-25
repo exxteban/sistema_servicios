@@ -46,6 +46,7 @@
                         </span>
                     </td>
                     <td class="whitespace-nowrap px-5 py-3.5">
+                        <div class="flex flex-wrap gap-2">
                         {% if actividad.cliente_servicio_id and actividad.cliente_servicio_estado in ['agendado', 'solicitado', 'presupuestado'] %}
                         <form method="POST" action="{{ url_for('agenda.iniciar_actividad', id_actividad=actividad.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -65,9 +66,18 @@
                            data-tab-url="{{ url_for('agenda.lista_actividades', estado='pendiente', desde=agenda_fecha_hoy_iso, hasta=agenda_fecha_hoy_iso) }}"
                            data-tab-title="Agenda"
                            class="app-tab-link inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5">
-                             <i class="fas fa-play text-[9px]"></i> Iniciar
+                              <i class="fas fa-play text-[9px]"></i> Iniciar
                         </a>
                         {% endif %}
+                        {% if dashboard_negocio.id == 'peluqueria_barberia' %}
+                        <a href="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}"
+                           data-tab-url="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}"
+                           data-tab-title="Gestionar turno"
+                           class="app-tab-link inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/15">
+                            <i class="fas fa-pen text-[9px]"></i> Gestionar
+                        </a>
+                        {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% else %}

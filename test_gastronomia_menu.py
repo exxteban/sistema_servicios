@@ -2,7 +2,13 @@ import re
 
 from app import create_app, db
 from app.models import Cliente, Usuario
-from gastronomia.models import GastronomiaClienteConfig, GastronomiaCategoria, GastronomiaProducto
+from gastronomia.models import (
+    GastronomiaClienteConfig,
+    GastronomiaCategoria,
+    GastronomiaGrupoOpciones,
+    GastronomiaOpcionProducto,
+    GastronomiaProducto,
+)
 
 
 def _loguear(client, app, username: str):
@@ -71,6 +77,7 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
             'precio': '12500.50',
             'disponible': True,
             'visible': True,
+            'ingredientes_removibles': 'Lechuga\nTomate\nCebolla',
         },
         headers={'X-CSRFToken': csrf},
     )
@@ -78,9 +85,53 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     assert producto_resp.status_code == 201
     producto = producto_resp.get_json()['producto']
     assert producto['precio'] == 12500.5
+    producto_publico = client.get(
+        '/api/gastronomia/productos',
+        query_string={'publico': '1', 'modificadores': '1'},
+    )
+    assert producto_publico.status_code == 200
+    grupos = producto_publico.get_json()['productos'][0]['grupos_opciones']
+    assert grupos[0]['tipo'] == 'ingrediente_removible'
+    assert [opcion['nombre'] for opcion in grupos[0]['opciones']] == ['Lechuga', 'Tomate', 'Cebolla']
     with app.app_context():
         assert GastronomiaCategoria.query.filter_by(cliente_id=cliente_id).count() == 1
         assert GastronomiaProducto.query.filter_by(cliente_id=cliente_id).count() == 1
+        grupo = GastronomiaGrupoOpciones.query.filter_by(
+            cliente_id=cliente_id,
+            producto_id=producto['id_producto'],
+            tipo='ingrediente_removible',
+            activo=True,
+        ).one()
+        opciones = GastronomiaOpcionProducto.query.filter_by(grupo_id=grupo.id_grupo, activo=True).order_by(
+            GastronomiaOpcionProducto.orden.asc(),
+        ).all()
+        assert [opcion.nombre for opcion in opciones] == ['Lechuga', 'Tomate', 'Cebolla']
+
+    editar_resp = client.put(
+        f'/api/gastronomia/productos/{producto["id_producto"]}',
+        json={
+            'categoria_id': categoria_id,
+            'nombre': 'Clasica editada',
+            'descripcion': 'Pan, carne y queso cheddar',
+            'precio': '14000',
+            'disponible': True,
+            'visible': True,
+            'ingredientes_removibles': 'Lechuga\nCebolla morada',
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+
+    assert editar_resp.status_code == 200
+    producto_editado = client.get(
+        f'/api/gastronomia/productos/{producto["id_producto"]}',
+        query_string={'modificadores': '1'},
+    ).get_json()['producto']
+    assert producto_editado['nombre'] == 'Clasica editada'
+    assert producto_editado['precio'] == 14000
+    grupo_removible = next(
+        grupo for grupo in producto_editado['grupos_opciones'] if grupo['tipo'] == 'ingrediente_removible'
+    )
+    assert [opcion['nombre'] for opcion in grupo_removible['opciones']] == ['Lechuga', 'Cebolla morada']
 
 
 def test_api_menu_no_filtra_datos_entre_clientes():

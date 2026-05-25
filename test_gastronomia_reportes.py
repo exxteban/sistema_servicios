@@ -2,7 +2,7 @@ import re
 from datetime import date
 
 from app import create_app, db
-from app.models import Cliente, Usuario
+from app.models import Caja, Cliente, SesionCaja, Usuario
 from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaProducto
 
 
@@ -63,6 +63,22 @@ def _crear_productos(app, nombre_cliente: str, username: str):
         return cliente.id_cliente, pizza.id_producto, bebida.id_producto
 
 
+def _abrir_caja(app, username: str):
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username=username).first()
+        assert usuario is not None
+        caja = Caja(nombre=f'Caja {username}', ubicacion='Gastronomia')
+        db.session.add(caja)
+        db.session.flush()
+        db.session.add(SesionCaja(
+            id_caja=caja.id_caja,
+            id_usuario=usuario.id_usuario,
+            monto_inicial=0,
+            estado='abierta',
+        ))
+        db.session.commit()
+
+
 def _pedido_cobrado(client, csrf, items, metodo_pago='efectivo', descuento=0):
     pedido_resp = client.post(
         '/api/gastronomia/pedidos',
@@ -100,6 +116,7 @@ def test_reportes_resumen_filtra_cliente_y_calcula_metricas():
     _cliente_dos_id, pizza_dos_id, _bebida_dos_id = _crear_productos(app, 'Resto Reporte B', 'resto_reporte_b')
 
     _loguear(client_uno, app, 'resto_reporte_a')
+    _abrir_caja(app, 'resto_reporte_a')
     csrf_uno = _csrf(client_uno.get('/gastronomia/caja').get_data(as_text=True))
     _pedido_cobrado(
         client_uno,
@@ -116,6 +133,7 @@ def test_reportes_resumen_filtra_cliente_y_calcula_metricas():
     )
 
     _loguear(client_dos, app, 'resto_reporte_b')
+    _abrir_caja(app, 'resto_reporte_b')
     csrf_dos = _csrf(client_dos.get('/gastronomia/caja').get_data(as_text=True))
     _pedido_cobrado(client_dos, csrf_dos, [{'producto_id': pizza_dos_id, 'cantidad': 1}], metodo_pago='qr')
 

@@ -231,17 +231,37 @@ else
   exit 1
 fi
 
-mysql_root() {
+mysql_root_auth="password"
+
+mysql_root_with_password() {
   as_root env MYSQL_PWD="$db_root_password" "$mysql_cmd" --user=root "$@"
 }
 
-if ! mysql_root -e "SELECT 1" >/dev/null 2>&1; then
-  echo "No se pudo conectar a MariaDB/MySQL como root con la contraseña provista (DB_ROOT_PASSWORD)."
+mysql_root_with_socket() {
+  as_root "$mysql_cmd" --user=root "$@"
+}
+
+if mysql_root_with_password -e "SELECT 1" >/dev/null 2>&1; then
+  mysql_root_auth="password"
+elif mysql_root_with_socket -e "SELECT 1" >/dev/null 2>&1; then
+  mysql_root_auth="socket"
+else
+  echo "No se pudo conectar a MariaDB/MySQL como root."
+  echo "Define DB_ROOT_PASSWORD si root ya tiene clave, o ejecuta como root/sudo para usar auth_socket."
   exit 1
 fi
 
+mysql_root() {
+  if [ "$mysql_root_auth" = "socket" ]; then
+    mysql_root_with_socket "$@"
+  else
+    mysql_root_with_password "$@"
+  fi
+}
+
 mysql_root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$db_root_password';" >/dev/null 2>&1 || \
 mysql_root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$db_root_password';"
+mysql_root_auth="password"
 
 if [[ ! "$db_name" =~ ^[A-Za-z0-9_]+$ ]]; then
   echo "DB_NAME inválido: $db_name"

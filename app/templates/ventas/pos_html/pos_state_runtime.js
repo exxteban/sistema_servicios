@@ -524,6 +524,10 @@
                     url.searchParams.delete('agenda_turno_cliente_id');
                     url.searchParams.delete('agenda_turno_servicio_id');
                     url.searchParams.delete('agenda_turno_vendedor_id');
+                    url.searchParams.delete('agenda_turno_actividad_id');
+                    url.searchParams.delete('agenda_turno_precio_manual');
+                    url.searchParams.delete('agenda_turno_precio_opcion_id');
+                    url.searchParams.delete('agenda_turno_titulo');
                     const nuevaUrl = `${url.pathname}${url.search}${url.hash}`;
                     window.history.replaceState({}, document.title, nuevaUrl);
                 } catch (e) {

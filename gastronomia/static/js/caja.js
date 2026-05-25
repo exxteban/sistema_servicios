@@ -4,6 +4,7 @@
   const alertBox = document.getElementById('caja-alert');
   const selectedSummary = document.getElementById('selected-summary');
   const discountInput = document.getElementById('discount-amount');
+  const paymentMethodInput = document.getElementById('payment-method');
   const paymentTotal = document.getElementById('payment-total');
   let orders = [];
   let selectedOrderId = null;
@@ -25,6 +26,14 @@
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
+  const selectPaymentMethod = (button) => {
+    if (!button || !paymentMethodInput) return;
+    paymentMethodInput.value = button.dataset.paymentMethod || 'efectivo';
+    document.querySelectorAll('[data-payment-method]').forEach((item) => {
+      item.classList.toggle('active', item === button);
+      item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+    });
+  };
 
   const loadOrders = async () => {
     const data = await apiJson('/api/gastronomia/caja/pedidos');
@@ -81,7 +90,7 @@
     `;
     paymentTotal.textContent = money(Math.max(0, Number(order.total || 0) - discount));
   };
-  const chargeSelected = async () => {
+  const chargeSelected = async (ticketWindow = null) => {
     if (!selectedOrderId) throw new Error('Selecciona un pedido para cobrar.');
     const data = await apiJson(`/api/gastronomia/caja/pedidos/${selectedOrderId}/cobrar`, {
       method: 'POST',
@@ -92,9 +101,13 @@
       }),
     });
     showAlert(`Pedido #${data.pedido.id_pedido} cobrado.`, true);
+    const ticketUrl = `/gastronomia/pedidos/${data.pedido.id_pedido}/ticket`;
+    if (ticketWindow) ticketWindow.location = ticketUrl;
+    else window.open(ticketUrl, '_blank');
     selectedOrderId = null;
     discountInput.value = 0;
     document.getElementById('payment-note').value = '';
+    selectPaymentMethod(document.querySelector('[data-payment-method="efectivo"]'));
     await loadOrders();
   };
 
@@ -106,8 +119,16 @@
     renderSelected();
   });
   discountInput?.addEventListener('input', renderSelected);
+  document.querySelectorAll('[data-payment-method]').forEach((button) => {
+    button.setAttribute('aria-pressed', button.classList.contains('active') ? 'true' : 'false');
+    button.addEventListener('click', () => selectPaymentMethod(button));
+  });
   document.getElementById('charge-order')?.addEventListener('click', () => {
-    chargeSelected().catch((error) => showAlert(error.message, false));
+    const ticketWindow = selectedOrderId ? window.open('', '_blank') : null;
+    chargeSelected(ticketWindow).catch((error) => {
+      if (ticketWindow) ticketWindow.close();
+      showAlert(error.message, false);
+    });
   });
   loadOrders().catch((error) => showAlert(error.message, false));
 }());

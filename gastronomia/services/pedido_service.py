@@ -28,7 +28,15 @@ def listar_pedidos(cliente_id: int, *, estados: list[str] | None = None) -> list
 
 
 def listar_pedidos_cocina(cliente_id: int) -> list[GastronomiaPedido]:
-    return listar_pedidos(cliente_id, estados=['enviado_cocina', 'preparando'])
+    return (
+        GastronomiaPedido.query
+        .filter(
+            GastronomiaPedido.cliente_id == int(cliente_id),
+            GastronomiaPedido.estado.in_(['enviado_cocina', 'preparando', 'listo']),
+        )
+        .order_by(GastronomiaPedido.fecha_envio_cocina.asc(), GastronomiaPedido.id_pedido.asc())
+        .all()
+    )
 
 
 def listar_eventos_pedido(cliente_id: int, *, despues_de: int = 0, limite: int = 100) -> list[GastronomiaPedidoEvento]:

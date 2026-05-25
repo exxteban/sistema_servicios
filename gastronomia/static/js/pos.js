@@ -1,6 +1,7 @@
 (function () {
   const csrf = document.getElementById('csrf-token')?.value || '';
   const productsGrid = document.getElementById('products-grid');
+  const productSearch = document.getElementById('product-search');
   const cartItems = document.getElementById('cart-items');
   const cartTotal = document.getElementById('cart-total');
   const alertBox = document.getElementById('pos-alert');
@@ -10,6 +11,8 @@
   const modalGroups = document.getElementById('modifier-groups');
   const modalQty = document.getElementById('modal-qty');
   const modalNote = document.getElementById('modal-note');
+  const modalModeLabel = document.getElementById('modal-mode-label');
+  const configuredProductButton = document.getElementById('add-configured-product');
   const root = document.querySelector('[data-gastro-pos]');
   const orderTypeInput = document.getElementById('order-type');
   const tableNameInput = document.getElementById('table-name');
@@ -21,6 +24,7 @@
   let selectedCategory = '';
   let cart = [];
   let activeProduct = null;
+  let editingItemKey = null;
   let lastOrderId = null;
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
@@ -54,16 +58,24 @@
   };
 
   const renderProducts = () => {
-    const visible = selectedCategory
+    const searchTerm = (productSearch?.value || '').trim().toLowerCase();
+    const categoryProducts = selectedCategory
       ? products.filter((product) => String(product.categoria_id) === String(selectedCategory))
       : products;
+    const visible = searchTerm
+      ? categoryProducts.filter((product) => `${product.nombre} ${product.descripcion || ''}`.toLowerCase().includes(searchTerm))
+      : categoryProducts;
     productsGrid.innerHTML = visible.map((product) => `
-      <button type="button" data-product="${product.id_producto}" class="min-h-36 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
-        <span class="block text-lg font-bold text-gray-900 dark:text-white">${escapeHtml(product.nombre)}</span>
-        <span class="mt-2 block text-sm text-gray-500">${escapeHtml(product.descripcion || '')}</span>
-        <span class="mt-4 block text-xl font-black text-emerald-700 dark:text-emerald-300">${money(product.precio)}</span>
+      <button type="button" data-product="${product.id_producto}" class="min-h-36 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
+        <span class="block text-base font-black text-gray-900 dark:text-white">${escapeHtml(product.nombre)}</span>
+        <span class="mt-2 line-clamp-2 block min-h-10 text-sm text-gray-600 dark:text-gray-400">${escapeHtml(product.descripcion || 'Toca para configurar el item.')}</span>
+        <span class="mt-5 block text-xl font-black text-orange-600 dark:text-orange-300">${money(product.precio)}</span>
       </button>
-    `).join('') || '<div class="rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-500 dark:border-gray-700">Sin productos disponibles.</div>';
+    `).join('') || `
+      <div class="rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-500 dark:border-gray-700 sm:col-span-2 2xl:col-span-3">
+        ${products.length ? 'No hay productos para esta busqueda o categoria.' : 'Sin productos disponibles. Revisa que el producto este visible y disponible en Cargar menu.'}
+      </div>
+    `;
   };
   const renderMesas = () => {
     if (!tableGrid) return;
@@ -101,29 +113,41 @@
     renderMesas();
   };
 
-  const openProduct = (product) => {
+  const openProduct = (product, item = null) => {
     activeProduct = product;
+    editingItemKey = item?.key || null;
     modalName.textContent = product.nombre;
     modalPrice.textContent = money(product.precio);
-    modalQty.value = 1;
-    modalNote.value = '';
-    modalGroups.innerHTML = (product.grupos_opciones || []).map(renderGroup).join('');
+    modalQty.value = item?.cantidad || 1;
+    modalNote.value = item?.notas || '';
+    modalGroups.innerHTML = (product.grupos_opciones || [])
+      .map((group) => renderGroup(group, item?.opciones || []))
+      .join('');
+    if (configuredProductButton) {
+      configuredProductButton.textContent = editingItemKey ? 'Guardar cambios' : 'Agregar';
+    }
+    if (modalModeLabel) {
+      modalModeLabel.textContent = editingItemKey ? 'Editar item del pedido' : 'Configurar producto';
+    }
     modal.classList.remove('hidden');
     modal.classList.add('flex');
   };
 
-  const renderGroup = (group) => {
-    const inputType = group.max_selecciones === 1 ? 'radio' : 'checkbox';
+  const renderGroup = (group, selectedOptions = []) => {
+    const isRemovable = group.tipo === 'ingrediente_removible';
+    const inputType = isRemovable ? 'checkbox' : (group.max_selecciones === 1 ? 'radio' : 'checkbox');
+    const helper = isRemovable ? 'Marca los ingredientes que NO debe llevar.' : 'Selecciona las opciones para este item.';
     return `
       <section class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
         <div class="flex items-center justify-between gap-3">
           <h3 class="font-bold text-gray-900 dark:text-white">${escapeHtml(group.nombre)}</h3>
           <span class="text-xs font-semibold text-gray-500">${group.min_selecciones || 0}-${group.max_selecciones || 0}</span>
         </div>
+        <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">${helper}</p>
         <div class="mt-3 grid gap-2 sm:grid-cols-2">
           ${(group.opciones || []).map((option) => `
             <label class="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:text-gray-100">
-              <span><input type="${inputType}" name="group-${group.id_grupo}" value="${option.id_opcion}" class="mr-2">${escapeHtml(option.nombre)}</span>
+              <span><input type="${inputType}" name="group-${group.id_grupo}" value="${option.id_opcion}" class="mr-2" ${selectedOptions.includes(Number(option.id_opcion)) ? 'checked' : ''}>${escapeHtml(formatModifierName({...option, tipo_grupo: group.tipo}))}</span>
               <span>${option.precio_delta ? `+${money(option.precio_delta)}` : ''}</span>
             </label>
           `).join('')}
@@ -138,8 +162,8 @@
       method: 'POST',
       body: JSON.stringify({opciones: selectedOptions}),
     });
-    cart.push({
-      key: `${Date.now()}-${Math.random()}`,
+    const configuredItem = {
+      key: editingItemKey || `${Date.now()}-${Math.random()}`,
       producto_id: activeProduct.id_producto,
       nombre: activeProduct.nombre,
       cantidad: Math.max(1, Number(modalQty.value || 1)),
@@ -147,24 +171,50 @@
       opciones: selectedOptions,
       selecciones: validation.selecciones || [],
       notas: modalNote.value.trim(),
-    });
+    };
+    if (editingItemKey) {
+      cart = cart.map((item) => item.key === editingItemKey ? configuredItem : item);
+    } else {
+      cart.push(configuredItem);
+    }
     lastOrderId = null;
     closeModal();
     renderCart();
   };
 
+  const editCartItem = (itemKey) => {
+    const item = cart.find((cartItem) => cartItem.key === itemKey);
+    const product = products.find((productItem) => String(productItem.id_producto) === String(item?.producto_id));
+    if (!item || !product) {
+      showAlert('No se pudo abrir el item para editar.', false);
+      return;
+    }
+    openProduct(product, item);
+  };
+
   const renderCart = () => {
     cartItems.innerHTML = cart.map((item) => `
-      <article class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <h3 class="font-bold text-gray-900 dark:text-white">${item.cantidad} x ${escapeHtml(item.nombre)}</h3>
-            <p class="mt-1 text-xs text-gray-500">${escapeHtml(item.selecciones.map((s) => s.nombre).join(', '))}</p>
-            ${item.notas ? `<p class="mt-1 text-xs font-semibold text-amber-700">${escapeHtml(item.notas)}</p>` : ''}
+      <article class="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+        <div class="grid grid-cols-[44px_1fr_auto] items-start gap-3">
+          <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm font-black text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">${item.cantidad}</span>
+          <div class="min-w-0">
+            <h3 class="font-black leading-tight text-gray-900 dark:text-white">${escapeHtml(item.nombre)}</h3>
+            <p class="mt-1 text-xs text-gray-500">${escapeHtml(item.selecciones.map(formatModifierName).join(', '))}</p>
+            ${item.notas ? `<p class="mt-1 rounded bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700 dark:bg-orange-500/10 dark:text-orange-200">${escapeHtml(item.notas)}</p>` : ''}
           </div>
-          <button type="button" data-remove="${item.key}" class="text-sm font-bold text-red-600">Quitar</button>
+          <div class="flex shrink-0 items-center gap-2">
+            <button type="button" data-edit="${item.key}" class="rounded-lg border border-amber-200 px-2 py-1 text-sm font-bold text-amber-700 hover:bg-amber-50" aria-label="Editar ${escapeHtml(item.nombre)}">
+              <i class="fas fa-pen" aria-hidden="true"></i>
+            </button>
+            <button type="button" data-remove="${item.key}" class="rounded-lg border border-red-200 px-2 py-1 text-sm font-bold text-red-600 hover:bg-red-50" aria-label="Quitar ${escapeHtml(item.nombre)}">
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
-        <div class="mt-2 text-right font-black text-gray-900 dark:text-white">${money(item.precio_unitario * item.cantidad)}</div>
+        <div class="mt-2 flex justify-between text-sm">
+          <span class="font-semibold text-gray-500">${money(item.precio_unitario)} c/u</span>
+          <strong class="font-black text-gray-900 dark:text-white">${money(item.precio_unitario * item.cantidad)}</strong>
+        </div>
       </article>
     `).join('') || '<div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">Sin items.</div>';
     cartTotal.textContent = money(cart.reduce((sum, item) => sum + item.precio_unitario * item.cantidad, 0));
@@ -211,6 +261,8 @@
   const closeModal = () => {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+    activeProduct = null;
+    editingItemKey = null;
   };
 
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -220,6 +272,9 @@
     '"': '&quot;',
     "'": '&#039;',
   }[char]));
+  const formatModifierName = (modifier) => (
+    modifier?.tipo_grupo === 'ingrediente_removible' ? `Sin ${modifier.nombre}` : modifier?.nombre
+  );
 
   document.getElementById('category-tabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-category]');
@@ -229,6 +284,7 @@
     button.classList.add('active');
     renderProducts();
   });
+  productSearch?.addEventListener('input', renderProducts);
   document.getElementById('order-type-buttons')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-order-type]');
     if (!button) return;
@@ -246,9 +302,15 @@
     if (product) openProduct(product);
   });
   cartItems?.addEventListener('click', (event) => {
+    const editButton = event.target.closest('[data-edit]');
+    if (editButton) {
+      editCartItem(editButton.dataset.edit);
+      return;
+    }
     const button = event.target.closest('[data-remove]');
     if (!button) return;
     cart = cart.filter((item) => item.key !== button.dataset.remove);
+    lastOrderId = null;
     renderCart();
   });
   document.getElementById('close-modal')?.addEventListener('click', closeModal);

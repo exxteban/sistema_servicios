@@ -378,6 +378,10 @@ class GastronomiaPedidoPago(db.Model):
         index=True,
     )
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False, index=True)
+    id_sesion_caja = db.Column(db.Integer, db.ForeignKey('sesiones_caja.id_sesion'), nullable=True, index=True)
+    id_metodo_pago = db.Column(db.Integer, db.ForeignKey('metodos_pago.id_metodo_pago'), nullable=True, index=True)
+    id_venta = db.Column(db.Integer, db.ForeignKey('ventas.id_venta'), nullable=True, index=True)
+    id_movimiento_caja = db.Column(db.Integer, db.ForeignKey('movimientos_caja.id_movimiento_caja'), nullable=True, index=True)
     metodo_pago = db.Column(db.String(40), nullable=False, default='efectivo')
     subtotal = db.Column(db.Numeric(15, 2), nullable=False, default=0)
     descuento_monto = db.Column(db.Numeric(15, 2), nullable=False, default=0)
@@ -387,6 +391,10 @@ class GastronomiaPedidoPago(db.Model):
 
     cliente = db.relationship('Cliente')
     usuario = db.relationship('Usuario')
+    sesion_caja = db.relationship('SesionCaja', foreign_keys=[id_sesion_caja])
+    metodo = db.relationship('MetodoPago', foreign_keys=[id_metodo_pago])
+    venta = db.relationship('Venta', foreign_keys=[id_venta])
+    movimiento_caja = db.relationship('MovimientoCaja', foreign_keys=[id_movimiento_caja])
 
     def to_dict(self):
         return {
@@ -394,6 +402,10 @@ class GastronomiaPedidoPago(db.Model):
             'cliente_id': self.cliente_id,
             'pedido_id': self.pedido_id,
             'usuario_id': self.usuario_id,
+            'id_sesion_caja': self.id_sesion_caja,
+            'id_metodo_pago': self.id_metodo_pago,
+            'id_venta': self.id_venta,
+            'id_movimiento_caja': self.id_movimiento_caja,
             'metodo_pago': self.metodo_pago,
             'subtotal': float(self.subtotal or 0),
             'descuento_monto': float(self.descuento_monto or 0),

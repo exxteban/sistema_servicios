@@ -95,6 +95,7 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
     assert cocina_resp.status_code == 200
     pedidos = cocina_resp.get_json()['pedidos']
     assert [pedido['id_pedido'] for pedido in pedidos] == [pedido_id]
+    assert [pedido['estado'] for pedido in pedidos] == ['enviado_cocina']
 
     tomar_resp = client.post(
         f'/api/gastronomia/cocina/pedidos/{pedido_id}/tomar',
@@ -103,6 +104,10 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
     )
     assert tomar_resp.status_code == 200
     assert tomar_resp.get_json()['pedido']['estado'] == 'preparando'
+    cocina_resp = client.get('/api/gastronomia/cocina/pedidos')
+    assert cocina_resp.status_code == 200
+    pedidos = cocina_resp.get_json()['pedidos']
+    assert [pedido['estado'] for pedido in pedidos] == ['preparando']
 
     listo_resp = client.post(
         f'/api/gastronomia/cocina/pedidos/{pedido_id}/listo',
@@ -111,6 +116,10 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
     )
     assert listo_resp.status_code == 200
     assert listo_resp.get_json()['pedido']['estado'] == 'listo'
+    cocina_resp = client.get('/api/gastronomia/cocina/pedidos')
+    assert cocina_resp.status_code == 200
+    pedidos = cocina_resp.get_json()['pedidos']
+    assert [pedido['estado'] for pedido in pedidos] == ['listo']
 
     with app.app_context():
         pedido = GastronomiaPedido.query.filter_by(cliente_id=cliente_id, id_pedido=pedido_id).first()

@@ -6,6 +6,7 @@ function peluqueriaTurnoRapido(config) {
         servicios: Array.isArray(config.servicios) ? config.servicios : [],
         serviciosCatalogo: Array.isArray(config.serviciosCatalogo) ? config.serviciosCatalogo : [],
         horarios: Array.isArray(config.horarios) ? config.horarios : [],
+        puedeCrearCliente: !!config.puedeCrearCliente,
         profesionalId: '',
         servicioId: '',
         servicioNombre: '',
@@ -23,6 +24,9 @@ function peluqueriaTurnoRapido(config) {
         clienteSeleccionado: null,
         clienteId: '',
         clienteBusqueda: '',
+        crearClienteNuevo: false,
+        clienteNuevoNombre: '',
+        clienteNuevoTelefono: '',
         clientes: [],
         mostrarClientes: false,
         cargandoClientes: false,
@@ -351,7 +355,8 @@ function peluqueriaTurnoRapido(config) {
             return profesional ? profesional.nombre : 'Sin profesional';
         },
         tituloTurno() {
-            const cliente = this.clienteSeleccionado ? ` - ${this.clienteSeleccionado.nombre}` : '';
+            const nombreCliente = this.clienteNombreTurno();
+            const cliente = nombreCliente ? ` - ${nombreCliente}` : '';
             return `${this.nombreServicio()}${cliente}`;
         },
         descripcionTurno() {
@@ -391,13 +396,42 @@ function peluqueriaTurnoRapido(config) {
             this.clienteSeleccionado = null;
             this.clienteId = '';
             this.clienteBusqueda = '';
+            this.cancelarClienteNuevo();
         },
         seleccionarCliente(cliente) {
             this.clienteSeleccionado = cliente;
             this.clienteId = cliente ? cliente.id_cliente : '';
             this.clienteBusqueda = '';
+            this.cancelarClienteNuevo();
             this.clientes = [];
             this.mostrarClientes = false;
+        },
+        puedePrepararClienteNuevo() {
+            return this.puedeCrearCliente && !this.clienteSeleccionado && !this.crearClienteNuevo && this.clienteBusqueda.trim().length >= 2;
+        },
+        prepararClienteNuevo() {
+            if (!this.puedePrepararClienteNuevo()) return;
+            this.clienteNuevoNombre = this.clienteBusqueda.trim();
+            this.clienteNuevoTelefono = '';
+            this.crearClienteNuevo = true;
+            this.mostrarClientes = false;
+            this.clientes = [];
+        },
+        cancelarClienteNuevo() {
+            this.crearClienteNuevo = false;
+            this.clienteNuevoNombre = '';
+            this.clienteNuevoTelefono = '';
+        },
+        clienteNombreTurno() {
+            if (this.clienteSeleccionado) return this.clienteSeleccionado.nombre;
+            if (this.crearClienteNuevo && this.clienteNuevoNombre.trim()) return this.clienteNuevoNombre.trim();
+            return '';
+        },
+        clienteNuevoNombreFormValue() {
+            return this.crearClienteNuevo ? this.clienteNuevoNombre.trim() : '';
+        },
+        clienteNuevoTelefonoFormValue() {
+            return this.crearClienteNuevo ? this.clienteNuevoTelefono.trim() : '';
         },
         async buscarClientes(query = '', abrir = false) {
             if (abrir) this.mostrarClientes = true;

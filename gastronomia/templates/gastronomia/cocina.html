@@ -3,21 +3,21 @@
 {% block title %}Cocina Gastronomia{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-7xl" data-gastro-kds>
+<div class="kds-shell" data-gastro-kds>
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
-    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div class="kds-header mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-300">Gastronomia</p>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Cocina</h1>
+            <p class="text-xs font-black uppercase tracking-[0.22em] text-rose-400">Gastronomia</p>
+            <h1 class="mt-1 text-3xl font-black tracking-tight text-slate-100">Cocina</h1>
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="{{ url_for('gastronomia.dashboard') }}"
-               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
                 <i class="fas fa-arrow-left"></i>Volver
             </a>
             <a href="{{ url_for('gastronomia.pos') }}"
-               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
                 <i class="fas fa-tablet-alt"></i>POS
             </a>
         </div>
@@ -25,22 +25,209 @@
 
     <div id="kds-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <div class="grid gap-4 lg:grid-cols-2" id="kds-board"></div>
+    <div class="grid gap-4 xl:grid-cols-3" id="kds-board"></div>
 </div>
 {% endblock %}
 
 {% block extra_css %}
 <style>
+    .kds-shell {
+        min-height: calc(100vh - 8.5rem);
+        border-radius: 18px;
+        background:
+            radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.18), transparent 30%),
+            radial-gradient(circle at 88% 8%, rgba(16, 185, 129, 0.14), transparent 28%),
+            linear-gradient(135deg, #f8fbff 0%, #eef5ff 48%, #f8fafc 100%);
+        color: #0f172a;
+        padding: 20px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 24px 80px rgba(15, 23, 42, 0.10);
+    }
+    .dark .kds-shell {
+        background:
+            radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.14), transparent 30%),
+            radial-gradient(circle at 88% 8%, rgba(16, 185, 129, 0.10), transparent 28%),
+            linear-gradient(135deg, #07111f 0%, #0f172a 48%, #07111f 100%);
+        color: #e5edf8;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 80px rgba(2, 6, 23, 0.24);
+    }
+    .kds-header {
+        position: relative;
+        z-index: 1;
+    }
+    .kds-nav-button {
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.82);
+        color: #0f172a;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.80), 0 10px 24px rgba(15, 23, 42, 0.08);
+        transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+    .kds-nav-button:hover {
+        border-color: rgba(37, 99, 235, 0.28);
+        background: rgba(255, 255, 255, 0.96);
+        transform: translateY(-1px);
+    }
+    .dark .kds-nav-button {
+        border-color: rgba(148, 163, 184, 0.20);
+        background: rgba(15, 23, 42, 0.62);
+        color: #dbe7f7;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .dark .kds-nav-button:hover {
+        border-color: rgba(148, 163, 184, 0.38);
+        background: rgba(30, 41, 59, 0.72);
+    }
     .kds-card {
-        border: 1px solid rgb(229 231 235);
-        border-radius: 12px;
-        background: white;
-        padding: 18px;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        border: 1px solid rgba(15, 23, 42, 0.10);
+        border-radius: 14px;
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.94));
+        padding: 14px;
+        box-shadow: 0 14px 36px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        transition: border-color 160ms ease, transform 160ms ease;
+    }
+    .kds-card:hover {
+        border-color: rgba(37, 99, 235, 0.24);
+        transform: translateY(-1px);
     }
     .dark .kds-card {
-        border-color: rgb(55 65 81);
-        background: rgb(31 41 55);
+        border-color: rgba(148, 163, 184, 0.15);
+        background: linear-gradient(145deg, rgba(30, 41, 59, 0.90), rgba(15, 23, 42, 0.92));
+        box-shadow: 0 14px 36px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .dark .kds-card:hover {
+        border-color: rgba(148, 163, 184, 0.30);
+    }
+    .kds-column {
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.58);
+        padding: 14px;
+        min-height: 18rem;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.80), 0 14px 36px rgba(15, 23, 42, 0.07);
+    }
+    .dark .kds-column {
+        border-color: rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.58);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .kds-column-body {
+        max-height: calc(100vh - 18rem);
+        overflow-y: auto;
+        padding-right: 2px;
+    }
+    .kds-column-body::-webkit-scrollbar {
+        width: 8px;
+    }
+    .kds-column-body::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgba(100, 116, 139, 0.40);
+    }
+    .kds-shell .text-slate-100,
+    .kds-shell .text-slate-200,
+    .kds-shell .text-slate-300 {
+        color: #0f172a;
+    }
+    .kds-shell .text-slate-400,
+    .kds-shell .text-slate-500 {
+        color: #475569;
+    }
+    .kds-shell .text-rose-400 {
+        color: #e11d48;
+    }
+    .kds-shell .text-amber-200,
+    .kds-shell .text-amber-300 {
+        color: #b45309;
+    }
+    .kds-shell .text-emerald-300 {
+        color: #047857;
+    }
+    .kds-shell .text-sky-300 {
+        color: #0369a1;
+    }
+    .kds-shell .border-slate-700\/60,
+    .kds-shell .border-slate-700\/70,
+    .kds-shell .border-slate-700\/80 {
+        border-color: rgba(15, 23, 42, 0.16);
+    }
+    .kds-shell .border-slate-700\/80.bg-slate-900\/40,
+    .kds-shell .bg-slate-900\/45 {
+        background: rgba(255, 255, 255, 0.48);
+    }
+    .kds-shell .bg-slate-800 {
+        background: #e2e8f0;
+    }
+    .dark .kds-shell .text-slate-100,
+    .dark .kds-shell .text-slate-200,
+    .dark .kds-shell .text-slate-300 {
+        color: #e5edf8;
+    }
+    .dark .kds-shell .text-slate-400 {
+        color: #94a3b8;
+    }
+    .dark .kds-shell .text-slate-500 {
+        color: #64748b;
+    }
+    .dark .kds-shell .text-rose-400 {
+        color: #fb7185;
+    }
+    .dark .kds-shell .text-amber-200,
+    .dark .kds-shell .text-amber-300 {
+        color: #fcd34d;
+    }
+    .dark .kds-shell .text-emerald-300 {
+        color: #6ee7b7;
+    }
+    .dark .kds-shell .text-sky-300 {
+        color: #7dd3fc;
+    }
+    .dark .kds-shell .border-slate-700\/60,
+    .dark .kds-shell .border-slate-700\/70,
+    .dark .kds-shell .border-slate-700\/80 {
+        border-color: rgba(51, 65, 85, 0.80);
+    }
+    .dark .kds-shell .border-slate-700\/80.bg-slate-900\/40,
+    .dark .kds-shell .bg-slate-900\/45 {
+        background: rgba(15, 23, 42, 0.45);
+    }
+    .dark .kds-shell .bg-slate-800 {
+        background: #1e293b;
+    }
+    .kds-warning-note {
+        position: relative;
+        border: 2px solid rgba(239, 68, 68, 0.82) !important;
+        background: linear-gradient(135deg, rgba(254, 226, 226, 0.98), rgba(254, 243, 199, 0.96)) !important;
+        color: #7f1d1d !important;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.50), 0 12px 30px rgba(239, 68, 68, 0.18);
+        animation: kdsWarningPulse 1.15s ease-in-out infinite;
+    }
+    .dark .kds-warning-note {
+        background: linear-gradient(135deg, rgba(127, 29, 29, 0.96), rgba(120, 53, 15, 0.94)) !important;
+        color: #fff7ed !important;
+        box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.56), 0 12px 34px rgba(239, 68, 68, 0.24);
+    }
+    .kds-warning-note i {
+        color: #dc2626;
+    }
+    .dark .kds-warning-note i {
+        color: #fcd34d;
+    }
+    @keyframes kdsWarningPulse {
+        0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.52), 0 12px 30px rgba(239, 68, 68, 0.18);
+        }
+        50% {
+            transform: scale(1.025);
+            box-shadow: 0 0 0 8px rgba(239, 68, 68, 0), 0 16px 38px rgba(239, 68, 68, 0.26);
+        }
+    }
+    @media (max-width: 768px) {
+        .kds-shell {
+            min-height: calc(100vh - 7rem);
+            padding: 14px;
+        }
+        .kds-column-body {
+            max-height: none;
+        }
     }
 </style>
 {% endblock %}
