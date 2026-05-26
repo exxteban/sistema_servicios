@@ -36,7 +36,7 @@
                 <div x-show="selectorOpen"
                     x-transition
                     @click.away="selectorOpen = false"
-                    class="absolute right-0 z-[9999] mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/70 ring-1 ring-slate-200 dark:border-white/10 dark:bg-slate-950 dark:shadow-black/50 dark:ring-white/10"
+                    class="absolute left-0 z-[9999] mt-2 w-[min(20rem,calc(100vw-6rem))] max-w-[calc(100vw-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/70 ring-1 ring-slate-200 dark:border-white/10 dark:bg-slate-950 dark:shadow-black/50 dark:ring-white/10 sm:w-80 sm:max-w-none"
                     style="display: none;">
                     <div class="border-b border-slate-100 px-4 py-3 dark:border-white/5">
                         <p class="text-sm font-bold text-slate-950 dark:text-white">Personalizar dashboard</p>

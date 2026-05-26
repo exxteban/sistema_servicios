@@ -43,9 +43,22 @@
     </button>
 
     <!-- Profesionales activos -->
-    <a href="{{ url_for('control_empleados.index') if modulo_control_empleados_activo else url_for('usuarios.listar') }}"
-       data-tab-url="{{ url_for('control_empleados.index') if modulo_control_empleados_activo else url_for('usuarios.listar') }}"
-       data-tab-title="Profesionales" data-tab-icon="fas fa-users"
+    {% if current_user.tiene_permiso('gestionar_usuarios') %}
+    {% set dashboard_profesionales_url = url_for('usuarios.listar') %}
+    {% set dashboard_profesionales_tab_title = 'Usuarios' %}
+    {% set dashboard_profesionales_tab_icon = 'fas fa-user-cog' %}
+    {% elif can_ver_agenda %}
+    {% set dashboard_profesionales_url = url_for('agenda.dashboard') %}
+    {% set dashboard_profesionales_tab_title = 'Agenda' %}
+    {% set dashboard_profesionales_tab_icon = 'fas fa-calendar-check' %}
+    {% else %}
+    {% set dashboard_profesionales_url = url_for('main.dashboard') %}
+    {% set dashboard_profesionales_tab_title = 'Dashboard' %}
+    {% set dashboard_profesionales_tab_icon = 'fas fa-tachometer-alt' %}
+    {% endif %}
+    <a href="{{ dashboard_profesionales_url }}"
+       data-tab-url="{{ dashboard_profesionales_url }}"
+       data-tab-title="{{ dashboard_profesionales_tab_title }}" data-tab-icon="{{ dashboard_profesionales_tab_icon }}"
        :class="{ 'hidden': !isCardVisible('kpi_profesionales') }"
        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900 {% if 'kpi_profesionales' not in dashboard_service_cards_selected %}hidden{% endif %}"
        :style="cardStyle('kpi_profesionales')">
