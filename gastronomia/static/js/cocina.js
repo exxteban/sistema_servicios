@@ -298,15 +298,16 @@
 
     try {
       const data = await apiJson(`/api/gastronomia/cocina/pedidos/${numericOrderId}/${action}`, {method: 'POST', body: '{}'});
+      if (destroyed) return;
       if (data?.pedido?.id_pedido) {
         applyOrderSnapshot(data.pedido);
         sortOrders();
         render(orders);
         showAlert(`Pedido #${data.pedido.id_pedido} actualizado.`, true);
       } else {
-        await loadBoard();
         showAlert(`Pedido #${numericOrderId} actualizado.`, true);
       }
+      await loadBoard();
     } catch (error) {
       if (previousOrder) {
         applyOrderSnapshot(previousOrder);
