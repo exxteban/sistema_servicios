@@ -199,6 +199,7 @@
                     const tabId = getActiveTabId();
                     if (!tabId) return false;
                     if (tabId === principalTabId) {
+                        if (!principalPanelShowsDashboard() || shouldNavigateToDashboard()) return false;
                         setActiveTab(principalTabId);
                         return true;
                     }
