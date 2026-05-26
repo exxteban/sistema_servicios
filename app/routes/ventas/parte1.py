@@ -360,6 +360,11 @@ def _build_pos_data_from_cola_cobro(item_cola):
         'descuento': float(metadata.get('descuento') or 0),
         'beneficio_fidelizacion_id': metadata.get('beneficio_fidelizacion_id'),
         'observaciones': (metadata.get('observaciones') or '').strip(),
+        'gastronomia_pedido_id': metadata.get('gastronomia_pedido_id'),
+        'gastronomia_codigo_entrega': (metadata.get('gastronomia_codigo_entrega') or '').strip(),
+        'gastronomia_referencia_entrega': (metadata.get('gastronomia_referencia_entrega') or '').strip(),
+        'gastronomia_tipo_pedido': (metadata.get('gastronomia_tipo_pedido') or '').strip(),
+        'gastronomia_mesa': (metadata.get('gastronomia_mesa') or '').strip(),
         'items': items,
     }
 

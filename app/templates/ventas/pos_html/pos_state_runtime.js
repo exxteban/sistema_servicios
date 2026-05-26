@@ -204,6 +204,11 @@
                     this.clienteServicioId = null;
                     this.clienteServicioIds = [];
                     this.agendaActividadId = null;
+                    this.gastronomiaPedidoId = null;
+                    this.gastronomiaCodigoEntrega = '';
+                    this.gastronomiaReferenciaEntrega = '';
+                    this.gastronomiaTipoPedido = '';
+                    this.gastronomiaMesa = '';
                     if (this.reparacionId) {
                         sessionStorage.removeItem(`pos_reparacion_skip_${this.reparacionId}`);
                         sessionStorage.removeItem(`pos_reparacion_skip_token_${this.reparacionId}`);
@@ -288,6 +293,11 @@
                     this.agendaActividadId = Number(COLA_COBRO_DATA.agenda_actividad_id || 0) || null;
                     this.colaCobroId = Number(COLA_COBRO_DATA.id) || null;
                     this.beneficioFidelizacionId = Number(COLA_COBRO_DATA.beneficio_fidelizacion_id || 0) || null;
+                    this.gastronomiaPedidoId = Number(COLA_COBRO_DATA.gastronomia_pedido_id || 0) || null;
+                    this.gastronomiaCodigoEntrega = String(COLA_COBRO_DATA.gastronomia_codigo_entrega || '');
+                    this.gastronomiaReferenciaEntrega = String(COLA_COBRO_DATA.gastronomia_referencia_entrega || '');
+                    this.gastronomiaTipoPedido = String(COLA_COBRO_DATA.gastronomia_tipo_pedido || '');
+                    this.gastronomiaMesa = String(COLA_COBRO_DATA.gastronomia_mesa || '');
                     if (this.colaCobroId) {
                         sessionStorage.removeItem(`pos_cola_skip_${this.colaCobroId}`);
                         sessionStorage.removeItem(`pos_cola_skip_token_${this.colaCobroId}`);
@@ -368,6 +378,11 @@
                     this.colaCobroId = null;
                     this.beneficioFidelizacionId = null;
                     this.agendaActividadId = null;
+                    this.gastronomiaPedidoId = null;
+                    this.gastronomiaCodigoEntrega = '';
+                    this.gastronomiaReferenciaEntrega = '';
+                    this.gastronomiaTipoPedido = '';
+                    this.gastronomiaMesa = '';
                     const clienteServicioIds = Array.isArray(CLIENTE_SERVICIO_DATA.ids)
                         ? CLIENTE_SERVICIO_DATA.ids.map(id => Number(id || 0)).filter(id => id > 0)
                         : [];
@@ -436,6 +451,11 @@
                     this.agendaActividadId = Number(AGENDA_TURNO_DATA.agenda_actividad_id || 0) || null;
                     this.colaCobroId = null;
                     this.beneficioFidelizacionId = null;
+                    this.gastronomiaPedidoId = null;
+                    this.gastronomiaCodigoEntrega = '';
+                    this.gastronomiaReferenciaEntrega = '';
+                    this.gastronomiaTipoPedido = '';
+                    this.gastronomiaMesa = '';
 
                     if (AGENDA_TURNO_DATA.items && Array.isArray(AGENDA_TURNO_DATA.items)) {
                         this.carrito = AGENDA_TURNO_DATA.items.map(item => ({

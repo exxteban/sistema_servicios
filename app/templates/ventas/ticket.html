@@ -115,6 +115,12 @@
             font-weight: bold;
         }
 
+        .pickup-code {
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+
         /* Sin flex - todo con tablas */
         .info-row td {
             padding: 1px 0;
@@ -207,6 +213,26 @@
                 <td class="info-label">Venta:</td>
                 <td class="info-value">#{{ venta.id_venta }}</td>
             </tr>
+            {% if gastronomia_entrega %}
+            <tr class="info-row">
+                <td class="info-label">Pedido:</td>
+                <td class="info-value">#{{ gastronomia_entrega.pedido_id }}</td>
+            </tr>
+            <tr class="info-row">
+                <td class="info-label">Codigo:</td>
+                <td class="info-value pickup-code">{{ gastronomia_entrega.codigo_entrega }}</td>
+            </tr>
+            {% if gastronomia_entrega.referencia_entrega %}
+            <tr class="info-row">
+                <td class="info-label">Entrega:</td>
+                <td class="info-value">{{ gastronomia_entrega.referencia_entrega|thermal_safe }}</td>
+            </tr>
+            {% endif %}
+            <tr class="info-row">
+                <td class="info-label">Origen:</td>
+                <td class="info-value">{{ gastronomia_entrega.origen|thermal_safe }}</td>
+            </tr>
+            {% endif %}
             <tr class="info-row">
                 <td class="info-label">Fecha:</td>
                 <td class="info-value">{{ venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}</td>
@@ -358,6 +384,11 @@
 {% endif %}{% if empresa.direccion %}{{ thermal_center(empresa.direccion|thermal_safe, thermal_width) }}
 {% endif %}{{ '-' * thermal_width }}
 {{ thermal_pair('Venta:', '#' ~ venta.id_venta, thermal_width) }}
+{% if gastronomia_entrega %}{{ thermal_pair('Pedido:', '#' ~ gastronomia_entrega.pedido_id, thermal_width) }}
+{{ thermal_pair('Codigo:', gastronomia_entrega.codigo_entrega, thermal_width) }}
+{% if gastronomia_entrega.referencia_entrega %}{{ thermal_pair('Entrega:', gastronomia_entrega.referencia_entrega|thermal_safe, thermal_width) }}
+{% endif %}{{ thermal_pair('Origen:', gastronomia_entrega.origen|thermal_safe, thermal_width) }}
+{% endif %}
 {{ thermal_pair('Fecha:', venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M'), thermal_width) }}
 Cliente:
 {{ venta.cliente.nombre|thermal_safe }}

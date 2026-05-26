@@ -102,10 +102,14 @@ def _crear_pedido_listo(client, csrf, producto_id):
     return pedido_id
 
 
-def _crear_pedido_abierto(client, csrf, producto_id):
+def _crear_pedido_abierto(client, csrf, producto_id, referencia_entrega=None):
     pedido_resp = client.post(
         '/api/gastronomia/pedidos',
-        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 1}]},
+        json={
+            'tipo_pedido': 'mostrador',
+            'referencia_entrega': referencia_entrega,
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
         headers={'X-CSRFToken': csrf},
     )
     assert pedido_resp.status_code == 201
@@ -267,7 +271,7 @@ def test_cobro_avanzado_usa_checkout_central_y_envia_a_cocina():
     _abrir_caja(app, 'resto_checkout')
 
     csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
-    pedido_id = _crear_pedido_abierto(client, csrf, producto_id)
+    pedido_id = _crear_pedido_abierto(client, csrf, producto_id, referencia_entrega='Carlos retiro')
     cola_resp = client.post(
         f'/api/gastronomia/pedidos/{pedido_id}/cobro-avanzado',
         json={'enviar_cocina': True},
@@ -279,6 +283,9 @@ def test_cobro_avanzado_usa_checkout_central_y_envia_a_cocina():
 
     checkout_resp = client.get(cola_data['checkout_url'])
     assert checkout_resp.status_code == 200
+    checkout_html = checkout_resp.get_data(as_text=True)
+    assert f'#{pedido_id:03d}' in checkout_html
+    assert 'Carlos retiro' in checkout_html
 
     with app.app_context():
         metodo = MetodoPago.query.filter(MetodoPago.nombre.ilike('%efectivo%')).first()
@@ -299,6 +306,12 @@ def test_cobro_avanzado_usa_checkout_central_y_envia_a_cocina():
     assert venta_resp.status_code == 200
     venta_json = venta_resp.get_json()
     assert venta_json['success'] is True
+
+    ticket_resp = client.get(f'/ventas/{venta_json["id_venta"]}/ticket?preview=1')
+    assert ticket_resp.status_code == 200
+    ticket_html = ticket_resp.get_data(as_text=True)
+    assert f'#{pedido_id:03d}' in ticket_html
+    assert 'Carlos retiro' in ticket_html
 
     with app.app_context():
         pedido = GastronomiaPedido.query.get(pedido_id)

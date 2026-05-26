@@ -1,6 +1,7 @@
 from app.models import Configuracion, MetodoPago
 from app.services.clientes_fidelizacion import obtener_beneficios_aplicados_venta
 from cobranzas.services.cuotas_service import obtener_plan_credito_vigente
+from gastronomia.models import GastronomiaPedidoPago
 
 from .parte1 import _resolver_metodo_credito_tienda
 
@@ -103,6 +104,7 @@ def build_sales_ticket_context(
         for item in beneficios_aplicados
         if (item.get('resumen') or '').strip()
     )
+    gastronomia_entrega = _gastronomia_entrega_venta(venta)
 
     return dict(
         venta=venta,
@@ -130,4 +132,19 @@ def build_sales_ticket_context(
         beneficio_aplicado_texto=beneficio_aplicado_texto,
         beneficio_fidelizacion_tipo=beneficio_fidelizacion_tipo,
         beneficio_fidelizacion_descripcion=beneficio_fidelizacion_descripcion,
+        gastronomia_entrega=gastronomia_entrega,
     )
+
+
+def _gastronomia_entrega_venta(venta):
+    pago = GastronomiaPedidoPago.query.filter_by(id_venta=int(getattr(venta, 'id_venta', 0) or 0)).first()
+    pedido = getattr(pago, 'pedido', None) if pago else None
+    if not pedido:
+        return None
+    origen = f'Mesa {pedido.mesa}' if pedido.mesa else str(pedido.tipo_pedido or '').replace('_', ' ').title()
+    return {
+        'pedido_id': int(pedido.id_pedido),
+        'codigo_entrega': pedido.codigo_entrega,
+        'referencia_entrega': (pedido.referencia_entrega or '').strip(),
+        'origen': origen.strip(),
+    }

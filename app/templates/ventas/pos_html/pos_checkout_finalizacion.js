@@ -333,6 +333,11 @@
         const moneda = '₲';
         const clienteNombre = this.clienteSeleccionado ? this.clienteSeleccionado.nombre : 'Consumidor Final';
         const clienteRuc = this.clienteSeleccionado ? (this.clienteSeleccionado.ruc_ci || 'Sin RUC') : '44444401-7';
+        const origenGastronomia = !!(this.colaCobroId && this.gastronomiaPedidoId && this.gastronomiaCodigoEntrega);
+        const origenEntrega = this.gastronomiaMesa
+            ? `Mesa ${this.escapeHtml(this.gastronomiaMesa)}`
+            : this.escapeHtml((this.gastronomiaTipoPedido || '').replace(/_/g, ' '));
+        const referenciaEntrega = this.escapeHtml(this.gastronomiaReferenciaEntrega || '');
 
         const rows = items.map(it => {
             const nombre = this.escapeHtml(it.nombre || '');
@@ -383,6 +388,7 @@
     .muted { color: #444; }
     .sep { border-top: 1px dashed #000; margin: 8px 0; }
     .h1 { font-size: 14px; font-weight: 700; margin: 0; }
+    .pickup-code { font-size: 20px; font-weight: 900; letter-spacing: 1px; }
     .small { font-size: 11px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td { padding: 3px 0; vertical-align: top; }
@@ -416,6 +422,10 @@
   </div>
   <div class="sep"></div>
   <div class="small">
+    ${origenGastronomia ? `<div>Pedido gastro: #${this.escapeHtml(this.gastronomiaPedidoId)}</div>` : ``}
+    ${origenGastronomia ? `<div class="pickup-code">Codigo: ${this.escapeHtml(this.gastronomiaCodigoEntrega)}</div>` : ``}
+    ${origenGastronomia && referenciaEntrega ? `<div>Entrega: ${referenciaEntrega}</div>` : ``}
+    ${origenGastronomia && origenEntrega ? `<div>Origen: ${origenEntrega}</div>` : ``}
     <div>Fecha: <span style="white-space:nowrap;">${this.escapeHtml(fecha)}</span></div>
     <div>Cliente: ${this.escapeHtml(clienteNombre)}</div>
     <div>RUC/CI: ${this.escapeHtml(clienteRuc)}</div>
@@ -483,6 +493,11 @@
         this.clienteServicioIds = [];
         this.agendaActividadId = null;
         this.colaCobroId = null;
+        this.gastronomiaPedidoId = null;
+        this.gastronomiaCodigoEntrega = '';
+        this.gastronomiaReferenciaEntrega = '';
+        this.gastronomiaTipoPedido = '';
+        this.gastronomiaMesa = '';
         this.forzarPrecioMayorista = false;  // Reset del toggle mayorista
         this.bloquearPrecioMayorista = false;
         this.actualizarTotal();

@@ -103,6 +103,11 @@
             clienteServicioIds: [],
             agendaActividadId: null,
             colaCobroId: null,
+            gastronomiaPedidoId: null,
+            gastronomiaCodigoEntrega: '',
+            gastronomiaReferenciaEntrega: '',
+            gastronomiaTipoPedido: '',
+            gastronomiaMesa: '',
             reparacionToken: (typeof REPARACION_TOKEN !== 'undefined' && REPARACION_TOKEN !== null) ? String(REPARACION_TOKEN) : '',
 
             // Nuevo cliente dropdown data
