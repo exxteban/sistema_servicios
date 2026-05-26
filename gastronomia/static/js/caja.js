@@ -8,6 +8,10 @@
   const paymentTotal = document.getElementById('payment-total');
   let orders = [];
   let selectedOrderId = null;
+  let lastEventId = 0;
+  let pollTimer = null;
+  let chargeBusy = false;
+  const cashStates = new Set(['abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado']);
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const showAlert = (message, ok) => {
@@ -38,11 +42,56 @@
   const loadOrders = async () => {
     const data = await apiJson('/api/gastronomia/caja/pedidos');
     orders = data.pedidos || [];
+    lastEventId = Math.max(lastEventId, Number(data.ultimo_evento_id || 0));
     if (!orders.some((order) => Number(order.id_pedido) === Number(selectedOrderId))) {
       selectedOrderId = null;
     }
     renderOrders();
     renderSelected();
+  };
+  const pollEvents = async () => {
+    try {
+      const data = await apiJson(`/api/gastronomia/caja/eventos?after=${lastEventId}`);
+      const events = data.eventos || [];
+      lastEventId = Math.max(lastEventId, Number(data.ultimo_evento_id || 0), ...events.map((event) => Number(event.id_evento || 0)));
+      if (events.length) applyOrderEvents(events);
+    } catch (error) {
+      showAlert(error.message, false);
+    }
+  };
+  const applyOrderEvents = (events) => {
+    let changed = false;
+    events.forEach((event) => {
+      const order = event?.payload?.pedido;
+      if (!order?.id_pedido) return;
+      changed = applyOrderSnapshot(order) || changed;
+    });
+    if (!changed) return;
+    sortOrders();
+    if (!orders.some((order) => Number(order.id_pedido) === Number(selectedOrderId))) {
+      selectedOrderId = null;
+    }
+    renderOrders();
+    renderSelected();
+  };
+  const applyOrderSnapshot = (order) => {
+    const orderId = Number(order.id_pedido);
+    const index = orders.findIndex((item) => Number(item.id_pedido) === orderId);
+    const visible = cashStates.has(order.estado) && !order.pagado;
+    if (!visible) {
+      if (index === -1) return false;
+      orders.splice(index, 1);
+      return true;
+    }
+    if (index === -1) orders.push(order);
+    else orders[index] = order;
+    return true;
+  };
+  const sortOrders = () => {
+    orders.sort((a, b) => {
+      const dateDiff = new Date(b.fecha_creacion || 0).getTime() - new Date(a.fecha_creacion || 0).getTime();
+      return dateDiff || Number(b.id_pedido || 0) - Number(a.id_pedido || 0);
+    });
   };
   const renderOrders = () => {
     ordersEl.innerHTML = orders.map(renderOrder).join('') || `
@@ -92,6 +141,8 @@
   };
   const chargeSelected = async (ticketWindow = null) => {
     if (!selectedOrderId) throw new Error('Selecciona un pedido para cobrar.');
+    if (chargeBusy) return;
+    setChargeBusy(true);
     const data = await apiJson(`/api/gastronomia/caja/pedidos/${selectedOrderId}/cobrar`, {
       method: 'POST',
       body: JSON.stringify({
@@ -108,7 +159,17 @@
     discountInput.value = 0;
     document.getElementById('payment-note').value = '';
     selectPaymentMethod(document.querySelector('[data-payment-method="efectivo"]'));
-    await loadOrders();
+    applyOrderEvents([{payload: {pedido: data.pedido}}]);
+    setChargeBusy(false);
+  };
+  const setChargeBusy = (busy) => {
+    chargeBusy = busy;
+    const button = document.getElementById('charge-order');
+    if (!button) return;
+    button.disabled = busy;
+    button.classList.toggle('opacity-70', busy);
+    button.classList.toggle('cursor-not-allowed', busy);
+    button.textContent = busy ? 'Cobrando...' : 'Cobrar pedido';
   };
 
   ordersEl?.addEventListener('click', (event) => {
@@ -124,11 +185,16 @@
     button.addEventListener('click', () => selectPaymentMethod(button));
   });
   document.getElementById('charge-order')?.addEventListener('click', () => {
+    if (chargeBusy) return;
     const ticketWindow = selectedOrderId ? window.open('', '_blank') : null;
     chargeSelected(ticketWindow).catch((error) => {
       if (ticketWindow) ticketWindow.close();
+      setChargeBusy(false);
       showAlert(error.message, false);
     });
   });
-  loadOrders().catch((error) => showAlert(error.message, false));
+  loadOrders()
+    .catch((error) => showAlert(error.message, false))
+    .finally(() => { pollTimer = setInterval(pollEvents, 2500); });
+  window.addEventListener('beforeunload', () => clearInterval(pollTimer));
 }());

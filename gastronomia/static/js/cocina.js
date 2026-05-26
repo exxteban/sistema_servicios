@@ -2,8 +2,10 @@
   const csrf = document.getElementById('csrf-token')?.value || '';
   const board = document.getElementById('kds-board');
   const alertBox = document.getElementById('kds-alert');
+  let orders = [];
   let lastEventId = 0;
   let pollTimer = null;
+  const kitchenStates = new Set(['enviado_cocina', 'preparando', 'listo']);
   const columns = [
     {
       key: 'enviado_cocina',
@@ -100,19 +102,50 @@
 
   const loadBoard = async () => {
     const data = await apiJson('/api/gastronomia/cocina/pedidos');
-    render(data.pedidos || []);
+    orders = data.pedidos || [];
+    lastEventId = Math.max(lastEventId, Number(data.ultimo_evento_id || 0));
+    render(orders);
   };
   const pollEvents = async () => {
     try {
       const data = await apiJson(`/api/gastronomia/cocina/eventos?after=${lastEventId}`);
       const events = data.eventos || [];
-      if (events.length) {
-        lastEventId = Math.max(...events.map((event) => Number(event.id_evento || 0)));
-        await loadBoard();
-      }
+      lastEventId = Math.max(lastEventId, Number(data.ultimo_evento_id || 0), ...events.map((event) => Number(event.id_evento || 0)));
+      if (events.length) applyOrderEvents(events);
     } catch (error) {
       showAlert(error.message, false);
     }
+  };
+  const applyOrderEvents = (events) => {
+    let changed = false;
+    events.forEach((event) => {
+      const order = event?.payload?.pedido;
+      if (!order?.id_pedido) return;
+      changed = applyOrderSnapshot(order) || changed;
+    });
+    if (!changed) return;
+    sortOrders();
+    render(orders);
+  };
+  const applyOrderSnapshot = (order) => {
+    const orderId = Number(order.id_pedido);
+    const index = orders.findIndex((item) => Number(item.id_pedido) === orderId);
+    const visible = kitchenStates.has(order.estado) && !order.pagado;
+    if (!visible) {
+      if (index === -1) return false;
+      orders.splice(index, 1);
+      return true;
+    }
+    if (index === -1) orders.push(order);
+    else orders[index] = order;
+    return true;
+  };
+  const sortOrders = () => {
+    orders.sort((a, b) => {
+      const dateDiff = new Date(a.fecha_envio_cocina || a.fecha_creacion || 0).getTime()
+        - new Date(b.fecha_envio_cocina || b.fecha_creacion || 0).getTime();
+      return dateDiff || Number(a.id_pedido || 0) - Number(b.id_pedido || 0);
+    });
   };
   const render = (orders) => {
     const groups = Object.fromEntries(columns.map((column) => [column.key, []]));
@@ -225,19 +258,39 @@
       </div>
     `;
   };
-  const changeState = async (orderId, action) => {
+  const changeState = async (orderId, action, button) => {
+    setButtonBusy(button, true);
     const data = await apiJson(`/api/gastronomia/cocina/pedidos/${orderId}/${action}`, {method: 'POST', body: '{}'});
     showAlert(`Pedido #${data.pedido.id_pedido} actualizado.`, true);
-    await loadBoard();
+    applyOrderEvents([{payload: {pedido: data.pedido}}]);
+    setButtonBusy(button, false);
+  };
+  const setButtonBusy = (button, busy) => {
+    if (!button) return;
+    button.disabled = busy;
+    button.classList.toggle('opacity-70', busy);
+    button.classList.toggle('cursor-not-allowed', busy);
+    if (busy) {
+      button.dataset.originalText = button.textContent;
+      button.textContent = 'Actualizando...';
+    } else if (button.dataset.originalText) {
+      button.textContent = button.dataset.originalText;
+      delete button.dataset.originalText;
+    }
   };
 
   board?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-action]');
     const card = event.target.closest('[data-order]');
     if (!button || !card) return;
-    changeState(card.dataset.order, button.dataset.action).catch((error) => showAlert(error.message, false));
+    if (button.disabled) return;
+    changeState(card.dataset.order, button.dataset.action, button).catch((error) => {
+      setButtonBusy(button, false);
+      showAlert(error.message, false);
+    });
   });
-  loadBoard().catch((error) => showAlert(error.message, false));
-  pollTimer = setInterval(pollEvents, 5000);
+  loadBoard()
+    .catch((error) => showAlert(error.message, false))
+    .finally(() => { pollTimer = setInterval(pollEvents, 2000); });
   window.addEventListener('beforeunload', () => clearInterval(pollTimer));
 }());

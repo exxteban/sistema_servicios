@@ -7,6 +7,8 @@ from gastronomia.services.pedido_service import (
     cambiar_estado_pedido,
     listar_eventos_pedido,
     listar_pedidos_cocina,
+    obtener_ultimo_evento_id,
+    serializar_pedidos,
 )
 from gastronomia.services.permisos import PERMISO_COCINA, requiere_permiso_gastronomia
 
@@ -29,7 +31,11 @@ def cocina_pedidos():
     if error:
         return error
     pedidos = listar_pedidos_cocina(cliente_id)
-    return jsonify({'ok': True, 'pedidos': [pedido.to_dict() for pedido in pedidos]})
+    return jsonify({
+        'ok': True,
+        'pedidos': serializar_pedidos(pedidos),
+        'ultimo_evento_id': obtener_ultimo_evento_id(cliente_id),
+    })
 
 
 @gastronomia_cocina_api_bp.route('/cocina/eventos', methods=['GET'])
@@ -41,7 +47,11 @@ def cocina_eventos():
         return error
     despues_de = request.args.get('after', 0, type=int)
     eventos = listar_eventos_pedido(cliente_id, despues_de=despues_de)
-    return jsonify({'ok': True, 'eventos': [evento.to_dict() for evento in eventos]})
+    return jsonify({
+        'ok': True,
+        'eventos': [evento.to_dict() for evento in eventos],
+        'ultimo_evento_id': obtener_ultimo_evento_id(cliente_id),
+    })
 
 
 @gastronomia_cocina_api_bp.route('/cocina/pedidos/<int:pedido_id>/tomar', methods=['POST'])

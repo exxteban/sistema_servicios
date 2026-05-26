@@ -275,6 +275,27 @@
     editingItemKey = null;
   };
 
+  const runBusyAction = async (button, busyText, action) => {
+    if (button?.disabled) return;
+    const originalText = button?.textContent;
+    if (button) {
+      button.disabled = true;
+      button.textContent = busyText;
+      button.classList.add('opacity-70', 'cursor-not-allowed');
+    }
+    try {
+      await action();
+    } catch (error) {
+      showAlert(error.message, false);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText;
+        button.classList.remove('opacity-70', 'cursor-not-allowed');
+      }
+    }
+  };
+
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
     '<': '&lt;',
@@ -324,11 +345,19 @@
     renderCart();
   });
   document.getElementById('close-modal')?.addEventListener('click', closeModal);
-  document.getElementById('add-configured-product')?.addEventListener('click', () => addConfiguredProduct().catch((error) => showAlert(error.message, false)));
+  document.getElementById('add-configured-product')?.addEventListener('click', (event) => {
+    runBusyAction(event.currentTarget, editingItemKey ? 'Guardando...' : 'Agregando...', addConfiguredProduct);
+  });
   document.getElementById('clear-cart')?.addEventListener('click', () => { cart = []; lastOrderId = null; renderCart(); });
-  document.getElementById('save-order')?.addEventListener('click', () => saveOrder().catch((error) => showAlert(error.message, false)));
-  document.getElementById('send-kitchen')?.addEventListener('click', () => sendKitchen().catch((error) => showAlert(error.message, false)));
-  document.getElementById('charge-send-kitchen')?.addEventListener('click', () => openAdvancedCheckoutAndSendKitchen().catch((error) => showAlert(error.message, false)));
+  document.getElementById('save-order')?.addEventListener('click', (event) => {
+    runBusyAction(event.currentTarget, 'Guardando...', saveOrder);
+  });
+  document.getElementById('send-kitchen')?.addEventListener('click', (event) => {
+    runBusyAction(event.currentTarget, 'Enviando...', sendKitchen);
+  });
+  document.getElementById('charge-send-kitchen')?.addEventListener('click', (event) => {
+    runBusyAction(event.currentTarget, 'Abriendo cobro...', openAdvancedCheckoutAndSendKitchen);
+  });
 
   const mesaInicial = root?.dataset.mesaInicial || '';
   if (mesaInicial) {

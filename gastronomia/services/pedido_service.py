@@ -10,6 +10,7 @@ from gastronomia.models import (
     GastronomiaPedidoEvento,
     GastronomiaPedidoItem,
     GastronomiaPedidoItemModificador,
+    GastronomiaPedidoPago,
 )
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
@@ -50,6 +51,102 @@ def listar_eventos_pedido(cliente_id: int, *, despues_de: int = 0, limite: int =
         .limit(max(1, min(200, int(limite or 100))))
         .all()
     )
+
+
+def obtener_ultimo_evento_id(cliente_id: int) -> int:
+    ultimo = (
+        db.session.query(db.func.max(GastronomiaPedidoEvento.id_evento))
+        .filter(GastronomiaPedidoEvento.cliente_id == int(cliente_id))
+        .scalar()
+    )
+    return int(ultimo or 0)
+
+
+def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
+    if not pedidos:
+        return []
+
+    pedido_ids = [int(pedido.id_pedido) for pedido in pedidos]
+    cliente_ids = {int(pedido.cliente_id) for pedido in pedidos}
+    pagos = (
+        GastronomiaPedidoPago.query
+        .filter(
+            GastronomiaPedidoPago.cliente_id.in_(cliente_ids),
+            GastronomiaPedidoPago.pedido_id.in_(pedido_ids),
+        )
+        .all()
+    )
+    pagos_por_pedido = {int(pago.pedido_id): pago for pago in pagos}
+
+    items = (
+        GastronomiaPedidoItem.query
+        .filter(
+            GastronomiaPedidoItem.cliente_id.in_(cliente_ids),
+            GastronomiaPedidoItem.pedido_id.in_(pedido_ids),
+        )
+        .order_by(GastronomiaPedidoItem.id_item.asc())
+        .all()
+    )
+    item_ids = [int(item.id_item) for item in items]
+    modificadores_por_item = {item_id: [] for item_id in item_ids}
+    if item_ids:
+        modificadores = (
+            GastronomiaPedidoItemModificador.query
+            .filter(
+                GastronomiaPedidoItemModificador.cliente_id.in_(cliente_ids),
+                GastronomiaPedidoItemModificador.item_id.in_(item_ids),
+            )
+            .order_by(GastronomiaPedidoItemModificador.id_modificador.asc())
+            .all()
+        )
+        for modificador in modificadores:
+            modificadores_por_item.setdefault(int(modificador.item_id), []).append(modificador.to_dict())
+
+    items_por_pedido = {pedido_id: [] for pedido_id in pedido_ids}
+    for item in items:
+        item_data = {
+            'id_item': item.id_item,
+            'producto_id': item.producto_id,
+            'nombre_producto': item.nombre_producto,
+            'cantidad': int(item.cantidad or 0),
+            'precio_unitario': float(item.precio_unitario or 0),
+            'notas': item.notas,
+            'subtotal': float(item.subtotal or 0),
+            'modificadores': modificadores_por_item.get(int(item.id_item), []),
+        }
+        items_por_pedido.setdefault(int(item.pedido_id), []).append(item_data)
+
+    return [
+        _pedido_to_dict_prearmado(
+            pedido,
+            pago=pagos_por_pedido.get(int(pedido.id_pedido)),
+            items=items_por_pedido.get(int(pedido.id_pedido), []),
+        )
+        for pedido in pedidos
+    ]
+
+
+def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPedidoPago | None, items: list[dict]) -> dict:
+    pago_data = pago.to_dict() if pago else None
+    return {
+        'id_pedido': pedido.id_pedido,
+        'cliente_id': pedido.cliente_id,
+        'usuario_id': pedido.usuario_id,
+        'tipo_pedido': pedido.tipo_pedido,
+        'mesa': pedido.mesa,
+        'estado': pedido.estado,
+        'notas': pedido.notas,
+        'subtotal': float(pedido.subtotal or 0),
+        'total': float(pedido.total or 0),
+        'fecha_creacion': pedido.fecha_creacion.isoformat() if pedido.fecha_creacion else None,
+        'fecha_envio_cocina': pedido.fecha_envio_cocina.isoformat() if pedido.fecha_envio_cocina else None,
+        'fecha_inicio_preparacion': pedido.fecha_inicio_preparacion.isoformat() if pedido.fecha_inicio_preparacion else None,
+        'fecha_listo': pedido.fecha_listo.isoformat() if pedido.fecha_listo else None,
+        'pagado': bool(pago),
+        'estado_pago': 'pagado' if pago else 'pendiente',
+        'pago': pago_data,
+        'items': items,
+    }
 
 
 def obtener_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido | None:

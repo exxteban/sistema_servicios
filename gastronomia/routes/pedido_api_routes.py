@@ -9,6 +9,7 @@ from gastronomia.services.pedido_service import (
     enviar_pedido_cocina,
     listar_pedidos,
     obtener_pedido,
+    serializar_pedidos,
 )
 from gastronomia.services.venta_integration_service import crear_cola_cobro_central_desde_pedido
 from gastronomia.services.permisos import (
@@ -47,7 +48,7 @@ def pedidos():
     if not estados and request.args.get('estados'):
         estados = [estado.strip() for estado in request.args.get('estados').split(',') if estado.strip()]
     items = listar_pedidos(cliente_id, estados=estados)
-    return jsonify({'ok': True, 'pedidos': [pedido.to_dict() for pedido in items]})
+    return jsonify({'ok': True, 'pedidos': serializar_pedidos(items)})
 
 
 @gastronomia_pedidos_api_bp.route('/pedidos', methods=['POST'])
