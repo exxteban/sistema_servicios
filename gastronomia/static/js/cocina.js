@@ -1,11 +1,19 @@
 (function () {
+  if (window.__gastroKdsCleanup) window.__gastroKdsCleanup();
+  const root = document.querySelector('[data-gastro-kds]');
   const csrf = document.getElementById('csrf-token')?.value || '';
   const board = document.getElementById('kds-board');
   const alertBox = document.getElementById('kds-alert');
+  if (!root || !board || !alertBox) return;
+
   let orders = [];
   let lastEventId = 0;
   let pollTimer = null;
+  let destroyed = false;
+  const activeControllers = new Set();
+  const pendingOrders = new Set();
   const kitchenStates = new Set(['enviado_cocina', 'preparando', 'listo']);
+  const nextStateByAction = {tomar: 'preparando', listo: 'listo'};
   const columns = [
     {
       key: 'enviado_cocina',
@@ -56,13 +64,20 @@
     alertBox.className = `mb-4 rounded-lg border px-4 py-3 text-sm font-semibold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
   };
   const apiJson = async (url, options = {}) => {
-    const response = await fetch(url, {
-      ...options,
-      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf, ...(options.headers || {})},
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
-    return data;
+    const controller = new AbortController();
+    activeControllers.add(controller);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf, ...(options.headers || {})},
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
+      return data;
+    } finally {
+      activeControllers.delete(controller);
+    }
   };
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const ageMinutes = (iso) => {
@@ -102,17 +117,21 @@
 
   const loadBoard = async () => {
     const data = await apiJson('/api/gastronomia/cocina/pedidos');
+    if (destroyed) return;
     orders = data.pedidos || [];
     lastEventId = Math.max(lastEventId, Number(data.ultimo_evento_id || 0));
     render(orders);
   };
   const pollEvents = async () => {
+    if (destroyed || pendingOrders.size) return;
     try {
       const data = await apiJson(`/api/gastronomia/cocina/eventos?after=${lastEventId}`);
+      if (destroyed) return;
       const events = data.eventos || [];
       lastEventId = Math.max(lastEventId, Number(data.ultimo_evento_id || 0), ...events.map((event) => Number(event.id_evento || 0)));
       if (events.length) applyOrderEvents(events);
     } catch (error) {
+      if (error.name === 'AbortError' || destroyed) return;
       showAlert(error.message, false);
     }
   };
@@ -148,6 +167,7 @@
     });
   };
   const render = (orders) => {
+    if (destroyed) return;
     const groups = Object.fromEntries(columns.map((column) => [column.key, []]));
     orders.forEach((order) => {
       if (groups[order.estado]) groups[order.estado].push(order);
@@ -238,17 +258,20 @@
     return `${itemDetails}${orderNotes}`;
   };
   const renderActions = (order) => {
+    const pending = pendingOrders.has(Number(order.id_pedido));
+    const disabledAttrs = pending ? 'disabled aria-busy="true"' : '';
+    const disabledClass = pending ? ' opacity-70 cursor-not-allowed' : '';
     if (order.estado === 'enviado_cocina') {
       return `
         <div class="mt-3">
-          <button type="button" data-action="tomar" class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.enviado_cocina.actionClass}">${stateMeta.enviado_cocina.action}</button>
+          <button type="button" data-action="tomar" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.enviado_cocina.actionClass}${disabledClass}">${pending ? 'Actualizando...' : stateMeta.enviado_cocina.action}</button>
         </div>
       `;
     }
     if (order.estado === 'preparando') {
       return `
         <div class="mt-3">
-          <button type="button" data-action="listo" class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.preparando.actionClass}">${stateMeta.preparando.action}</button>
+          <button type="button" data-action="listo" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.preparando.actionClass}${disabledClass}">${pending ? 'Actualizando...' : stateMeta.preparando.action}</button>
         </div>
       `;
     }
@@ -259,11 +282,54 @@
     `;
   };
   const changeState = async (orderId, action, button) => {
+    const numericOrderId = Number(orderId || 0);
+    const nextState = nextStateByAction[action];
+    const currentOrder = orders.find((order) => Number(order.id_pedido) === numericOrderId);
+    const previousOrder = currentOrder ? structuredOrderClone(currentOrder) : null;
+    if (!numericOrderId || !nextState || pendingOrders.has(numericOrderId)) return;
+
+    pendingOrders.add(numericOrderId);
     setButtonBusy(button, true);
-    const data = await apiJson(`/api/gastronomia/cocina/pedidos/${orderId}/${action}`, {method: 'POST', body: '{}'});
-    showAlert(`Pedido #${data.pedido.id_pedido} actualizado.`, true);
-    applyOrderEvents([{payload: {pedido: data.pedido}}]);
-    setButtonBusy(button, false);
+    if (currentOrder) {
+      applyOrderSnapshot(buildOptimisticOrder(currentOrder, nextState));
+      sortOrders();
+      render(orders);
+    }
+
+    try {
+      const data = await apiJson(`/api/gastronomia/cocina/pedidos/${numericOrderId}/${action}`, {method: 'POST', body: '{}'});
+      if (data?.pedido?.id_pedido) {
+        applyOrderSnapshot(data.pedido);
+        sortOrders();
+        render(orders);
+        showAlert(`Pedido #${data.pedido.id_pedido} actualizado.`, true);
+      } else {
+        await loadBoard();
+        showAlert(`Pedido #${numericOrderId} actualizado.`, true);
+      }
+    } catch (error) {
+      if (previousOrder) {
+        applyOrderSnapshot(previousOrder);
+        sortOrders();
+        render(orders);
+      }
+      await loadBoard().catch(() => {});
+      throw error;
+    } finally {
+      pendingOrders.delete(numericOrderId);
+      setButtonBusy(button, false);
+      render(orders);
+    }
+  };
+  const structuredOrderClone = (order) => JSON.parse(JSON.stringify(order));
+  const buildOptimisticOrder = (order, nextState) => {
+    const now = new Date().toISOString();
+    return {
+      ...structuredOrderClone(order),
+      estado: nextState,
+      fecha_inicio_preparacion: nextState === 'preparando' ? (order.fecha_inicio_preparacion || now) : order.fecha_inicio_preparacion,
+      fecha_listo: nextState === 'listo' ? (order.fecha_listo || now) : order.fecha_listo,
+    };
   };
   const setButtonBusy = (button, busy) => {
     if (!button) return;
@@ -279,18 +345,36 @@
     }
   };
 
-  board?.addEventListener('click', (event) => {
+  const handleBoardClick = (event) => {
     const button = event.target.closest('[data-action]');
     const card = event.target.closest('[data-order]');
     if (!button || !card) return;
     if (button.disabled) return;
+    if (pendingOrders.has(Number(card.dataset.order || 0))) return;
     changeState(card.dataset.order, button.dataset.action, button).catch((error) => {
+      if (error.name === 'AbortError' || destroyed) return;
       setButtonBusy(button, false);
       showAlert(error.message, false);
     });
-  });
+  };
+  const cleanup = () => {
+    destroyed = true;
+    clearInterval(pollTimer);
+    board.removeEventListener('click', handleBoardClick);
+    activeControllers.forEach((controller) => controller.abort());
+    activeControllers.clear();
+    if (window.__gastroKdsCleanup === cleanup) window.__gastroKdsCleanup = null;
+  };
+
+  window.__gastroKdsCleanup = cleanup;
+  board.addEventListener('click', handleBoardClick);
   loadBoard()
-    .catch((error) => showAlert(error.message, false))
-    .finally(() => { pollTimer = setInterval(pollEvents, 2000); });
-  window.addEventListener('beforeunload', () => clearInterval(pollTimer));
+    .catch((error) => {
+      if (error.name === 'AbortError' || destroyed) return;
+      showAlert(error.message, false);
+    })
+    .finally(() => {
+      if (!destroyed) pollTimer = setInterval(pollEvents, 2000);
+    });
+  window.addEventListener('beforeunload', cleanup, {once: true});
 }());

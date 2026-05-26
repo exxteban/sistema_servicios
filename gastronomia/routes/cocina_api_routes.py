@@ -65,7 +65,7 @@ def cocina_tomar(pedido_id):
         pedido = cambiar_estado_pedido(cliente_id, pedido_id, 'preparando')
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
 
 
 @gastronomia_cocina_api_bp.route('/cocina/pedidos/<int:pedido_id>/listo', methods=['POST'])
@@ -79,4 +79,4 @@ def cocina_listo(pedido_id):
         pedido = cambiar_estado_pedido(cliente_id, pedido_id, 'listo')
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
