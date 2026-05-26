@@ -80,3 +80,17 @@ def cocina_listo(pedido_id):
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+
+
+@gastronomia_cocina_api_bp.route('/cocina/pedidos/<int:pedido_id>/entregar', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_COCINA)
+def cocina_entregar(pedido_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        pedido = cambiar_estado_pedido(cliente_id, pedido_id, 'entregado')
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})

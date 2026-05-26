@@ -97,6 +97,7 @@ def test_pos_page_carga_y_pedido_se_guarda_con_totales_backend():
         json={
             'tipo_pedido': 'mesa',
             'mesa': 'A1',
+            'referencia_entrega': 'Juan Perez',
             'items': [
                 {
                     'producto_id': producto_id,
@@ -114,6 +115,8 @@ def test_pos_page_carga_y_pedido_se_guarda_con_totales_backend():
     assert pedido['estado'] == 'abierto'
     assert pedido['tipo_pedido'] == 'mesa'
     assert pedido['mesa'] == 'A1'
+    assert pedido['referencia_entrega'] == 'Juan Perez'
+    assert pedido['codigo_entrega'] == f"#{pedido['id_pedido']:03d}"
     assert pedido['total'] == 35000
     assert pedido['items'][0]['precio_unitario'] == 17500
     assert pedido['items'][0]['modificadores'][0]['nombre_opcion'] == 'Queso'

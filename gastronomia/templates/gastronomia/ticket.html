@@ -63,6 +63,7 @@
         }
         .header { margin-bottom: 4px; text-align: center; }
         .header .nombre { font-size: 13px; font-weight: bold; }
+        .pickup-code { font-size: 20px; font-weight: 900; letter-spacing: 1px; }
         .info-label { width: {{ 32 if paper_width_value == 80 else 38 }}%; }
         .info-value { width: {{ 68 if paper_width_value == 80 else 62 }}%; }
         .col-prod { width: {{ 58 if paper_width_value == 80 else 50 }}%; }
@@ -151,6 +152,8 @@
         <hr class="sep">
         <table>
             <tr><td class="info-label">Pedido:</td><td class="info-value">#{{ pedido.id_pedido }}</td></tr>
+            <tr><td class="info-label">Codigo:</td><td class="info-value pickup-code">{{ pedido.codigo_entrega }}</td></tr>
+            {% if pedido.referencia_entrega %}<tr><td class="info-label">Cliente:</td><td class="info-value">{{ pedido.referencia_entrega|thermal_safe }}</td></tr>{% endif %}
             <tr><td class="info-label">Fecha:</td><td class="info-value">{{ fecha_ticket|local_strftime('%d/%m/%Y %H:%M') }}</td></tr>
             <tr><td class="info-label">Origen:</td><td class="info-value">{% if pedido.mesa %}Mesa {{ pedido.mesa|thermal_safe }}{% else %}{{ pedido.tipo_pedido|replace('_', ' ')|title|thermal_safe }}{% endif %}</td></tr>
             <tr><td class="info-label">Estado:</td><td class="info-value">{{ pedido.estado|replace('_', ' ')|title|thermal_safe }}</td></tr>
@@ -192,6 +195,9 @@
 {% endif %}{% if empresa.direccion %}{{ thermal_center(empresa.direccion|thermal_safe, thermal_width) }}
 {% endif %}{{ '-' * thermal_width }}
 {{ thermal_pair('Pedido:', '#' ~ pedido.id_pedido, thermal_width) }}
+{{ thermal_pair('Codigo:', pedido.codigo_entrega, thermal_width) }}
+{% if pedido.referencia_entrega %}{{ thermal_pair('Cliente:', pedido.referencia_entrega|thermal_safe, thermal_width) }}
+{% endif %}
 {{ thermal_pair('Fecha:', fecha_ticket|local_strftime('%d/%m/%Y %H:%M'), thermal_width) }}
 {{ thermal_pair('Origen:', ('Mesa ' ~ pedido.mesa) if pedido.mesa else pedido.tipo_pedido|replace('_', ' ')|title, thermal_width) }}
 {{ '-' * thermal_width }}

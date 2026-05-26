@@ -130,10 +130,12 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
     pago_data = pago.to_dict() if pago else None
     return {
         'id_pedido': pedido.id_pedido,
+        'codigo_entrega': pedido.codigo_entrega,
         'cliente_id': pedido.cliente_id,
         'usuario_id': pedido.usuario_id,
         'tipo_pedido': pedido.tipo_pedido,
         'mesa': pedido.mesa,
+        'referencia_entrega': pedido.referencia_entrega,
         'estado': pedido.estado,
         'notas': pedido.notas,
         'subtotal': float(pedido.subtotal or 0),
@@ -142,6 +144,7 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
         'fecha_envio_cocina': pedido.fecha_envio_cocina.isoformat() if pedido.fecha_envio_cocina else None,
         'fecha_inicio_preparacion': pedido.fecha_inicio_preparacion.isoformat() if pedido.fecha_inicio_preparacion else None,
         'fecha_listo': pedido.fecha_listo.isoformat() if pedido.fecha_listo else None,
+        'fecha_entrega': pedido.fecha_entrega.isoformat() if pedido.fecha_entrega else None,
         'pagado': bool(pago),
         'estado_pago': 'pagado' if pago else 'pendiente',
         'pago': pago_data,
@@ -169,6 +172,7 @@ def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPed
         usuario_id=int(usuario_id),
         tipo_pedido=tipo,
         mesa=(data.get('mesa') or '').strip()[:40] or None,
+        referencia_entrega=(data.get('referencia_entrega') or '').strip()[:80] or None,
         notas=(data.get('notas') or '').strip() or None,
         estado='abierto',
     )
@@ -209,6 +213,8 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
         raise ValueError('Estado invalido.')
     if pedido.estado == 'cobrado' and estado != 'cobrado':
         raise ValueError('No se puede modificar un pedido cobrado.')
+    if estado == 'entregado' and pedido.estado not in {'listo', 'entregado'}:
+        raise ValueError('Solo se pueden entregar pedidos listos.')
     pedido.estado = estado
     if estado == 'enviado_cocina':
         pedido.fecha_envio_cocina = pedido.fecha_envio_cocina or datetime.utcnow()
@@ -216,6 +222,8 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
         pedido.fecha_inicio_preparacion = pedido.fecha_inicio_preparacion or datetime.utcnow()
     elif estado == 'listo':
         pedido.fecha_listo = pedido.fecha_listo or datetime.utcnow()
+    elif estado == 'entregado':
+        pedido.fecha_entrega = pedido.fecha_entrega or datetime.utcnow()
     db.session.commit()
     registrar_evento_pedido(pedido, f'pedido_{estado}')
     return pedido

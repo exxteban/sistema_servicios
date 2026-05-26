@@ -65,7 +65,11 @@ def _crear_producto(app, nombre_cliente: str, username: str):
 def _crear_pedido_enviado(client, csrf, producto_id):
     pedido_resp = client.post(
         '/api/gastronomia/pedidos',
-        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 1}]},
+        json={
+            'tipo_pedido': 'mostrador',
+            'referencia_entrega': 'Juan mostrador',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
         headers={'X-CSRFToken': csrf},
     )
     assert pedido_resp.status_code == 201
@@ -96,6 +100,8 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
     pedidos = cocina_resp.get_json()['pedidos']
     assert [pedido['id_pedido'] for pedido in pedidos] == [pedido_id]
     assert [pedido['estado'] for pedido in pedidos] == ['enviado_cocina']
+    assert pedidos[0]['codigo_entrega'] == f'#{pedido_id:03d}'
+    assert pedidos[0]['referencia_entrega'] == 'Juan mostrador'
 
     tomar_resp = client.post(
         f'/api/gastronomia/cocina/pedidos/{pedido_id}/tomar',
@@ -121,10 +127,22 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
     pedidos = cocina_resp.get_json()['pedidos']
     assert [pedido['estado'] for pedido in pedidos] == ['listo']
 
+    entregar_resp = client.post(
+        f'/api/gastronomia/cocina/pedidos/{pedido_id}/entregar',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert entregar_resp.status_code == 200
+    assert entregar_resp.get_json()['pedido']['estado'] == 'entregado'
+    cocina_resp = client.get('/api/gastronomia/cocina/pedidos')
+    assert cocina_resp.status_code == 200
+    assert cocina_resp.get_json()['pedidos'] == []
+
     with app.app_context():
         pedido = GastronomiaPedido.query.filter_by(cliente_id=cliente_id, id_pedido=pedido_id).first()
         assert pedido.fecha_inicio_preparacion is not None
         assert pedido.fecha_listo is not None
+        assert pedido.fecha_entrega is not None
         eventos = GastronomiaPedidoEvento.query.filter_by(cliente_id=cliente_id).order_by(
             GastronomiaPedidoEvento.id_evento.asc()
         ).all()
@@ -133,6 +151,7 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
             'pedido_enviado_cocina',
             'pedido_preparando',
             'pedido_listo',
+            'pedido_entregado',
         ]
 
 

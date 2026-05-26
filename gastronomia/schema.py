@@ -5,8 +5,10 @@ from app import db
 
 
 ORDER_COLUMN_MIGRATIONS = (
+    ('referencia_entrega', 'VARCHAR(80)'),
     ('fecha_inicio_preparacion', 'DATETIME'),
     ('fecha_listo', 'DATETIME'),
+    ('fecha_entrega', 'DATETIME'),
 )
 
 PAYMENT_COLUMN_MIGRATIONS = (

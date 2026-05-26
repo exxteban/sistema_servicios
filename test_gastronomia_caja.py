@@ -84,7 +84,11 @@ def _abrir_caja(app, username: str):
 def _crear_pedido_listo(client, csrf, producto_id):
     pedido_resp = client.post(
         '/api/gastronomia/pedidos',
-        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 1}]},
+        json={
+            'tipo_pedido': 'mostrador',
+            'referencia_entrega': 'Ana retiro',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
         headers={'X-CSRFToken': csrf},
     )
     assert pedido_resp.status_code == 201
@@ -142,6 +146,8 @@ def test_caja_lista_y_cobra_pedido_con_descuento():
     assert ticket_resp.status_code == 200
     ticket_html = ticket_resp.get_data(as_text=True)
     assert f'Ticket Pedido #{pedido_id}' in ticket_html
+    assert f'#{pedido_id:03d}' in ticket_html
+    assert 'Ana retiro' in ticket_html
     assert 'Menu ejecutivo' in ticket_html
     assert 'Efectivo' in ticket_html
 

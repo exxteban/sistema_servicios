@@ -15,6 +15,7 @@
   const configuredProductButton = document.getElementById('add-configured-product');
   const root = document.querySelector('[data-gastro-pos]');
   const orderTypeInput = document.getElementById('order-type');
+  const deliveryReferenceInput = document.getElementById('delivery-reference');
   const tableNameInput = document.getElementById('table-name');
   const tablePickerSection = document.getElementById('table-picker-section');
   const tableGrid = document.getElementById('table-grid');
@@ -223,6 +224,7 @@
   const buildOrderPayload = () => ({
     tipo_pedido: orderTypeInput?.value || 'mostrador',
     mesa: tableNameInput?.value.trim() || '',
+    referencia_entrega: deliveryReferenceInput?.value.trim() || '',
     notas: document.getElementById('order-notes').value.trim(),
     items: cart.map((item) => ({
       producto_id: item.producto_id,
@@ -246,6 +248,7 @@
     if (tableNameInput && (orderTypeInput?.value || '') !== 'mesa') {
       tableNameInput.value = '';
     }
+    if (deliveryReferenceInput) deliveryReferenceInput.value = '';
     renderCart();
     showAlert(`Pedido #${lastOrderId} guardado.`, true);
     return lastOrderId;

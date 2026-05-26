@@ -13,7 +13,7 @@
   const activeControllers = new Set();
   const pendingOrders = new Set();
   const kitchenStates = new Set(['enviado_cocina', 'preparando', 'listo']);
-  const nextStateByAction = {tomar: 'preparando', listo: 'listo'};
+  const nextStateByAction = {tomar: 'preparando', listo: 'listo', entregar: 'entregado'};
   const columns = [
     {
       key: 'enviado_cocina',
@@ -56,6 +56,8 @@
     listo: {
       label: 'Listo',
       pill: 'border-sky-400/20 bg-sky-400/15 text-sky-300',
+      action: 'Marcar entregado',
+      actionClass: 'bg-sky-500 hover:bg-sky-400 focus:ring-sky-300',
     },
   };
 
@@ -96,6 +98,7 @@
     const type = String(order.tipo_pedido || 'mostrador').replace(/_/g, ' ');
     return escapeHtml(type.charAt(0).toUpperCase() + type.slice(1));
   };
+  const deliveryCode = (order) => escapeHtml(order.codigo_entrega || `#${String(order.id_pedido || 0).padStart(3, '0')}`);
   const timeDotClass = (order) => {
     const minutes = ageMinutes(order.fecha_envio_cocina || order.fecha_creacion);
     if (minutes >= 12) return 'bg-red-400 shadow-red-400/40';
@@ -149,7 +152,7 @@
   const applyOrderSnapshot = (order) => {
     const orderId = Number(order.id_pedido);
     const index = orders.findIndex((item) => Number(item.id_pedido) === orderId);
-    const visible = kitchenStates.has(order.estado) && !order.pagado;
+    const visible = kitchenStates.has(order.estado);
     if (!visible) {
       if (index === -1) return false;
       orders.splice(index, 1);
@@ -214,7 +217,8 @@
       <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 gap-3">
           <div class="border-r border-slate-700/80 pr-3">
-            <h2 class="text-2xl font-black leading-none text-slate-100">#${order.id_pedido}</h2>
+            <h2 class="text-2xl font-black leading-none text-slate-100">${deliveryCode(order)}</h2>
+            <p class="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Pedido #${order.id_pedido}</p>
             <p class="mt-2 flex items-center gap-2 text-xs font-bold text-slate-400">
               <span class="h-2 w-2 rounded-full shadow-lg ${timeDotClass(order)}"></span>
               ${elapsed(order.fecha_envio_cocina || order.fecha_creacion)}
@@ -222,6 +226,7 @@
           </div>
           <div class="min-w-0 pt-0.5">
             <p class="truncate text-sm font-black text-slate-200">${displayOrigin(order)}</p>
+            ${order.referencia_entrega ? `<p class="mt-1 truncate text-xs font-black uppercase tracking-wide text-sky-200">${escapeHtml(order.referencia_entrega)}</p>` : ''}
             <div class="mt-3 space-y-1.5">
               ${(order.items || []).map((item) => `
                 <div class="grid grid-cols-[auto_1fr] gap-2 text-sm leading-tight">
@@ -276,8 +281,11 @@
       `;
     }
     return `
-      <div class="mt-3 rounded-lg border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-center text-sm font-black text-sky-200">
-        Esperando entrega o retiro
+      <div class="mt-3 space-y-2">
+        <div class="rounded-lg border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-center text-sm font-black text-sky-200">
+          Esperando entrega o retiro
+        </div>
+        <button type="button" data-action="entregar" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.listo.actionClass}${disabledClass}">${pending ? 'Actualizando...' : stateMeta.listo.action}</button>
       </div>
     `;
   };
@@ -330,6 +338,7 @@
       estado: nextState,
       fecha_inicio_preparacion: nextState === 'preparando' ? (order.fecha_inicio_preparacion || now) : order.fecha_inicio_preparacion,
       fecha_listo: nextState === 'listo' ? (order.fecha_listo || now) : order.fecha_listo,
+      fecha_entrega: nextState === 'entregado' ? (order.fecha_entrega || now) : order.fecha_entrega,
     };
   };
   const setButtonBusy = (button, busy) => {

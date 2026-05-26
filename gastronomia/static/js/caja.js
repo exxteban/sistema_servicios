@@ -30,6 +30,7 @@
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
+  const deliveryCode = (order) => escapeHtml(order.codigo_entrega || `#${String(order.id_pedido || 0).padStart(3, '0')}`);
   const selectPaymentMethod = (button) => {
     if (!button || !paymentMethodInput) return;
     paymentMethodInput.value = button.dataset.paymentMethod || 'efectivo';
@@ -104,8 +105,9 @@
     <article class="caja-card ${Number(order.id_pedido) === Number(selectedOrderId) ? 'active' : ''}" data-order="${order.id_pedido}">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <h2 class="text-xl font-black text-gray-900 dark:text-white">#${order.id_pedido} ${escapeHtml(order.tipo_pedido)}</h2>
+          <h2 class="text-xl font-black text-gray-900 dark:text-white">${deliveryCode(order)} ${escapeHtml(order.tipo_pedido)}</h2>
           <p class="mt-1 text-sm font-semibold text-gray-500">${order.mesa ? `Mesa ${escapeHtml(order.mesa)} - ` : ''}${escapeHtml(order.estado)}</p>
+          ${order.referencia_entrega ? `<p class="mt-1 text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">${escapeHtml(order.referencia_entrega)}</p>` : ''}
         </div>
         <strong class="text-xl text-emerald-700 dark:text-emerald-300">${money(order.total)}</strong>
       </div>
@@ -132,10 +134,10 @@
     const discount = Math.max(0, Number(discountInput.value || 0));
     selectedSummary.innerHTML = `
       <div class="flex items-center justify-between gap-3">
-        <strong class="text-gray-900 dark:text-white">Pedido #${order.id_pedido}</strong>
+        <strong class="text-gray-900 dark:text-white">Pedido ${deliveryCode(order)}</strong>
         <span class="font-bold text-emerald-700 dark:text-emerald-300">${money(order.total)}</span>
       </div>
-      <p class="mt-2 text-sm text-gray-500">${escapeHtml(order.tipo_pedido)}${order.mesa ? ` - Mesa ${escapeHtml(order.mesa)}` : ''}</p>
+      <p class="mt-2 text-sm text-gray-500">${escapeHtml(order.tipo_pedido)}${order.mesa ? ` - Mesa ${escapeHtml(order.mesa)}` : ''}${order.referencia_entrega ? ` - ${escapeHtml(order.referencia_entrega)}` : ''}</p>
     `;
     paymentTotal.textContent = money(Math.max(0, Number(order.total || 0) - discount));
   };
