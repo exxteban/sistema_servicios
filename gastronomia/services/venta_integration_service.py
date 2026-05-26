@@ -1,14 +1,15 @@
 """Integracion de cobros gastronomicos con ventas y caja central."""
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from app import db
-from app.models.caja import MovimientoCaja, SesionCaja
+from app.models.caja import ColaCobro, MovimientoCaja, SesionCaja
 from app.models.cliente import Cliente
 from app.models.servicio import Servicio
 from app.models.venta import DetalleVenta, MetodoPago, PagoVenta, Ticket, Venta
-from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem
+from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem, GastronomiaPedidoPago
 
 
 METODO_BUSQUEDAS = {
@@ -91,6 +92,96 @@ def crear_venta_central_desde_pedido(pedido: GastronomiaPedido, usuario_id: int,
     }
 
 
+def crear_cola_cobro_central_desde_pedido(
+    pedido: GastronomiaPedido,
+    usuario_id: int,
+    *,
+    enviar_cocina: bool = True,
+) -> ColaCobro:
+    if pedido.pago:
+        raise ValueError('El pedido ya fue cobrado.')
+    if pedido.estado == 'cancelado':
+        raise ValueError('No se puede cobrar un pedido cancelado.')
+
+    existente = ColaCobro.query.filter(
+        ColaCobro.tipo_origen == 'gastronomia',
+        ColaCobro.id_origen == int(pedido.id_pedido),
+        ColaCobro.estado.in_(['pendiente', 'en_proceso']),
+    ).first()
+    if existente:
+        return existente
+
+    metadata = {
+        'gastronomia_pedido_id': int(pedido.id_pedido),
+        'gastronomia_cliente_id': int(pedido.cliente_id),
+        'gastronomia_enviar_cocina': bool(enviar_cocina),
+        'id_usuario_vendedor': int(pedido.usuario_id),
+        'cliente_id': _consumidor_final_id(),
+        'permitir_cambiar_cliente': True,
+        'permitir_editar_descuento': True,
+        'permitir_beneficio_fidelizacion': True,
+        'observaciones': _observaciones_venta(pedido, {}),
+        'items': [_item_cola_desde_pedido_item(item) for item in pedido.items.order_by(GastronomiaPedidoItem.id_item.asc()).all()],
+    }
+    cola = ColaCobro(
+        tipo_origen='gastronomia',
+        id_origen=int(pedido.id_pedido),
+        id_cliente=metadata['cliente_id'],
+        monto_total=Decimal(str(pedido.total or 0)).quantize(Decimal('0.01')),
+        id_usuario_origen=int(usuario_id),
+        estado='pendiente',
+    )
+    cola.set_metadata(metadata)
+    db.session.add(cola)
+    db.session.commit()
+    return cola
+
+
+def registrar_pago_gastronomia_desde_venta_central(cola_metadata: dict, venta, usuario_id: int) -> list[dict]:
+    pedido_id = cola_metadata.get('gastronomia_pedido_id')
+    if not pedido_id:
+        return []
+    pedido = GastronomiaPedido.query.filter(
+        GastronomiaPedido.id_pedido == int(pedido_id),
+        GastronomiaPedido.cliente_id == int(cola_metadata.get('gastronomia_cliente_id') or 0),
+    ).first()
+    if not pedido:
+        raise ValueError('Pedido gastronomico no encontrado para registrar el cobro.')
+    if pedido.pago:
+        return []
+
+    pagos = PagoVenta.query.filter_by(id_venta=venta.id_venta).order_by(PagoVenta.id_pago.asc()).all()
+    movimiento = MovimientoCaja.query.filter_by(
+        referencia_tipo='venta',
+        referencia_id=venta.id_venta,
+        tipo='ingreso',
+    ).order_by(MovimientoCaja.id_movimiento_caja.asc()).first()
+    metodo_unico = pagos[0].metodo if len(pagos) == 1 else None
+    metodo_slug = _slug_metodo(metodo_unico) if metodo_unico else 'mixto'
+
+    db.session.add(GastronomiaPedidoPago(
+        cliente_id=int(pedido.cliente_id),
+        pedido_id=int(pedido.id_pedido),
+        usuario_id=int(usuario_id),
+        id_sesion_caja=int(venta.id_sesion_caja),
+        id_metodo_pago=int(metodo_unico.id_metodo_pago) if metodo_unico else None,
+        id_venta=int(venta.id_venta),
+        id_movimiento_caja=int(movimiento.id_movimiento_caja) if movimiento else None,
+        metodo_pago=metodo_slug,
+        subtotal=Decimal(str(pedido.total or 0)).quantize(Decimal('0.01')),
+        descuento_monto=Decimal(str(venta.descuento_monto or 0)).quantize(Decimal('0.01')),
+        total_cobrado=Decimal(str(venta.total or 0)).quantize(Decimal('0.01')),
+        observacion=(venta.observaciones or '').strip()[:255] or None,
+    ))
+
+    eventos = [{'pedido': pedido, 'tipo': 'pedido_cobrado'}]
+    if cola_metadata.get('gastronomia_enviar_cocina') and pedido.estado in {'abierto', 'enviado_cocina'}:
+        pedido.estado = 'enviado_cocina'
+        pedido.fecha_envio_cocina = pedido.fecha_envio_cocina or datetime.utcnow()
+        eventos.append({'pedido': pedido, 'tipo': 'pedido_enviado_cocina'})
+    return eventos
+
+
 def _sesion_abierta_usuario(usuario_id: int):
     return SesionCaja.query.filter_by(id_usuario=int(usuario_id), estado='abierta').first()
 
@@ -157,6 +248,26 @@ def _registrar_detalles(venta: Venta, pedido: GastronomiaPedido):
             es_kit=False,
         ))
     return total_iva_10, total_iva_5, total_exenta
+
+
+def _item_cola_desde_pedido_item(item: GastronomiaPedidoItem) -> dict:
+    servicio = _servicio_para_item(item)
+    precio = Decimal(str(item.precio_unitario or 0)).quantize(Decimal('0.01'))
+    return {
+        'tipo': 'servicio',
+        'id': int(servicio.id_servicio),
+        'id_servicio': int(servicio.id_servicio),
+        'codigo': servicio.codigo,
+        'nombre': item.nombre_producto,
+        'precio': float(precio),
+        'precio_base': float(precio),
+        'cantidad': int(item.cantidad or 1),
+        'es_servicio': True,
+        'stock': 0,
+        'stock_minimo': 0,
+        'iva': int(servicio.porcentaje_iva or 10),
+        'precio_manual': True,
+    }
 
 
 def _servicio_para_item(item) -> Servicio:

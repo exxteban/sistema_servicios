@@ -1,5 +1,5 @@
 """API de pedidos para POS gastronomico."""
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, url_for
 from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
@@ -10,6 +10,7 @@ from gastronomia.services.pedido_service import (
     listar_pedidos,
     obtener_pedido,
 )
+from gastronomia.services.venta_integration_service import crear_cola_cobro_central_desde_pedido
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
     PERMISO_COCINA,
@@ -88,6 +89,36 @@ def enviar_cocina(pedido_id):
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+
+
+@gastronomia_pedidos_api_bp.route('/pedidos/<int:pedido_id>/cobro-avanzado', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_CAJA)
+def cobro_avanzado(pedido_id):
+    if not (current_user.es_admin() or current_user.tiene_permiso('crear_venta')):
+        return jsonify({
+            'error': 'Sin permisos',
+            'mensaje': 'Se requiere permiso de ventas para usar el cobro avanzado.',
+        }), 403
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    pedido = obtener_pedido(cliente_id, pedido_id)
+    if not pedido:
+        return jsonify({'error': 'not_found'}), 404
+    try:
+        cola = crear_cola_cobro_central_desde_pedido(
+            pedido,
+            current_user.id_usuario,
+            enviar_cocina=bool(_payload().get('enviar_cocina', True)),
+        )
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({
+        'ok': True,
+        'cola_id': int(cola.id),
+        'checkout_url': url_for('ventas.pos', cola_id=cola.id),
+    })
 
 
 @gastronomia_pedidos_api_bp.route('/pedidos/<int:pedido_id>/estado', methods=['POST'])

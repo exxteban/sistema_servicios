@@ -58,6 +58,8 @@
             printFocusPollId: null,
             printFocusTimeoutId: null,
             printEnCurso: false,
+            salidaDashboardProgramada: false,
+            salidaDashboardEjecutada: false,
 
             // Client Search State
             buscandoCliente: false,

@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from app import db
 from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
-from gastronomia.services.pedido_service import listar_pedidos, obtener_pedido, registrar_evento_pedido
+from gastronomia.services.pedido_service import obtener_pedido, registrar_evento_pedido
 from gastronomia.services.venta_integration_service import crear_venta_central_desde_pedido
 
 
@@ -15,9 +15,16 @@ ESTADOS_COBRABLES = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'entreg
 
 
 def listar_pedidos_caja(cliente_id: int) -> list[GastronomiaPedido]:
-    return listar_pedidos(
-        cliente_id,
-        estados=['abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado'],
+    return (
+        GastronomiaPedido.query
+        .outerjoin(GastronomiaPedidoPago, GastronomiaPedidoPago.pedido_id == GastronomiaPedido.id_pedido)
+        .filter(
+            GastronomiaPedido.cliente_id == int(cliente_id),
+            GastronomiaPedido.estado.in_(ESTADOS_COBRABLES),
+            GastronomiaPedidoPago.id_pago.is_(None),
+        )
+        .order_by(GastronomiaPedido.fecha_creacion.desc(), GastronomiaPedido.id_pedido.desc())
+        .all()
     )
 
 
@@ -68,7 +75,6 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
         total_cobrado=subtotal - descuento,
         observacion=(data.get('observacion') or '').strip()[:255] or None,
     )
-    pedido.estado = 'cobrado'
     db.session.add(pago)
     registrar_auditoria(
         accion='cobrar_pedido_gastronomia',

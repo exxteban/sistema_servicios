@@ -263,6 +263,8 @@ class GastronomiaPedido(db.Model):
             'fecha_envio_cocina': self.fecha_envio_cocina.isoformat() if self.fecha_envio_cocina else None,
             'fecha_inicio_preparacion': self.fecha_inicio_preparacion.isoformat() if self.fecha_inicio_preparacion else None,
             'fecha_listo': self.fecha_listo.isoformat() if self.fecha_listo else None,
+            'pagado': bool(self.pago),
+            'estado_pago': 'pagado' if self.pago else 'pendiente',
             'pago': self.pago.to_dict() if self.pago else None,
             'items': [item.to_dict() for item in self.items.order_by(GastronomiaPedidoItem.id_item.asc()).all()],
         }

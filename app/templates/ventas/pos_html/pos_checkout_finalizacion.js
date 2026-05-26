@@ -25,6 +25,42 @@
         this.ticketPreviewHtml = '';
     },
 
+    esCobroGastronomiaDesdeCola() {
+        return !this.soloRegistroVendedor
+            && !!this.colaCobroId
+            && typeof COLA_COBRO_DATA !== 'undefined'
+            && COLA_COBRO_DATA
+            && String(COLA_COBRO_DATA.tipo_origen || '').toLowerCase() === 'gastronomia';
+    },
+
+    volverDashboardPrincipal() {
+        if (this.salidaDashboardEjecutada) return;
+        this.salidaDashboardEjecutada = true;
+        const dashboardUrl = "{{ url_for('main.dashboard') }}";
+        if (typeof window.appCloseActiveTabToPrincipal === 'function' && window.appCloseActiveTabToPrincipal()) {
+            return;
+        }
+        window.location.href = dashboardUrl;
+    },
+
+    programarVueltaDashboardPrincipal() {
+        if (this.salidaDashboardProgramada) return;
+        this.salidaDashboardProgramada = true;
+        let ejecutado = false;
+        const volver = () => {
+            if (ejecutado) return;
+            ejecutado = true;
+            window.removeEventListener('afterprint', despuesDeImprimir);
+            window.removeEventListener('focus', despuesDeFoco);
+            this.volverDashboardPrincipal();
+        };
+        const despuesDeImprimir = () => setTimeout(volver, 250);
+        const despuesDeFoco = () => setTimeout(volver, 700);
+        window.addEventListener('afterprint', despuesDeImprimir, {once: true});
+        window.addEventListener('focus', despuesDeFoco, {once: true});
+        setTimeout(volver, 2500);
+    },
+
             async confirmarYProcesarVenta() {
         if (this.confirmandoVenta || this.procesando) return;
         this.confirmandoVenta = true;
@@ -158,10 +194,14 @@
                 const clienteVentaId = Number(this.clienteId || 0);
                 const fueVentaCredito = this.esVentaCredito();
                 const cerrarPosAlFinalizar = !this.soloRegistroVendedor && !!this.colaCobroId;
+                const cerrarEnDashboardPrincipal = this.esCobroGastronomiaDesdeCola();
                 let impresionOk = true;
                 if (idVenta) {
                     this.guardarUltimaVenta(idVenta);
 
+                    if (cerrarEnDashboardPrincipal) {
+                        this.programarVueltaDashboardPrincipal();
+                    }
                     impresionOk = await this.imprimirTicketVenta(idVenta);
                     if (!impresionOk) {
                         mostrarNotificacion('Venta #' + idVenta + ' registrada. No se pudo abrir la impresión, use "Reimprimir Último Ticket"', 'warning');
@@ -210,6 +250,10 @@
                     localStorage.setItem('caja_estado_refresh_v1', String(Date.now()));
                     if (window.dashboardRefreshTotals) window.dashboardRefreshTotals();
                 } catch (e) {
+                }
+                if (cerrarEnDashboardPrincipal) {
+                    this.volverDashboardPrincipal();
+                    return;
                 }
                 if (cerrarPosAlFinalizar && impresionOk) {
                     const cajaEstadoUrl = "{{ url_for('caja.estado') }}";

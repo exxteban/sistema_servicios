@@ -194,6 +194,21 @@
                     return false;
                 }
             };
+            window.appCloseActiveTabToPrincipal = function () {
+                try {
+                    const tabId = getActiveTabId();
+                    if (!tabId) return false;
+                    if (tabId === principalTabId) {
+                        setActiveTab(principalTabId);
+                        return true;
+                    }
+                    setActiveTab(principalTabId);
+                    closeTab(tabId);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            };
             window.appGoBack = function () {
                 try {
                     window.history.back();

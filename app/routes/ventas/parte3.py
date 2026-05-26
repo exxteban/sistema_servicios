@@ -109,7 +109,7 @@ def _procesar_venta_payload(data):
         cola_cobro = db.session.get(ColaCobro, cola_cobro_id)
         if not cola_cobro:
             return {'error': 'Pendiente de cobro no encontrado'}, 404
-        if cola_cobro.tipo_origen not in ('venta', 'reparacion'):
+        if cola_cobro.tipo_origen not in ('venta', 'reparacion', 'gastronomia'):
             return {'error': 'El pendiente indicado no corresponde a un origen soportado'}, 400
         if cola_cobro.estado in ('cobrado', 'cancelado'):
             return {'error': 'Este pendiente ya no est? disponible'}, 400
@@ -122,10 +122,13 @@ def _procesar_venta_payload(data):
         cola_metadata = cola_cobro.get_metadata()
         cola_cobro_data = _build_pos_data_from_cola_cobro(cola_cobro)
         items = _build_venta_items_payload_from_pos_items(cola_cobro_data.get('items'))
-        id_cliente = int(cola_cobro_data.get('cliente_id') or 1)
+        if not cola_metadata.get('permitir_cambiar_cliente') or id_cliente in (None, ''):
+            id_cliente = int(cola_cobro_data.get('cliente_id') or 1)
         id_usuario_vendedor_raw = cola_cobro_data.get('id_usuario_vendedor')
-        descuento_monto = Decimal(str(cola_cobro_data.get('descuento') or 0))
-        beneficio_fidelizacion_id = cola_cobro_data.get('beneficio_fidelizacion_id')
+        if not cola_metadata.get('permitir_editar_descuento'):
+            descuento_monto = Decimal(str(cola_cobro_data.get('descuento') or 0))
+        if not cola_metadata.get('permitir_beneficio_fidelizacion'):
+            beneficio_fidelizacion_id = cola_cobro_data.get('beneficio_fidelizacion_id')
         cliente_servicio_ids = parse_cliente_servicio_ids([
             cola_cobro_data.get('cliente_servicio_ids'),
             cola_cobro_data.get('cliente_servicio_id'),
@@ -181,6 +184,7 @@ def _procesar_venta_payload(data):
     ocultar_selector_vendedor_pos = _ocultar_selector_vendedor_pos()
     vendedores_cajeros = _usuarios_vendedores_cajeros_activos()
     ids_vendedores = {int(u.id_usuario) for u in vendedores_cajeros}
+    gastronomia_eventos_post_commit = []
     if cola_cobro is not None:
         vendedor_origen = id_usuario_vendedor_raw or cola_cobro.id_usuario_origen or current_user.id_usuario
         try:
@@ -657,6 +661,17 @@ def _procesar_venta_payload(data):
         cola_cobro = db.session.get(ColaCobro, cola_cobro.id)
         cola_cobro.set_metadata(metadata_cola)
 
+        if cola_cobro.tipo_origen == 'gastronomia':
+            from gastronomia.services.venta_integration_service import registrar_pago_gastronomia_desde_venta_central
+
+            gastronomia_eventos_post_commit = registrar_pago_gastronomia_desde_venta_central(
+                metadata_cola,
+                venta,
+                int(current_user.id_usuario),
+            )
+            metadata_cola['gastronomia_pago_registrado'] = True
+            cola_cobro.set_metadata(metadata_cola)
+
         try:
             with db.session.begin_nested():
                 registrar_auditoria(
@@ -685,6 +700,12 @@ def _procesar_venta_payload(data):
     _perf_stage('persistencia_pre_commit')
     db.session.commit()
     _perf_stage('commit')
+
+    if gastronomia_eventos_post_commit:
+        from gastronomia.services.pedido_service import registrar_evento_pedido
+
+        for evento in gastronomia_eventos_post_commit:
+            registrar_evento_pedido(evento['pedido'], evento['tipo'])
 
     mensaje = f'Venta #{venta.id_venta} procesada correctamente'
     if fidelizacion_resultado.get('beneficios_generados'):

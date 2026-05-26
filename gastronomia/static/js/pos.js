@@ -258,6 +258,16 @@
     showAlert(`Pedido #${pedidoId} enviado a cocina.`, true);
   };
 
+  const openAdvancedCheckoutAndSendKitchen = async () => {
+    const pedidoId = lastOrderId || await saveOrder();
+    const data = await apiJson(`/api/gastronomia/pedidos/${pedidoId}/cobro-avanzado`, {
+      method: 'POST',
+      body: JSON.stringify({enviar_cocina: true}),
+    });
+    lastOrderId = null;
+    window.location.href = data.checkout_url;
+  };
+
   const closeModal = () => {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
@@ -318,6 +328,7 @@
   document.getElementById('clear-cart')?.addEventListener('click', () => { cart = []; lastOrderId = null; renderCart(); });
   document.getElementById('save-order')?.addEventListener('click', () => saveOrder().catch((error) => showAlert(error.message, false)));
   document.getElementById('send-kitchen')?.addEventListener('click', () => sendKitchen().catch((error) => showAlert(error.message, false)));
+  document.getElementById('charge-send-kitchen')?.addEventListener('click', () => openAdvancedCheckoutAndSendKitchen().catch((error) => showAlert(error.message, false)));
 
   const mesaInicial = root?.dataset.mesaInicial || '';
   if (mesaInicial) {

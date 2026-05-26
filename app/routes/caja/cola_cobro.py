@@ -7,7 +7,7 @@ from app.models import ColaCobro, SesionCaja
 from app.routes.caja import caja_bp
 from app.services.dashboard_servicios import obtener_resumen_cobros_pendientes_dashboard
 
-VALID_QUEUE_TYPES = {'venta', 'reparacion', 'cobro_credito', 'pedido'}
+VALID_QUEUE_TYPES = {'venta', 'reparacion', 'cobro_credito', 'pedido', 'gastronomia'}
 VALID_QUEUE_STATES = {'pendiente', 'en_proceso'}
 VALID_QUEUE_SCOPES = {'mias', 'disponibles'}
 

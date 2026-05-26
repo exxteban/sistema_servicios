@@ -5,7 +5,12 @@ from flask_login import login_required
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.access import cliente_id_actual_gastronomia, mensaje_contexto_gastronomia
 from gastronomia.services.menu_service import listar_categorias
-from gastronomia.services.permisos import PERMISO_POS, requiere_permiso_gastronomia
+from gastronomia.services.permisos import (
+    PERMISO_CAJA,
+    PERMISO_POS,
+    requiere_permiso_gastronomia,
+    tiene_permiso_gastronomia,
+)
 
 
 @gastronomia_bp.route('/pos')
@@ -20,4 +25,5 @@ def pos():
         'gastronomia/pos.html',
         categorias=listar_categorias(cliente_id, incluir_ocultas=False),
         mesa_inicial=(request.args.get('mesa') or '').strip()[:40],
+        puede_cobrar=tiene_permiso_gastronomia(PERMISO_CAJA),
     )
