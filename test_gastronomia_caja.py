@@ -263,6 +263,25 @@ def test_pedido_abierto_puede_cobrarse_y_luego_enviarse_a_cocina():
     assert [pedido['id_pedido'] for pedido in cocina_resp.get_json()['pedidos']] == [pedido_id]
 
 
+def test_caja_avisa_si_no_hay_sesion_abierta_y_dashboard_resalta_pendientes():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Alerta Caja', 'resto_alerta_caja')
+    _loguear(client, app, 'resto_alerta_caja')
+
+    caja_html = client.get('/gastronomia/caja').get_data(as_text=True)
+    assert 'data-sesion-caja-abierta="0"' in caja_html
+    assert 'Abri una caja central antes de cobrar pedidos desde esta pantalla.' in caja_html
+
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    _crear_pedido_listo(client, csrf, producto_id)
+
+    dashboard_html = client.get('/gastronomia/').get_data(as_text=True)
+    assert 'gastro-dashboard-card--alert' in dashboard_html
+    assert '1 pendiente' in dashboard_html
+    assert 'Hay pedidos sin cobrar esperando en caja.' in dashboard_html
+
+
 def test_cobro_avanzado_usa_checkout_central_y_envia_a_cocina():
     app = create_app('testing')
     client = app.test_client()

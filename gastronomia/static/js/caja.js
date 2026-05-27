@@ -1,4 +1,5 @@
 (function () {
+  const pageRoot = document.querySelector('[data-gastro-caja]');
   const csrf = document.getElementById('csrf-token')?.value || '';
   const ordersEl = document.getElementById('caja-orders');
   const alertBox = document.getElementById('caja-alert');
@@ -6,6 +7,8 @@
   const discountInput = document.getElementById('discount-amount');
   const paymentMethodInput = document.getElementById('payment-method');
   const paymentTotal = document.getElementById('payment-total');
+  const chargeButton = document.getElementById('charge-order');
+  const hasOpenCashSession = pageRoot?.dataset.sesionCajaAbierta === '1';
   let orders = [];
   let selectedOrderId = null;
   let lastEventId = 0;
@@ -23,7 +26,16 @@
       ...options,
       headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf, ...(options.headers || {})},
     });
-    const data = await response.json();
+    const raw = await response.text();
+    let data = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch (error) {
+        const message = raw.trim();
+        data = {mensaje: message.startsWith('<') ? 'La solicitud fue rechazada por el servidor.' : message};
+      }
+    }
     if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
     return data;
   };
@@ -129,6 +141,7 @@
     if (!order) {
       selectedSummary.textContent = 'Selecciona un pedido pendiente.';
       paymentTotal.textContent = money(0);
+      updateChargeButton();
       return;
     }
     const discount = Math.max(0, Number(discountInput.value || 0));
@@ -140,9 +153,11 @@
       <p class="mt-2 text-sm text-gray-500">${escapeHtml(order.tipo_pedido)}${order.mesa ? ` - Mesa ${escapeHtml(order.mesa)}` : ''}${order.referencia_entrega ? ` - ${escapeHtml(order.referencia_entrega)}` : ''}</p>
     `;
     paymentTotal.textContent = money(Math.max(0, Number(order.total || 0) - discount));
+    updateChargeButton();
   };
   const chargeSelected = async (ticketWindow = null) => {
     if (!selectedOrderId) throw new Error('Selecciona un pedido para cobrar.');
+    if (!hasOpenCashSession) throw new Error('Abri una caja central antes de cobrar pedidos desde esta pantalla.');
     if (chargeBusy) return;
     setChargeBusy(true);
     const data = await apiJson(`/api/gastronomia/caja/pedidos/${selectedOrderId}/cobrar`, {
@@ -166,12 +181,23 @@
   };
   const setChargeBusy = (busy) => {
     chargeBusy = busy;
-    const button = document.getElementById('charge-order');
-    if (!button) return;
-    button.disabled = busy;
-    button.classList.toggle('opacity-70', busy);
-    button.classList.toggle('cursor-not-allowed', busy);
-    button.textContent = busy ? 'Cobrando...' : 'Cobrar pedido';
+    updateChargeButton();
+  };
+  const updateChargeButton = () => {
+    if (!chargeButton) return;
+    const blocked = !hasOpenCashSession || !selectedOrderId;
+    chargeButton.disabled = chargeBusy || blocked;
+    chargeButton.classList.toggle('opacity-70', chargeBusy || blocked);
+    chargeButton.classList.toggle('cursor-not-allowed', chargeBusy || blocked);
+    if (chargeBusy) {
+      chargeButton.textContent = 'Cobrando...';
+      return;
+    }
+    if (!hasOpenCashSession) {
+      chargeButton.textContent = 'Abrir caja central para cobrar';
+      return;
+    }
+    chargeButton.textContent = selectedOrderId ? 'Cobrar pedido' : 'Selecciona un pedido para cobrar';
   };
 
   ordersEl?.addEventListener('click', (event) => {
@@ -188,6 +214,10 @@
   });
   document.getElementById('charge-order')?.addEventListener('click', () => {
     if (chargeBusy) return;
+    if (!hasOpenCashSession) {
+      showAlert('Abri una caja central antes de cobrar pedidos desde esta pantalla.', false);
+      return;
+    }
     const ticketWindow = selectedOrderId ? window.open('', '_blank') : null;
     chargeSelected(ticketWindow).catch((error) => {
       if (ticketWindow) ticketWindow.close();
@@ -198,5 +228,9 @@
   loadOrders()
     .catch((error) => showAlert(error.message, false))
     .finally(() => { pollTimer = setInterval(pollEvents, 2500); });
+  updateChargeButton();
+  if (!hasOpenCashSession) {
+    showAlert('Abri una caja central antes de cobrar pedidos desde esta pantalla.', false);
+  }
   window.addEventListener('beforeunload', () => clearInterval(pollTimer));
 }());

@@ -3,7 +3,7 @@
 {% block title %}Caja Gastronomia{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-7xl" data-gastro-caja>
+<div class="mx-auto max-w-7xl" data-gastro-caja data-sesion-caja-abierta="{{ 1 if sesion_caja_abierta else 0 }}">
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
     <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -28,6 +28,13 @@
     </div>
 
     <div id="caja-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+
+    {% if not sesion_caja_abierta %}
+    <section class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-900 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100">
+        <p class="font-bold uppercase tracking-wide text-rose-700 dark:text-rose-200">Caja central pendiente</p>
+        <p class="mt-1">Abri una caja central antes de cobrar pedidos desde esta pantalla.</p>
+    </section>
+    {% endif %}
 
     <div class="grid gap-5 xl:grid-cols-[1fr_360px]">
         <section>

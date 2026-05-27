@@ -14,7 +14,7 @@ METODOS_PAGO = {'efectivo', 'tarjeta', 'transferencia', 'qr', 'mixto'}
 ESTADOS_COBRABLES = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado'}
 
 
-def listar_pedidos_caja(cliente_id: int) -> list[GastronomiaPedido]:
+def _query_pedidos_caja(cliente_id: int):
     return (
         GastronomiaPedido.query
         .outerjoin(GastronomiaPedidoPago, GastronomiaPedidoPago.pedido_id == GastronomiaPedido.id_pedido)
@@ -23,9 +23,19 @@ def listar_pedidos_caja(cliente_id: int) -> list[GastronomiaPedido]:
             GastronomiaPedido.estado.in_(ESTADOS_COBRABLES),
             GastronomiaPedidoPago.id_pago.is_(None),
         )
+    )
+
+
+def listar_pedidos_caja(cliente_id: int) -> list[GastronomiaPedido]:
+    return (
+        _query_pedidos_caja(cliente_id)
         .order_by(GastronomiaPedido.fecha_creacion.desc(), GastronomiaPedido.id_pedido.desc())
         .all()
     )
+
+
+def contar_pedidos_caja(cliente_id: int) -> int:
+    return _query_pedidos_caja(cliente_id).count()
 
 
 def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) -> GastronomiaPedido:
