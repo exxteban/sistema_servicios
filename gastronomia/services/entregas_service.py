@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 
 from app import db
-from app.utils.helpers import parse_iso_date, today_local, utc_bounds_for_local_dates
+from app.utils.helpers import parse_iso_date, today_local, utc_bounds_for_local_dates, utc_naive_to_local
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem, GastronomiaPedidoPago
 from gastronomia.services.pedido_service import ESTADOS_PEDIDO, serializar_pedidos
 
@@ -13,16 +13,32 @@ TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro'}
 
 
 def buscar_entregas(cliente_id: int, filtros: dict) -> dict:
-    fecha = _fecha_filtro(filtros.get('fecha'))
+    fecha = _fecha_filtro(cliente_id, filtros.get('fecha'))
     inicio, fin = utc_bounds_for_local_dates(fecha, fecha)
     query = (
         GastronomiaPedido.query
-        .outerjoin(GastronomiaPedidoPago, GastronomiaPedidoPago.pedido_id == GastronomiaPedido.id_pedido)
+        .outerjoin(
+            GastronomiaPedidoPago,
+            db.and_(
+                GastronomiaPedidoPago.pedido_id == GastronomiaPedido.id_pedido,
+                GastronomiaPedidoPago.cliente_id == GastronomiaPedido.cliente_id,
+            ),
+        )
         .filter(
             GastronomiaPedido.cliente_id == int(cliente_id),
-            GastronomiaPedido.fecha_entrega.isnot(None),
-            GastronomiaPedido.fecha_entrega >= inicio,
-            GastronomiaPedido.fecha_entrega < fin,
+            db.or_(
+                db.and_(
+                    GastronomiaPedido.fecha_entrega.isnot(None),
+                    GastronomiaPedido.fecha_entrega >= inicio,
+                    GastronomiaPedido.fecha_entrega < fin,
+                ),
+                db.and_(
+                    GastronomiaPedido.fecha_entrega.is_(None),
+                    GastronomiaPedido.estado == 'cobrado',
+                    GastronomiaPedidoPago.fecha_pago >= inicio,
+                    GastronomiaPedidoPago.fecha_pago < fin,
+                ),
+            ),
         )
     )
 
@@ -54,11 +70,43 @@ def buscar_entregas(cliente_id: int, filtros: dict) -> dict:
     }
 
 
-def _fecha_filtro(value) -> object:
+def _fecha_filtro(cliente_id: int, value) -> object:
     text = str(value or '').strip().lower()
-    if text in {'', 'hoy', 'today'}:
+    if text in {'hoy', 'today'}:
         return today_local()
-    return parse_iso_date(text) or today_local()
+    if text:
+        return parse_iso_date(text) or today_local()
+    return _ultima_fecha_entrega(cliente_id) or today_local()
+
+
+def _ultima_fecha_entrega(cliente_id: int):
+    ultima_entrega = (
+        db.session.query(db.func.max(GastronomiaPedido.fecha_entrega))
+        .filter(
+            GastronomiaPedido.cliente_id == int(cliente_id),
+            GastronomiaPedido.fecha_entrega.isnot(None),
+        )
+        .scalar()
+    )
+    ultimo_cobro = (
+        db.session.query(db.func.max(GastronomiaPedidoPago.fecha_pago))
+        .join(
+            GastronomiaPedido,
+            db.and_(
+                GastronomiaPedido.id_pedido == GastronomiaPedidoPago.pedido_id,
+                GastronomiaPedido.cliente_id == GastronomiaPedidoPago.cliente_id,
+            ),
+        )
+        .filter(
+            GastronomiaPedido.cliente_id == int(cliente_id),
+            GastronomiaPedido.estado == 'cobrado',
+            GastronomiaPedido.fecha_entrega.is_(None),
+        )
+        .scalar()
+    )
+    ultima_fecha = max([fecha for fecha in (ultima_entrega, ultimo_cobro) if fecha], default=None)
+    local = utc_naive_to_local(ultima_fecha)
+    return local.date() if local else None
 
 
 def _parse_paid_filter(value) -> bool | None:

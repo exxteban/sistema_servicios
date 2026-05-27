@@ -11,7 +11,6 @@
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
-  const todayIso = () => new Date().toISOString().slice(0, 10);
   const time = (iso) => {
     if (!iso) return '--:--';
     return new Date(iso).toLocaleTimeString('es-PY', {hour: '2-digit', minute: '2-digit'});
@@ -39,6 +38,7 @@
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || data.error || 'No se pudieron cargar las entregas.');
+    if (data.fecha) fechaInput.value = data.fecha;
     renderSummary(data.resumen || {});
     renderOrders(data.pedidos || []);
   };
@@ -74,7 +74,7 @@
             <span class="rounded-full ${order.pagado ? 'bg-sky-100 text-sky-800' : 'bg-amber-100 text-amber-800'} px-2 py-1 text-xs font-bold uppercase">${order.pagado ? 'Pagado' : 'Pendiente pago'}</span>
           </div>
           <p class="mt-2 text-sm font-semibold text-gray-500">
-            ${time(order.fecha_entrega)} - ${escapeHtml(order.tipo_pedido)}${order.mesa ? ` - Mesa ${escapeHtml(order.mesa)}` : ''}${order.referencia_entrega ? ` - ${escapeHtml(order.referencia_entrega)}` : ''}
+            ${time(order.fecha_entrega || (order.pago && order.pago.fecha_pago))} - ${escapeHtml(order.tipo_pedido)}${order.mesa ? ` - Mesa ${escapeHtml(order.mesa)}` : ''}${order.referencia_entrega ? ` - ${escapeHtml(order.referencia_entrega)}` : ''}
           </p>
           <div class="mt-4 flex flex-wrap gap-2">
             ${(order.items || []).map((item) => `
@@ -95,7 +95,6 @@
     </article>
   `;
 
-  fechaInput.value = fechaInput.value || todayIso();
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     load().catch((error) => showAlert(error.message, false));

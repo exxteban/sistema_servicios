@@ -8,6 +8,7 @@ from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
     GastronomiaPedido,
+    GastronomiaPedidoPago,
     GastronomiaProducto,
 )
 
@@ -152,6 +153,39 @@ def test_entregas_view_requiere_login():
     client = app.test_client()
     response = client.get('/gastronomia/entregas')
     assert response.status_code in (302, 401)
+
+
+def test_entregas_incluye_cobrados_sin_fecha_entrega_por_fecha_pago():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id, _agotado_id = _crear_base(app, 'Resto Cobrado Entregas', 'entregas_cobrado', 'entregas-cobrado')
+
+    _loguear(client, app, 'entregas_cobrado')
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    pedido_id = _crear_pedido(client, csrf, producto_id, 'Pago Caja')
+
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username='entregas_cobrado').first()
+        inicio_hoy, _fin_hoy = utc_bounds_for_local_dates(today_local(), today_local())
+        pedido = GastronomiaPedido.query.get(pedido_id)
+        pedido.estado = 'cobrado'
+        pedido.fecha_entrega = None
+        db.session.add(GastronomiaPedidoPago(
+            cliente_id=pedido.cliente_id,
+            pedido_id=pedido.id_pedido,
+            usuario_id=usuario.id_usuario,
+            metodo_pago='efectivo',
+            subtotal=pedido.total,
+            total_cobrado=pedido.total,
+            fecha_pago=inicio_hoy + timedelta(hours=3),
+        ))
+        db.session.commit()
+
+    response = client.get('/api/gastronomia/entregas?estado=cobrado')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['fecha'] == today_local().isoformat()
+    assert [pedido['id_pedido'] for pedido in data['pedidos']] == [pedido_id]
 
 
 def test_menu_tv_publico_respeta_visibilidad_disponibilidad_y_estado():

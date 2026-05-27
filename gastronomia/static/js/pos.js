@@ -316,7 +316,7 @@
     })),
   });
 
-  const saveOrder = async () => {
+  const saveOrder = async ({resetAfterCreate = true} = {}) => {
     if (!cart.length) throw new Error('El pedido debe tener items.');
     if ((orderTypeInput?.value || '') === 'mesa' && !(tableNameInput?.value || '').trim()) {
       throw new Error('Selecciona una mesa.');
@@ -336,13 +336,25 @@
       showAlert(`Pedido #${lastOrderId} actualizado.`, true);
       return lastOrderId;
     }
-    resetDraft();
+    if (resetAfterCreate) {
+      resetDraft();
+    } else {
+      hydrateOrder(data.pedido);
+    }
     showAlert(`Pedido #${savedOrderId} guardado.`, true);
     return savedOrderId;
   };
 
+  const ensureOrderSavedForNextStep = async () => {
+    if (cart.length || activeOrderId) {
+      return Number(await saveOrder({resetAfterCreate: false}) || 0);
+    }
+    return Number(lastOrderId || 0);
+  };
+
   const sendKitchen = async () => {
-    const pedidoId = lastOrderId || await saveOrder();
+    const pedidoId = await ensureOrderSavedForNextStep();
+    if (!pedidoId) throw new Error('No se pudo preparar el pedido para cocina.');
     await apiJson(`/api/gastronomia/pedidos/${pedidoId}/enviar-cocina`, {method: 'POST', body: '{}'});
     resetDraft();
     lastOrderId = null;
@@ -350,7 +362,7 @@
   };
 
   const openAdvancedCheckoutAndSendKitchen = async () => {
-    const pedidoId = Number(lastOrderId || await saveOrder() || 0);
+    const pedidoId = await ensureOrderSavedForNextStep();
     if (!pedidoId) throw new Error('No se pudo preparar el pedido para cobro.');
     const data = await apiJson(`/api/gastronomia/pedidos/${pedidoId}/cobro-avanzado`, {
       method: 'POST',

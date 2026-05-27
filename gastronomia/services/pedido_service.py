@@ -231,7 +231,7 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
         pedido.fecha_inicio_preparacion = pedido.fecha_inicio_preparacion or datetime.utcnow()
     elif estado == 'listo':
         pedido.fecha_listo = pedido.fecha_listo or datetime.utcnow()
-    elif estado == 'entregado':
+    elif estado in {'entregado', 'cobrado'}:
         pedido.fecha_entrega = pedido.fecha_entrega or datetime.utcnow()
     db.session.commit()
     registrar_evento_pedido(pedido, f'pedido_{estado}')
