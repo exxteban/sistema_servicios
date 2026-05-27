@@ -44,8 +44,16 @@
         ...(options.headers || {}),
       },
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
+    const contentType = response.headers.get('Content-Type') || '';
+    const data = contentType.includes('application/json')
+      ? await response.json()
+      : {mensaje: (await response.text()).trim()};
+    if (!response.ok) {
+      const fallbackMessage = response.status === 404
+        ? 'No se encontro el recurso solicitado. Recarga la pantalla e intenta de nuevo.'
+        : 'Solicitud invalida.';
+      throw new Error(data.mensaje || data.error || fallbackMessage);
+    }
     return data;
   };
 
@@ -338,14 +346,17 @@
   };
 
   const openAdvancedCheckoutAndSendKitchen = async () => {
-    const pedidoId = lastOrderId || await saveOrder();
+    const pedidoId = Number(lastOrderId || await saveOrder() || 0);
+    if (!pedidoId) throw new Error('No se pudo preparar el pedido para cobro.');
     const data = await apiJson(`/api/gastronomia/pedidos/${pedidoId}/cobro-avanzado`, {
       method: 'POST',
       body: JSON.stringify({enviar_cocina: true}),
     });
+    const checkoutUrl = data.checkout_url || (data.cola_id ? `/ventas/pos?cola_id=${encodeURIComponent(data.cola_id)}` : '');
+    if (!checkoutUrl) throw new Error('No se pudo abrir el checkout central.');
     resetDraft();
     lastOrderId = null;
-    window.location.href = data.checkout_url;
+    window.location.href = checkoutUrl;
   };
 
   const closeModal = () => {
