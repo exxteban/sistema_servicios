@@ -8,6 +8,7 @@ from gastronomia.models import (
     GastronomiaGrupoOpciones,
     GastronomiaOpcionProducto,
     GastronomiaPedido,
+    GastronomiaPedidoEvento,
     GastronomiaProducto,
 )
 
@@ -78,6 +79,21 @@ def _crear_menu_para_pedidos(app, nombre_cliente='Resto Uno', username='resto_un
         db.session.add(opcion)
         db.session.commit()
         return cliente.id_cliente, producto.id_producto, opcion.id_opcion
+
+
+def _agregar_producto(app, cliente_id: int, categoria_nombre: str, nombre: str, precio: int) -> int:
+    with app.app_context():
+        categoria = GastronomiaCategoria.query.filter_by(cliente_id=cliente_id, nombre=categoria_nombre).first()
+        assert categoria is not None
+        producto = GastronomiaProducto(
+            cliente_id=cliente_id,
+            categoria_id=categoria.id_categoria,
+            nombre=nombre,
+            precio=precio,
+        )
+        db.session.add(producto)
+        db.session.commit()
+        return producto.id_producto
 
 
 def test_pos_page_carga_y_pedido_se_guarda_con_totales_backend():
@@ -161,3 +177,111 @@ def test_pedido_se_envia_a_cocina_y_no_se_filtra_entre_clientes():
     assert propio_resp.status_code == 201
     listado = client_dos.get('/api/gastronomia/pedidos')
     assert len(listado.get_json()['pedidos']) == 1
+
+
+def test_pedido_abierto_se_puede_editar_y_recalcula_total():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id, opcion_id = _crear_menu_para_pedidos(app, 'Resto Edicion', 'resto_edicion')
+    producto_secundario_id = _agregar_producto(app, cliente_id, 'Hamburguesas', 'Doble', 22000)
+    _loguear(client, app, 'resto_edicion')
+
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    crear_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'mesa',
+            'mesa': 'M1',
+            'referencia_entrega': 'Juan',
+            'notas': 'Primera version',
+            'items': [
+                {
+                    'producto_id': producto_id,
+                    'cantidad': 2,
+                    'opciones': [opcion_id],
+                    'notas': 'Sin cebolla',
+                }
+            ],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert crear_resp.status_code == 201
+    pedido_id = crear_resp.get_json()['pedido']['id_pedido']
+
+    editar_resp = client.put(
+        f'/api/gastronomia/pedidos/{pedido_id}',
+        json={
+            'tipo_pedido': 'retiro',
+            'mesa': '',
+            'referencia_entrega': 'Maria retiro',
+            'notas': 'Cambiar a retiro',
+            'items': [
+                {
+                    'producto_id': producto_secundario_id,
+                    'cantidad': 3,
+                    'opciones': [],
+                    'notas': 'Bien cocido',
+                }
+            ],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert editar_resp.status_code == 200
+    pedido = editar_resp.get_json()['pedido']
+    assert pedido['id_pedido'] == pedido_id
+    assert pedido['estado'] == 'abierto'
+    assert pedido['tipo_pedido'] == 'retiro'
+    assert pedido['mesa'] is None
+    assert pedido['referencia_entrega'] == 'Maria retiro'
+    assert pedido['notas'] == 'Cambiar a retiro'
+    assert pedido['total'] == 66000
+    assert len(pedido['items']) == 1
+    assert pedido['items'][0]['producto_id'] == producto_secundario_id
+    assert pedido['items'][0]['cantidad'] == 3
+    assert pedido['items'][0]['precio_unitario'] == 22000
+    assert pedido['items'][0]['modificadores'] == []
+
+    with app.app_context():
+        pedido_db = GastronomiaPedido.query.filter_by(cliente_id=cliente_id, id_pedido=pedido_id).first()
+        assert pedido_db is not None
+        assert pedido_db.tipo_pedido == 'retiro'
+        assert pedido_db.mesa is None
+        assert float(pedido_db.total) == 66000
+        assert pedido_db.items.count() == 1
+        evento = GastronomiaPedidoEvento.query.filter_by(
+            cliente_id=cliente_id,
+            pedido_id=pedido_id,
+            tipo='pedido_actualizado',
+        ).first()
+        assert evento is not None
+
+
+def test_pedido_no_se_puede_editar_despues_de_enviarse_a_cocina():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id, _opcion_id = _crear_menu_para_pedidos(app, 'Resto Bloqueado', 'resto_bloqueado')
+    _loguear(client, app, 'resto_bloqueado')
+
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    crear_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 1}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert crear_resp.status_code == 201
+    pedido_id = crear_resp.get_json()['pedido']['id_pedido']
+
+    enviar_resp = client.post(
+        f'/api/gastronomia/pedidos/{pedido_id}/enviar-cocina',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert enviar_resp.status_code == 200
+
+    editar_resp = client.put(
+        f'/api/gastronomia/pedidos/{pedido_id}',
+        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 2}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert editar_resp.status_code == 400
+    assert editar_resp.get_json()['mensaje'] == 'Solo se pueden editar pedidos abiertos.'

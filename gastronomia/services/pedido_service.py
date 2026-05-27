@@ -160,34 +160,43 @@ def obtener_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido | None:
 
 
 def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPedido:
-    tipo = (data.get('tipo_pedido') or 'mostrador').strip().lower()
-    if tipo not in TIPOS_PEDIDO:
-        raise ValueError('Tipo de pedido invalido.')
-    items_data = data.get('items') or []
-    if not isinstance(items_data, list) or not items_data:
-        raise ValueError('El pedido debe tener al menos un item.')
+    pedido_data = _validar_datos_pedido(data)
 
     pedido = GastronomiaPedido(
         cliente_id=int(cliente_id),
         usuario_id=int(usuario_id),
-        tipo_pedido=tipo,
-        mesa=(data.get('mesa') or '').strip()[:40] or None,
-        referencia_entrega=(data.get('referencia_entrega') or '').strip()[:80] or None,
-        notas=(data.get('notas') or '').strip() or None,
+        tipo_pedido=pedido_data['tipo_pedido'],
+        mesa=pedido_data['mesa'],
+        referencia_entrega=pedido_data['referencia_entrega'],
+        notas=pedido_data['notas'],
         estado='abierto',
     )
     db.session.add(pedido)
     db.session.flush()
 
-    total = Decimal('0.00')
-    for item_data in items_data:
-        item = _crear_item_desde_payload(cliente_id, pedido.id_pedido, item_data)
-        total += Decimal(str(item.subtotal or 0))
-
-    pedido.subtotal = total
-    pedido.total = total
+    _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
     db.session.commit()
     registrar_evento_pedido(pedido, 'pedido_creado')
+    return pedido
+
+
+def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> GastronomiaPedido:
+    pedido = obtener_pedido(cliente_id, pedido_id)
+    if not pedido:
+        raise ValueError('Pedido no encontrado.')
+    if pedido.estado != 'abierto':
+        raise ValueError('Solo se pueden editar pedidos abiertos.')
+    if pedido.pago:
+        raise ValueError('No se puede editar un pedido que ya fue cobrado.')
+
+    pedido_data = _validar_datos_pedido(data)
+    pedido.tipo_pedido = pedido_data['tipo_pedido']
+    pedido.mesa = pedido_data['mesa']
+    pedido.referencia_entrega = pedido_data['referencia_entrega']
+    pedido.notas = pedido_data['notas']
+    _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
+    db.session.commit()
+    registrar_evento_pedido(pedido, 'pedido_actualizado')
     return pedido
 
 
@@ -242,6 +251,39 @@ def registrar_evento_pedido(pedido: GastronomiaPedido, tipo: str) -> Gastronomia
     db.session.add(evento)
     db.session.commit()
     return evento
+
+
+def _validar_datos_pedido(data: dict) -> dict:
+    tipo = (data.get('tipo_pedido') or 'mostrador').strip().lower()
+    if tipo not in TIPOS_PEDIDO:
+        raise ValueError('Tipo de pedido invalido.')
+    mesa = (data.get('mesa') or '').strip()[:40] or None
+    if tipo == 'mesa' and not mesa:
+        raise ValueError('La mesa es obligatoria para pedidos de mesa.')
+    items_data = data.get('items') or []
+    if not isinstance(items_data, list) or not items_data:
+        raise ValueError('El pedido debe tener al menos un item.')
+    return {
+        'tipo_pedido': tipo,
+        'mesa': mesa,
+        'referencia_entrega': (data.get('referencia_entrega') or '').strip()[:80] or None,
+        'notas': (data.get('notas') or '').strip() or None,
+        'items': items_data,
+    }
+
+
+def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_data: list[dict]) -> None:
+    for item in pedido.items.all():
+        db.session.delete(item)
+    db.session.flush()
+
+    total = Decimal('0.00')
+    for item_data in items_data:
+        item = _crear_item_desde_payload(cliente_id, pedido.id_pedido, item_data)
+        total += Decimal(str(item.subtotal or 0))
+
+    pedido.subtotal = total
+    pedido.total = total
 
 
 def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) -> GastronomiaPedidoItem:

@@ -5,6 +5,7 @@
   const cartItems = document.getElementById('cart-items');
   const cartTotal = document.getElementById('cart-total');
   const alertBox = document.getElementById('pos-alert');
+  const editingOrderBanner = document.getElementById('editing-order-banner');
   const modal = document.getElementById('modifier-modal');
   const modalName = document.getElementById('modal-product-name');
   const modalPrice = document.getElementById('modal-product-price');
@@ -26,6 +27,7 @@
   let cart = [];
   let activeProduct = null;
   let editingItemKey = null;
+  let activeOrderId = null;
   let lastOrderId = null;
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
@@ -113,6 +115,78 @@
     tableNameInput.value = mesaNombre;
     renderMesas();
   };
+  const formatModifierName = (modifier) => (
+    modifier?.tipo_grupo === 'ingrediente_removible'
+      ? `Sin ${modifier.nombre || modifier.nombre_opcion || ''}`
+      : modifier?.nombre || modifier?.nombre_opcion || ''
+  );
+  const mapOrderItemToCartItem = (item) => {
+    const modifiers = item.modificadores || [];
+    return {
+      key: item.id_item ? `pedido-item-${item.id_item}` : `${Date.now()}-${Math.random()}`,
+      producto_id: item.producto_id,
+      nombre: item.nombre_producto,
+      cantidad: Math.max(1, Number(item.cantidad || 1)),
+      precio_unitario: Number(item.precio_unitario || 0),
+      opciones: modifiers.map((modifier) => Number(modifier.opcion_id)).filter(Boolean),
+      selecciones: modifiers.map((modifier) => ({
+        ...modifier,
+        nombre: modifier.nombre || modifier.nombre_opcion,
+      })),
+      notas: item.notas || '',
+    };
+  };
+  const setEditingOrderState = (orderId, order = null) => {
+    activeOrderId = orderId ? Number(orderId) : null;
+    lastOrderId = activeOrderId;
+    if (editingOrderBanner) {
+      if (activeOrderId) {
+        const deliveryCode = order?.codigo_entrega || `#${String(activeOrderId).padStart(3, '0')}`;
+        editingOrderBanner.textContent = `Editando pedido abierto ${deliveryCode}.`;
+        editingOrderBanner.classList.remove('hidden');
+      } else {
+        editingOrderBanner.textContent = 'Editando pedido abierto.';
+        editingOrderBanner.classList.add('hidden');
+      }
+    }
+    const saveButton = document.getElementById('save-order');
+    if (saveButton) {
+      saveButton.innerHTML = activeOrderId
+        ? '<i class="fas fa-save"></i> Guardar cambios'
+        : '<i class="fas fa-check-square"></i> Guardar pedido';
+    }
+  };
+  const resetDraft = () => {
+    cart = [];
+    setEditingOrderState(null);
+    if (orderTypeInput) orderTypeInput.value = 'mostrador';
+    if (deliveryReferenceInput) deliveryReferenceInput.value = '';
+    if (tableNameInput) tableNameInput.value = '';
+    const orderNotesInput = document.getElementById('order-notes');
+    if (orderNotesInput) orderNotesInput.value = '';
+    syncOrderTypeUi();
+    renderCart();
+  };
+  const hydrateOrder = (order) => {
+    if (!order) return;
+    setEditingOrderState(order.id_pedido, order);
+    if (orderTypeInput) orderTypeInput.value = order.tipo_pedido || 'mostrador';
+    if (deliveryReferenceInput) deliveryReferenceInput.value = order.referencia_entrega || '';
+    if (tableNameInput) tableNameInput.value = order.mesa || '';
+    const orderNotesInput = document.getElementById('order-notes');
+    if (orderNotesInput) orderNotesInput.value = order.notas || '';
+    cart = (order.items || []).map(mapOrderItemToCartItem);
+    syncOrderTypeUi();
+    renderCart();
+  };
+  const loadOrder = async (orderId) => {
+    const data = await apiJson(`/api/gastronomia/pedidos/${orderId}`);
+    const order = data.pedido;
+    if (!order) throw new Error('Pedido no encontrado.');
+    if (order.estado !== 'abierto') throw new Error('Solo se pueden editar pedidos abiertos.');
+    if (order.pagado) throw new Error('No se puede editar un pedido que ya fue cobrado.');
+    hydrateOrder(order);
+  };
 
   const openProduct = (product, item = null) => {
     activeProduct = product;
@@ -178,7 +252,7 @@
     } else {
       cart.push(configuredItem);
     }
-    lastOrderId = null;
+    lastOrderId = activeOrderId || null;
     closeModal();
     renderCart();
   };
@@ -239,17 +313,18 @@
     if ((orderTypeInput?.value || '') === 'mesa' && !(tableNameInput?.value || '').trim()) {
       throw new Error('Selecciona una mesa.');
     }
-    const data = await apiJson('/api/gastronomia/pedidos', {
-      method: 'POST',
+    const orderId = activeOrderId;
+    const data = await apiJson(orderId ? `/api/gastronomia/pedidos/${orderId}` : '/api/gastronomia/pedidos', {
+      method: orderId ? 'PUT' : 'POST',
       body: JSON.stringify(buildOrderPayload()),
     });
     lastOrderId = data.pedido.id_pedido;
-    cart = [];
-    if (tableNameInput && (orderTypeInput?.value || '') !== 'mesa') {
-      tableNameInput.value = '';
+    if (orderId) {
+      hydrateOrder(data.pedido);
+      showAlert(`Pedido #${lastOrderId} actualizado.`, true);
+      return lastOrderId;
     }
-    if (deliveryReferenceInput) deliveryReferenceInput.value = '';
-    renderCart();
+    resetDraft();
     showAlert(`Pedido #${lastOrderId} guardado.`, true);
     return lastOrderId;
   };
@@ -257,6 +332,7 @@
   const sendKitchen = async () => {
     const pedidoId = lastOrderId || await saveOrder();
     await apiJson(`/api/gastronomia/pedidos/${pedidoId}/enviar-cocina`, {method: 'POST', body: '{}'});
+    resetDraft();
     lastOrderId = null;
     showAlert(`Pedido #${pedidoId} enviado a cocina.`, true);
   };
@@ -267,6 +343,7 @@
       method: 'POST',
       body: JSON.stringify({enviar_cocina: true}),
     });
+    resetDraft();
     lastOrderId = null;
     window.location.href = data.checkout_url;
   };
@@ -306,10 +383,6 @@
     '"': '&quot;',
     "'": '&#039;',
   }[char]));
-  const formatModifierName = (modifier) => (
-    modifier?.tipo_grupo === 'ingrediente_removible' ? `Sin ${modifier.nombre}` : modifier?.nombre
-  );
-
   document.getElementById('category-tabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-category]');
     if (!button) return;
@@ -351,7 +424,7 @@
   document.getElementById('add-configured-product')?.addEventListener('click', (event) => {
     runBusyAction(event.currentTarget, editingItemKey ? 'Guardando...' : 'Agregando...', addConfiguredProduct);
   });
-  document.getElementById('clear-cart')?.addEventListener('click', () => { cart = []; lastOrderId = null; renderCart(); });
+  document.getElementById('clear-cart')?.addEventListener('click', resetDraft);
   document.getElementById('save-order')?.addEventListener('click', (event) => {
     runBusyAction(event.currentTarget, 'Guardando...', saveOrder);
   });
@@ -363,7 +436,10 @@
   });
 
   const mesaInicial = root?.dataset.mesaInicial || '';
-  if (mesaInicial) {
+  const pedidoInicialId = Number(root?.dataset.pedidoInicialId || 0);
+  if (pedidoInicialId) {
+    loadOrder(pedidoInicialId).catch((error) => showAlert(error.message, false));
+  } else if (mesaInicial) {
     setOrderType('mesa');
     setMesa(mesaInicial);
   }

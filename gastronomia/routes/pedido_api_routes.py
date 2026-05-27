@@ -4,6 +4,7 @@ from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.pedido_service import (
+    actualizar_pedido_abierto,
     cambiar_estado_pedido,
     crear_pedido,
     enviar_pedido_cocina,
@@ -75,6 +76,22 @@ def detalle(pedido_id):
     pedido = obtener_pedido(cliente_id, pedido_id)
     if not pedido:
         return jsonify({'error': 'not_found'}), 404
+    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+
+
+@gastronomia_pedidos_api_bp.route('/pedidos/<int:pedido_id>', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_POS)
+def actualizar(pedido_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        pedido = actualizar_pedido_abierto(cliente_id, pedido_id, _payload())
+    except ValueError as exc:
+        if str(exc) == 'Pedido no encontrado.':
+            return jsonify({'error': 'not_found'}), 404
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'pedido': pedido.to_dict()})
 
 

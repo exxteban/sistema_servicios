@@ -3,7 +3,7 @@
 {% block title %}POS Gastronomia{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-7xl" data-gastro-pos data-mesa-inicial="{{ mesa_inicial }}">
+<div class="mx-auto max-w-7xl" data-gastro-pos data-mesa-inicial="{{ mesa_inicial }}" data-pedido-inicial-id="{{ pedido_inicial_id or '' }}">
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
     <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -56,6 +56,9 @@
                 <button type="button" id="clear-cart" class="rounded-lg border border-orange-200 px-3 py-2 text-sm font-bold text-orange-600 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-300">
                     <i class="fas fa-trash-alt"></i> Limpiar
                 </button>
+            </div>
+            <div id="editing-order-banner" class="mt-4 hidden rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+                Editando pedido abierto.
             </div>
             <div class="mt-4">
                 <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Tipo de pedido</p>
@@ -242,5 +245,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260525-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260526-1') }}"></script>
 {% endblock %}

@@ -46,6 +46,10 @@
   const renderMesa = (mesa) => {
     const pedido = mesa.pedido_activo;
     const statusClass = estadoStyles[mesa.estado_salon] || 'bg-gray-100 text-gray-800';
+    const posUrl = pedido?.estado === 'abierto' && !pedido?.pagado
+      ? `/gastronomia/pos?pedido=${encodeURIComponent(pedido.id_pedido)}`
+      : `/gastronomia/pos?mesa=${encodeURIComponent(mesa.nombre)}`;
+    const actionLabel = pedido?.estado === 'abierto' && !pedido?.pagado ? 'Editar pedido abierto' : 'Abrir pedido';
     return `
       <article class="salon-card" data-table="${mesa.id_mesa}">
         <div class="flex items-start justify-between gap-3">
@@ -65,8 +69,8 @@
           </div>
         ` : ''}
         <div class="mt-4 grid gap-2">
-          <a href="/gastronomia/pos?mesa=${encodeURIComponent(mesa.nombre)}" class="rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-indigo-700">
-            Abrir pedido
+          <a href="${posUrl}" class="rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-indigo-700">
+            ${actionLabel}
           </a>
         </div>
       </article>
