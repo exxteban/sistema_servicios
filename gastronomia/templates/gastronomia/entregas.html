@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Entregas Gastronomia{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6" data-gastro-entregas>
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Gastronomia</p>
+            <h1 class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">Entregas</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Historial operativo por fecha de entrega.</p>
+        </div>
+        <a href="{{ url_for('gastronomia.dashboard') }}"
+           class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+            <i class="fas fa-arrow-left"></i>Volver
+        </a>
+    </div>
+
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <form id="entregas-filters" class="grid gap-3 lg:grid-cols-[180px_1fr_170px_150px_150px_auto] lg:items-end">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Fecha
+                <input name="fecha" type="date"
+                       class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            </label>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Buscar
+                <input name="q" placeholder="Codigo, cliente, mesa o producto"
+                       class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            </label>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Tipo
+                <select name="tipo_pedido" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    <option value="">Todos</option>
+                    <option value="mesa">Mesa</option>
+                    <option value="mostrador">Mostrador</option>
+                    <option value="retiro">Retiro</option>
+                </select>
+            </label>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Pago
+                <select name="pagado" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    <option value="">Todos</option>
+                    <option value="1">Pagados</option>
+                    <option value="0">Pendientes</option>
+                </select>
+            </label>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Estado
+                <select name="estado" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    <option value="">Todos</option>
+                    <option value="entregado">Entregado</option>
+                    <option value="cobrado">Cobrado</option>
+                    <option value="cancelado">Cancelado</option>
+                </select>
+            </label>
+            <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
+                Filtrar
+            </button>
+        </form>
+    </section>
+
+    <div id="entregas-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" id="entregas-summary"></section>
+    <section class="space-y-3" id="entregas-list"></section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/entregas.js', v='20260526-1') }}"></script>
+{% endblock %}

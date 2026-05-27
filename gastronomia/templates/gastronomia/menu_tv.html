@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Menu TV</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 12% 8%, rgba(249, 115, 22, 0.28), transparent 30%),
+                radial-gradient(circle at 85% 0%, rgba(20, 184, 166, 0.22), transparent 32%),
+                linear-gradient(135deg, #120b07 0%, #1d1410 46%, #081716 100%);
+            color: #fff7ed;
+            font-family: "Trebuchet MS", "Avenir Next", sans-serif;
+            overflow-x: hidden;
+        }
+        body.menu-tv-high {
+            background: #030712;
+            color: #f9fafb;
+        }
+        .menu-tv-shell { min-height: 100vh; padding: clamp(24px, 4vw, 64px); }
+        .menu-tv-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 32px;
+            align-items: flex-start;
+            margin-bottom: clamp(28px, 4vw, 56px);
+        }
+        .menu-tv-kicker {
+            color: #fb923c;
+            font-size: clamp(16px, 1.6vw, 24px);
+            font-weight: 900;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+        }
+        .menu-tv-title {
+            margin: 8px 0 0;
+            font-size: clamp(48px, 7vw, 118px);
+            line-height: 0.9;
+            letter-spacing: -0.06em;
+        }
+        .menu-tv-subtitle {
+            max-width: 880px;
+            margin: 18px 0 0;
+            color: #fed7aa;
+            font-size: clamp(22px, 2.4vw, 40px);
+            font-weight: 700;
+        }
+        .menu-tv-clock {
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 24px;
+            background: rgba(255,255,255,0.08);
+            padding: 18px 24px;
+            text-align: right;
+            font-size: clamp(24px, 3vw, 54px);
+            font-weight: 900;
+        }
+        .menu-tv-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: clamp(18px, 2.4vw, 34px);
+        }
+        .menu-tv-category {
+            border: 1px solid rgba(255,255,255,0.16);
+            border-radius: 30px;
+            background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05));
+            box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+            padding: clamp(22px, 2.5vw, 36px);
+            backdrop-filter: blur(18px);
+        }
+        .menu-tv-category h2 {
+            margin: 0 0 18px;
+            color: #fdba74;
+            font-size: clamp(32px, 3.2vw, 62px);
+            line-height: 1;
+        }
+        .menu-tv-product {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 18px;
+            align-items: baseline;
+            border-top: 1px solid rgba(255,255,255,0.12);
+            padding: 18px 0;
+        }
+        .menu-tv-product:first-of-type { border-top: 0; }
+        .menu-tv-product h3 {
+            margin: 0;
+            font-size: clamp(24px, 2.2vw, 42px);
+            line-height: 1.05;
+        }
+        .menu-tv-product p {
+            margin: 8px 0 0;
+            color: #ffedd5;
+            font-size: clamp(16px, 1.35vw, 24px);
+            font-weight: 700;
+        }
+        .menu-tv-price {
+            color: #bbf7d0;
+            font-size: clamp(24px, 2.2vw, 44px);
+            font-weight: 1000;
+            white-space: nowrap;
+        }
+        .menu-tv-soldout { opacity: 0.55; }
+        .menu-tv-badge {
+            display: inline-block;
+            margin-top: 10px;
+            border-radius: 999px;
+            background: #f97316;
+            color: #111827;
+            padding: 6px 12px;
+            font-size: 16px;
+            font-weight: 1000;
+            text-transform: uppercase;
+        }
+        .menu-tv-empty {
+            border: 2px dashed rgba(255,255,255,0.22);
+            border-radius: 32px;
+            padding: 8vh 24px;
+            text-align: center;
+            font-size: clamp(28px, 3vw, 54px);
+            font-weight: 900;
+        }
+    </style>
+</head>
+<body>
+    <main class="menu-tv-shell" data-menu-tv data-slug="{{ slug }}">
+        <header class="menu-tv-header">
+            <div>
+                <div class="menu-tv-kicker">Menu del local</div>
+                <h1 id="menu-tv-title" class="menu-tv-title">Menu</h1>
+                <p id="menu-tv-subtitle" class="menu-tv-subtitle"></p>
+            </div>
+            <div id="menu-tv-clock" class="menu-tv-clock"></div>
+        </header>
+        <section id="menu-tv-content" class="menu-tv-grid"></section>
+    </main>
+    <script src="{{ url_for('gastronomia.static', filename='js/menu_tv.js', v='20260526-1') }}"></script>
+</body>
+</html>

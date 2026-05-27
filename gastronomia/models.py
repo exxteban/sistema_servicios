@@ -18,6 +18,14 @@ class GastronomiaClienteConfig(db.Model):
     )
     modo_operacion = db.Column(db.String(30), nullable=False, default='servicios')
     gastronomia_activo = db.Column(db.Boolean, nullable=False, default=False)
+    menu_tv_publico_activo = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
+    menu_tv_slug = db.Column(db.String(100), nullable=True, unique=True, index=True)
+    menu_tv_titulo = db.Column(db.String(160), nullable=True)
+    menu_tv_subtitulo = db.Column(db.String(240), nullable=True)
+    menu_tv_tema = db.Column(db.String(40), nullable=False, default='clasico', server_default='clasico')
+    menu_tv_mostrar_precios = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
+    menu_tv_mostrar_agotados = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
+    menu_tv_intervalo_refresco_seg = db.Column(db.Integer, nullable=False, default=60, server_default='60')
     fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     fecha_modificacion = db.Column(
         db.DateTime,

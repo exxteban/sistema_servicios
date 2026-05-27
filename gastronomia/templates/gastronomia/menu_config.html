@@ -111,6 +111,60 @@
                     </div>
                 </div>
             </form>
+
+            {% if menu_tv_config %}
+            <form id="menu-tv-form" class="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-400/30 dark:bg-amber-500/10">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">Pantalla TV</h2>
+                        <p class="mt-1 text-xs font-semibold text-gray-600 dark:text-gray-300">Link publico para mostrar el menu en televisores.</p>
+                    </div>
+                    <a href="{{ menu_tv_public_url }}" target="_blank"
+                       class="rounded-lg bg-gray-900 px-3 py-2 text-xs font-bold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900">
+                        Abrir
+                    </a>
+                </div>
+                <div class="mt-4 space-y-3">
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Link publico
+                        <input id="menu-tv-url" readonly value="{{ menu_tv_public_url }}"
+                               class="mt-1 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                    </label>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Titulo
+                        <input name="menu_tv_titulo" maxlength="160" value="{{ menu_tv_config.titulo }}"
+                               class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                    </label>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Subtitulo
+                        <input name="menu_tv_subtitulo" maxlength="240" value="{{ menu_tv_config.subtitulo or '' }}"
+                               class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            Tema
+                            <select name="menu_tv_tema" class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                                <option value="clasico" {% if menu_tv_config.tema == 'clasico' %}selected{% endif %}>Clasico</option>
+                                <option value="alto_contraste" {% if menu_tv_config.tema == 'alto_contraste' %}selected{% endif %}>Alto contraste</option>
+                            </select>
+                        </label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            Refresco seg.
+                            <input name="menu_tv_intervalo_refresco_seg" type="number" min="15" max="3600" value="{{ menu_tv_config.intervalo_refresco_seg }}"
+                                   class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                        </label>
+                    </div>
+                    <div class="grid gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        <label class="inline-flex items-center gap-2"><input name="menu_tv_publico_activo" type="checkbox" {% if menu_tv_config.publico_activo %}checked{% endif %}> Link publico activo</label>
+                        <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_precios" type="checkbox" {% if menu_tv_config.mostrar_precios %}checked{% endif %}> Mostrar precios</label>
+                        <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_agotados" type="checkbox" {% if menu_tv_config.mostrar_agotados %}checked{% endif %}> Mostrar agotados</label>
+                    </div>
+                    <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900">
+                        <i class="fas fa-tv"></i>Guardar pantalla TV
+                    </button>
+                </div>
+            </form>
+            {% endif %}
         </section>
 
         <section class="space-y-5">
@@ -174,6 +228,7 @@
   const csrf = document.getElementById('csrf-token')?.value || '';
   const alertBox = document.getElementById('gastro-menu-alert');
   const productoForm = document.getElementById('producto-form');
+  const menuTvForm = document.getElementById('menu-tv-form');
   const productoSubmit = document.getElementById('producto-submit');
   const productoCancelEdit = document.getElementById('producto-cancel-edit');
   const showAlert = (message, ok) => {
@@ -245,6 +300,21 @@
       await apiJson(url, {method: productoId ? 'PUT' : 'POST', body: data});
       showAlert('Producto guardado.', true);
       window.location.reload();
+    } catch (error) {
+      showAlert(error.message, false);
+    }
+  });
+  menuTvForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      const data = formData(event.currentTarget);
+      data.menu_tv_publico_activo = event.currentTarget.menu_tv_publico_activo.checked;
+      data.menu_tv_mostrar_precios = event.currentTarget.menu_tv_mostrar_precios.checked;
+      data.menu_tv_mostrar_agotados = event.currentTarget.menu_tv_mostrar_agotados.checked;
+      const response = await apiJson('/api/gastronomia/menu-tv/config', {method: 'PUT', body: data});
+      const urlInput = document.getElementById('menu-tv-url');
+      if (urlInput) urlInput.value = response.public_url || urlInput.value;
+      showAlert('Configuracion de pantalla TV guardada.', true);
     } catch (error) {
       showAlert(error.message, false);
     }

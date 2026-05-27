@@ -37,6 +37,7 @@ def dashboard():
         'salon': tiene_permiso_gastronomia(PERMISO_SALON),
         'cocina': tiene_permiso_gastronomia(PERMISO_COCINA),
         'caja': tiene_permiso_gastronomia(PERMISO_CAJA),
+        'entregas': tiene_permiso_gastronomia(PERMISO_CAJA, PERMISO_COCINA, PERMISO_SALON),
         'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
     }
 
