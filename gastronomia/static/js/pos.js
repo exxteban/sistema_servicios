@@ -326,7 +326,11 @@
       method: orderId ? 'PUT' : 'POST',
       body: JSON.stringify(buildOrderPayload()),
     });
-    lastOrderId = data.pedido.id_pedido;
+    const savedOrderId = Number(data?.pedido?.id_pedido || orderId || activeOrderId || lastOrderId || 0);
+    if (!savedOrderId) {
+      throw new Error('No se pudo guardar el pedido correctamente.');
+    }
+    lastOrderId = savedOrderId;
     if (orderId) {
       hydrateOrder(data.pedido);
       showAlert(`Pedido #${lastOrderId} actualizado.`, true);
