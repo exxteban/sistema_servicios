@@ -57,6 +57,7 @@ def _crear_base(app, nombre_cliente: str, username: str, slug: str):
             categoria_id=categoria.id_categoria,
             nombre='Milanesa',
             precio=25000,
+            imagen_url='https://cdn.example.com/milanesa.jpg',
             orden=1,
         )
         oculto = GastronomiaProducto(
@@ -188,6 +189,34 @@ def test_entregas_incluye_cobrados_sin_fecha_entrega_por_fecha_pago():
     assert [pedido['id_pedido'] for pedido in data['pedidos']] == [pedido_id]
 
 
+def test_entregas_api_pagina_resultados_filtrados_y_resumen_total():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id, _agotado_id = _crear_base(app, 'Resto Entregas Paginadas', 'entregas_paginadas', 'entregas-paginadas')
+
+    _loguear(client, app, 'entregas_paginadas')
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    pedidos = []
+    for index in range(5):
+        pedido_id = _crear_pedido(client, csrf, producto_id, f'Pedido {index}')
+        _entregar(client, csrf, pedido_id)
+        pedidos.append(pedido_id)
+
+    response = client.get('/api/gastronomia/entregas?fecha=hoy&page=2&per_page=2')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['paginacion'] == {
+        'pagina': 2,
+        'por_pagina': 2,
+        'total': 5,
+        'paginas': 3,
+        'tiene_anterior': True,
+        'tiene_siguiente': True,
+    }
+    assert [pedido['id_pedido'] for pedido in data['pedidos']] == [pedidos[2], pedidos[1]]
+    assert data['resumen']['cantidad_entregada'] == 5
+
+
 def test_menu_tv_publico_respeta_visibilidad_disponibilidad_y_estado():
     app = create_app('testing')
     client = app.test_client()
@@ -200,6 +229,7 @@ def test_menu_tv_publico_respeta_visibilidad_disponibilidad_y_estado():
     productos = response.get_json()['categorias'][0]['productos']
     nombres = [producto['nombre'] for producto in productos]
     assert nombres == ['Milanesa']
+    assert productos[0]['imagen_url'] == 'https://cdn.example.com/milanesa.jpg'
     assert 'Secreto' not in nombres
     assert 'Empanada' not in nombres
 

@@ -77,7 +77,8 @@
       ? categoryProducts.filter((product) => `${product.nombre} ${product.descripcion || ''}`.toLowerCase().includes(searchTerm))
       : categoryProducts;
     productsGrid.innerHTML = visible.map((product) => `
-      <button type="button" data-product="${product.id_producto}" class="min-h-36 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
+      <button type="button" data-product="${product.id_producto}" class="pos-product-card min-h-36 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
+        ${renderProductImage(product)}
         <span class="block text-base font-black text-gray-900 dark:text-white">${escapeHtml(product.nombre)}</span>
         <span class="mt-2 line-clamp-2 block min-h-10 text-sm text-gray-600 dark:text-gray-400">${escapeHtml(product.descripcion || 'Toca para configurar el item.')}</span>
         <span class="mt-5 block text-xl font-black text-orange-600 dark:text-orange-300">${money(product.precio)}</span>
@@ -410,6 +411,20 @@
     '"': '&quot;',
     "'": '&#039;',
   }[char]));
+  const safeImageUrl = (value) => {
+    const url = String(value || '').trim();
+    if (!url || /^javascript:/i.test(url)) return '';
+    return url;
+  };
+  const renderProductImage = (product) => {
+    const imageUrl = safeImageUrl(product?.imagen_url);
+    if (!imageUrl) return '';
+    return `
+      <span class="pos-product-image-wrap mb-3 block overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.nombre)}" class="pos-product-image" loading="lazy" onerror="this.closest('.pos-product-image-wrap').remove()">
+      </span>
+    `;
+  };
   document.getElementById('category-tabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-category]');
     if (!button) return;

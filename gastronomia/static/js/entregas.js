@@ -2,10 +2,13 @@
   const form = document.getElementById('entregas-filters');
   const summaryEl = document.getElementById('entregas-summary');
   const listEl = document.getElementById('entregas-list');
+  const paginationEl = document.getElementById('entregas-pagination');
   const alertBox = document.getElementById('entregas-alert');
   const fechaInput = form?.querySelector('[name="fecha"]');
   const searchInput = form?.querySelector('[name="q"]');
-  if (!form || !summaryEl || !listEl || !alertBox || !fechaInput || !searchInput) return;
+  if (!form || !summaryEl || !listEl || !paginationEl || !alertBox || !fechaInput || !searchInput) return;
+
+  const state = {page: 1, perPage: 8};
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -29,6 +32,8 @@
     for (const [key, value] of data.entries()) {
       if (String(value || '').trim()) query.set(key, value);
     }
+    query.set('page', state.page);
+    query.set('per_page', state.perPage);
     return query;
   };
   const load = async () => {
@@ -39,8 +44,10 @@
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || data.error || 'No se pudieron cargar las entregas.');
     if (data.fecha) fechaInput.value = data.fecha;
+    if (data.paginacion?.pagina) state.page = data.paginacion.pagina;
     renderSummary(data.resumen || {});
     renderOrders(data.pedidos || []);
+    renderPagination(data.paginacion || {});
   };
   const renderSummary = (summary) => {
     const cards = [
@@ -61,6 +68,34 @@
     listEl.innerHTML = orders.map(renderOrder).join('') || `
       <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500 dark:border-gray-700 dark:bg-gray-800">
         No hay entregas para los filtros seleccionados.
+      </div>
+    `;
+  };
+  const renderPagination = (pagination) => {
+    const total = Number(pagination.total || 0);
+    const page = Number(pagination.pagina || 1);
+    const perPage = Number(pagination.por_pagina || state.perPage);
+    const pages = Number(pagination.paginas || 1);
+    const start = total ? ((page - 1) * perPage) + 1 : 0;
+    const end = Math.min(page * perPage, total);
+    paginationEl.innerHTML = `
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">
+          Mostrando ${start}-${end} de ${total} entregas
+        </p>
+        <div class="flex items-center gap-2">
+          <button type="button" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}
+                  class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">
+            Anterior
+          </button>
+          <span class="rounded-lg bg-gray-100 px-3 py-2 text-sm font-black text-gray-700 dark:bg-gray-900 dark:text-gray-200">
+            ${page} / ${pages}
+          </span>
+          <button type="button" data-page="${page + 1}" ${page >= pages ? 'disabled' : ''}
+                  class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">
+            Siguiente
+          </button>
+        </div>
       </div>
     `;
   };
@@ -97,11 +132,19 @@
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+    state.page = 1;
     load().catch((error) => showAlert(error.message, false));
   });
   searchInput.addEventListener('input', () => {
     window.clearTimeout(searchInput._timer);
+    state.page = 1;
     searchInput._timer = window.setTimeout(() => load().catch((error) => showAlert(error.message, false)), 300);
+  });
+  paginationEl.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-page]');
+    if (!button || button.disabled) return;
+    state.page = Number(button.dataset.page || 1);
+    load().catch((error) => showAlert(error.message, false));
   });
   load().catch((error) => showAlert(error.message, false));
 }());

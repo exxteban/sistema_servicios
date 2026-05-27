@@ -86,7 +86,23 @@
             border-top: 1px solid rgba(255,255,255,0.12);
             padding: 18px 0;
         }
+        .menu-tv-product--with-image {
+            grid-template-columns: clamp(92px, 8vw, 150px) minmax(0, 1fr) auto;
+            align-items: center;
+        }
         .menu-tv-product:first-of-type { border-top: 0; }
+        .menu-tv-product-image-wrap {
+            aspect-ratio: 4 / 3;
+            overflow: hidden;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+        }
+        .menu-tv-product-image {
+            display: block;
+            height: 100%;
+            width: 100%;
+            object-fit: cover;
+        }
         .menu-tv-product h3 {
             margin: 0;
             font-size: clamp(24px, 2.2vw, 42px);
@@ -124,6 +140,11 @@
             font-size: clamp(28px, 3vw, 54px);
             font-weight: 900;
         }
+        @media (max-width: 720px) {
+            .menu-tv-grid { grid-template-columns: 1fr; }
+            .menu-tv-product--with-image { grid-template-columns: 96px minmax(0, 1fr); }
+            .menu-tv-product--with-image .menu-tv-price { grid-column: 2; }
+        }
     </style>
 </head>
 <body>
@@ -138,6 +159,6 @@
         </header>
         <section id="menu-tv-content" class="menu-tv-grid"></section>
     </main>
-    <script src="{{ url_for('gastronomia.static', filename='js/menu_tv.js', v='20260526-1') }}"></script>
+    <script src="{{ url_for('gastronomia.static', filename='js/menu_tv.js', v='20260527-1') }}"></script>
 </body>
 </html>

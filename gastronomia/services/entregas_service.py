@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from math import ceil
 
 from app import db
 from app.utils.helpers import parse_iso_date, today_local, utc_bounds_for_local_dates, utc_naive_to_local
@@ -10,6 +11,7 @@ from gastronomia.services.pedido_service import ESTADOS_PEDIDO, serializar_pedid
 
 
 TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro'}
+PEDIDOS_POR_PAGINA = 8
 
 
 def buscar_entregas(cliente_id: int, filtros: dict) -> dict:
@@ -57,16 +59,31 @@ def buscar_entregas(cliente_id: int, filtros: dict) -> dict:
         query = query.filter(GastronomiaPedidoPago.id_pago.is_(None))
 
     query = _apply_search(query, filtros.get('q'))
+    total = query.count()
+    por_pagina = min(_parse_positive_int(filtros.get('per_page'), PEDIDOS_POR_PAGINA), 50)
+    paginas = max(1, ceil(total / por_pagina)) if total else 1
+    pagina = min(_parse_positive_int(filtros.get('page'), 1), paginas)
+    fecha_operativa = db.func.coalesce(GastronomiaPedido.fecha_entrega, GastronomiaPedidoPago.fecha_pago)
     pedidos = (
         query
-        .order_by(GastronomiaPedido.fecha_entrega.desc(), GastronomiaPedido.id_pedido.desc())
+        .order_by(fecha_operativa.desc(), GastronomiaPedido.id_pedido.desc())
+        .offset((pagina - 1) * por_pagina)
+        .limit(por_pagina)
         .all()
     )
     pedidos_data = serializar_pedidos(pedidos)
     return {
         'fecha': fecha.isoformat(),
-        'resumen': _resumen(pedidos_data),
+        'resumen': _resumen(query),
         'pedidos': pedidos_data,
+        'paginacion': {
+            'pagina': pagina,
+            'por_pagina': por_pagina,
+            'total': total,
+            'paginas': paginas,
+            'tiene_anterior': pagina > 1,
+            'tiene_siguiente': pagina < paginas,
+        },
     }
 
 
@@ -118,6 +135,14 @@ def _parse_paid_filter(value) -> bool | None:
     return None
 
 
+def _parse_positive_int(value, default: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return number if number > 0 else default
+
+
 def _apply_search(query, value):
     text = str(value or '').strip()
     if not text:
@@ -135,13 +160,18 @@ def _apply_search(query, value):
     return query.filter(db.or_(*conditions))
 
 
-def _resumen(pedidos: list[dict]) -> dict:
-    total_vendido = sum(float(pedido.get('total') or 0) for pedido in pedidos)
-    pagados = [pedido for pedido in pedidos if pedido.get('pagado')]
-    pendiente_pago = len(pedidos) - len(pagados)
-    total_pagado = sum(float(pedido.get('pago', {}).get('total_cobrado') or 0) for pedido in pagados)
+def _resumen(query) -> dict:
+    rows = query.with_entities(
+        GastronomiaPedido.total,
+        GastronomiaPedidoPago.id_pago,
+        GastronomiaPedidoPago.total_cobrado,
+    ).all()
+    total_vendido = sum(float(total or 0) for total, _id_pago, _total_cobrado in rows)
+    pagados = [(id_pago, total_cobrado) for _total, id_pago, total_cobrado in rows if id_pago]
+    pendiente_pago = len(rows) - len(pagados)
+    total_pagado = sum(float(total_cobrado or 0) for _id_pago, total_cobrado in pagados)
     return {
-        'cantidad_entregada': len(pedidos),
+        'cantidad_entregada': len(rows),
         'total_vendido': total_vendido,
         'cantidad_pagada': len(pagados),
         'cantidad_pendiente_pago': pendiente_pago,

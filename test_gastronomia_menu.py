@@ -75,6 +75,7 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
             'nombre': 'Clasica',
             'descripcion': 'Pan, carne y queso',
             'precio': '12500.50',
+            'imagen_url': 'https://cdn.example.com/clasica.jpg',
             'disponible': True,
             'visible': True,
             'ingredientes_removibles': 'Lechuga\nTomate\nCebolla',
@@ -85,12 +86,15 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     assert producto_resp.status_code == 201
     producto = producto_resp.get_json()['producto']
     assert producto['precio'] == 12500.5
+    assert producto['imagen_url'] == 'https://cdn.example.com/clasica.jpg'
     producto_publico = client.get(
         '/api/gastronomia/productos',
         query_string={'publico': '1', 'modificadores': '1'},
     )
     assert producto_publico.status_code == 200
-    grupos = producto_publico.get_json()['productos'][0]['grupos_opciones']
+    producto_pos = producto_publico.get_json()['productos'][0]
+    assert producto_pos['imagen_url'] == 'https://cdn.example.com/clasica.jpg'
+    grupos = producto_pos['grupos_opciones']
     assert grupos[0]['tipo'] == 'ingrediente_removible'
     assert [opcion['nombre'] for opcion in grupos[0]['opciones']] == ['Lechuga', 'Tomate', 'Cebolla']
     with app.app_context():

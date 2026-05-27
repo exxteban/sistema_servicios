@@ -44,8 +44,11 @@
       ${(category.productos || []).map((product) => renderProduct(product, config)).join('')}
     </article>
   `;
-  const renderProduct = (product, config) => `
-    <div class="menu-tv-product ${product.disponible ? '' : 'menu-tv-soldout'}">
+  const renderProduct = (product, config) => {
+    const image = renderProductImage(product);
+    return `
+    <div class="menu-tv-product ${image ? 'menu-tv-product--with-image' : ''} ${product.disponible ? '' : 'menu-tv-soldout'}">
+      ${image}
       <div>
         <h3>${escapeHtml(product.nombre)}</h3>
         ${product.descripcion ? `<p>${escapeHtml(product.descripcion)}</p>` : ''}
@@ -54,6 +57,21 @@
       ${config.mostrar_precios ? `<strong class="menu-tv-price">${money(product.precio)}</strong>` : ''}
     </div>
   `;
+  };
+  const safeImageUrl = (value) => {
+    const url = String(value || '').trim();
+    if (!url || /^javascript:/i.test(url)) return '';
+    return url;
+  };
+  const renderProductImage = (product) => {
+    const imageUrl = safeImageUrl(product?.imagen_url);
+    if (!imageUrl) return '';
+    return `
+      <div class="menu-tv-product-image-wrap">
+        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.nombre)}" class="menu-tv-product-image" loading="lazy" onerror="this.closest('.menu-tv-product-image-wrap').remove()">
+      </div>
+    `;
+  };
   const renderError = (error) => {
     content.innerHTML = `<div class="menu-tv-empty">${escapeHtml(error.message)}</div>`;
   };
