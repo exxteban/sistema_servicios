@@ -3,7 +3,9 @@
   const summaryEl = document.getElementById('entregas-summary');
   const listEl = document.getElementById('entregas-list');
   const alertBox = document.getElementById('entregas-alert');
-  if (!form || !summaryEl || !listEl || !alertBox) return;
+  const fechaInput = form?.querySelector('[name="fecha"]');
+  const searchInput = form?.querySelector('[name="q"]');
+  if (!form || !summaryEl || !listEl || !alertBox || !fechaInput || !searchInput) return;
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -93,14 +95,14 @@
     </article>
   `;
 
-  form.fecha.value = form.fecha.value || todayIso();
+  fechaInput.value = fechaInput.value || todayIso();
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     load().catch((error) => showAlert(error.message, false));
   });
-  form.q.addEventListener('input', () => {
-    window.clearTimeout(form.q._timer);
-    form.q._timer = window.setTimeout(() => load().catch((error) => showAlert(error.message, false)), 300);
+  searchInput.addEventListener('input', () => {
+    window.clearTimeout(searchInput._timer);
+    searchInput._timer = window.setTimeout(() => load().catch((error) => showAlert(error.message, false)), 300);
   });
   load().catch((error) => showAlert(error.message, false));
 }());
