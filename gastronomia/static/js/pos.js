@@ -337,8 +337,8 @@
       return lastOrderId;
     }
     resetDraft();
-    showAlert(`Pedido #${lastOrderId} guardado.`, true);
-    return lastOrderId;
+    showAlert(`Pedido #${savedOrderId} guardado.`, true);
+    return savedOrderId;
   };
 
   const sendKitchen = async () => {
