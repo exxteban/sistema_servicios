@@ -118,6 +118,8 @@ def crear_cola_cobro_central_desde_pedido(
         'gastronomia_enviar_cocina': bool(enviar_cocina),
         'gastronomia_codigo_entrega': pedido.codigo_entrega,
         'gastronomia_referencia_entrega': (pedido.referencia_entrega or '').strip(),
+        'gastronomia_celular_cliente': (pedido.celular_cliente or '').strip(),
+        'gastronomia_direccion_entrega': (pedido.direccion_entrega or '').strip(),
         'gastronomia_tipo_pedido': (pedido.tipo_pedido or '').strip(),
         'gastronomia_mesa': (pedido.mesa or '').strip(),
         'id_usuario_vendedor': int(pedido.usuario_id),
@@ -384,6 +386,11 @@ def _observaciones_venta(pedido: GastronomiaPedido, data: dict) -> str:
     partes = [f'Pedido gastronomia #{pedido.id_pedido}']
     if pedido.mesa:
         partes.append(f'Mesa {pedido.mesa}')
+    if pedido.tipo_pedido == 'delivery':
+        if pedido.celular_cliente:
+            partes.append(f'Celular: {pedido.celular_cliente}')
+        if pedido.direccion_entrega:
+            partes.append(f'Direccion: {pedido.direccion_entrega}')
     if pedido.notas:
         partes.append(f'Notas: {pedido.notas}')
     observacion = (data.get('observacion') or '').strip()

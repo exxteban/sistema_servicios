@@ -187,6 +187,60 @@ def test_caja_lista_y_cobra_pedido_con_descuento():
     assert client.get('/api/gastronomia/caja/pedidos').get_json()['pedidos'] == []
 
 
+def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Delivery', 'resto_delivery')
+    _loguear(client, app, 'resto_delivery')
+    csrf = _csrf(client.get('/gastronomia/pos?tipo=delivery').get_data(as_text=True))
+
+    pedido_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'delivery',
+            'referencia_entrega': 'Carla',
+            'celular_cliente': '0981123456',
+            'direccion_entrega': 'Av. Siempre Viva 742',
+            'tiempo_estimado_minutos': 35,
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert pedido_resp.status_code == 201
+    pedido = pedido_resp.get_json()['pedido']
+    assert pedido['tipo_pedido'] == 'delivery'
+    assert pedido['celular_cliente'] == '0981123456'
+    assert pedido['direccion_entrega'] == 'Av. Siempre Viva 742'
+    assert pedido['tiempo_estimado_minutos'] == 35
+    assert pedido['codigo_publico']
+
+    cocina_resp = client.post(
+        f'/api/gastronomia/pedidos/{pedido["id_pedido"]}/enviar-cocina',
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cocina_resp.status_code == 200
+    assert client.post(
+        f'/api/gastronomia/pedidos/{pedido["id_pedido"]}/estado',
+        json={'estado': 'listo'},
+        headers={'X-CSRFToken': csrf},
+    ).status_code == 200
+    en_camino_resp = client.post(
+        f'/api/gastronomia/pedidos/{pedido["id_pedido"]}/estado',
+        json={'estado': 'en_camino'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert en_camino_resp.status_code == 200
+    assert en_camino_resp.get_json()['pedido']['estado'] == 'en_camino'
+
+    ticket_html = client.get(f'/gastronomia/pedidos/{pedido["id_pedido"]}/ticket?preview=1').get_data(as_text=True)
+    assert 'DELIVERY' in ticket_html
+    assert '0981123456' in ticket_html
+    assert 'Av. Siempre Viva 742' in ticket_html
+    seguimiento_html = client.get(f'/gastronomia/pedido/{pedido["codigo_publico"]}').get_data(as_text=True)
+    assert 'Tu pedido ya salio con el delivery.' in seguimiento_html
+    assert '35 minutos' in seguimiento_html
+
+
 def test_caja_no_cobra_pedido_ajeno_ni_duplica_cobro():
     app = create_app('testing')
     client_uno = app.test_client()

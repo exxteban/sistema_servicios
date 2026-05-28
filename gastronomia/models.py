@@ -3,6 +3,7 @@ from datetime import datetime
 
 from app import db
 import json
+import secrets
 
 
 class GastronomiaClienteConfig(db.Model):
@@ -242,8 +243,13 @@ class GastronomiaPedido(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False, index=True)
     tipo_pedido = db.Column(db.String(30), nullable=False, default='mostrador')
+    codigo_publico = db.Column(db.String(32), unique=True, index=True)
     mesa = db.Column(db.String(40))
     referencia_entrega = db.Column(db.String(80))
+    nombre_cliente = db.Column(db.String(120))
+    celular_cliente = db.Column(db.String(40))
+    direccion_entrega = db.Column(db.String(240))
+    tiempo_estimado_minutos = db.Column(db.Integer)
     estado = db.Column(db.String(30), nullable=False, default='abierto', index=True)
     notas = db.Column(db.Text)
     subtotal = db.Column(db.Numeric(15, 2), nullable=False, default=0)
@@ -272,8 +278,14 @@ class GastronomiaPedido(db.Model):
             'cliente_id': self.cliente_id,
             'usuario_id': self.usuario_id,
             'tipo_pedido': self.tipo_pedido,
+            'codigo_publico': self.codigo_publico,
+            'url_seguimiento': f'/gastronomia/pedido/{self.codigo_publico}' if self.codigo_publico else None,
             'mesa': self.mesa,
             'referencia_entrega': self.referencia_entrega,
+            'nombre_cliente': self.nombre_cliente,
+            'celular_cliente': self.celular_cliente,
+            'direccion_entrega': self.direccion_entrega,
+            'tiempo_estimado_minutos': self.tiempo_estimado_minutos,
             'estado': self.estado,
             'notas': self.notas,
             'subtotal': float(self.subtotal or 0),
@@ -296,6 +308,10 @@ class GastronomiaPedido(db.Model):
 
 def _codigo_entrega(pedido_id) -> str:
     return f'#{int(pedido_id or 0):03d}'
+
+
+def generar_codigo_publico_pedido() -> str:
+    return secrets.token_urlsafe(6).replace('-', '').replace('_', '')[:10].upper()
 
 
 class GastronomiaPedidoItem(db.Model):

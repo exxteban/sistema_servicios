@@ -8,7 +8,12 @@ from app import db
 
 
 ORDER_COLUMN_MIGRATIONS = (
+    ('codigo_publico', 'VARCHAR(32)'),
     ('referencia_entrega', 'VARCHAR(80)'),
+    ('nombre_cliente', 'VARCHAR(120)'),
+    ('celular_cliente', 'VARCHAR(40)'),
+    ('direccion_entrega', 'VARCHAR(240)'),
+    ('tiempo_estimado_minutos', 'INTEGER'),
     ('fecha_inicio_preparacion', 'DATETIME'),
     ('fecha_listo', 'DATETIME'),
     ('fecha_entrega', 'DATETIME'),

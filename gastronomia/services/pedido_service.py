@@ -14,14 +14,15 @@ from gastronomia.models import (
     GastronomiaPedidoItemModificador,
     GastronomiaPedidoPago,
     GastronomiaProducto,
+    generar_codigo_publico_pedido,
 )
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
 
 
-TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro'}
-ESTADOS_PEDIDO = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado', 'cobrado', 'cancelado'}
+TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro', 'delivery'}
+ESTADOS_PEDIDO = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino', 'entregado', 'cobrado', 'cancelado'}
 
 
 def listar_pedidos(cliente_id: int, *, estados: list[str] | None = None) -> list[GastronomiaPedido]:
@@ -138,8 +139,14 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
         'cliente_id': pedido.cliente_id,
         'usuario_id': pedido.usuario_id,
         'tipo_pedido': pedido.tipo_pedido,
+        'codigo_publico': pedido.codigo_publico,
+        'url_seguimiento': f'/gastronomia/pedido/{pedido.codigo_publico}' if pedido.codigo_publico else None,
         'mesa': pedido.mesa,
         'referencia_entrega': pedido.referencia_entrega,
+        'nombre_cliente': pedido.nombre_cliente,
+        'celular_cliente': pedido.celular_cliente,
+        'direccion_entrega': pedido.direccion_entrega,
+        'tiempo_estimado_minutos': pedido.tiempo_estimado_minutos,
         'estado': pedido.estado,
         'notas': pedido.notas,
         'subtotal': float(pedido.subtotal or 0),
@@ -170,8 +177,13 @@ def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPed
         cliente_id=int(cliente_id),
         usuario_id=int(usuario_id),
         tipo_pedido=pedido_data['tipo_pedido'],
+        codigo_publico=_codigo_publico_unico(),
         mesa=pedido_data['mesa'],
         referencia_entrega=pedido_data['referencia_entrega'],
+        nombre_cliente=pedido_data['nombre_cliente'],
+        celular_cliente=pedido_data['celular_cliente'],
+        direccion_entrega=pedido_data['direccion_entrega'],
+        tiempo_estimado_minutos=pedido_data['tiempo_estimado_minutos'],
         notas=pedido_data['notas'],
         estado='abierto',
     )
@@ -199,8 +211,13 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
 
     pedido_data = _validar_datos_pedido(cliente_id, data)
     pedido.tipo_pedido = pedido_data['tipo_pedido']
+    pedido.codigo_publico = pedido.codigo_publico or _codigo_publico_unico()
     pedido.mesa = pedido_data['mesa']
     pedido.referencia_entrega = pedido_data['referencia_entrega']
+    pedido.nombre_cliente = pedido_data['nombre_cliente']
+    pedido.celular_cliente = pedido_data['celular_cliente']
+    pedido.direccion_entrega = pedido_data['direccion_entrega']
+    pedido.tiempo_estimado_minutos = pedido_data['tiempo_estimado_minutos']
     pedido.notas = pedido_data['notas']
     try:
         _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
@@ -235,8 +252,10 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
     estado_anterior = pedido.estado
     if pedido.estado == 'cobrado' and estado != 'cobrado':
         raise ValueError('No se puede modificar un pedido cobrado.')
-    if estado == 'entregado' and pedido.estado not in {'listo', 'entregado'}:
-        raise ValueError('Solo se pueden entregar pedidos listos.')
+    if estado == 'en_camino' and pedido.estado not in {'listo', 'en_camino'}:
+        raise ValueError('Solo se pueden despachar pedidos listos.')
+    if estado == 'entregado' and pedido.estado not in {'listo', 'en_camino', 'entregado'}:
+        raise ValueError('Solo se pueden entregar pedidos listos o en camino.')
     pedido.estado = estado
     if estado == 'enviado_cocina':
         pedido.fecha_envio_cocina = pedido.fecha_envio_cocina or datetime.utcnow()
@@ -287,6 +306,13 @@ def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
         if not mesa_activa:
             raise ValueError('Mesa no encontrada o inactiva.')
         mesa = mesa_activa.nombre
+    nombre_cliente = (data.get('nombre_cliente') or data.get('referencia_entrega') or '').strip()[:120] or None
+    celular_cliente = (data.get('celular_cliente') or '').strip()[:40] or None
+    direccion_entrega = (data.get('direccion_entrega') or '').strip()[:240] or None
+    if tipo == 'delivery' and not celular_cliente:
+        raise ValueError('El celular es obligatorio para pedidos delivery.')
+    if tipo == 'delivery' and not direccion_entrega:
+        raise ValueError('La direccion es obligatoria para pedidos delivery.')
     items_data = data.get('items') or []
     if not isinstance(items_data, list) or not items_data:
         raise ValueError('El pedido debe tener al menos un item.')
@@ -294,9 +320,31 @@ def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
         'tipo_pedido': tipo,
         'mesa': mesa,
         'referencia_entrega': (data.get('referencia_entrega') or '').strip()[:80] or None,
+        'nombre_cliente': nombre_cliente,
+        'celular_cliente': celular_cliente,
+        'direccion_entrega': direccion_entrega,
+        'tiempo_estimado_minutos': _parse_estimated_minutes(data.get('tiempo_estimado_minutos')),
         'notas': (data.get('notas') or '').strip() or None,
         'items': items_data,
     }
+
+
+def _codigo_publico_unico() -> str:
+    for _ in range(10):
+        codigo = generar_codigo_publico_pedido()
+        if not GastronomiaPedido.query.filter_by(codigo_publico=codigo).first():
+            return codigo
+    raise ValueError('No se pudo generar el codigo publico del pedido.')
+
+
+def _parse_estimated_minutes(value) -> int | None:
+    try:
+        minutes = int(value)
+    except (TypeError, ValueError):
+        return None
+    if minutes <= 0:
+        return None
+    return min(minutes, 1440)
 
 
 def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_data: list[dict]) -> None:

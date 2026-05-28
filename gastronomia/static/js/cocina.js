@@ -12,8 +12,8 @@
   let destroyed = false;
   const activeControllers = new Set();
   const pendingOrders = new Set();
-  const kitchenStates = new Set(['enviado_cocina', 'preparando', 'listo']);
-  const nextStateByAction = {tomar: 'preparando', listo: 'listo', entregar: 'entregado'};
+  const kitchenStates = new Set(['enviado_cocina', 'preparando', 'listo', 'en_camino']);
+  const nextStateByAction = {tomar: 'preparando', listo: 'listo', salir: 'en_camino', entregar: 'entregado'};
   const columns = [
     {
       key: 'enviado_cocina',
@@ -39,6 +39,14 @@
       iconBox: 'border-sky-400/30 bg-sky-400/10 text-sky-300',
       counter: 'bg-sky-400 text-slate-950',
     },
+    {
+      key: 'en_camino',
+      title: 'En camino',
+      icon: 'fa-motorcycle',
+      accent: 'text-rose-300',
+      iconBox: 'border-rose-400/30 bg-rose-400/10 text-rose-300',
+      counter: 'bg-rose-400 text-slate-950',
+    },
   ];
   const stateMeta = {
     enviado_cocina: {
@@ -58,6 +66,12 @@
       pill: 'border-sky-400/20 bg-sky-400/15 text-sky-300',
       action: 'Marcar entregado',
       actionClass: 'bg-sky-500 hover:bg-sky-400 focus:ring-sky-300',
+    },
+    en_camino: {
+      label: 'En camino',
+      pill: 'border-rose-400/20 bg-rose-400/15 text-rose-300',
+      action: 'Marcar entregado',
+      actionClass: 'bg-rose-500 hover:bg-rose-400 focus:ring-rose-300',
     },
   };
 
@@ -179,7 +193,7 @@
     board.innerHTML = columns.map((column) => renderColumn(column, groups[column.key] || [])).join('');
     if (!total) {
       board.innerHTML = `
-        <div class="rounded-2xl border border-dashed border-slate-700/80 bg-slate-900/45 p-10 text-center text-slate-400 xl:col-span-3">
+        <div class="rounded-2xl border border-dashed border-slate-700/80 bg-slate-900/45 p-10 text-center text-slate-400 xl:col-span-4">
           <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 text-slate-500">
             <i class="fas fa-check"></i>
           </div>
@@ -227,6 +241,8 @@
           <div class="min-w-0 pt-0.5">
             <p class="truncate text-sm font-black text-slate-200">${displayOrigin(order)}</p>
             ${order.referencia_entrega ? `<p class="mt-1 truncate text-xs font-black uppercase tracking-wide text-sky-200">${escapeHtml(order.referencia_entrega)}</p>` : ''}
+            ${order.celular_cliente ? `<p class="mt-1 truncate text-xs font-bold text-slate-400">Cel: ${escapeHtml(order.celular_cliente)}</p>` : ''}
+            ${order.direccion_entrega ? `<p class="mt-1 truncate text-xs font-bold text-slate-400">${escapeHtml(order.direccion_entrega)}</p>` : ''}
             <div class="mt-3 space-y-1.5">
               ${(order.items || []).map((item) => `
                 <div class="grid grid-cols-[auto_1fr] gap-2 text-sm leading-tight">
@@ -280,12 +296,23 @@
         </div>
       `;
     }
+    if (order.estado === 'listo' && order.tipo_pedido === 'delivery') {
+      return `
+        <div class="mt-3 space-y-2">
+          <div class="rounded-lg border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-center text-sm font-black text-sky-200">
+            Listo para delivery
+          </div>
+          <button type="button" data-action="salir" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.listo.actionClass}${disabledClass}">${pending ? 'Actualizando...' : 'Marcar en camino'}</button>
+        </div>
+      `;
+    }
+    const meta = stateMeta[order.estado] || stateMeta.listo;
     return `
       <div class="mt-3 space-y-2">
         <div class="rounded-lg border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-center text-sm font-black text-sky-200">
           Esperando entrega o retiro
         </div>
-        <button type="button" data-action="entregar" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.listo.actionClass}${disabledClass}">${pending ? 'Actualizando...' : stateMeta.listo.action}</button>
+        <button type="button" data-action="entregar" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${meta.actionClass}${disabledClass}">${pending ? 'Actualizando...' : meta.action}</button>
       </div>
     `;
   };

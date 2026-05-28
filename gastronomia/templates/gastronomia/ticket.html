@@ -64,6 +64,7 @@
         .header { margin-bottom: 4px; text-align: center; }
         .header .nombre { font-size: 13px; font-weight: bold; }
         .pickup-code { font-size: 20px; font-weight: 900; letter-spacing: 1px; }
+        .delivery-title { font-size: 16px; font-weight: 900; letter-spacing: 1px; }
         .info-label { width: {{ 32 if paper_width_value == 80 else 38 }}%; }
         .info-value { width: {{ 68 if paper_width_value == 80 else 62 }}%; }
         .col-prod { width: {{ 58 if paper_width_value == 80 else 50 }}%; }
@@ -150,10 +151,15 @@
             {% if empresa.direccion %}<div class="small">{{ empresa.direccion|thermal_safe }}</div>{% endif %}
         </div>
         <hr class="sep">
+        {% if pedido.tipo_pedido == 'delivery' %}<div class="center delivery-title">DELIVERY</div><hr class="sep">{% endif %}
         <table>
             <tr><td class="info-label">Pedido:</td><td class="info-value">#{{ pedido.id_pedido }}</td></tr>
             <tr><td class="info-label">Codigo:</td><td class="info-value pickup-code">{{ pedido.codigo_entrega }}</td></tr>
-            {% if pedido.referencia_entrega %}<tr><td class="info-label">Cliente:</td><td class="info-value">{{ pedido.referencia_entrega|thermal_safe }}</td></tr>{% endif %}
+            {% if pedido.nombre_cliente or pedido.referencia_entrega %}<tr><td class="info-label">Cliente:</td><td class="info-value">{{ (pedido.nombre_cliente or pedido.referencia_entrega)|thermal_safe }}</td></tr>{% endif %}
+            {% if pedido.celular_cliente %}<tr><td class="info-label">Celular:</td><td class="info-value">{{ pedido.celular_cliente|thermal_safe }}</td></tr>{% endif %}
+            {% if pedido.direccion_entrega %}<tr><td class="info-label">Direccion:</td><td class="info-value">{{ pedido.direccion_entrega|thermal_safe }}</td></tr>{% endif %}
+            {% if pedido.referencia_entrega and pedido.nombre_cliente and pedido.referencia_entrega != pedido.nombre_cliente %}<tr><td class="info-label">Ref:</td><td class="info-value">{{ pedido.referencia_entrega|thermal_safe }}</td></tr>{% endif %}
+            {% if pedido.tiempo_estimado_minutos %}<tr><td class="info-label">Estimado:</td><td class="info-value">{{ pedido.tiempo_estimado_minutos }} min</td></tr>{% endif %}
             <tr><td class="info-label">Fecha:</td><td class="info-value">{{ fecha_ticket|local_strftime('%d/%m/%Y %H:%M') }}</td></tr>
             <tr><td class="info-label">Origen:</td><td class="info-value">{% if pedido.mesa %}Mesa {{ pedido.mesa|thermal_safe }}{% else %}{{ pedido.tipo_pedido|replace('_', ' ')|title|thermal_safe }}{% endif %}</td></tr>
             <tr><td class="info-label">Estado:</td><td class="info-value">{{ pedido.estado|replace('_', ' ')|title|thermal_safe }}</td></tr>
@@ -183,6 +189,7 @@
             <tr><td class="left bold">TOTAL</td><td class="right bold">{{ thermal_amount(total_cobrado) }}</td></tr>
             <tr><td class="left">Pago</td><td class="right">{{ metodo_pago_label|thermal_safe }}</td></tr>
         </table>
+        {% if pedido.codigo_publico %}<hr class="sep"><div class="small">Seguimiento: {{ url_for('gastronomia.seguimiento_pedido_publico', codigo_publico=pedido.codigo_publico, _external=True)|thermal_safe }}</div>{% endif %}
         {% if pago and pago.observacion %}<hr class="sep"><div class="small">Obs: {{ pago.observacion|thermal_safe }}</div>{% endif %}
         <hr class="sep">
         <div class="center small">{{ footer_text|thermal_safe }}</div>
@@ -194,9 +201,15 @@
 {% endif %}{% if empresa.telefono %}{{ thermal_center('Tel: ' ~ empresa.telefono|thermal_safe, thermal_width) }}
 {% endif %}{% if empresa.direccion %}{{ thermal_center(empresa.direccion|thermal_safe, thermal_width) }}
 {% endif %}{{ '-' * thermal_width }}
+{% if pedido.tipo_pedido == 'delivery' %}{{ thermal_center('DELIVERY', thermal_width) }}
+{{ '-' * thermal_width }}
+{% endif %}
 {{ thermal_pair('Pedido:', '#' ~ pedido.id_pedido, thermal_width) }}
 {{ thermal_pair('Codigo:', pedido.codigo_entrega, thermal_width) }}
-{% if pedido.referencia_entrega %}{{ thermal_pair('Cliente:', pedido.referencia_entrega|thermal_safe, thermal_width) }}
+{% if pedido.nombre_cliente or pedido.referencia_entrega %}{{ thermal_pair('Cliente:', (pedido.nombre_cliente or pedido.referencia_entrega)|thermal_safe, thermal_width) }}
+{% endif %}{% if pedido.celular_cliente %}{{ thermal_pair('Celular:', pedido.celular_cliente|thermal_safe, thermal_width) }}
+{% endif %}{% if pedido.direccion_entrega %}Direccion: {{ pedido.direccion_entrega|thermal_safe }}
+{% endif %}{% if pedido.tiempo_estimado_minutos %}{{ thermal_pair('Estimado:', pedido.tiempo_estimado_minutos ~ ' min', thermal_width) }}
 {% endif %}
 {{ thermal_pair('Fecha:', fecha_ticket|local_strftime('%d/%m/%Y %H:%M'), thermal_width) }}
 {{ thermal_pair('Origen:', ('Mesa ' ~ pedido.mesa) if pedido.mesa else pedido.tipo_pedido|replace('_', ' ')|title, thermal_width) }}
@@ -212,6 +225,10 @@
 {% if descuento > 0 %}{{ thermal_pair('Descuento', '- ' ~ thermal_amount(descuento), thermal_width) }}
 {% endif %}{{ thermal_pair('TOTAL', thermal_amount(total_cobrado), thermal_width) }}
 {{ thermal_pair('Pago', metodo_pago_label|thermal_safe, thermal_width) }}
+{% if pedido.codigo_publico %}{{ '-' * thermal_width }}
+Seguimiento:
+{{ url_for('gastronomia.seguimiento_pedido_publico', codigo_publico=pedido.codigo_publico, _external=True)|thermal_safe }}
+{% endif %}
 {% if pago and pago.observacion %}Obs: {{ pago.observacion|thermal_safe }}
 {% endif %}{{ '-' * thermal_width }}
 {{ footer_text|thermal_safe }}</pre>

@@ -14,6 +14,7 @@ from gastronomia.routes import entregas_routes as _entregas_routes  # noqa: F401
 from gastronomia.routes import menu_routes as _menu_routes  # noqa: F401
 from gastronomia.routes import menu_tv_routes as _menu_tv_routes  # noqa: F401
 from gastronomia.routes import pos_routes as _pos_routes  # noqa: F401
+from gastronomia.routes import public_routes as _public_routes  # noqa: F401
 from gastronomia.routes import reportes_routes as _reportes_routes  # noqa: F401
 from gastronomia.routes import salon_routes as _salon_routes  # noqa: F401
 

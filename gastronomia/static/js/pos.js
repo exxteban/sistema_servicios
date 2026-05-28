@@ -18,6 +18,10 @@
   const root = document.querySelector('[data-gastro-pos]');
   const orderTypeInput = document.getElementById('order-type');
   const deliveryReferenceInput = document.getElementById('delivery-reference');
+  const deliveryFields = document.getElementById('delivery-fields');
+  const deliveryPhoneInput = document.getElementById('delivery-phone');
+  const deliveryAddressInput = document.getElementById('delivery-address');
+  const deliveryEstimateInput = document.getElementById('delivery-estimate');
   const tableNameInput = document.getElementById('table-name');
   const tablePickerSection = document.getElementById('table-picker-section');
   const tableGrid = document.getElementById('table-grid');
@@ -118,6 +122,9 @@
     if (tablePickerSection) {
       tablePickerSection.classList.toggle('hidden', currentType !== 'mesa');
     }
+    if (deliveryFields) {
+      deliveryFields.classList.toggle('hidden', currentType !== 'delivery');
+    }
     if (currentType !== 'mesa' && tableNameInput) {
       tableNameInput.value = '';
       renderMesas();
@@ -179,6 +186,9 @@
     setEditingOrderState(null);
     if (orderTypeInput) orderTypeInput.value = 'mostrador';
     if (deliveryReferenceInput) deliveryReferenceInput.value = '';
+    if (deliveryPhoneInput) deliveryPhoneInput.value = '';
+    if (deliveryAddressInput) deliveryAddressInput.value = '';
+    if (deliveryEstimateInput) deliveryEstimateInput.value = '';
     if (tableNameInput) tableNameInput.value = '';
     const orderNotesInput = document.getElementById('order-notes');
     if (orderNotesInput) orderNotesInput.value = '';
@@ -190,6 +200,9 @@
     setEditingOrderState(order.id_pedido, order);
     if (orderTypeInput) orderTypeInput.value = order.tipo_pedido || 'mostrador';
     if (deliveryReferenceInput) deliveryReferenceInput.value = order.referencia_entrega || '';
+    if (deliveryPhoneInput) deliveryPhoneInput.value = order.celular_cliente || '';
+    if (deliveryAddressInput) deliveryAddressInput.value = order.direccion_entrega || '';
+    if (deliveryEstimateInput) deliveryEstimateInput.value = order.tiempo_estimado_minutos || '';
     if (tableNameInput) tableNameInput.value = order.mesa || '';
     const orderNotesInput = document.getElementById('order-notes');
     if (orderNotesInput) orderNotesInput.value = order.notas || '';
@@ -317,6 +330,10 @@
     tipo_pedido: orderTypeInput?.value || 'mostrador',
     mesa: tableNameInput?.value.trim() || '',
     referencia_entrega: deliveryReferenceInput?.value.trim() || '',
+    nombre_cliente: deliveryReferenceInput?.value.trim() || '',
+    celular_cliente: deliveryPhoneInput?.value.trim() || '',
+    direccion_entrega: deliveryAddressInput?.value.trim() || '',
+    tiempo_estimado_minutos: deliveryEstimateInput?.value || null,
     notas: document.getElementById('order-notes').value.trim(),
     items: cart.map((item) => ({
       producto_id: item.producto_id,
@@ -330,6 +347,10 @@
     if (!cart.length) throw new Error('El pedido debe tener items.');
     if ((orderTypeInput?.value || '') === 'mesa' && !(tableNameInput?.value || '').trim()) {
       throw new Error('Selecciona una mesa.');
+    }
+    if ((orderTypeInput?.value || '') === 'delivery') {
+      if (!(deliveryPhoneInput?.value || '').trim()) throw new Error('Carga el celular del cliente.');
+      if (!(deliveryAddressInput?.value || '').trim()) throw new Error('Carga la direccion de entrega.');
     }
     const orderId = activeOrderId;
     const data = await apiJson(orderId ? `/api/gastronomia/pedidos/${orderId}` : '/api/gastronomia/pedidos', {
@@ -487,12 +508,15 @@
   });
 
   const mesaInicial = root?.dataset.mesaInicial || '';
+  const tipoInicial = root?.dataset.tipoInicial || '';
   const pedidoInicialId = Number(root?.dataset.pedidoInicialId || 0);
   if (pedidoInicialId) {
     loadOrder(pedidoInicialId).catch((error) => showAlert(error.message, false));
   } else if (mesaInicial) {
     setOrderType('mesa');
     setMesa(mesaInicial);
+  } else if (tipoInicial === 'delivery') {
+    setOrderType('delivery');
   }
   syncOrderTypeUi();
   loadProducts().catch((error) => showAlert(error.message, false));

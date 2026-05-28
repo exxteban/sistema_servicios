@@ -10,7 +10,7 @@ from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem, Gastron
 from gastronomia.services.pedido_service import ESTADOS_PEDIDO, serializar_pedidos
 
 
-TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro'}
+TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro', 'delivery'}
 PEDIDOS_POR_PAGINA = 8
 
 
@@ -151,6 +151,9 @@ def _apply_search(query, value):
     conditions = [
         GastronomiaPedido.mesa.ilike(like),
         GastronomiaPedido.referencia_entrega.ilike(like),
+        GastronomiaPedido.nombre_cliente.ilike(like),
+        GastronomiaPedido.celular_cliente.ilike(like),
+        GastronomiaPedido.direccion_entrega.ilike(like),
         GastronomiaPedido.tipo_pedido.ilike(like),
         GastronomiaPedido.items.any(GastronomiaPedidoItem.nombre_producto.ilike(like)),
     ]
