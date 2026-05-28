@@ -230,6 +230,55 @@ def test_api_menu_no_filtra_datos_entre_clientes():
     assert [item['nombre'] for item in listado_uno.get_json()['categorias']] == ['Pizzas']
 
 
+def test_api_menu_reordena_categorias_y_prioriza_comidas_por_defecto():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id = _crear_restaurante(app, 'Resto Orden', 'resto_orden')
+
+    with app.app_context():
+        categorias = [
+            GastronomiaCategoria(cliente_id=cliente_id, nombre='Bebidas con gas'),
+            GastronomiaCategoria(cliente_id=cliente_id, nombre='Hamburguesas'),
+            GastronomiaCategoria(cliente_id=cliente_id, nombre='Cervezas'),
+            GastronomiaCategoria(cliente_id=cliente_id, nombre='Sandwiches'),
+        ]
+        db.session.add_all(categorias)
+        db.session.commit()
+        ids_por_nombre = {categoria.nombre: categoria.id_categoria for categoria in categorias}
+
+    _loguear(client, app, 'resto_orden')
+    listado = client.get('/api/gastronomia/categorias')
+    assert listado.status_code == 200
+    assert [item['nombre'] for item in listado.get_json()['categorias']] == [
+        'Hamburguesas',
+        'Sandwiches',
+        'Bebidas con gas',
+        'Cervezas',
+    ]
+
+    page = client.get('/gastronomia/menu')
+    csrf = _csrf(page.get_data(as_text=True))
+    nuevo_orden = [
+        ids_por_nombre['Cervezas'],
+        ids_por_nombre['Bebidas con gas'],
+        ids_por_nombre['Hamburguesas'],
+        ids_por_nombre['Sandwiches'],
+    ]
+    reordenar_resp = client.put(
+        '/api/gastronomia/categorias/orden',
+        json={'categorias': nuevo_orden},
+        headers={'X-CSRFToken': csrf},
+    )
+
+    assert reordenar_resp.status_code == 200
+    categorias_reordenadas = reordenar_resp.get_json()['categorias']
+    assert [item['id_categoria'] for item in categorias_reordenadas] == nuevo_orden
+    assert [item['orden'] for item in categorias_reordenadas] == [10, 20, 30, 40]
+
+    listado_actualizado = client.get('/api/gastronomia/categorias')
+    assert [item['id_categoria'] for item in listado_actualizado.get_json()['categorias']] == nuevo_orden
+
+
 def test_api_menu_guarda_imagen_subida_y_reemplaza_archivo_anterior():
     app = create_app('testing')
     client = app.test_client()

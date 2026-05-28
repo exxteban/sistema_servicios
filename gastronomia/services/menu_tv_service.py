@@ -6,7 +6,7 @@ import unicodedata
 
 from app import db
 from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaProducto
-from gastronomia.services.menu_service import parse_bool, parse_int
+from gastronomia.services.menu_service import ordenar_categorias, parse_bool, parse_int
 
 
 DEFAULT_REFRESH_SECONDS = 60
@@ -60,9 +60,9 @@ def listar_categorias_menu_tv(config: GastronomiaClienteConfig) -> list[dict]:
     categorias = (
         GastronomiaCategoria.query
         .filter_by(cliente_id=int(config.cliente_id), activo=True, visible=True)
-        .order_by(GastronomiaCategoria.orden.asc(), GastronomiaCategoria.nombre.asc())
         .all()
     )
+    categorias = ordenar_categorias(categorias)
     productos = _productos_visibles(config)
     productos_por_categoria: dict[int, list[dict]] = {}
     for producto in productos:

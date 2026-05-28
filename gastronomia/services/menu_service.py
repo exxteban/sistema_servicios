@@ -2,11 +2,24 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+import unicodedata
 
 from sqlalchemy.exc import IntegrityError
 
 from app import db
 from gastronomia.models import GastronomiaCategoria, GastronomiaProducto
+
+
+COMIDA_KEYWORDS = {
+    'hamburguesa', 'burger', 'sandwich', 'pizza', 'lomo', 'lomito', 'papa',
+    'frita', 'milanesa', 'empanada', 'pasta', 'carne', 'pollo', 'minuta',
+    'plato', 'comida', 'postre', 'helado',
+}
+BEBIDA_KEYWORDS = {
+    'bebida', 'gaseosa', 'soda', 'agua', 'cerveza', 'cafe', 'jugo',
+    'licuado', 'vino', 'whisky', 'trago', 'coctel', 'cocktail',
+}
+BEBIDA_PHRASES = {'con gas', 'sin gas'}
 
 
 def parse_bool(value, default: bool = False) -> bool:
@@ -46,6 +59,10 @@ def parse_price(value) -> Decimal:
     return price.quantize(Decimal('0.01'))
 
 
+def ordenar_categorias(categorias: list[GastronomiaCategoria]) -> list[GastronomiaCategoria]:
+    return sorted(categorias, key=_categoria_sort_key)
+
+
 def listar_categorias(cliente_id: int, *, incluir_ocultas: bool = True) -> list[GastronomiaCategoria]:
     query = GastronomiaCategoria.query.filter(
         GastronomiaCategoria.cliente_id == int(cliente_id),
@@ -53,7 +70,7 @@ def listar_categorias(cliente_id: int, *, incluir_ocultas: bool = True) -> list[
     )
     if not incluir_ocultas:
         query = query.filter(GastronomiaCategoria.visible.is_(True))
-    return query.order_by(GastronomiaCategoria.orden.asc(), GastronomiaCategoria.nombre.asc()).all()
+    return ordenar_categorias(query.all())
 
 
 def listar_productos(
@@ -157,6 +174,28 @@ def actualizar_estado_producto(cliente_id: int, producto_id: int, data: dict) ->
     return producto
 
 
+def reordenar_categorias(cliente_id: int, categoria_ids: list[int]) -> list[GastronomiaCategoria]:
+    ids = [parse_int(value, 0) for value in (categoria_ids or [])]
+    if not ids or any(categoria_id <= 0 for categoria_id in ids):
+        raise ValueError('El orden recibido no es valido.')
+    if len(ids) != len(set(ids)):
+        raise ValueError('El orden recibido contiene categorias repetidas.')
+
+    categorias = GastronomiaCategoria.query.filter(
+        GastronomiaCategoria.cliente_id == int(cliente_id),
+        GastronomiaCategoria.activo.is_(True),
+        GastronomiaCategoria.id_categoria.in_(ids),
+    ).all()
+    categorias_por_id = {int(categoria.id_categoria): categoria for categoria in categorias}
+    if len(categorias_por_id) != len(ids):
+        raise ValueError('El orden incluye categorias invalidas para este cliente.')
+
+    for index, categoria_id in enumerate(ids, start=1):
+        categorias_por_id[categoria_id].orden = index * 10
+    db.session.commit()
+    return listar_categorias(cliente_id)
+
+
 def eliminar_categoria(cliente_id: int, categoria_id: int) -> bool:
     categoria = obtener_categoria(cliente_id, categoria_id)
     if not categoria:
@@ -183,6 +222,24 @@ def _commit_or_raise_duplicate(message: str) -> None:
     except IntegrityError as exc:
         db.session.rollback()
         raise ValueError(message) from exc
+
+
+def _categoria_sort_key(categoria: GastronomiaCategoria) -> tuple[int, int, str]:
+    nombre = _normalizar_nombre_categoria(categoria.nombre)
+    return (int(categoria.orden or 0), _categoria_prioridad_default(nombre), nombre)
+
+
+def _categoria_prioridad_default(nombre: str) -> int:
+    if any(keyword in nombre for keyword in COMIDA_KEYWORDS):
+        return 0
+    if any(phrase in nombre for phrase in BEBIDA_PHRASES) or any(keyword in nombre for keyword in BEBIDA_KEYWORDS):
+        return 2
+    return 1
+
+
+def _normalizar_nombre_categoria(nombre: str | None) -> str:
+    texto = unicodedata.normalize('NFKD', nombre or '')
+    return ''.join(char for char in texto if not unicodedata.combining(char)).lower().strip()
 
 
 def _stock_disponible_desde_payload(data: dict) -> int:

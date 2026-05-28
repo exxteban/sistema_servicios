@@ -18,6 +18,7 @@ from gastronomia.services.menu_service import (
     listar_productos,
     obtener_categoria,
     obtener_producto,
+    reordenar_categorias,
 )
 from gastronomia.services.modificadores_service import (
     eliminar_grupo,
@@ -99,6 +100,24 @@ def categorias():
     incluir_ocultas = request.args.get('publico') != '1'
     items = listar_categorias(cliente_id, incluir_ocultas=incluir_ocultas)
     return jsonify({'ok': True, 'categorias': [item.to_dict() for item in items]})
+
+
+@gastronomia_api_bp.route('/categorias/orden', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def actualizar_orden_categorias():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    data = _payload()
+    categoria_ids = data.get('categorias') or data.get('categoria_ids') or data.get('ids') or []
+    if not isinstance(categoria_ids, list):
+        return jsonify({'error': 'validation_error', 'mensaje': 'El orden recibido no es valido.'}), 400
+    try:
+        categorias_ordenadas = reordenar_categorias(cliente_id, categoria_ids)
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'categorias': [item.to_dict() for item in categorias_ordenadas]})
 
 
 @gastronomia_api_bp.route('/categorias', methods=['POST'])
