@@ -3,6 +3,7 @@
   const alertBox = document.getElementById('gastro-menu-alert');
   const tbody = document.getElementById('categorias-body');
   let draggedRow = null;
+  let armedDragRow = null;
   let previousOrder = [];
 
   const rows = () => Array.from(tbody?.querySelectorAll('[data-category-order-row]') || []);
@@ -67,10 +68,22 @@
 
   const rowFromEvent = (event) => event.target.closest('[data-category-order-row]');
 
+  tbody?.addEventListener('pointerdown', (event) => {
+    const handle = event.target.closest('[data-category-drag-handle]');
+    if (!handle) return;
+    armedDragRow = handle.closest('[data-category-order-row]');
+  });
+
+  tbody?.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-category-drag-handle]')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
   tbody?.addEventListener('dragstart', (event) => {
     const handle = event.target.closest('[data-category-drag-handle]');
     const row = rowFromEvent(event);
-    if (!handle || !row) {
+    if (!row || (armedDragRow !== row && !handle)) {
       event.preventDefault();
       return;
     }
@@ -103,5 +116,6 @@
   tbody?.addEventListener('dragend', () => {
     if (draggedRow) draggedRow.classList.remove('is-dragging');
     draggedRow = null;
+    armedDragRow = null;
   });
 }());

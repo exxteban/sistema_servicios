@@ -3,6 +3,7 @@
   const alertBox = document.getElementById('pos-alert');
   const list = document.getElementById('category-tabs');
   let draggedItem = null;
+  let armedDragItem = null;
   let previousOrder = [];
   let suppressNextClick = false;
 
@@ -52,7 +53,19 @@
 
   const itemFromEvent = (event) => event.target.closest('[data-category-order-row]');
 
+  list?.addEventListener('pointerdown', (event) => {
+    const handle = event.target.closest('[data-category-drag-handle]');
+    if (!handle) return;
+    armedDragItem = handle.closest('[data-category-order-row]');
+  });
+
   list?.addEventListener('click', (event) => {
+    if (event.target.closest('[data-category-drag-handle]')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressNextClick = false;
+      return;
+    }
     if (!suppressNextClick) return;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -62,7 +75,7 @@
   list?.addEventListener('dragstart', (event) => {
     const handle = event.target.closest('[data-category-drag-handle]');
     const item = itemFromEvent(event);
-    if (!handle || !item) {
+    if (!item || (armedDragItem !== item && !handle)) {
       event.preventDefault();
       return;
     }
@@ -96,5 +109,6 @@
   list?.addEventListener('dragend', () => {
     if (draggedItem) draggedItem.classList.remove('is-dragging');
     draggedItem = null;
+    armedDragItem = null;
   });
 }());

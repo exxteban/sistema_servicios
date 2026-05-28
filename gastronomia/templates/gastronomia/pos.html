@@ -30,11 +30,11 @@
     <div id="pos-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
     <div class="pos-touch-layout grid gap-4">
-        <aside class="pos-category-panel rounded-xl border border-gray-200 bg-white p-2.5 shadow-sm dark:border-gray-700 dark:bg-gray-800" aria-label="Categorias del menu">
-            <div class="mb-2">
-                <h2 class="text-sm font-black text-gray-900 dark:text-white">Categorias</h2>
-                <p class="mt-1 text-[11px] font-bold text-gray-400 dark:text-gray-500">Arrastra el grip para ordenar</p>
-                <span class="mt-1.5 block h-px w-full bg-gradient-to-r from-orange-200 to-transparent dark:from-orange-500/40"></span>
+        <aside class="pos-category-panel rounded-xl border border-gray-200 bg-white p-2 shadow-sm dark:border-gray-700 dark:bg-gray-800" aria-label="Categorias del menu">
+            <div class="mb-1.5">
+                <h2 class="text-[13px] font-black text-gray-900 dark:text-white">Categorias</h2>
+                <p class="mt-0.5 text-[10px] font-bold text-gray-400 dark:text-gray-500">Arrastra el grip para ordenar</p>
+                <span class="mt-1 block h-px w-full bg-gradient-to-r from-orange-200 to-transparent dark:from-orange-500/40"></span>
             </div>
             <div class="pos-category-list" id="category-tabs">
                 <button type="button" data-category="" class="pos-category active"><i class="fas fa-border-all"></i><span>Todo</span></button>
@@ -76,7 +76,7 @@
                 </button>
                 {% endfor %}
             </div>
-            <a href="{{ url_for('gastronomia.menu_config') }}" class="pos-category-admin mt-3">
+            <a href="{{ url_for('gastronomia.menu_config') }}" class="pos-category-admin mt-2">
                 <i class="fas fa-cog"></i><span>Administracion</span>
             </a>
         </aside>
@@ -224,19 +224,19 @@
     .pos-category-list {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-        gap: 0.42rem;
+        gap: 0.32rem;
     }
     .pos-category {
         display: inline-flex;
         width: 100%;
-        min-height: 40px;
+        min-height: 36px;
         align-items: center;
         justify-content: flex-start;
-        gap: 0.6rem;
+        gap: 0.5rem;
         border: 1px solid rgb(229 231 235);
-        border-radius: 10px;
-        padding: 8px 10px;
-        font-size: 0.8rem;
+        border-radius: 9px;
+        padding: 7px 8px;
+        font-size: 0.74rem;
         font-weight: 850;
         background: white;
         color: rgb(55 65 81);
@@ -248,18 +248,18 @@
         box-shadow: 0 12px 22px rgba(234, 88, 12, 0.18);
     }
     .pos-category i {
-        width: 1.05rem;
-        flex: 0 0 1.05rem;
+        width: 0.95rem;
+        flex: 0 0 0.95rem;
         text-align: center;
     }
     .pos-category-drag-handle {
         margin-left: auto;
         display: inline-flex;
-        min-height: 1.65rem;
-        min-width: 1.65rem;
+        min-height: 1.45rem;
+        min-width: 1.45rem;
         align-items: center;
         justify-content: center;
-        border-radius: 0.6rem;
+        border-radius: 0.5rem;
         color: rgb(148 163 184);
         cursor: grab;
     }
@@ -288,16 +288,16 @@
     }
     .pos-category-admin {
         display: inline-flex;
-        min-height: 40px;
+        min-height: 36px;
         width: 100%;
         align-items: center;
         justify-content: center;
-        gap: 0.55rem;
+        gap: 0.45rem;
         border: 1px solid rgb(229 231 235);
-        border-radius: 11px;
+        border-radius: 9px;
         background: white;
-        padding: 0.55rem 0.7rem;
-        font-size: 0.78rem;
+        padding: 0.45rem 0.6rem;
+        font-size: 0.72rem;
         font-weight: 900;
         color: rgb(55 65 81);
     }
@@ -472,7 +472,7 @@
     }
     @media (min-width: 1024px) {
         .pos-touch-layout {
-            grid-template-columns: 165px minmax(0, 1fr);
+            grid-template-columns: 150px minmax(0, 1fr);
         }
         .pos-category-panel {
             position: sticky;
@@ -493,7 +493,7 @@
     }
     @media (min-width: 1280px) {
         .pos-touch-layout {
-            grid-template-columns: 170px minmax(460px, 1fr) minmax(320px, 380px);
+            grid-template-columns: 155px minmax(460px, 1fr) minmax(320px, 380px);
         }
         .pos-order-panel,
         .pos-checkout-panel {
@@ -502,7 +502,7 @@
     }
     @media (min-width: 1440px) {
         .pos-touch-layout {
-            grid-template-columns: 175px minmax(520px, 1fr) minmax(320px, 380px) minmax(250px, 300px);
+            grid-template-columns: 160px minmax(520px, 1fr) minmax(320px, 380px) minmax(250px, 300px);
         }
         .pos-order-panel {
             grid-column: auto;
@@ -525,5 +525,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260528-3') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-2') }}"></script>
 {% endblock %}
