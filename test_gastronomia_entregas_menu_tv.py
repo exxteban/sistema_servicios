@@ -236,19 +236,20 @@ def test_menu_tv_publico_respeta_visibilidad_disponibilidad_y_estado():
     assert response.status_code == 200
     productos = response.get_json()['categorias'][0]['productos']
     nombres = [producto['nombre'] for producto in productos]
-    assert nombres == ['Milanesa', 'Empanada']
+    assert nombres == ['Milanesa']
     assert productos[0]['imagen_url'] == 'https://cdn.example.com/milanesa.jpg'
     assert 'Secreto' not in nombres
     assert 'Solo menu' not in nombres
-    assert productos[1]['disponible'] is False
 
     with app.app_context():
         config = GastronomiaClienteConfig.query.filter_by(cliente_id=cliente_id).first()
         config.menu_tv_mostrar_agotados = True
         db.session.commit()
     con_agotados = client.get('/api/gastronomia/public/menu-tv/resto-tv')
-    nombres = [producto['nombre'] for producto in con_agotados.get_json()['categorias'][0]['productos']]
+    productos = con_agotados.get_json()['categorias'][0]['productos']
+    nombres = [producto['nombre'] for producto in productos]
     assert nombres == ['Milanesa', 'Empanada']
+    assert productos[1]['disponible'] is False
 
     with app.app_context():
         config = GastronomiaClienteConfig.query.filter_by(cliente_id=cliente_id).first()

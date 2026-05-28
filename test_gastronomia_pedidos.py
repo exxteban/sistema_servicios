@@ -6,6 +6,7 @@ from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
     GastronomiaGrupoOpciones,
+    GastronomiaMesa,
     GastronomiaOpcionProducto,
     GastronomiaPedido,
     GastronomiaPedidoEvento,
@@ -96,10 +97,17 @@ def _agregar_producto(app, cliente_id: int, categoria_nombre: str, nombre: str, 
         return producto.id_producto
 
 
+def _agregar_mesa(app, cliente_id: int, nombre: str) -> None:
+    with app.app_context():
+        db.session.add(GastronomiaMesa(cliente_id=cliente_id, nombre=nombre))
+        db.session.commit()
+
+
 def test_pos_page_carga_y_pedido_se_guarda_con_totales_backend():
     app = create_app('testing')
     client = app.test_client()
     cliente_id, producto_id, opcion_id = _crear_menu_para_pedidos(app)
+    _agregar_mesa(app, cliente_id, 'A1')
     _loguear(client, app, 'resto_uno')
 
     page = client.get('/gastronomia/pos')
@@ -184,6 +192,7 @@ def test_pedido_abierto_se_puede_editar_y_recalcula_total():
     client = app.test_client()
     cliente_id, producto_id, opcion_id = _crear_menu_para_pedidos(app, 'Resto Edicion', 'resto_edicion')
     producto_secundario_id = _agregar_producto(app, cliente_id, 'Hamburguesas', 'Doble', 22000)
+    _agregar_mesa(app, cliente_id, 'M1')
     _loguear(client, app, 'resto_edicion')
 
     csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
@@ -311,6 +320,32 @@ def test_stock_controlado_descuenta_agota_y_se_restaura_al_cancelar():
     with app.app_context():
         producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
         assert producto.stock_disponible == 3
+        assert producto.disponible is True
+
+
+def test_stock_controlado_rechaza_sobreventa_y_conserva_stock():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id, _opcion_id = _crear_menu_para_pedidos(app, 'Resto Sin Sobreventa', 'resto_sin_sobreventa')
+    with app.app_context():
+        producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
+        producto.control_stock_venta = True
+        producto.stock_disponible = 1
+        db.session.commit()
+    _loguear(client, app, 'resto_sin_sobreventa')
+
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    crear_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 2}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert crear_resp.status_code == 400
+    assert 'No hay stock suficiente' in crear_resp.get_json()['mensaje']
+
+    with app.app_context():
+        producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
+        assert producto.stock_disponible == 1
         assert producto.disponible is True
 
 

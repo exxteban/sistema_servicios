@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
+from sqlalchemy import case
+
 from app import db
 from gastronomia.models import (
     GastronomiaPedido,
@@ -13,6 +15,7 @@ from gastronomia.models import (
     GastronomiaPedidoPago,
     GastronomiaProducto,
 )
+from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
 
@@ -161,7 +164,7 @@ def obtener_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido | None:
 
 
 def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPedido:
-    pedido_data = _validar_datos_pedido(data)
+    pedido_data = _validar_datos_pedido(cliente_id, data)
 
     pedido = GastronomiaPedido(
         cliente_id=int(cliente_id),
@@ -194,7 +197,7 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
     if pedido.pago:
         raise ValueError('No se puede editar un pedido que ya fue cobrado.')
 
-    pedido_data = _validar_datos_pedido(data)
+    pedido_data = _validar_datos_pedido(cliente_id, data)
     pedido.tipo_pedido = pedido_data['tipo_pedido']
     pedido.mesa = pedido_data['mesa']
     pedido.referencia_entrega = pedido_data['referencia_entrega']
@@ -272,13 +275,18 @@ def registrar_evento_pedido(pedido: GastronomiaPedido, tipo: str) -> Gastronomia
     return evento
 
 
-def _validar_datos_pedido(data: dict) -> dict:
+def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
     tipo = (data.get('tipo_pedido') or 'mostrador').strip().lower()
     if tipo not in TIPOS_PEDIDO:
         raise ValueError('Tipo de pedido invalido.')
     mesa = (data.get('mesa') or '').strip()[:40] or None
-    if tipo == 'mesa' and not mesa:
-        raise ValueError('La mesa es obligatoria para pedidos de mesa.')
+    if tipo == 'mesa':
+        if not mesa:
+            raise ValueError('La mesa es obligatoria para pedidos de mesa.')
+        mesa_activa = obtener_mesa_activa_por_nombre(cliente_id, mesa)
+        if not mesa_activa:
+            raise ValueError('Mesa no encontrada o inactiva.')
+        mesa = mesa_activa.nombre
     items_data = data.get('items') or []
     if not isinstance(items_data, list) or not items_data:
         raise ValueError('El pedido debe tener al menos un item.')
@@ -347,21 +355,57 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
 
 
 def _consumir_stock_producto(cliente_id: int, producto_id: int, cantidad: int) -> None:
-    producto = GastronomiaProducto.query.filter(
+    cantidad = max(0, int(cantidad or 0))
+    if cantidad <= 0:
+        return
+
+    producto = db.session.query(
+        GastronomiaProducto.nombre,
+        GastronomiaProducto.control_stock_venta,
+    ).filter(
         GastronomiaProducto.cliente_id == int(cliente_id),
         GastronomiaProducto.id_producto == int(producto_id),
         GastronomiaProducto.activo.is_(True),
     ).first()
     if not producto or not producto.control_stock_venta:
         return
-    stock_actual = max(0, int(producto.stock_disponible or 0))
-    cantidad = max(0, int(cantidad or 0))
-    if cantidad > stock_actual:
-        raise ValueError(f'No hay stock suficiente de "{producto.nombre}". Quedan {stock_actual}.')
-    producto.stock_disponible = stock_actual - cantidad
-    if producto.stock_disponible <= 0:
-        producto.disponible = False
-    db.session.add(producto)
+
+    stock_restante = GastronomiaProducto.stock_disponible - cantidad
+    filas_actualizadas = (
+        GastronomiaProducto.query
+        .filter(
+            GastronomiaProducto.cliente_id == int(cliente_id),
+            GastronomiaProducto.id_producto == int(producto_id),
+            GastronomiaProducto.activo.is_(True),
+            GastronomiaProducto.control_stock_venta.is_(True),
+            GastronomiaProducto.stock_disponible >= cantidad,
+        )
+        .update(
+            {
+                GastronomiaProducto.stock_disponible: stock_restante,
+                GastronomiaProducto.disponible: case(
+                    (stock_restante <= 0, False),
+                    else_=GastronomiaProducto.disponible,
+                ),
+            },
+            synchronize_session=False,
+        )
+    )
+    if filas_actualizadas:
+        return
+
+    stock_actual = (
+        db.session.query(GastronomiaProducto.stock_disponible)
+        .filter(
+            GastronomiaProducto.cliente_id == int(cliente_id),
+            GastronomiaProducto.id_producto == int(producto_id),
+            GastronomiaProducto.activo.is_(True),
+            GastronomiaProducto.control_stock_venta.is_(True),
+        )
+        .scalar()
+    )
+    stock_actual = max(0, int(stock_actual or 0))
+    raise ValueError(f'No hay stock suficiente de "{producto.nombre}". Quedan {stock_actual}.')
 
 
 def _restaurar_stock_items(items: list[GastronomiaPedidoItem]) -> None:

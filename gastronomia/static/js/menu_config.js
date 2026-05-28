@@ -451,7 +451,7 @@
       const data = formData(event.currentTarget);
       data.menu_tv_publico_activo = event.currentTarget.menu_tv_publico_activo.checked;
       data.menu_tv_mostrar_precios = event.currentTarget.menu_tv_mostrar_precios.checked;
-      data.menu_tv_mostrar_agotados = true;
+      data.menu_tv_mostrar_agotados = Boolean(event.currentTarget.menu_tv_mostrar_agotados?.checked);
       const response = await apiJson('/api/gastronomia/menu-tv/config', {method: 'PUT', body: data});
       const urlInput = document.getElementById('menu-tv-url');
       if (urlInput) urlInput.value = response.public_url || urlInput.value;

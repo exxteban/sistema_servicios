@@ -229,6 +229,47 @@ def test_caja_no_cobra_pedido_ajeno_ni_duplica_cobro():
         assert pedido.estado == 'listo'
 
 
+def test_caja_reserva_pago_antes_de_crear_venta_central(monkeypatch):
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto(app, 'Resto Cobro Atomico', 'resto_cobro_atomico')
+    _loguear(client, app, 'resto_cobro_atomico')
+    _abrir_caja(app, 'resto_cobro_atomico')
+
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+    pedido_id = _crear_pedido_listo(client, csrf, producto_id)
+
+    from gastronomia.services import caja_service
+
+    original = caja_service.crear_venta_central_desde_pedido
+    reserva_observada = {'ok': False}
+
+    def _crear_venta_verificando_reserva(pedido, usuario_id, data, *, descuento):
+        pago_reservado = GastronomiaPedidoPago.query.filter_by(
+            cliente_id=cliente_id,
+            pedido_id=pedido_id,
+        ).one()
+        assert pago_reservado.id_venta is None
+        reserva_observada['ok'] = True
+        return original(pedido, usuario_id, data, descuento=descuento)
+
+    monkeypatch.setattr(caja_service, 'crear_venta_central_desde_pedido', _crear_venta_verificando_reserva)
+
+    cobrar_resp = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'metodo_pago': 'efectivo'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cobrar_resp.status_code == 200
+    assert reserva_observada['ok'] is True
+
+    with app.app_context():
+        pagos = GastronomiaPedidoPago.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).all()
+        assert len(pagos) == 1
+        assert pagos[0].id_venta is not None
+        assert Venta.query.count() == 1
+
+
 def test_pedido_abierto_puede_cobrarse_y_luego_enviarse_a_cocina():
     app = create_app('testing')
     client = app.test_client()

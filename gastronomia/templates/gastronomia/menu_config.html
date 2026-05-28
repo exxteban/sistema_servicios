@@ -325,6 +325,7 @@
                                 <div class="grid gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
                                     <label class="inline-flex items-center gap-2"><input name="menu_tv_publico_activo" type="checkbox" {% if menu_tv_config.publico_activo %}checked{% endif %}> Link publico activo</label>
                                     <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_precios" type="checkbox" {% if menu_tv_config.mostrar_precios %}checked{% endif %}> Mostrar precios</label>
+                                    <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_agotados" type="checkbox" {% if menu_tv_config.mostrar_agotados %}checked{% endif %}> Mostrar agotados</label>
                                 </div>
                                 <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900">
                                     <i class="fas fa-tv"></i>Guardar pantalla TV
@@ -466,5 +467,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='20260527-2') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/category_order.js', v='20260528-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

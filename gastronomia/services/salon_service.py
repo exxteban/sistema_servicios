@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from app import db
 from gastronomia.models import GastronomiaMesa, GastronomiaPedido
+from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.pedido_service import obtener_pedido, registrar_evento_pedido
 
@@ -20,7 +21,7 @@ def listar_mesas(cliente_id: int, *, incluir_inactivas: bool = False) -> list[Ga
 def listar_salon(cliente_id: int) -> list[dict]:
     mesas = listar_mesas(cliente_id)
     pedidos = _pedidos_activos_por_mesa(cliente_id)
-    return [_mesa_con_estado(mesa, pedidos.get(mesa.nombre.strip().lower())) for mesa in mesas]
+    return [_mesa_con_estado(mesa, pedidos.get(mesa.nombre.strip().lower(), [])) for mesa in mesas]
 
 
 def obtener_mesa(cliente_id: int, mesa_id: int) -> GastronomiaMesa | None:
@@ -71,16 +72,17 @@ def mover_pedido_mesa(cliente_id: int, pedido_id: int, data: dict) -> Gastronomi
     mesa_nombre = (data.get('mesa') or '').strip()[:40]
     if not mesa_nombre:
         raise ValueError('La mesa destino es obligatoria.')
-    if not _mesa_activa_por_nombre(cliente_id, mesa_nombre):
+    mesa = obtener_mesa_activa_por_nombre(cliente_id, mesa_nombre)
+    if not mesa:
         raise ValueError('Mesa destino no encontrada.')
     pedido.tipo_pedido = 'mesa'
-    pedido.mesa = mesa_nombre
+    pedido.mesa = mesa.nombre
     db.session.commit()
     registrar_evento_pedido(pedido, 'pedido_mesa_movido')
     return pedido
 
 
-def _pedidos_activos_por_mesa(cliente_id: int) -> dict[str, GastronomiaPedido]:
+def _pedidos_activos_por_mesa(cliente_id: int) -> dict[str, list[GastronomiaPedido]]:
     pedidos = (
         GastronomiaPedido.query
         .filter(
@@ -92,18 +94,21 @@ def _pedidos_activos_por_mesa(cliente_id: int) -> dict[str, GastronomiaPedido]:
         .order_by(GastronomiaPedido.fecha_creacion.desc(), GastronomiaPedido.id_pedido.desc())
         .all()
     )
-    por_mesa = {}
+    por_mesa: dict[str, list[GastronomiaPedido]] = {}
     for pedido in pedidos:
         key = (pedido.mesa or '').strip().lower()
-        if key and key not in por_mesa:
-            por_mesa[key] = pedido
+        if key:
+            por_mesa.setdefault(key, []).append(pedido)
     return por_mesa
 
 
-def _mesa_con_estado(mesa: GastronomiaMesa, pedido: GastronomiaPedido | None) -> dict:
+def _mesa_con_estado(mesa: GastronomiaMesa, pedidos: list[GastronomiaPedido]) -> dict:
+    pedido_principal = pedidos[0] if pedidos else None
     data = mesa.to_dict()
-    data['estado_salon'] = _estado_salon_para_pedido(pedido)
-    data['pedido_activo'] = pedido.to_dict() if pedido else None
+    data['estado_salon'] = _estado_salon_para_pedido(pedido_principal)
+    data['pedido_activo'] = pedido_principal.to_dict() if pedido_principal else None
+    data['pedidos_activos'] = [pedido.to_dict() for pedido in pedidos]
+    data['pedidos_activos_count'] = len(pedidos)
     return data
 
 
@@ -117,14 +122,6 @@ def _estado_salon_para_pedido(pedido: GastronomiaPedido | None) -> str:
     if pedido.estado in {'listo', 'entregado'}:
         return 'listo'
     return 'libre'
-
-
-def _mesa_activa_por_nombre(cliente_id: int, nombre: str) -> GastronomiaMesa | None:
-    return GastronomiaMesa.query.filter(
-        GastronomiaMesa.cliente_id == int(cliente_id),
-        GastronomiaMesa.nombre == nombre,
-        GastronomiaMesa.activo.is_(True),
-    ).first()
 
 
 def _parse_bool(value) -> bool:

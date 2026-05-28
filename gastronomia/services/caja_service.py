@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 
+from sqlalchemy.exc import IntegrityError
+
 from app import db
 from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
@@ -60,32 +62,28 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     if descuento > subtotal:
         raise ValueError('El descuento no puede superar el total del pedido.')
 
-    integracion = crear_venta_central_desde_pedido(
-        pedido,
-        usuario_id,
-        data,
-        descuento=descuento,
-    )
+    pago = _reservar_pago_pedido(cliente_id, usuario_id, pedido, metodo_pago, subtotal, descuento, data)
+
+    try:
+        integracion = crear_venta_central_desde_pedido(
+            pedido,
+            usuario_id,
+            data,
+            descuento=descuento,
+        )
+    except ValueError:
+        db.session.rollback()
+        raise
     venta = integracion['venta']
     sesion = integracion['sesion']
     metodo = integracion['metodo']
     movimiento = integracion['movimiento']
 
-    pago = GastronomiaPedidoPago(
-        cliente_id=int(cliente_id),
-        pedido_id=int(pedido.id_pedido),
-        usuario_id=int(usuario_id),
-        id_sesion_caja=int(sesion.id_sesion),
-        id_metodo_pago=int(metodo.id_metodo_pago),
-        id_venta=int(venta.id_venta),
-        id_movimiento_caja=int(movimiento.id_movimiento_caja) if movimiento else None,
-        metodo_pago=integracion['metodo_slug'] or metodo_pago,
-        subtotal=subtotal,
-        descuento_monto=descuento,
-        total_cobrado=subtotal - descuento,
-        observacion=(data.get('observacion') or '').strip()[:255] or None,
-    )
-    db.session.add(pago)
+    pago.id_sesion_caja = int(sesion.id_sesion)
+    pago.id_metodo_pago = int(metodo.id_metodo_pago)
+    pago.id_venta = int(venta.id_venta)
+    pago.id_movimiento_caja = int(movimiento.id_movimiento_caja) if movimiento else None
+    pago.metodo_pago = integracion['metodo_slug'] or metodo_pago
     registrar_auditoria(
         accion='cobrar_pedido_gastronomia',
         modulo='gastronomia',
@@ -103,6 +101,34 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     db.session.commit()
     registrar_evento_pedido(pedido, 'pedido_cobrado')
     return pedido
+
+
+def _reservar_pago_pedido(
+    cliente_id: int,
+    usuario_id: int,
+    pedido: GastronomiaPedido,
+    metodo_pago: str,
+    subtotal: Decimal,
+    descuento: Decimal,
+    data: dict,
+) -> GastronomiaPedidoPago:
+    pago = GastronomiaPedidoPago(
+        cliente_id=int(cliente_id),
+        pedido_id=int(pedido.id_pedido),
+        usuario_id=int(usuario_id),
+        metodo_pago=metodo_pago,
+        subtotal=subtotal,
+        descuento_monto=descuento,
+        total_cobrado=subtotal - descuento,
+        observacion=(data.get('observacion') or '').strip()[:255] or None,
+    )
+    db.session.add(pago)
+    try:
+        db.session.flush()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError('El pedido ya fue cobrado.')
+    return pago
 
 
 def _parse_decimal(value, default: Decimal) -> Decimal:

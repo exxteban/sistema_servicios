@@ -47,18 +47,26 @@
     title.textContent = config.titulo || 'Menu';
     subtitle.textContent = config.subtitulo || '';
     content.className = 'menu-tv-grid';
-    content.innerHTML = (data.categorias || []).map((category) => renderCategory(category, config)).join('') || `
+    const categorias = (data.categorias || []).filter((category) => productsForCategory(category, config).length);
+    content.innerHTML = categorias.map((category) => renderCategory(category, config)).join('') || `
       <div class="menu-tv-empty">Menu no disponible por el momento.</div>
     `;
     window.requestAnimationFrame(() => setupShowcase(data));
   };
 
-  const renderCategory = (category, config) => `
-    <article class="menu-tv-category">
-      <h2>${escapeHtml(category.nombre)}</h2>
-      ${(category.productos || []).map((product) => renderProduct(product, config)).join('')}
-    </article>
-  `;
+  const productsForCategory = (category, config) => (
+    category.productos || []
+  ).filter((product) => config.mostrar_agotados || product.disponible);
+
+  const renderCategory = (category, config) => {
+    const products = productsForCategory(category, config);
+    return `
+      <article class="menu-tv-category">
+        <h2>${escapeHtml(category.nombre)}</h2>
+        ${products.map((product) => renderProduct(product, config)).join('')}
+      </article>
+    `;
+  };
 
   const renderProduct = (product, config) => {
     const image = renderProductImage(product);
@@ -132,8 +140,9 @@
     const layout = estimateSlideLayout();
     const pages = [];
     let current = [];
+    const config = data.config || {};
     (data.categorias || []).forEach((category) => {
-      const products = category.productos || [];
+      const products = productsForCategory(category, config);
       for (let offset = 0; offset < products.length; offset += layout.productsPerCard) {
         const chunk = products.slice(offset, offset + layout.productsPerCard);
         if (current.length >= layout.columns) {

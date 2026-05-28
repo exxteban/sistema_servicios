@@ -5,6 +5,7 @@
   let draggedRow = null;
   let armedDragRow = null;
   let previousOrder = [];
+  let orderSaveQueued = false;
 
   const rows = () => Array.from(tbody?.querySelectorAll('[data-category-order-row]') || []);
   const currentOrder = () => rows().map((row) => Number(row.dataset.categoryOrderRow)).filter(Boolean);
@@ -68,6 +69,15 @@
 
   const rowFromEvent = (event) => event.target.closest('[data-category-order-row]');
 
+  const persistChangedOrder = () => {
+    if (!draggedRow || orderSaveQueued) return;
+    const nextOrder = currentOrder();
+    if (nextOrder.join(',') !== previousOrder.join(',')) {
+      orderSaveQueued = true;
+      saveOrder(nextOrder);
+    }
+  };
+
   tbody?.addEventListener('pointerdown', (event) => {
     const handle = event.target.closest('[data-category-drag-handle]');
     if (!handle) return;
@@ -89,6 +99,7 @@
     }
     draggedRow = row;
     previousOrder = currentOrder();
+    orderSaveQueued = false;
     row.classList.add('is-dragging');
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', row.dataset.categoryOrderRow || '');
@@ -107,13 +118,11 @@
   tbody?.addEventListener('drop', (event) => {
     if (!draggedRow) return;
     event.preventDefault();
-    const nextOrder = currentOrder();
-    if (nextOrder.join(',') !== previousOrder.join(',')) {
-      saveOrder(nextOrder);
-    }
+    persistChangedOrder();
   });
 
   tbody?.addEventListener('dragend', () => {
+    persistChangedOrder();
     if (draggedRow) draggedRow.classList.remove('is-dragging');
     draggedRow = null;
     armedDragRow = null;

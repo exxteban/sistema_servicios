@@ -11,7 +11,7 @@ from gastronomia.services.salon_service import (
     mover_pedido_mesa,
     obtener_mesa,
 )
-from gastronomia.services.permisos import PERMISO_SALON, requiere_permiso_gastronomia
+from gastronomia.services.permisos import PERMISO_POS, PERMISO_SALON, requiere_permiso_gastronomia
 
 
 gastronomia_salon_api_bp = Blueprint('gastronomia_salon_api', __name__)
@@ -42,7 +42,7 @@ def salon_estado():
 
 @gastronomia_salon_api_bp.route('/salon/mesas', methods=['GET'])
 @login_required
-@requiere_permiso_gastronomia(PERMISO_SALON)
+@requiere_permiso_gastronomia(PERMISO_SALON, PERMISO_POS)
 def mesas():
     cliente_id, error = _cliente_o_error()
     if error:

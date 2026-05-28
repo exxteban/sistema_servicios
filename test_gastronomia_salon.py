@@ -1,7 +1,7 @@
 import re
 
 from app import create_app, db
-from app.models import Cliente, Usuario
+from app.models import Cliente, Permiso, Rol, Usuario
 from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
@@ -77,6 +77,24 @@ def _crear_pedido_mesa(client, csrf, producto_id, mesa):
     return response.get_json()['pedido']['id_pedido']
 
 
+def _crear_usuario_con_permisos(cliente_id: int, username: str, codigos: list[str]) -> None:
+    rol = Rol(nombre=f'Rol {username}', descripcion='Rol de prueba gastronomia', nivel_jerarquia=1)
+    permisos = Permiso.query.filter(Permiso.codigo.in_(codigos)).all()
+    assert {permiso.codigo for permiso in permisos} == set(codigos)
+    rol.permisos.extend(permisos)
+    db.session.add(rol)
+    db.session.flush()
+    usuario = Usuario(
+        id_cliente=cliente_id,
+        username=username,
+        nombre_completo=f'Usuario {username}',
+        id_rol=rol.id_rol,
+        activo=True,
+    )
+    usuario.set_password('clave123')
+    db.session.add(usuario)
+
+
 def test_salon_crea_mesas_y_calcula_estado_desde_pedidos():
     app = create_app('testing')
     client = app.test_client()
@@ -117,6 +135,8 @@ def test_salon_crea_mesas_y_calcula_estado_desde_pedidos():
 
     salon_ocupado = client.get('/api/gastronomia/salon/estado').get_json()['mesas']
     assert salon_ocupado[0]['pedido_activo']['id_pedido'] == pedido_id
+    assert [pedido['id_pedido'] for pedido in salon_ocupado[0]['pedidos_activos']] == [pedido_id]
+    assert salon_ocupado[0]['pedidos_activos_count'] == 1
     assert salon_ocupado[0]['estado_salon'] == 'ocupada'
 
     client.post(
@@ -135,6 +155,83 @@ def test_salon_crea_mesas_y_calcula_estado_desde_pedidos():
     with app.app_context():
         mesa = GastronomiaMesa.query.filter_by(cliente_id=cliente_id, id_mesa=mesa_id).first()
         assert mesa.nombre == 'M1'
+
+
+def test_pedidos_de_mesa_validan_mesa_activa_y_salon_muestra_duplicados():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Salon Validacion', 'resto_salon_validacion')
+    _loguear(client, app, 'resto_salon_validacion')
+    csrf = _csrf(client.get('/gastronomia/salon').get_data(as_text=True))
+
+    inexistente = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'mesa',
+            'mesa': 'Fantasma',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert inexistente.status_code == 400
+    assert 'Mesa no encontrada' in inexistente.get_json()['mensaje']
+
+    client.post(
+        '/api/gastronomia/salon/mesas',
+        json={'nombre': 'D1', 'activo': False},
+        headers={'X-CSRFToken': csrf},
+    )
+    inactiva = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'mesa',
+            'mesa': 'D1',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert inactiva.status_code == 400
+
+    client.post('/api/gastronomia/salon/mesas', json={'nombre': 'M2'}, headers={'X-CSRFToken': csrf})
+    pedido_uno_id = _crear_pedido_mesa(client, csrf, producto_id, 'M2')
+    pedido_dos_id = _crear_pedido_mesa(client, csrf, producto_id, 'M2')
+
+    mesas = client.get('/api/gastronomia/salon/estado').get_json()['mesas']
+    mesa = next(item for item in mesas if item['nombre'] == 'M2')
+    assert mesa['pedidos_activos_count'] == 2
+    assert [pedido['id_pedido'] for pedido in mesa['pedidos_activos']] == [pedido_dos_id, pedido_uno_id]
+    assert mesa['pedido_activo']['id_pedido'] == pedido_dos_id
+
+
+def test_pos_puede_listar_mesas_sin_permiso_de_administrar_salon():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, _producto_id = _crear_producto(app, 'Resto POS Mesas', 'resto_pos_mesas_admin')
+    with app.app_context():
+        db.session.add(GastronomiaMesa(cliente_id=cliente_id, nombre='P1', capacidad=2))
+        _crear_usuario_con_permisos(
+            cliente_id,
+            'resto_pos_mesas',
+            ['gastronomia_acceso', 'gastronomia_pos'],
+        )
+        db.session.commit()
+
+    _loguear(client, app, 'resto_pos_mesas')
+    pos_page = client.get('/gastronomia/pos')
+    assert pos_page.status_code == 200
+    csrf = _csrf(pos_page.get_data(as_text=True))
+
+    mesas_resp = client.get('/api/gastronomia/salon/mesas')
+    assert mesas_resp.status_code == 200
+    mesas = mesas_resp.get_json()['mesas']
+    assert [mesa['nombre'] for mesa in mesas] == ['P1']
+
+    crear_resp = client.post(
+        '/api/gastronomia/salon/mesas',
+        json={'nombre': 'P2'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert crear_resp.status_code == 403
 
 
 def test_salon_mueve_pedido_y_respeta_cliente():

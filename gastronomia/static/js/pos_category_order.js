@@ -5,6 +5,7 @@
   let draggedItem = null;
   let armedDragItem = null;
   let previousOrder = [];
+  let orderSaveQueued = false;
   let suppressNextClick = false;
 
   const items = () => Array.from(list?.querySelectorAll('[data-category-order-row]') || []);
@@ -53,6 +54,16 @@
 
   const itemFromEvent = (event) => event.target.closest('[data-category-order-row]');
 
+  const persistChangedOrder = () => {
+    if (!draggedItem || orderSaveQueued) return;
+    const nextOrder = currentOrder();
+    if (nextOrder.join(',') !== previousOrder.join(',')) {
+      orderSaveQueued = true;
+      suppressNextClick = true;
+      saveOrder(nextOrder);
+    }
+  };
+
   list?.addEventListener('pointerdown', (event) => {
     const handle = event.target.closest('[data-category-drag-handle]');
     if (!handle) return;
@@ -81,6 +92,7 @@
     }
     draggedItem = item;
     previousOrder = currentOrder();
+    orderSaveQueued = false;
     item.classList.add('is-dragging');
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', item.dataset.categoryOrderRow || '');
@@ -100,13 +112,11 @@
     if (!draggedItem) return;
     event.preventDefault();
     suppressNextClick = true;
-    const nextOrder = currentOrder();
-    if (nextOrder.join(',') !== previousOrder.join(',')) {
-      saveOrder(nextOrder);
-    }
+    persistChangedOrder();
   });
 
   list?.addEventListener('dragend', () => {
+    persistChangedOrder();
     if (draggedItem) draggedItem.classList.remove('is-dragging');
     draggedItem = null;
     armedDragItem = null;

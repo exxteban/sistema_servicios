@@ -44,12 +44,15 @@
     `;
   };
   const renderMesa = (mesa) => {
-    const pedido = mesa.pedido_activo;
+    const pedidos = Array.isArray(mesa.pedidos_activos) && mesa.pedidos_activos.length
+      ? mesa.pedidos_activos
+      : (mesa.pedido_activo ? [mesa.pedido_activo] : []);
+    const pedidoEditable = pedidos.find((pedido) => pedido?.estado === 'abierto' && !pedido?.pagado);
     const statusClass = estadoStyles[mesa.estado_salon] || 'bg-gray-100 text-gray-800';
-    const posUrl = pedido?.estado === 'abierto' && !pedido?.pagado
-      ? `/gastronomia/pos?pedido=${encodeURIComponent(pedido.id_pedido)}`
+    const posUrl = pedidoEditable
+      ? `/gastronomia/pos?pedido=${encodeURIComponent(pedidoEditable.id_pedido)}`
       : `/gastronomia/pos?mesa=${encodeURIComponent(mesa.nombre)}`;
-    const actionLabel = pedido?.estado === 'abierto' && !pedido?.pagado ? 'Editar pedido abierto' : 'Abrir pedido';
+    const actionLabel = pedidoEditable ? 'Editar pedido abierto' : 'Abrir pedido';
     return `
       <article class="salon-card" data-table="${mesa.id_mesa}">
         <div class="flex items-start justify-between gap-3">
@@ -59,15 +62,12 @@
           </div>
           <span class="rounded-full px-3 py-1 text-xs font-bold ${statusClass}">${escapeHtml(mesa.estado_salon)}</span>
         </div>
-        ${pedido ? `
-          <div class="mt-4 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/40">
-            <div class="flex justify-between gap-3">
-              <strong class="text-gray-900 dark:text-white">Pedido #${pedido.id_pedido}</strong>
-              <span class="font-bold text-emerald-700 dark:text-emerald-300">${money(pedido.total)}</span>
-            </div>
-            <p class="mt-1 text-sm text-gray-500">${escapeHtml(pedido.estado)}</p>
-          </div>
+        ${pedidos.length > 1 ? `
+          <p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+            ${pedidos.length} pedidos activos en esta mesa
+          </p>
         ` : ''}
+        ${pedidos.map(renderPedidoResumen).join('')}
         <div class="mt-4 grid gap-2">
           <a href="${posUrl}" class="rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-indigo-700">
             ${actionLabel}
@@ -76,6 +76,15 @@
       </article>
     `;
   };
+  const renderPedidoResumen = (pedido) => `
+    <div class="mt-4 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/40">
+      <div class="flex justify-between gap-3">
+        <strong class="text-gray-900 dark:text-white">Pedido #${pedido.id_pedido}</strong>
+        <span class="font-bold text-emerald-700 dark:text-emerald-300">${money(pedido.total)}</span>
+      </div>
+      <p class="mt-1 text-sm text-gray-500">${escapeHtml(pedido.estado)}</p>
+    </div>
+  `;
   const renderMoveGrid = () => {
     if (!moveTableGrid) return;
     moveTableGrid.innerHTML = mesas.map((mesa) => `
