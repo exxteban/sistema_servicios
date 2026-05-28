@@ -104,7 +104,7 @@ def categorias():
 
 @gastronomia_api_bp.route('/categorias/orden', methods=['PUT'])
 @login_required
-@requiere_permiso_gastronomia(PERMISO_MENU)
+@requiere_permiso_gastronomia(PERMISO_MENU, PERMISO_POS)
 def actualizar_orden_categorias():
     cliente_id, error = _cliente_o_error()
     if error:
