@@ -114,6 +114,8 @@ def anular(id):
         flash('Esta venta ya está anulada.', 'warning')
         return redirect(url_for('ventas.detalle', id=id))
 
+    gastronomia_eventos_post_commit = []
+
     sesion_venta = getattr(venta, 'sesion_caja', None)
     if sesion_venta is not None and (sesion_venta.estado or '').strip().lower() == 'cerrada':
         flash(
@@ -287,7 +289,27 @@ def anular(id):
         id_usuario=getattr(current_user, 'id_usuario', None),
     )
     venta.estado = 'anulada'
+
+    try:
+        from gastronomia.services.venta_integration_service import registrar_anulacion_gastronomia_desde_venta_central
+
+        gastronomia_eventos_post_commit = registrar_anulacion_gastronomia_desde_venta_central(
+            venta,
+            int(current_user.id_usuario),
+        )
+    except Exception:
+        current_app.logger.exception('No se pudo sincronizar la anulacion con Gastronomia.')
+        db.session.rollback()
+        flash('No se pudo anular el pedido gastronomico asociado. Intenta nuevamente.', 'danger')
+        return redirect(url_for('ventas.detalle', id=id))
+
     db.session.commit()
+
+    if gastronomia_eventos_post_commit:
+        from gastronomia.services.pedido_service import registrar_evento_pedido
+
+        for evento in gastronomia_eventos_post_commit:
+            registrar_evento_pedido(evento['pedido'], evento['tipo'])
 
     try:
         id_aut = int(getattr(autorizacion, 'id_autorizacion', 0) or 0) if autorizacion else None
@@ -519,4 +541,3 @@ def crear_devolucion(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-

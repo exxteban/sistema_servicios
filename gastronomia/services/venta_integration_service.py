@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from app import db
+from app.models import Configuracion
 from app.models.caja import ColaCobro, MovimientoCaja, SesionCaja
 from app.models.cliente import Cliente
 from app.models.servicio import Servicio
@@ -186,6 +187,31 @@ def registrar_pago_gastronomia_desde_venta_central(cola_metadata: dict, venta, u
     return eventos
 
 
+def registrar_anulacion_gastronomia_desde_venta_central(venta, usuario_id: int) -> list[dict]:
+    pago = GastronomiaPedidoPago.query.filter_by(id_venta=int(venta.id_venta)).first()
+    if not pago:
+        return []
+    pedido = GastronomiaPedido.query.filter(
+        GastronomiaPedido.id_pedido == int(pago.pedido_id),
+        GastronomiaPedido.cliente_id == int(pago.cliente_id),
+    ).first()
+    if not pedido:
+        db.session.delete(pago)
+        return []
+
+    eventos = []
+    if pedido.estado != 'cancelado':
+        from gastronomia.services.pedido_service import _restaurar_stock_items
+
+        _restaurar_stock_items(pedido.items.all())
+        pedido.estado = 'cancelado'
+        pedido.fecha_modificacion = datetime.utcnow()
+        eventos.append({'pedido': pedido, 'tipo': 'pedido_cancelado'})
+    db.session.delete(pago)
+    eventos.append({'pedido': pedido, 'tipo': 'pedido_cobro_anulado'})
+    return eventos
+
+
 def _sesion_abierta_usuario(usuario_id: int):
     return SesionCaja.query.filter_by(id_usuario=int(usuario_id), estado='abierta').first()
 
@@ -195,6 +221,7 @@ def _resolver_metodo_pago(data: dict) -> MetodoPago:
     if metodo_id not in (None, ''):
         metodo = db.session.get(MetodoPago, int(metodo_id))
         if metodo and bool(getattr(metodo, 'activo', True)):
+            _validar_referencia_metodo(metodo, data)
             return metodo
         raise ValueError('Metodo de pago no encontrado o inactivo.')
 
@@ -204,6 +231,7 @@ def _resolver_metodo_pago(data: dict) -> MetodoPago:
     for patron in METODO_BUSQUEDAS.get(metodo_slug, (metodo_slug,)):
         metodo = MetodoPago.query.filter(MetodoPago.nombre.ilike(f'%{patron}%'), MetodoPago.activo == True).first()
         if metodo:
+            _validar_referencia_metodo(metodo, data)
             return metodo
     raise ValueError('Metodo de pago invalido o no configurado.')
 
@@ -222,6 +250,13 @@ def _metodo_pago_mixto() -> MetodoPago:
     db.session.add(metodo)
     db.session.flush()
     return metodo
+
+
+def _validar_referencia_metodo(metodo: MetodoPago, data: dict) -> None:
+    if not bool(getattr(metodo, 'requiere_referencia', False)):
+        return
+    if not (data.get('referencia') or '').strip():
+        raise ValueError('Este metodo de pago requiere referencia.')
 
 
 def _registrar_detalles(venta: Venta, pedido: GastronomiaPedido):
@@ -287,7 +322,7 @@ def _servicio_para_item(item) -> Servicio:
             costo=Decimal('0.00'),
             precio=precio,
             duracion_minutos=0,
-            porcentaje_iva=10,
+            porcentaje_iva=_gastronomia_iva_porcentaje(),
             activo=True,
         )
         db.session.add(servicio)
@@ -297,6 +332,15 @@ def _servicio_para_item(item) -> Servicio:
     servicio.precio = precio
     servicio.activo = True
     return servicio
+
+
+def _gastronomia_iva_porcentaje() -> int:
+    raw_value = Configuracion.obtener('gastronomia_iva_porcentaje', '10')
+    try:
+        porcentaje = int(str(raw_value or '10').strip())
+    except (TypeError, ValueError):
+        return 10
+    return porcentaje if porcentaje in {0, 5, 10} else 10
 
 
 def _iva_incluido(subtotal: Decimal, porcentaje: int) -> Decimal:

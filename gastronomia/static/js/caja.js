@@ -165,6 +165,7 @@
       body: JSON.stringify({
         metodo_pago: document.getElementById('payment-method').value,
         descuento_monto: Number(discountInput.value || 0),
+        referencia: document.getElementById('payment-reference')?.value.trim() || '',
         observacion: document.getElementById('payment-note').value.trim(),
       }),
     });
@@ -174,6 +175,8 @@
     else window.open(ticketUrl, '_blank');
     selectedOrderId = null;
     discountInput.value = 0;
+    const paymentReference = document.getElementById('payment-reference');
+    if (paymentReference) paymentReference.value = '';
     document.getElementById('payment-note').value = '';
     selectPaymentMethod(document.querySelector('[data-payment-method="efectivo"]'));
     applyOrderEvents([{payload: {pedido: data.pedido}}]);

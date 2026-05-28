@@ -101,7 +101,11 @@ def _pedido_cobrado(client, csrf, items, metodo_pago='efectivo', descuento=0):
     assert listo_resp.status_code == 200
     cobrar_resp = client.post(
         f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
-        json={'metodo_pago': metodo_pago, 'descuento_monto': descuento},
+        json={
+            'metodo_pago': metodo_pago,
+            'descuento_monto': descuento,
+            'referencia': 'REF-TEST' if metodo_pago != 'efectivo' else '',
+        },
         headers={'X-CSRFToken': csrf},
     )
     assert cobrar_resp.status_code == 200

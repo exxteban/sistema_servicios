@@ -8,6 +8,7 @@ env_file_path="${ENV_FILE_PATH:-}"
 use_system_python="${USE_SYSTEM_PYTHON:-0}"
 skip_git="${SKIP_GIT:-1}"
 run_tienda_migrations="${RUN_TIENDA_MIGRATIONS:-1}"
+run_gastronomia_migrations="${RUN_GASTRONOMIA_MIGRATIONS:-1}"
 run_tienda_build="${RUN_TIENDA_BUILD:-1}"
 run_app_bootstrap_migrations="${RUN_APP_BOOTSTRAP_MIGRATIONS:-1}"
 run_tienda_upload_permissions="${RUN_TIENDA_UPLOAD_PERMISSIONS:-1}"
@@ -203,6 +204,12 @@ if [ "$run_tienda_migrations" = "1" ]; then
       "$python_bin" "$migration"
     fi
   done
+fi
+if [ "$run_gastronomia_migrations" = "1" ]; then
+  gastronomia_migration="$app_dir/migrations/gastronomia_base.py"
+  if [ -f "$gastronomia_migration" ]; then
+    "$python_bin" "$gastronomia_migration"
+  fi
 fi
 if [ "$run_tienda_upload_permissions" = "1" ]; then
   fix_upload_permissions

@@ -213,14 +213,14 @@ def test_caja_no_cobra_pedido_ajeno_ni_duplica_cobro():
 
     cobrar_resp = client_dos.post(
         f'/api/gastronomia/caja/pedidos/{pedido_dos_id}/cobrar',
-        json={'metodo_pago': 'tarjeta'},
+        json={'metodo_pago': 'tarjeta', 'referencia': 'POS-001'},
         headers={'X-CSRFToken': csrf_dos},
     )
     assert cobrar_resp.status_code == 200
 
     duplicado_resp = client_dos.post(
         f'/api/gastronomia/caja/pedidos/{pedido_dos_id}/cobrar',
-        json={'metodo_pago': 'tarjeta'},
+        json={'metodo_pago': 'tarjeta', 'referencia': 'POS-001'},
         headers={'X-CSRFToken': csrf_dos},
     )
     assert duplicado_resp.status_code == 400
@@ -268,6 +268,78 @@ def test_caja_reserva_pago_antes_de_crear_venta_central(monkeypatch):
         assert len(pagos) == 1
         assert pagos[0].id_venta is not None
         assert Venta.query.count() == 1
+
+
+def test_caja_exige_referencia_si_metodo_pago_la_requiere():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Referencia', 'resto_referencia')
+    _loguear(client, app, 'resto_referencia')
+    _abrir_caja(app, 'resto_referencia')
+
+    with app.app_context():
+        metodo = MetodoPago(nombre='QR Referenciado', requiere_referencia=True, activo=True)
+        db.session.add(metodo)
+        db.session.commit()
+        metodo_id = metodo.id_metodo_pago
+
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+    pedido_id = _crear_pedido_listo(client, csrf, producto_id)
+    sin_referencia = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'id_metodo_pago': metodo_id},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert sin_referencia.status_code == 400
+    assert 'requiere referencia' in sin_referencia.get_json()['mensaje']
+
+    con_referencia = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'id_metodo_pago': metodo_id, 'referencia': 'QR-123'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert con_referencia.status_code == 200
+
+
+def test_anular_venta_central_cancela_pedido_gastronomico_y_restaura_stock():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto(app, 'Resto Anulacion', 'resto_anulacion')
+    _loguear(client, app, 'resto_anulacion')
+    _abrir_caja(app, 'resto_anulacion')
+
+    with app.app_context():
+        producto = GastronomiaProducto.query.get(producto_id)
+        producto.control_stock_venta = True
+        producto.stock_disponible = 2
+        db.session.commit()
+
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+    pedido_id = _crear_pedido_listo(client, csrf, producto_id)
+    cobrar_resp = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'metodo_pago': 'efectivo'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cobrar_resp.status_code == 200
+
+    with app.app_context():
+        from gastronomia.services.venta_integration_service import registrar_anulacion_gastronomia_desde_venta_central
+
+        pago = GastronomiaPedidoPago.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).one()
+        venta = Venta.query.get(pago.id_venta)
+        eventos = registrar_anulacion_gastronomia_desde_venta_central(venta, pago.usuario_id)
+        venta.estado = 'anulada'
+        db.session.commit()
+
+        pedido = GastronomiaPedido.query.get(pedido_id)
+        producto = GastronomiaProducto.query.get(producto_id)
+        assert [evento['tipo'] for evento in eventos] == ['pedido_cancelado', 'pedido_cobro_anulado']
+        assert pedido.estado == 'cancelado'
+        assert pedido.pago is None
+        assert GastronomiaPedidoPago.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).count() == 0
+        assert producto.stock_disponible == 2
+        assert Venta.query.get(venta.id_venta).estado == 'anulada'
 
 
 def test_pedido_abierto_puede_cobrarse_y_luego_enviarse_a_cocina():
