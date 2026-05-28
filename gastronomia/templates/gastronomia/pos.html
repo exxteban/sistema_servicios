@@ -290,6 +290,13 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    .pos-category > span:not([data-category-drag-handle]) {
+        flex: 1 1 auto;
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+        line-height: 1.05;
+    }
     .pos-category-admin {
         display: inline-flex;
         min-height: 36px;
