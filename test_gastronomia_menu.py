@@ -1,4 +1,7 @@
 import re
+from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from app import create_app, db
 from app.models import Cliente, Usuario
@@ -9,6 +12,7 @@ from gastronomia.models import (
     GastronomiaOpcionProducto,
     GastronomiaProducto,
 )
+from PIL import Image
 
 
 def _loguear(client, app, username: str):
@@ -48,6 +52,13 @@ def _crear_restaurante(app, nombre: str, username: str):
         ))
         db.session.commit()
         return cliente.id_cliente
+
+
+def _imagen_png(color: str = 'red') -> BytesIO:
+    stream = BytesIO()
+    Image.new('RGB', (24, 24), color=color).save(stream, format='PNG')
+    stream.seek(0)
+    return stream
 
 
 def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
@@ -171,3 +182,64 @@ def test_api_menu_no_filtra_datos_entre_clientes():
     _loguear(client_uno, app, 'resto_uno')
     listado_uno = client_uno.get('/api/gastronomia/categorias')
     assert [item['nombre'] for item in listado_uno.get_json()['categorias']] == ['Pizzas']
+
+
+def test_api_menu_guarda_imagen_subida_y_reemplaza_archivo_anterior():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_restaurante(app, 'Resto Imagen', 'resto_imagen')
+    _loguear(client, app, 'resto_imagen')
+
+    page = client.get('/gastronomia/menu')
+    csrf = _csrf(page.get_data(as_text=True))
+
+    categoria_resp = client.post(
+        '/api/gastronomia/categorias',
+        json={'nombre': 'Sandwiches', 'descripcion': 'Linea fria', 'orden': 1},
+        headers={'X-CSRFToken': csrf},
+    )
+    categoria_id = categoria_resp.get_json()['categoria']['id_categoria']
+
+    with TemporaryDirectory() as static_dir:
+        app.static_folder = static_dir
+
+        crear_resp = client.post(
+            '/api/gastronomia/productos',
+            data={
+                'categoria_id': str(categoria_id),
+                'nombre': 'Mbeju burger',
+                'descripcion': 'Con queso',
+                'precio': '18000',
+                'disponible': '1',
+                'visible': '1',
+                'imagen_archivo': (_imagen_png('red'), 'burger.png'),
+            },
+            headers={'X-CSRFToken': csrf},
+        )
+
+        assert crear_resp.status_code == 201
+        producto = crear_resp.get_json()['producto']
+        ruta_uno = Path(static_dir, *producto['imagen_url'].replace('/static/', '').split('/'))
+        assert producto['imagen_url'].startswith('/static/tienda_uploads/gastronomia/menu/')
+        assert ruta_uno.is_file()
+
+        actualizar_resp = client.put(
+            f"/api/gastronomia/productos/{producto['id_producto']}",
+            data={
+                'categoria_id': str(categoria_id),
+                'nombre': 'Mbeju burger',
+                'descripcion': 'Con queso y huevo',
+                'precio': '19000',
+                'disponible': '1',
+                'visible': '1',
+                'imagen_archivo': (_imagen_png('blue'), 'burger-2.png'),
+            },
+            headers={'X-CSRFToken': csrf},
+        )
+
+        assert actualizar_resp.status_code == 200
+        producto_actualizado = actualizar_resp.get_json()['producto']
+        ruta_dos = Path(static_dir, *producto_actualizado['imagen_url'].replace('/static/', '').split('/'))
+        assert ruta_dos.is_file()
+        assert producto_actualizado['imagen_url'] != producto['imagen_url']
+        assert not ruta_uno.exists()

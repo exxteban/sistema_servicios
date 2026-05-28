@@ -1,8 +1,13 @@
 """API interna para configuracion de menu gastronomico."""
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.menu_image_service import (
+    eliminar_imagen_producto_menu,
+    extension_permitida as extension_imagen_permitida,
+    guardar_imagen_producto_menu,
+)
 from gastronomia.services.menu_service import (
     eliminar_categoria,
     eliminar_producto,
@@ -47,6 +52,30 @@ def _payload():
     if request.is_json:
         return request.get_json(silent=True) or {}
     return request.form.to_dict()
+
+
+def _adjuntar_imagen_producto(cliente_id: int, data: dict, producto_actual=None):
+    archivo = request.files.get('imagen_archivo')
+    quitar_imagen = str(data.get('quitar_imagen') or '').strip().lower() in {'1', 'true', 'on', 'si', 'yes'}
+    imagen_anterior = producto_actual.imagen_url if producto_actual else None
+    if quitar_imagen:
+        data['imagen_url'] = ''
+    if not archivo or not getattr(archivo, 'filename', ''):
+        return data, imagen_anterior, None
+    if not extension_imagen_permitida(archivo.filename):
+        raise ValueError('La imagen debe ser PNG, JPG, JPEG, WEBP o GIF.')
+    nueva_imagen = guardar_imagen_producto_menu(archivo, current_app.static_folder, cliente_id)
+    data['imagen_url'] = nueva_imagen
+    return data, imagen_anterior, nueva_imagen
+
+
+def _limpiar_imagen_subida(url_imagen: str | None) -> None:
+    if not url_imagen:
+        return
+    try:
+        eliminar_imagen_producto_menu(url_imagen, current_app.static_folder)
+    except OSError:
+        current_app.logger.warning('No se pudo limpiar una imagen de menu gastronomico temporal.')
 
 
 @gastronomia_api_bp.route('/config', methods=['GET'])
@@ -138,8 +167,10 @@ def crear_producto():
     cliente_id, error = _cliente_o_error()
     if error:
         return error
+    imagen_nueva = None
     try:
         data = _payload()
+        data, _, imagen_nueva = _adjuntar_imagen_producto(cliente_id, data)
         producto = guardar_producto(cliente_id, data)
         if 'ingredientes_removibles' in data:
             sincronizar_ingredientes_removibles(
@@ -147,7 +178,11 @@ def crear_producto():
                 producto.id_producto,
                 data.get('ingredientes_removibles'),
             )
+    except PermissionError:
+        _limpiar_imagen_subida(imagen_nueva)
+        return jsonify({'error': 'sin_permisos_uploads', 'mensaje': 'No hay permisos para guardar la imagen.'}), 500
     except ValueError as exc:
+        _limpiar_imagen_subida(imagen_nueva)
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'producto': producto.to_dict()}), 201
 
@@ -178,8 +213,11 @@ def actualizar_producto(producto_id):
     producto = obtener_producto(cliente_id, producto_id)
     if not producto:
         return jsonify({'error': 'not_found'}), 404
+    imagen_anterior = None
+    imagen_nueva = None
     try:
         data = _payload()
+        data, imagen_anterior, imagen_nueva = _adjuntar_imagen_producto(cliente_id, data, producto_actual=producto)
         producto = guardar_producto(cliente_id, data, producto=producto)
         if 'ingredientes_removibles' in data:
             sincronizar_ingredientes_removibles(
@@ -187,7 +225,19 @@ def actualizar_producto(producto_id):
                 producto.id_producto,
                 data.get('ingredientes_removibles'),
             )
+        if imagen_anterior and imagen_anterior != producto.imagen_url:
+            try:
+                eliminar_imagen_producto_menu(imagen_anterior, current_app.static_folder)
+            except OSError:
+                current_app.logger.warning(
+                    'No se pudo eliminar la imagen anterior del producto gastronomico %s',
+                    producto.id_producto,
+                )
+    except PermissionError:
+        _limpiar_imagen_subida(imagen_nueva)
+        return jsonify({'error': 'sin_permisos_uploads', 'mensaje': 'No hay permisos para guardar la imagen.'}), 500
     except ValueError as exc:
+        _limpiar_imagen_subida(imagen_nueva)
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'producto': producto.to_dict()})
 

@@ -92,11 +92,28 @@
                                    class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                         </label>
                     </div>
-                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                        Imagen URL
-                        <input name="imagen_url" maxlength="500"
-                               class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                    </label>
+                    <input type="hidden" name="imagen_url">
+                    <div class="rounded-lg border border-dashed border-gray-300 p-4 dark:border-gray-600">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+                            <div class="gastro-image-preview-shell">
+                                <img id="producto-imagen-preview" src="" alt="Vista previa del producto" class="hidden h-full w-full object-cover">
+                                <div id="producto-imagen-empty" class="flex h-full items-center justify-center text-center text-xs font-semibold text-gray-400">
+                                    Sin imagen
+                                </div>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                    Imagen del producto
+                                    <input id="producto-imagen-archivo" name="imagen_archivo" type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+                                           class="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-amber-100 file:px-3 file:py-2 file:font-semibold file:text-amber-800 hover:file:bg-amber-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:file:bg-amber-500/20 dark:file:text-amber-200">
+                                </label>
+                                <p id="producto-imagen-nombre" class="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400">Puedes elegir una imagen desde tu computadora. El sistema la guardará dentro del servidor.</p>
+                                <label class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                    <input name="quitar_imagen" type="checkbox"> Quitar imagen actual
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="flex flex-wrap gap-4 text-sm font-semibold text-gray-700 dark:text-gray-200">
                         <label class="inline-flex items-center gap-2"><input name="disponible" type="checkbox" checked> Disponible</label>
                         <label class="inline-flex items-center gap-2"><input name="visible" type="checkbox" checked> Visible</label>
@@ -112,114 +129,179 @@
                 </div>
             </form>
 
-            {% if menu_tv_config %}
-            <form id="menu-tv-form" class="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-400/30 dark:bg-amber-500/10">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">Pantalla TV</h2>
-                        <p class="mt-1 text-xs font-semibold text-gray-600 dark:text-gray-300">Link publico para mostrar el menu en televisores.</p>
-                    </div>
-                    <a href="{{ menu_tv_public_url }}" target="_blank"
-                       class="rounded-lg bg-gray-900 px-3 py-2 text-xs font-bold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900">
-                        Abrir
-                    </a>
-                </div>
-                <div class="mt-4 space-y-3">
-                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                        Link publico
-                        <input id="menu-tv-url" readonly value="{{ menu_tv_public_url }}"
-                               class="mt-1 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
-                    </label>
-                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                        Titulo
-                        <input name="menu_tv_titulo" maxlength="160" value="{{ menu_tv_config.titulo }}"
-                               class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
-                    </label>
-                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                        Subtitulo
-                        <input name="menu_tv_subtitulo" maxlength="240" value="{{ menu_tv_config.subtitulo or '' }}"
-                               class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
-                    </label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            Tema
-                            <select name="menu_tv_tema" class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
-                                <option value="clasico" {% if menu_tv_config.tema == 'clasico' %}selected{% endif %}>Clasico</option>
-                                <option value="alto_contraste" {% if menu_tv_config.tema == 'alto_contraste' %}selected{% endif %}>Alto contraste</option>
-                            </select>
-                        </label>
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            Refresco seg.
-                            <input name="menu_tv_intervalo_refresco_seg" type="number" min="15" max="3600" value="{{ menu_tv_config.intervalo_refresco_seg }}"
-                                   class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
-                        </label>
-                    </div>
-                    <div class="grid gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                        <label class="inline-flex items-center gap-2"><input name="menu_tv_publico_activo" type="checkbox" {% if menu_tv_config.publico_activo %}checked{% endif %}> Link publico activo</label>
-                        <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_precios" type="checkbox" {% if menu_tv_config.mostrar_precios %}checked{% endif %}> Mostrar precios</label>
-                        <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_agotados" type="checkbox" {% if menu_tv_config.mostrar_agotados %}checked{% endif %}> Mostrar agotados</label>
-                    </div>
-                    <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900">
-                        <i class="fas fa-tv"></i>Guardar pantalla TV
-                    </button>
-                </div>
-            </form>
-            {% endif %}
         </section>
 
         <section class="space-y-5">
             <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Categorias cargadas</h2>
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-left text-sm">
-                        <thead class="text-xs uppercase text-gray-500">
-                            <tr><th class="py-2">Nombre</th><th>Orden</th><th>Estado</th></tr>
-                        </thead>
-                        <tbody id="categorias-body">
-                            {% for categoria in categorias %}
-                            <tr data-id="{{ categoria.id_categoria }}" class="border-t border-gray-100 dark:border-gray-700">
-                                <td class="py-3 font-semibold text-gray-900 dark:text-white">{{ categoria.nombre }}</td>
-                                <td>{{ categoria.orden }}</td>
-                                <td>{% if categoria.visible %}Visible{% else %}Oculta{% endif %}</td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="3" class="py-6 text-center text-gray-500">Sin categorias.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <h2 class="text-base font-semibold text-gray-900 dark:text-white">Productos cargados</h2>
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    {% for producto in productos %}
-                    <article class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-                        <div class="flex items-start justify-between gap-3">
-                            <div>
-                                <h3 class="font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</h3>
-                                <p class="mt-1 text-xs text-gray-500">{{ producto.categoria.nombre if producto.categoria else 'Sin categoria' }}</p>
-                            </div>
-                            <span class="text-sm font-bold text-emerald-700 dark:text-emerald-300">Gs. {{ "{:,.0f}".format(producto.precio or 0).replace(",", ".") }}</span>
-                        </div>
-                        <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                            <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.visible %}Visible{% else %}Oculto{% endif %}</span>
-                            <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.disponible %}Disponible{% else %}Agotado{% endif %}</span>
-                        </div>
-                        <button type="button" data-edit-product="{{ producto.id_producto }}" class="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-200 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-200 dark:hover:bg-amber-500/10">
-                            <i class="fas fa-pen"></i>Editar producto
-                        </button>
-                    </article>
-                    {% else %}
-                    <div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700 md:col-span-2">
-                        Sin productos.
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">Menu cargado</h2>
+                        <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Revisa categorias, productos y la pantalla TV desde un solo lugar.</p>
                     </div>
-                    {% endfor %}
+                    <div class="gastro-menu-tabs flex flex-wrap gap-2" role="tablist" aria-label="Panel de menu">
+                        <button type="button" class="gastro-menu-tab activa" data-menu-tab="categorias" role="tab" aria-selected="true">Categorias</button>
+                        <button type="button" class="gastro-menu-tab" data-menu-tab="productos" role="tab" aria-selected="false">Productos</button>
+                        {% if menu_tv_config %}
+                        <button type="button" class="gastro-menu-tab" data-menu-tab="tv" role="tab" aria-selected="false">Pantalla TV</button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-5 space-y-5">
+                    <div data-menu-tab-panel="categorias" role="tabpanel">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-left text-sm">
+                                <thead class="text-xs uppercase text-gray-500">
+                                    <tr><th class="py-2">Nombre</th><th>Orden</th><th>Estado</th></tr>
+                                </thead>
+                                <tbody id="categorias-body">
+                                    {% for categoria in categorias %}
+                                    <tr data-id="{{ categoria.id_categoria }}" class="border-t border-gray-100 dark:border-gray-700">
+                                        <td class="py-3 font-semibold text-gray-900 dark:text-white">{{ categoria.nombre }}</td>
+                                        <td>{{ categoria.orden }}</td>
+                                        <td>{% if categoria.visible %}Visible{% else %}Oculta{% endif %}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr><td colspan="3" class="py-6 text-center text-gray-500">Sin categorias.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div data-menu-tab-panel="productos" class="hidden" role="tabpanel">
+                        <div class="grid gap-3 md:grid-cols-2">
+                            {% for producto in productos %}
+                            <article class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</h3>
+                                        <p class="mt-1 text-xs text-gray-500">{{ producto.categoria.nombre if producto.categoria else 'Sin categoria' }}</p>
+                                    </div>
+                                    <span class="text-sm font-bold text-emerald-700 dark:text-emerald-300">Gs. {{ "{:,.0f}".format(producto.precio or 0).replace(",", ".") }}</span>
+                                </div>
+                                <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                                    <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.visible %}Visible{% else %}Oculto{% endif %}</span>
+                                    <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.disponible %}Disponible{% else %}Agotado{% endif %}</span>
+                                </div>
+                                <button type="button" data-edit-product="{{ producto.id_producto }}" class="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-200 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-200 dark:hover:bg-amber-500/10">
+                                    <i class="fas fa-pen"></i>Editar producto
+                                </button>
+                            </article>
+                            {% else %}
+                            <div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700 md:col-span-2">
+                                Sin productos.
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {% if menu_tv_config %}
+                    <div data-menu-tab-panel="tv" class="hidden" role="tabpanel">
+                        <form id="menu-tv-form" class="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-400/30 dark:bg-amber-500/10">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="text-base font-semibold text-gray-900 dark:text-white">Pantalla TV</h3>
+                                    <p class="mt-1 text-xs font-semibold text-gray-600 dark:text-gray-300">Link publico para mostrar el menu en televisores.</p>
+                                </div>
+                                <a href="{{ menu_tv_public_url }}" target="_blank"
+                                   class="rounded-lg bg-gray-900 px-3 py-2 text-xs font-bold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900">
+                                    Abrir
+                                </a>
+                            </div>
+                            <div class="mt-4 space-y-3">
+                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                    Link publico
+                                    <input id="menu-tv-url" readonly value="{{ menu_tv_public_url }}"
+                                           class="mt-1 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                                </label>
+                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                    Titulo
+                                    <input name="menu_tv_titulo" maxlength="160" value="{{ menu_tv_config.titulo }}"
+                                           class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                                </label>
+                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                    Subtitulo
+                                    <input name="menu_tv_subtitulo" maxlength="240" value="{{ menu_tv_config.subtitulo or '' }}"
+                                           class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                                </label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                        Tema
+                                        <select name="menu_tv_tema" class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                                            <option value="clasico" {% if menu_tv_config.tema == 'clasico' %}selected{% endif %}>Clasico</option>
+                                            <option value="alto_contraste" {% if menu_tv_config.tema == 'alto_contraste' %}selected{% endif %}>Alto contraste</option>
+                                        </select>
+                                    </label>
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                        Refresco seg.
+                                        <input name="menu_tv_intervalo_refresco_seg" type="number" min="15" max="3600" value="{{ menu_tv_config.intervalo_refresco_seg }}"
+                                               class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                                    </label>
+                                </div>
+                                <div class="grid gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                    <label class="inline-flex items-center gap-2"><input name="menu_tv_publico_activo" type="checkbox" {% if menu_tv_config.publico_activo %}checked{% endif %}> Link publico activo</label>
+                                    <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_precios" type="checkbox" {% if menu_tv_config.mostrar_precios %}checked{% endif %}> Mostrar precios</label>
+                                    <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_agotados" type="checkbox" {% if menu_tv_config.mostrar_agotados %}checked{% endif %}> Mostrar agotados</label>
+                                </div>
+                                <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900">
+                                    <i class="fas fa-tv"></i>Guardar pantalla TV
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </section>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .gastro-image-preview-shell {
+        height: 9rem;
+        width: 9rem;
+        flex-shrink: 0;
+        overflow: hidden;
+        border-radius: 0.75rem;
+        border: 1px solid rgb(229 231 235);
+        background: rgb(249 250 251);
+    }
+    .dark .gastro-image-preview-shell {
+        border-color: rgb(75 85 99);
+        background: rgb(17 24 39);
+    }
+    .gastro-menu-tab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        border: 1px solid rgb(229 231 235);
+        background: white;
+        padding: 0.55rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: rgb(75 85 99);
+        transition: all 160ms ease;
+    }
+    .gastro-menu-tab.activa {
+        border-color: rgb(245 158 11);
+        background: rgb(255 251 235);
+        color: rgb(146 64 14);
+    }
+    .dark .gastro-menu-tab {
+        border-color: rgb(75 85 99);
+        background: rgb(17 24 39);
+        color: rgb(209 213 219);
+    }
+    .dark .gastro-menu-tab.activa {
+        border-color: rgb(251 191 36);
+        background: rgb(120 53 15 / 0.45);
+        color: rgb(253 230 138);
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -231,6 +313,13 @@
   const menuTvForm = document.getElementById('menu-tv-form');
   const productoSubmit = document.getElementById('producto-submit');
   const productoCancelEdit = document.getElementById('producto-cancel-edit');
+  const productoImageInput = document.getElementById('producto-imagen-archivo');
+  const productoImagePreview = document.getElementById('producto-imagen-preview');
+  const productoImageEmpty = document.getElementById('producto-imagen-empty');
+  const productoImageName = document.getElementById('producto-imagen-nombre');
+  const tabButtons = Array.from(document.querySelectorAll('[data-menu-tab]'));
+  const tabPanels = Array.from(document.querySelectorAll('[data-menu-tab-panel]'));
+  let productoImageObjectUrl = '';
   const showAlert = (message, ok) => {
     alertBox.textContent = message;
     alertBox.className = `rounded-lg border px-4 py-3 text-sm font-semibold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
@@ -246,23 +335,87 @@
     if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
     return data;
   };
+  const apiMultipart = async (url, {method = 'POST', body} = {}) => {
+    const response = await fetch(url, {
+      method,
+      headers: {'X-CSRFToken': csrf},
+      body,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
+    return data;
+  };
   const postJson = (url, body) => apiJson(url, {method: 'POST', body});
   const ingredientesRemovibles = (producto) => (producto.grupos_opciones || [])
     .find((grupo) => grupo.tipo === 'ingrediente_removible')?.opciones
     ?.map((opcion) => opcion.nombre)
     .join('\n') || '';
+  const clearObjectUrl = () => {
+    if (!productoImageObjectUrl) return;
+    URL.revokeObjectURL(productoImageObjectUrl);
+    productoImageObjectUrl = '';
+  };
+  const renderImagePreview = ({url = '', fileName = '', emptyText = 'Sin imagen'} = {}) => {
+    if (!productoImagePreview || !productoImageEmpty || !productoImageName) return;
+    if (url) {
+      productoImagePreview.src = url;
+      productoImagePreview.classList.remove('hidden');
+      productoImageEmpty.classList.add('hidden');
+    } else {
+      productoImagePreview.src = '';
+      productoImagePreview.classList.add('hidden');
+      productoImageEmpty.textContent = emptyText;
+      productoImageEmpty.classList.remove('hidden');
+    }
+    productoImageName.textContent = fileName || (url ? 'Imagen actual del producto.' : 'Puedes elegir una imagen desde tu computadora. El sistema la guardará dentro del servidor.');
+  };
+  const syncImageSelection = () => {
+    const file = productoImageInput?.files?.[0];
+    if (!file) {
+      clearObjectUrl();
+      renderImagePreview({
+        url: productoForm?.imagen_url?.value || '',
+        emptyText: 'Sin imagen',
+      });
+      return;
+    }
+    if (productoForm?.quitar_imagen) {
+      productoForm.quitar_imagen.checked = false;
+    }
+    clearObjectUrl();
+    productoImageObjectUrl = URL.createObjectURL(file);
+    renderImagePreview({
+      url: productoImageObjectUrl,
+      fileName: `Archivo seleccionado: ${file.name}`,
+    });
+  };
+  const switchTab = (tabId) => {
+    tabButtons.forEach((button) => {
+      const active = button.dataset.menuTab === tabId;
+      button.classList.toggle('activa', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    tabPanels.forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.menuTabPanel !== tabId);
+    });
+  };
   const resetProductoForm = () => {
     if (!productoForm) return;
+    clearObjectUrl();
     productoForm.reset();
     productoForm.id_producto.value = '';
+    productoForm.imagen_url.value = '';
     productoForm.disponible.checked = true;
     productoForm.visible.checked = true;
     productoSubmit.innerHTML = '<i class="fas fa-save"></i>Guardar producto';
     productoCancelEdit.classList.add('hidden');
+    renderImagePreview({emptyText: 'Sin imagen'});
   };
   const cargarProductoParaEditar = async (productoId) => {
     const data = await apiJson(`/api/gastronomia/productos/${productoId}?modificadores=1`);
     const producto = data.producto;
+    clearObjectUrl();
+    productoForm.reset();
     productoForm.id_producto.value = producto.id_producto;
     productoForm.categoria_id.value = producto.categoria_id;
     productoForm.nombre.value = producto.nombre || '';
@@ -273,8 +426,13 @@
     productoForm.imagen_url.value = producto.imagen_url || '';
     productoForm.disponible.checked = Boolean(producto.disponible);
     productoForm.visible.checked = Boolean(producto.visible);
+    productoForm.quitar_imagen.checked = false;
     productoSubmit.innerHTML = '<i class="fas fa-save"></i>Actualizar producto';
     productoCancelEdit.classList.remove('hidden');
+    renderImagePreview({
+      url: producto.imagen_url || '',
+      emptyText: 'Sin imagen',
+    });
     productoForm.scrollIntoView({behavior: 'smooth', block: 'start'});
   };
   document.getElementById('categoria-form')?.addEventListener('submit', async (event) => {
@@ -292,12 +450,13 @@
   productoForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
-      const data = formData(event.currentTarget);
-      data.visible = event.currentTarget.visible.checked;
-      data.disponible = event.currentTarget.disponible.checked;
-      const productoId = data.id_producto;
+      const data = new FormData(event.currentTarget);
+      data.set('visible', event.currentTarget.visible.checked ? '1' : '0');
+      data.set('disponible', event.currentTarget.disponible.checked ? '1' : '0');
+      data.set('quitar_imagen', event.currentTarget.quitar_imagen.checked ? '1' : '0');
+      const productoId = data.get('id_producto');
       const url = productoId ? `/api/gastronomia/productos/${productoId}` : '/api/gastronomia/productos';
-      await apiJson(url, {method: productoId ? 'PUT' : 'POST', body: data});
+      await apiMultipart(url, {method: productoId ? 'PUT' : 'POST', body: data});
       showAlert('Producto guardado.', true);
       window.location.reload();
     } catch (error) {
@@ -320,11 +479,28 @@
     }
   });
   productoCancelEdit?.addEventListener('click', resetProductoForm);
+  productoImageInput?.addEventListener('change', syncImageSelection);
+  productoForm?.quitar_imagen?.addEventListener('change', (event) => {
+    if (!event.currentTarget.checked) {
+      syncImageSelection();
+      return;
+    }
+    clearObjectUrl();
+    if (productoImageInput) productoImageInput.value = '';
+    renderImagePreview({emptyText: 'La imagen actual se quitará al guardar.'});
+  });
+  document.querySelector('.gastro-menu-tabs')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-menu-tab]');
+    if (!button) return;
+    switchTab(button.dataset.menuTab);
+  });
   document.querySelector('[data-gastro-menu]')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-edit-product]');
     if (!button) return;
     cargarProductoParaEditar(button.dataset.editProduct).catch((error) => showAlert(error.message, false));
   });
+  renderImagePreview({emptyText: 'Sin imagen'});
+  switchTab('categorias');
 }());
 </script>
 {% endblock %}
