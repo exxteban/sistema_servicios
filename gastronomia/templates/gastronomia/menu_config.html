@@ -17,10 +17,15 @@
         </a>
     </div>
 
+    <div class="gastro-main-tabs flex flex-wrap gap-2" role="tablist" aria-label="Secciones de menu">
+        <button type="button" class="gastro-main-tab activa" data-main-tab="menu" role="tab" aria-selected="true">Menu</button>
+        <button type="button" class="gastro-main-tab" data-main-tab="menu-cargado" role="tab" aria-selected="false">Menu cargado</button>
+    </div>
+
     <div id="gastro-menu-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <div class="grid gap-5 xl:grid-cols-[360px_1fr]">
-        <section class="space-y-5">
+    <div data-main-tab-panel="menu" role="tabpanel">
+        <section class="mx-auto max-w-xl space-y-5">
             <form id="categoria-form" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">Categoria</h2>
                 <input type="hidden" name="id_categoria">
@@ -130,7 +135,9 @@
             </form>
 
         </section>
+    </div>
 
+    <div data-main-tab-panel="menu-cargado" class="hidden" role="tabpanel">
         <section class="space-y-5">
             <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -273,6 +280,7 @@
         border-color: rgb(75 85 99);
         background: rgb(17 24 39);
     }
+    .gastro-main-tab,
     .gastro-menu-tab {
         display: inline-flex;
         align-items: center;
@@ -286,16 +294,19 @@
         color: rgb(75 85 99);
         transition: all 160ms ease;
     }
+    .gastro-main-tab.activa,
     .gastro-menu-tab.activa {
         border-color: rgb(245 158 11);
         background: rgb(255 251 235);
         color: rgb(146 64 14);
     }
+    .dark .gastro-main-tab,
     .dark .gastro-menu-tab {
         border-color: rgb(75 85 99);
         background: rgb(17 24 39);
         color: rgb(209 213 219);
     }
+    .dark .gastro-main-tab.activa,
     .dark .gastro-menu-tab.activa {
         border-color: rgb(251 191 36);
         background: rgb(120 53 15 / 0.45);
@@ -317,6 +328,8 @@
   const productoImagePreview = document.getElementById('producto-imagen-preview');
   const productoImageEmpty = document.getElementById('producto-imagen-empty');
   const productoImageName = document.getElementById('producto-imagen-nombre');
+  const mainTabButtons = Array.from(document.querySelectorAll('[data-main-tab]'));
+  const mainTabPanels = Array.from(document.querySelectorAll('[data-main-tab-panel]'));
   const tabButtons = Array.from(document.querySelectorAll('[data-menu-tab]'));
   const tabPanels = Array.from(document.querySelectorAll('[data-menu-tab-panel]'));
   let productoImageObjectUrl = '';
@@ -397,6 +410,16 @@
     });
     tabPanels.forEach((panel) => {
       panel.classList.toggle('hidden', panel.dataset.menuTabPanel !== tabId);
+    });
+  };
+  const switchMainTab = (tabId) => {
+    mainTabButtons.forEach((button) => {
+      const active = button.dataset.mainTab === tabId;
+      button.classList.toggle('activa', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    mainTabPanels.forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.mainTabPanel !== tabId);
     });
   };
   const resetProductoForm = () => {
@@ -494,12 +517,19 @@
     if (!button) return;
     switchTab(button.dataset.menuTab);
   });
+  document.querySelector('.gastro-main-tabs')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-main-tab]');
+    if (!button) return;
+    switchMainTab(button.dataset.mainTab);
+  });
   document.querySelector('[data-gastro-menu]')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-edit-product]');
     if (!button) return;
+    switchMainTab('menu');
     cargarProductoParaEditar(button.dataset.editProduct).catch((error) => showAlert(error.message, false));
   });
   renderImagePreview({emptyText: 'Sin imagen'});
+  switchMainTab('menu');
   switchTab('categorias');
 }());
 </script>
