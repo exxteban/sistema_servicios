@@ -83,14 +83,14 @@
         : '';
     }
     productsGrid.innerHTML = visible.map((product) => `
-      <button type="button" data-product="${product.id_producto}" ${product.disponible ? '' : 'disabled'} class="pos-product-card min-h-36 rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm transition dark:border-gray-700 dark:bg-gray-900 ${product.disponible ? 'hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md' : 'cursor-not-allowed opacity-60'}">
+      <button type="button" data-product="${product.id_producto}" ${product.disponible ? '' : 'disabled'} class="pos-product-card min-h-32 rounded-lg border border-gray-200 bg-white p-2.5 text-left shadow-sm transition dark:border-gray-700 dark:bg-gray-900 ${product.disponible ? 'hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md' : 'cursor-not-allowed opacity-60'}">
         ${renderProductImage(product)}
         <span class="flex items-start justify-between gap-2">
-          <span class="block text-base font-black text-gray-900 dark:text-white">${escapeHtml(product.nombre)}</span>
+          <span class="block text-sm font-black leading-tight text-gray-900 dark:text-white">${escapeHtml(product.nombre)}</span>
           ${product.disponible ? '' : '<span class="pos-soldout-badge">Agotado</span>'}
         </span>
-        <span class="mt-2 line-clamp-2 block min-h-10 text-sm text-gray-600 dark:text-gray-400">${escapeHtml(product.descripcion || 'Toca para configurar el item.')}</span>
-        <span class="mt-5 block text-xl font-black text-orange-600 dark:text-orange-300">${money(product.precio)}</span>
+        <span class="mt-1.5 line-clamp-2 block min-h-8 text-xs text-gray-600 dark:text-gray-400">${escapeHtml(product.descripcion || 'Toca para configurar el item.')}</span>
+        <span class="mt-3 block text-lg font-black text-orange-600 dark:text-orange-300">${money(product.precio)}</span>
       </button>
     `).join('') || `
       <div class="rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-500 dark:border-gray-700 sm:col-span-2 2xl:col-span-3">
@@ -429,7 +429,7 @@
     const imageUrl = safeImageUrl(product?.imagen_url);
     if (!imageUrl) return '';
     return `
-      <span class="pos-product-image-wrap mb-3 block overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+      <span class="pos-product-image-wrap mb-2 block overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
         <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.nombre)}" class="pos-product-image" loading="lazy" onerror="this.closest('.pos-product-image-wrap').remove()">
       </span>
     `;
