@@ -256,3 +256,39 @@ def test_menu_tv_publico_respeta_visibilidad_disponibilidad_y_estado():
         db.session.commit()
     assert client.get('/api/gastronomia/public/menu-tv/resto-tv').status_code == 404
     assert client.get('/gastronomia/menu-tv/resto-tv').status_code == 404
+
+
+def test_menu_tv_config_guarda_modo_rotacion():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_base(app, 'Resto TV Config', 'resto_tv_config', 'resto-tv-config')
+    _loguear(client, app, 'resto_tv_config')
+    csrf = _csrf(client.get('/gastronomia/menu').get_data(as_text=True))
+
+    response = client.put(
+        '/api/gastronomia/menu-tv/config',
+        json={
+            'menu_tv_publico_activo': True,
+            'menu_tv_titulo': 'Carta nocturna',
+            'menu_tv_tema': 'clasico',
+            'menu_tv_modo_rotacion': 'slides',
+            'menu_tv_mostrar_precios': True,
+            'menu_tv_intervalo_refresco_seg': 45,
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['config']['modo_rotacion'] == 'slides'
+
+    invalido = client.put(
+        '/api/gastronomia/menu-tv/config',
+        json={
+            'menu_tv_publico_activo': True,
+            'menu_tv_modo_rotacion': 'teatro-laser',
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert invalido.status_code == 200
+    assert invalido.get_json()['config']['modo_rotacion'] == 'auto'

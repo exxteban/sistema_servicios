@@ -27,6 +27,7 @@ CONFIG_COLUMN_MIGRATIONS = (
     ('menu_tv_titulo', 'VARCHAR(160)'),
     ('menu_tv_subtitulo', 'VARCHAR(240)'),
     ('menu_tv_tema', "VARCHAR(40) NOT NULL DEFAULT 'clasico'"),
+    ('menu_tv_modo_rotacion', "VARCHAR(20) NOT NULL DEFAULT 'auto'"),
     ('menu_tv_mostrar_precios', 'BOOLEAN NOT NULL DEFAULT 1'),
     ('menu_tv_mostrar_agotados', 'BOOLEAN NOT NULL DEFAULT 0'),
     ('menu_tv_intervalo_refresco_seg', 'INTEGER NOT NULL DEFAULT 60'),

@@ -56,9 +56,14 @@
                                 <input name="visible" type="checkbox" checked> Visible
                             </label>
                         </div>
-                        <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
-                            <i class="fas fa-save"></i>Guardar categoria
-                        </button>
+                        <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                            <button id="categoria-submit" type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                                <i class="fas fa-save"></i>Guardar categoria
+                            </button>
+                            <button id="categoria-cancel-edit" type="button" class="hidden rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">
+                                Cancelar
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -178,7 +183,7 @@
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-left text-sm">
                                 <thead class="text-xs uppercase text-gray-500">
-                                    <tr><th class="py-2">Nombre</th><th>Orden</th><th>Estado</th></tr>
+                                    <tr><th class="py-2">Nombre</th><th>Orden</th><th>Estado</th><th class="text-right">Acciones</th></tr>
                                 </thead>
                                 <tbody id="categorias-body">
                                     {% for categoria in categorias %}
@@ -186,9 +191,28 @@
                                         <td class="py-3 font-semibold text-gray-900 dark:text-white">{{ categoria.nombre }}</td>
                                         <td>{{ categoria.orden }}</td>
                                         <td>{% if categoria.visible %}Visible{% else %}Oculta{% endif %}</td>
+                                        <td class="py-3 text-right">
+                                            <div class="flex justify-end gap-2">
+                                                <button type="button"
+                                                        data-edit-category="{{ categoria.id_categoria }}"
+                                                        data-category-name="{{ categoria.nombre }}"
+                                                        data-category-description="{{ categoria.descripcion or '' }}"
+                                                        data-category-order="{{ categoria.orden or 0 }}"
+                                                        data-category-visible="{{ '1' if categoria.visible else '0' }}"
+                                                        class="inline-flex items-center gap-2 rounded-lg border border-amber-200 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-200 dark:hover:bg-amber-500/10">
+                                                    <i class="fas fa-pen"></i>Editar
+                                                </button>
+                                                <button type="button"
+                                                        data-delete-category="{{ categoria.id_categoria }}"
+                                                        data-category-name="{{ categoria.nombre }}"
+                                                        class="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 dark:border-red-400/40 dark:text-red-200 dark:hover:bg-red-500/10">
+                                                    <i class="fas fa-trash"></i>Eliminar
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
                                     {% else %}
-                                    <tr><td colspan="3" class="py-6 text-center text-gray-500">Sin categorias.</td></tr>
+                                    <tr><td colspan="4" class="py-6 text-center text-gray-500">Sin categorias.</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -283,6 +307,15 @@
                                                class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
                                     </label>
                                 </div>
+                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                    Rotacion automatica
+                                    <select name="menu_tv_modo_rotacion" class="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm dark:border-amber-400/30 dark:bg-gray-900 dark:text-gray-100">
+                                        <option value="auto" {% if menu_tv_config.modo_rotacion == 'auto' %}selected{% endif %}>Inteligente: detecta pantalla</option>
+                                        <option value="slides" {% if menu_tv_config.modo_rotacion == 'slides' %}selected{% endif %}>Slides por pantallas</option>
+                                        <option value="scroll" {% if menu_tv_config.modo_rotacion == 'scroll' %}selected{% endif %}>Auto-scroll continuo</option>
+                                    </select>
+                                    <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">Si no entra todo, la TV mostrara el resto sin que nadie toque nada.</span>
+                                </label>
                                 <div class="grid gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
                                     <label class="inline-flex items-center gap-2"><input name="menu_tv_publico_activo" type="checkbox" {% if menu_tv_config.publico_activo %}checked{% endif %}> Link publico activo</label>
                                     <label class="inline-flex items-center gap-2"><input name="menu_tv_mostrar_precios" type="checkbox" {% if menu_tv_config.mostrar_precios %}checked{% endif %}> Mostrar precios</label>

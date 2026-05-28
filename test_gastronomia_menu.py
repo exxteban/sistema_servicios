@@ -79,6 +79,18 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     assert categoria_resp.status_code == 201
     categoria_id = categoria_resp.get_json()['categoria']['id_categoria']
 
+    categoria_update_resp = client.put(
+        f'/api/gastronomia/categorias/{categoria_id}',
+        json={'nombre': 'Hamburguesas premium', 'descripcion': 'Linea principal editada', 'orden': 2, 'visible': True},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert categoria_update_resp.status_code == 200
+    categoria_editada = categoria_update_resp.get_json()['categoria']
+    assert categoria_editada['nombre'] == 'Hamburguesas premium'
+    assert categoria_editada['descripcion'] == 'Linea principal editada'
+    assert categoria_editada['orden'] == 2
+    assert categoria_editada['visible'] is True
+
     producto_resp = client.post(
         '/api/gastronomia/productos',
         json={
@@ -168,6 +180,19 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     producto_toggle = toggle_resp.get_json()['producto']
     assert producto_toggle['visible'] is False
     assert producto_toggle['visible_en_tv'] is False
+
+    borrar_categoria_resp = client.delete(
+        f'/api/gastronomia/categorias/{categoria_id}',
+        headers={'X-CSRFToken': csrf},
+    )
+    assert borrar_categoria_resp.status_code == 200
+    with app.app_context():
+        categoria_db = db.session.get(GastronomiaCategoria, categoria_id)
+        producto_db = db.session.get(GastronomiaProducto, producto['id_producto'])
+        assert categoria_db is not None
+        assert producto_db is not None
+        assert categoria_db.activo is False
+        assert producto_db.activo is False
 
 
 def test_api_menu_no_filtra_datos_entre_clientes():

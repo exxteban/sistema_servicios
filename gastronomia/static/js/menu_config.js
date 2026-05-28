@@ -1,8 +1,11 @@
 (function () {
   const csrf = document.getElementById('csrf-token')?.value || '';
   const alertBox = document.getElementById('gastro-menu-alert');
+  const categoriaForm = document.getElementById('categoria-form');
   const productoForm = document.getElementById('producto-form');
   const menuTvForm = document.getElementById('menu-tv-form');
+  const categoriaSubmit = document.getElementById('categoria-submit');
+  const categoriaCancelEdit = document.getElementById('categoria-cancel-edit');
   const productoSubmit = document.getElementById('producto-submit');
   const productoCancelEdit = document.getElementById('producto-cancel-edit');
   const productoImageInput = document.getElementById('producto-imagen-archivo');
@@ -15,6 +18,16 @@
   const entryTabPanels = Array.from(document.querySelectorAll('[data-entry-tab-panel]'));
   const tabButtons = Array.from(document.querySelectorAll('[data-menu-tab]'));
   const tabPanels = Array.from(document.querySelectorAll('[data-menu-tab-panel]'));
+  const menuStateParamKeys = {
+    mainTab: 'gastro_main_tab',
+    entryTab: 'gastro_entry_tab',
+    menuTab: 'gastro_menu_tab',
+    editProductId: 'gastro_edit_product',
+  };
+  const allowedMainTabs = new Set(['menu', 'menu-cargado']);
+  const allowedEntryTabs = new Set(['categoria', 'producto']);
+  const allowedMenuTabs = new Set(['categorias', 'productos', 'tv']);
+  const persistedAlertKey = 'gastro-menu-alert';
   let productoImageObjectUrl = '';
 
   const showAlert = (message, ok) => {
@@ -24,6 +37,113 @@
   };
 
   const formData = (form) => Object.fromEntries(new FormData(form).entries());
+
+  const activeTabValue = (buttons, datasetKey, fallbackValue) => {
+    const activeButton = buttons.find((button) => button.getAttribute('aria-selected') === 'true');
+    return activeButton?.dataset?.[datasetKey] || fallbackValue;
+  };
+
+  const hasTabValue = (buttons, datasetKey, value) => buttons.some((button) => button?.dataset?.[datasetKey] === value);
+
+  const normalizeMenuState = (state = {}) => {
+    const normalized = {
+      mainTab: allowedMainTabs.has(state.mainTab) && hasTabValue(mainTabButtons, 'mainTab', state.mainTab) ? state.mainTab : 'menu',
+      entryTab: allowedEntryTabs.has(state.entryTab) && hasTabValue(entryTabButtons, 'entryTab', state.entryTab) ? state.entryTab : 'categoria',
+      menuTab: allowedMenuTabs.has(state.menuTab) && hasTabValue(tabButtons, 'menuTab', state.menuTab) ? state.menuTab : 'categorias',
+      editProductId: state.editProductId ? String(state.editProductId) : '',
+    };
+
+    if (normalized.editProductId) {
+      normalized.mainTab = 'menu';
+      normalized.entryTab = 'producto';
+    }
+
+    if (normalized.mainTab !== 'menu') {
+      normalized.entryTab = 'categoria';
+      normalized.editProductId = '';
+    }
+
+    if (normalized.entryTab !== 'producto') {
+      normalized.editProductId = '';
+    }
+
+    return normalized;
+  };
+
+  const currentMenuState = (overrides = {}) => normalizeMenuState({
+    mainTab: activeTabValue(mainTabButtons, 'mainTab', 'menu'),
+    entryTab: activeTabValue(entryTabButtons, 'entryTab', 'categoria'),
+    menuTab: activeTabValue(tabButtons, 'menuTab', 'categorias'),
+    editProductId: '',
+    ...overrides,
+  });
+
+  const menuStateFromUrl = () => {
+    const url = new URL(window.location.href);
+    return normalizeMenuState({
+      mainTab: url.searchParams.get(menuStateParamKeys.mainTab) || 'menu',
+      entryTab: url.searchParams.get(menuStateParamKeys.entryTab) || 'categoria',
+      menuTab: url.searchParams.get(menuStateParamKeys.menuTab) || 'categorias',
+      editProductId: url.searchParams.get(menuStateParamKeys.editProductId) || '',
+    });
+  };
+
+  const buildMenuUrl = (state = {}) => {
+    const nextState = currentMenuState(state);
+    const url = new URL(window.location.href);
+    url.searchParams.set(menuStateParamKeys.mainTab, nextState.mainTab);
+    url.searchParams.set(menuStateParamKeys.entryTab, nextState.entryTab);
+    url.searchParams.set(menuStateParamKeys.menuTab, nextState.menuTab);
+    if (nextState.editProductId) {
+      url.searchParams.set(menuStateParamKeys.editProductId, nextState.editProductId);
+    } else {
+      url.searchParams.delete(menuStateParamKeys.editProductId);
+    }
+    return url.toString();
+  };
+
+  const syncMenuStateInUrl = (state = {}) => {
+    try {
+      window.history.replaceState(window.history.state, document.title, buildMenuUrl(state));
+    } catch (_error) {
+      // Ignore history sync issues and keep the current page usable.
+    }
+  };
+
+  const persistAlert = (message, ok) => {
+    try {
+      window.sessionStorage.setItem(persistedAlertKey, JSON.stringify({message, ok}));
+    } catch (_error) {
+      // Ignore storage issues and continue without persisted feedback.
+    }
+  };
+
+  const restorePersistedAlert = () => {
+    try {
+      const raw = window.sessionStorage.getItem(persistedAlertKey);
+      if (!raw) return;
+      window.sessionStorage.removeItem(persistedAlertKey);
+      const persisted = JSON.parse(raw);
+      if (!persisted?.message) return;
+      showAlert(persisted.message, Boolean(persisted.ok));
+    } catch (_error) {
+      // Ignore malformed persisted alerts.
+    }
+  };
+
+  const reloadMenuView = async ({message, ok, state = {}} = {}) => {
+    persistAlert(message, ok);
+    const targetUrl = buildMenuUrl(state);
+    if (typeof window.appNavigateActiveTab === 'function') {
+      try {
+        await window.appNavigateActiveTab(targetUrl);
+        return;
+      } catch (_error) {
+        // Fall back to a regular navigation if the tab runtime is unavailable.
+      }
+    }
+    window.location.assign(targetUrl);
+  };
 
   const apiJson = async (url, {method = 'GET', body = null} = {}) => {
     const response = await fetch(url, {
@@ -46,8 +166,6 @@
     if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
     return data;
   };
-
-  const postJson = (url, body) => apiJson(url, {method: 'POST', body});
 
   const ingredientesRemovibles = (producto) => (producto.grupos_opciones || [])
     .find((grupo) => grupo.tipo === 'ingrediente_removible')?.opciones
@@ -105,6 +223,7 @@
     tabPanels.forEach((panel) => {
       panel.classList.toggle('hidden', panel.dataset.menuTabPanel !== tabId);
     });
+    syncMenuStateInUrl();
   };
 
   const switchMainTab = (tabId) => {
@@ -116,6 +235,7 @@
     mainTabPanels.forEach((panel) => {
       panel.classList.toggle('hidden', panel.dataset.mainTabPanel !== tabId);
     });
+    syncMenuStateInUrl();
   };
 
   const switchEntryTab = (tabId) => {
@@ -127,6 +247,7 @@
     entryTabPanels.forEach((panel) => {
       panel.classList.toggle('hidden', panel.dataset.entryTabPanel !== tabId);
     });
+    syncMenuStateInUrl();
   };
 
   const syncProductBadges = (article, producto) => {
@@ -170,6 +291,7 @@
     productoSubmit.innerHTML = '<i class="fas fa-save"></i>Guardar producto';
     productoCancelEdit.classList.add('hidden');
     renderImagePreview({emptyText: 'Sin imagen'});
+    syncMenuStateInUrl({editProductId: ''});
   };
 
   const cargarProductoParaEditar = async (productoId) => {
@@ -194,6 +316,11 @@
     productoSubmit.innerHTML = '<i class="fas fa-save"></i>Actualizar producto';
     productoCancelEdit.classList.remove('hidden');
     switchEntryTab('producto');
+    syncMenuStateInUrl({
+      mainTab: 'menu',
+      entryTab: 'producto',
+      editProductId: producto.id_producto,
+    });
     renderImagePreview({
       url: producto.imagen_url || '',
       emptyText: 'Sin imagen',
@@ -228,14 +355,65 @@
     }
   };
 
-  document.getElementById('categoria-form')?.addEventListener('submit', async (event) => {
+  const resetCategoriaForm = () => {
+    if (!categoriaForm) return;
+    categoriaForm.reset();
+    categoriaForm.id_categoria.value = '';
+    if (categoriaForm.visible) {
+      categoriaForm.visible.checked = true;
+    }
+    if (categoriaSubmit) {
+      categoriaSubmit.innerHTML = '<i class="fas fa-save"></i>Guardar categoria';
+    }
+    categoriaCancelEdit?.classList.add('hidden');
+  };
+
+  const cargarCategoriaParaEditar = (button) => {
+    if (!categoriaForm || !button) return;
+    categoriaForm.reset();
+    categoriaForm.id_categoria.value = button.dataset.editCategory || '';
+    categoriaForm.nombre.value = button.dataset.categoryName || '';
+    categoriaForm.descripcion.value = button.dataset.categoryDescription || '';
+    categoriaForm.orden.value = button.dataset.categoryOrder || 0;
+    if (categoriaForm.visible) {
+      categoriaForm.visible.checked = button.dataset.categoryVisible !== '0';
+    }
+    if (categoriaSubmit) {
+      categoriaSubmit.innerHTML = '<i class="fas fa-save"></i>Actualizar categoria';
+    }
+    categoriaCancelEdit?.classList.remove('hidden');
+    switchMainTab('menu');
+    switchEntryTab('categoria');
+    categoriaForm.scrollIntoView({behavior: 'smooth', block: 'start'});
+  };
+
+  const eliminarCategoria = async (button) => {
+    const categoriaId = button?.dataset?.deleteCategory;
+    const categoryName = button?.dataset?.categoryName || 'esta categoria';
+    if (!categoriaId) return;
+    const confirmed = window.confirm(`Se eliminara ${categoryName} y sus productos asociados dejaran de estar activos. Deseas continuar?`);
+    if (!confirmed) return;
+    await apiJson(`/api/gastronomia/categorias/${categoriaId}`, {method: 'DELETE'});
+    await reloadMenuView({
+      message: 'Categoria eliminada.',
+      ok: true,
+      state: {mainTab: 'menu-cargado', menuTab: 'categorias', editProductId: ''},
+    });
+  };
+
+  categoriaForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
       const data = formData(event.currentTarget);
       data.visible = event.currentTarget.visible.checked;
-      await postJson('/api/gastronomia/categorias', data);
-      showAlert('Categoria guardada.', true);
-      window.location.reload();
+      const categoriaId = data.id_categoria;
+      const url = categoriaId ? `/api/gastronomia/categorias/${categoriaId}` : '/api/gastronomia/categorias';
+      await apiJson(url, {method: categoriaId ? 'PUT' : 'POST', body: data});
+      await reloadMenuView({
+        message: 'Categoria guardada.',
+        ok: true,
+        state: {mainTab: 'menu', entryTab: 'categoria', editProductId: ''},
+      });
     } catch (error) {
       showAlert(error.message, false);
     }
@@ -252,9 +430,16 @@
       data.set('quitar_imagen', event.currentTarget.quitar_imagen.checked ? '1' : '0');
       const productoId = data.get('id_producto');
       const url = productoId ? `/api/gastronomia/productos/${productoId}` : '/api/gastronomia/productos';
-      await apiMultipart(url, {method: productoId ? 'PUT' : 'POST', body: data});
-      showAlert('Producto guardado.', true);
-      window.location.reload();
+      const response = await apiMultipart(url, {method: productoId ? 'PUT' : 'POST', body: data});
+      await reloadMenuView({
+        message: 'Producto guardado.',
+        ok: true,
+        state: {
+          mainTab: 'menu',
+          entryTab: 'producto',
+          editProductId: response?.producto?.id_producto || productoId || '',
+        },
+      });
     } catch (error) {
       showAlert(error.message, false);
     }
@@ -276,6 +461,7 @@
     }
   });
 
+  categoriaCancelEdit?.addEventListener('click', resetCategoriaForm);
   productoCancelEdit?.addEventListener('click', resetProductoForm);
   productoImageInput?.addEventListener('change', syncImageSelection);
   productoForm?.quitar_imagen?.addEventListener('change', (event) => {
@@ -312,14 +498,32 @@
       toggleProductoEstado(toggle).catch((error) => showAlert(error.message, false));
       return;
     }
+    const categoryButton = event.target.closest('[data-edit-category]');
+    if (categoryButton) {
+      cargarCategoriaParaEditar(categoryButton);
+      return;
+    }
+    const deleteCategoryButton = event.target.closest('[data-delete-category]');
+    if (deleteCategoryButton) {
+      eliminarCategoria(deleteCategoryButton).catch((error) => showAlert(error.message, false));
+      return;
+    }
     const button = event.target.closest('[data-edit-product]');
     if (!button) return;
     switchMainTab('menu');
     cargarProductoParaEditar(button.dataset.editProduct).catch((error) => showAlert(error.message, false));
   });
 
+  const restoreMenuState = async () => {
+    const initialState = menuStateFromUrl();
+    switchMainTab(initialState.mainTab);
+    switchEntryTab(initialState.entryTab);
+    switchTab(initialState.menuTab);
+    if (!initialState.editProductId) return;
+    await cargarProductoParaEditar(initialState.editProductId);
+  };
+
   renderImagePreview({emptyText: 'Sin imagen'});
-  switchMainTab('menu');
-  switchEntryTab('categoria');
-  switchTab('categorias');
+  restorePersistedAlert();
+  restoreMenuState().catch((error) => showAlert(error.message, false));
 }());

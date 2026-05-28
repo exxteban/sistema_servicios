@@ -11,6 +11,7 @@ from gastronomia.services.menu_service import parse_bool, parse_int
 
 DEFAULT_REFRESH_SECONDS = 60
 TEMAS_MENU_TV = {'clasico', 'alto_contraste'}
+MODOS_ROTACION_MENU_TV = {'auto', 'scroll', 'slides'}
 
 
 def obtener_o_preparar_config_tv(cliente_id: int) -> GastronomiaClienteConfig | None:
@@ -33,6 +34,8 @@ def actualizar_config_tv(cliente_id: int, data: dict) -> GastronomiaClienteConfi
     config.menu_tv_subtitulo = _clean_text(data.get('menu_tv_subtitulo'), 240)
     tema = (data.get('menu_tv_tema') or 'clasico').strip().lower()
     config.menu_tv_tema = tema if tema in TEMAS_MENU_TV else 'clasico'
+    modo_rotacion = (data.get('menu_tv_modo_rotacion') or 'auto').strip().lower()
+    config.menu_tv_modo_rotacion = modo_rotacion if modo_rotacion in MODOS_ROTACION_MENU_TV else 'auto'
     config.menu_tv_mostrar_precios = parse_bool(data.get('menu_tv_mostrar_precios'), True)
     config.menu_tv_mostrar_agotados = parse_bool(data.get('menu_tv_mostrar_agotados'), False)
     intervalo = parse_int(data.get('menu_tv_intervalo_refresco_seg'), DEFAULT_REFRESH_SECONDS)
@@ -86,6 +89,7 @@ def serializar_config_tv(config: GastronomiaClienteConfig) -> dict:
         'titulo': titulo,
         'subtitulo': config.menu_tv_subtitulo,
         'tema': config.menu_tv_tema or 'clasico',
+        'modo_rotacion': config.menu_tv_modo_rotacion or 'auto',
         'publico_activo': bool(config.menu_tv_publico_activo),
         'mostrar_precios': bool(config.menu_tv_mostrar_precios),
         'mostrar_agotados': bool(config.menu_tv_mostrar_agotados),

@@ -23,6 +23,7 @@ class GastronomiaClienteConfig(db.Model):
     menu_tv_titulo = db.Column(db.String(160), nullable=True)
     menu_tv_subtitulo = db.Column(db.String(240), nullable=True)
     menu_tv_tema = db.Column(db.String(40), nullable=False, default='clasico', server_default='clasico')
+    menu_tv_modo_rotacion = db.Column(db.String(20), nullable=False, default='auto', server_default='auto')
     menu_tv_mostrar_precios = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     menu_tv_mostrar_agotados = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
     menu_tv_intervalo_refresco_seg = db.Column(db.Integer, nullable=False, default=60, server_default='60')

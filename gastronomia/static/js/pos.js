@@ -4,6 +4,7 @@
   const productSearch = document.getElementById('product-search');
   const cartItems = document.getElementById('cart-items');
   const cartTotal = document.getElementById('cart-total');
+  const productsCount = document.getElementById('products-count');
   const alertBox = document.getElementById('pos-alert');
   const editingOrderBanner = document.getElementById('editing-order-banner');
   const modal = document.getElementById('modifier-modal');
@@ -76,8 +77,13 @@
     const visible = searchTerm
       ? categoryProducts.filter((product) => `${product.nombre} ${product.descripcion || ''}`.toLowerCase().includes(searchTerm))
       : categoryProducts;
+    if (productsCount) {
+      productsCount.textContent = visible.length
+        ? `Mostrando ${visible.length} de ${products.length} productos`
+        : '';
+    }
     productsGrid.innerHTML = visible.map((product) => `
-      <button type="button" data-product="${product.id_producto}" ${product.disponible ? '' : 'disabled'} class="pos-product-card min-h-36 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition dark:border-gray-700 dark:bg-gray-900 ${product.disponible ? 'hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md' : 'cursor-not-allowed opacity-60'}">
+      <button type="button" data-product="${product.id_producto}" ${product.disponible ? '' : 'disabled'} class="pos-product-card min-h-36 rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm transition dark:border-gray-700 dark:bg-gray-900 ${product.disponible ? 'hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md' : 'cursor-not-allowed opacity-60'}">
         ${renderProductImage(product)}
         <span class="flex items-start justify-between gap-2">
           <span class="block text-base font-black text-gray-900 dark:text-white">${escapeHtml(product.nombre)}</span>

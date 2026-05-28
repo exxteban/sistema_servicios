@@ -29,15 +29,36 @@
 
     <div id="pos-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <div class="pos-touch-layout grid gap-5">
-        <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <div class="pos-category-strip flex gap-2 overflow-x-auto pb-2" id="category-tabs">
+    <div class="pos-touch-layout grid gap-4">
+        <aside class="pos-category-panel rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800" aria-label="Categorias del menu">
+            <div class="mb-3">
+                <h2 class="text-base font-black text-gray-900 dark:text-white">Categorias</h2>
+                <span class="mt-2 block h-px w-full bg-gradient-to-r from-orange-200 to-transparent dark:from-orange-500/40"></span>
+            </div>
+            <div class="pos-category-list" id="category-tabs">
                 <button type="button" data-category="" class="pos-category active"><i class="fas fa-border-all"></i>Todo</button>
                 {% for categoria in categorias %}
-                <button type="button" data-category="{{ categoria.id_categoria }}" class="pos-category"><i class="fas fa-hamburger"></i>{{ categoria.nombre }}</button>
+                {% set nombre_categoria = categoria.nombre|lower %}
+                {% set icono_categoria = 'fa-hamburger' %}
+                {% if 'bebida' in nombre_categoria %}
+                    {% set icono_categoria = 'fa-glass-whiskey' %}
+                {% elif 'pizza' in nombre_categoria %}
+                    {% set icono_categoria = 'fa-pizza-slice' %}
+                {% elif 'postre' in nombre_categoria %}
+                    {% set icono_categoria = 'fa-birthday-cake' %}
+                {% elif 'promo' in nombre_categoria %}
+                    {% set icono_categoria = 'fa-tag' %}
+                {% endif %}
+                <button type="button" data-category="{{ categoria.id_categoria }}" class="pos-category"><i class="fas {{ icono_categoria }}"></i>{{ categoria.nombre }}</button>
                 {% endfor %}
             </div>
-            <div class="mt-3 flex flex-col gap-3 sm:flex-row">
+            <a href="{{ url_for('gastronomia.menu_config') }}" class="pos-category-admin mt-4">
+                <i class="fas fa-cog"></i>Administracion
+            </a>
+        </aside>
+
+        <section class="pos-product-panel rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex flex-col gap-3 sm:flex-row">
                 <label class="relative flex-1">
                     <i class="fas fa-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
                     <input id="product-search" type="text" placeholder="Buscar productos..."
@@ -48,9 +69,10 @@
                 </button>
             </div>
             <div id="products-grid" class="pos-products-grid mt-4 grid gap-3"></div>
+            <p id="products-count" class="mt-4 text-xs font-semibold text-gray-500 dark:text-gray-400"></p>
         </section>
 
-        <aside class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <aside class="pos-order-panel rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div class="flex items-center justify-between gap-3">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">Pedido</h2>
                 <button type="button" id="clear-cart" class="rounded-lg border border-orange-200 px-3 py-2 text-sm font-bold text-orange-600 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-300">
@@ -154,6 +176,10 @@
     .pos-shell {
         max-width: min(2200px, calc(100vw - 1.5rem));
     }
+    .pos-touch-layout {
+        align-items: start;
+        grid-template-columns: minmax(0, 1fr);
+    }
     .pos-top-action {
         display: inline-flex;
         align-items: center;
@@ -166,22 +192,27 @@
         font-weight: 800;
         color: rgb(31 41 55);
     }
-    .pos-category-strip {
-        display: grid;
-        grid-auto-columns: max-content;
-        grid-auto-flow: column;
-        overscroll-behavior-inline: contain;
-        scrollbar-width: thin;
+    .pos-category-panel,
+    .pos-product-panel,
+    .pos-order-panel,
+    .pos-checkout-panel {
+        min-width: 0;
     }
-    .pos-touch-layout {
-        align-items: start;
-        grid-template-columns: minmax(0, 1fr);
+    .pos-category-panel {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+    .pos-category-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.75rem;
     }
     .pos-category {
         display: inline-flex;
-        min-width: 120px;
+        width: 100%;
+        min-height: 58px;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 0.5rem;
         border: 1px solid rgb(229 231 235);
         border-radius: 12px;
@@ -191,9 +222,29 @@
         color: rgb(55 65 81);
     }
     .pos-category.active {
-        border-color: rgb(245 158 11);
-        background: rgb(255 251 235);
-        color: rgb(146 64 14);
+        border-color: rgb(234 88 12);
+        background: linear-gradient(135deg, rgb(249 115 22), rgb(234 88 12));
+        color: white;
+        box-shadow: 0 12px 22px rgba(234, 88, 12, 0.18);
+    }
+    .pos-category i {
+        width: 1.25rem;
+        text-align: center;
+    }
+    .pos-category-admin {
+        display: inline-flex;
+        min-height: 54px;
+        width: 100%;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        border: 1px solid rgb(229 231 235);
+        border-radius: 12px;
+        background: white;
+        padding: 0.85rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 900;
+        color: rgb(55 65 81);
     }
     .tipo-pedido-btn,
     .mesa-selector-btn {
@@ -236,15 +287,16 @@
         color: rgb(229 231 235);
     }
     .dark .pos-top-action,
-    .dark .pos-category {
+    .dark .pos-category,
+    .dark .pos-category-admin {
         border-color: rgb(75 85 99);
         background: rgb(31 41 55);
         color: rgb(229 231 235);
     }
     .dark .pos-category.active {
-        border-color: rgb(251 191 36);
-        background: rgb(120 53 15 / 0.45);
-        color: rgb(253 230 138);
+        border-color: rgb(251 146 60);
+        background: linear-gradient(135deg, rgb(234 88 12), rgb(154 52 18));
+        color: white;
     }
     .dark .tipo-pedido-btn.activa {
         background: rgb(120 53 15 / 0.45);
@@ -324,8 +376,8 @@
     }
     .pos-product-image-wrap {
         aspect-ratio: 4 / 3;
-        width: min(100%, 180px);
-        height: clamp(88px, 10vw, 126px);
+        width: 100%;
+        height: clamp(104px, 11vw, 142px);
         margin-inline: auto;
         flex-shrink: 0;
     }
@@ -365,15 +417,42 @@
     }
     @media (min-width: 1024px) {
         .pos-touch-layout {
-            grid-template-columns: minmax(0, 1fr) 430px;
+            grid-template-columns: 220px minmax(0, 1fr);
         }
+        .pos-category-panel {
+            position: sticky;
+            top: 1rem;
+            max-height: calc(100vh - 2rem);
+        }
+        .pos-category-list {
+            grid-template-columns: 1fr;
+            overflow-y: auto;
+            padding-right: 0.15rem;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+        }
+        .pos-order-panel,
         .pos-checkout-panel {
             grid-column: 2;
         }
     }
+    @media (min-width: 1280px) {
+        .pos-touch-layout {
+            grid-template-columns: 230px minmax(460px, 1fr) minmax(360px, 420px);
+        }
+        .pos-order-panel,
+        .pos-checkout-panel {
+            grid-column: 3;
+        }
+    }
     @media (min-width: 1440px) {
         .pos-touch-layout {
-            grid-template-columns: minmax(620px, 1fr) minmax(360px, 430px) minmax(280px, 320px);
+            grid-template-columns: 230px minmax(520px, 1fr) minmax(360px, 420px) minmax(270px, 320px);
+        }
+        .pos-order-panel {
+            grid-column: auto;
+            position: sticky;
+            top: 1rem;
         }
         .pos-checkout-panel {
             position: sticky;
@@ -390,5 +469,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260527-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260528-1') }}"></script>
 {% endblock %}
