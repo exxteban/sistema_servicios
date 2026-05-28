@@ -56,7 +56,13 @@ def listar_categorias(cliente_id: int, *, incluir_ocultas: bool = True) -> list[
     return query.order_by(GastronomiaCategoria.orden.asc(), GastronomiaCategoria.nombre.asc()).all()
 
 
-def listar_productos(cliente_id: int, *, categoria_id: int | None = None, incluir_ocultos: bool = True) -> list[GastronomiaProducto]:
+def listar_productos(
+    cliente_id: int,
+    *,
+    categoria_id: int | None = None,
+    incluir_ocultos: bool = True,
+    incluir_agotados: bool = True,
+) -> list[GastronomiaProducto]:
     query = GastronomiaProducto.query.filter(
         GastronomiaProducto.cliente_id == int(cliente_id),
         GastronomiaProducto.activo.is_(True),
@@ -64,7 +70,9 @@ def listar_productos(cliente_id: int, *, categoria_id: int | None = None, inclui
     if categoria_id:
         query = query.filter(GastronomiaProducto.categoria_id == int(categoria_id))
     if not incluir_ocultos:
-        query = query.filter(GastronomiaProducto.visible.is_(True), GastronomiaProducto.disponible.is_(True))
+        query = query.filter(GastronomiaProducto.visible.is_(True))
+    if not incluir_agotados:
+        query = query.filter(GastronomiaProducto.disponible.is_(True))
     return query.order_by(GastronomiaProducto.orden.asc(), GastronomiaProducto.nombre.asc()).all()
 
 
@@ -114,9 +122,38 @@ def guardar_producto(cliente_id: int, data: dict, producto: GastronomiaProducto 
     producto.imagen_url = (data.get('imagen_url') or '').strip()[:500] or None
     producto.disponible = parse_bool(data.get('disponible'), True)
     producto.visible = parse_bool(data.get('visible'), True)
+    producto.visible_en_tv = parse_bool(
+        data.get('visible_en_tv'),
+        True if producto.id_producto is None else bool(producto.visible_en_tv),
+    )
+    producto.control_stock_venta = parse_bool(data.get('control_stock_venta'), False)
+    producto.stock_disponible = _stock_disponible_desde_payload(data) if producto.control_stock_venta else None
+    if producto.control_stock_venta and producto.stock_disponible <= 0:
+        producto.disponible = False
     producto.orden = parse_int(data.get('orden'), 0)
     db.session.add(producto)
     _commit_or_raise_duplicate('Ya existe un producto con ese nombre.')
+    return producto
+
+
+def actualizar_estado_producto(cliente_id: int, producto_id: int, data: dict) -> GastronomiaProducto | None:
+    producto = obtener_producto(cliente_id, producto_id)
+    if not producto:
+        return None
+    if 'visible' in data:
+        producto.visible = parse_bool(data.get('visible'), bool(producto.visible))
+    if 'visible_en_tv' in data:
+        producto.visible_en_tv = parse_bool(data.get('visible_en_tv'), bool(producto.visible_en_tv))
+    if 'disponible' in data:
+        producto.disponible = parse_bool(data.get('disponible'), bool(producto.disponible))
+    if 'control_stock_venta' in data:
+        producto.control_stock_venta = parse_bool(data.get('control_stock_venta'), bool(producto.control_stock_venta))
+    if 'stock_disponible' in data:
+        producto.stock_disponible = _stock_disponible_desde_payload(data)
+    if producto.control_stock_venta and producto.stock_disponible is not None and producto.stock_disponible <= 0:
+        producto.disponible = False
+    db.session.add(producto)
+    db.session.commit()
     return producto
 
 
@@ -146,3 +183,7 @@ def _commit_or_raise_duplicate(message: str) -> None:
     except IntegrityError as exc:
         db.session.rollback()
         raise ValueError(message) from exc
+
+
+def _stock_disponible_desde_payload(data: dict) -> int:
+    return max(0, parse_int(data.get('stock_disponible'), 0))

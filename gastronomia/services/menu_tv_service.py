@@ -132,9 +132,8 @@ def _productos_visibles(config: GastronomiaClienteConfig) -> list[GastronomiaPro
         cliente_id=int(config.cliente_id),
         activo=True,
         visible=True,
+        visible_en_tv=True,
     )
-    if not config.menu_tv_mostrar_agotados:
-        query = query.filter(GastronomiaProducto.disponible.is_(True))
     return query.order_by(GastronomiaProducto.orden.asc(), GastronomiaProducto.nombre.asc()).all()
 
 

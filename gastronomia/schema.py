@@ -32,6 +32,12 @@ CONFIG_COLUMN_MIGRATIONS = (
     ('menu_tv_intervalo_refresco_seg', 'INTEGER NOT NULL DEFAULT 60'),
 )
 
+PRODUCT_COLUMN_MIGRATIONS = (
+    ('visible_en_tv', 'BOOLEAN NOT NULL DEFAULT 1'),
+    ('control_stock_venta', 'BOOLEAN NOT NULL DEFAULT 0'),
+    ('stock_disponible', 'INTEGER'),
+)
+
 
 def ensure_gastronomia_schema():
     dialect = db.engine.dialect.name
@@ -43,6 +49,7 @@ def ensure_gastronomia_schema():
 
 def _ensure_sqlite_columns():
     _ensure_sqlite_config_columns()
+    _ensure_sqlite_product_columns()
     if not _sqlite_table_exists('gastronomia_pedidos'):
         db.session.commit()
         return
@@ -66,6 +73,7 @@ def _ensure_sqlite_columns():
 
 def _ensure_mysql_columns():
     _ensure_mysql_config_columns()
+    _ensure_mysql_product_columns()
     if not _mysql_table_exists('gastronomia_pedidos'):
         db.session.commit()
         return
@@ -96,6 +104,18 @@ def _ensure_sqlite_config_columns():
     ))
 
 
+def _ensure_sqlite_product_columns():
+    if not _sqlite_table_exists('gastronomia_productos'):
+        return
+    columns = {
+        row[1]
+        for row in db.session.execute(text('PRAGMA table_info(gastronomia_productos)')).fetchall()
+    }
+    for column, column_type in PRODUCT_COLUMN_MIGRATIONS:
+        if column not in columns:
+            db.session.execute(text(f'ALTER TABLE gastronomia_productos ADD COLUMN {column} {column_type}'))
+
+
 def _ensure_mysql_config_columns():
     if not _mysql_table_exists('gastronomia_cliente_config'):
         return
@@ -108,6 +128,14 @@ def _ensure_mysql_config_columns():
             'CREATE UNIQUE INDEX ix_gastronomia_cliente_config_menu_tv_slug '
             'ON gastronomia_cliente_config(menu_tv_slug)'
         ))
+
+
+def _ensure_mysql_product_columns():
+    if not _mysql_table_exists('gastronomia_productos'):
+        return
+    for column, column_type in PRODUCT_COLUMN_MIGRATIONS:
+        if not _mysql_column_exists('gastronomia_productos', column):
+            db.session.execute(text(f'ALTER TABLE gastronomia_productos ADD COLUMN {column} {column_type}'))
 
 
 def _backfill_menu_tv_slugs():

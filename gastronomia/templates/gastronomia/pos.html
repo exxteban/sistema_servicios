@@ -256,6 +256,33 @@
         width: 100%;
         object-fit: cover;
     }
+    .pos-soldout-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: rgb(254 226 226);
+        color: rgb(153 27 27);
+        padding: 0.2rem 0.55rem;
+        font-size: 0.7rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.2);
+        animation: pos-soldout-pulse 1.9s ease-in-out infinite;
+    }
+    .dark .pos-soldout-badge {
+        background: rgba(127, 29, 29, 0.42);
+        color: rgb(254 202 202);
+    }
+    @keyframes pos-soldout-pulse {
+        0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.2);
+        }
+        50% {
+            transform: scale(1.04);
+            box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.13);
+        }
+    }
 </style>
 {% endblock %}
 

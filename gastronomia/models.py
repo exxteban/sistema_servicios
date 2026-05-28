@@ -86,6 +86,9 @@ class GastronomiaProducto(db.Model):
     imagen_url = db.Column(db.String(500))
     disponible = db.Column(db.Boolean, nullable=False, default=True)
     visible = db.Column(db.Boolean, nullable=False, default=True)
+    visible_en_tv = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
+    control_stock_venta = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
+    stock_disponible = db.Column(db.Integer, nullable=True)
     orden = db.Column(db.Integer, nullable=False, default=0)
     activo = db.Column(db.Boolean, nullable=False, default=True)
     fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -109,6 +112,9 @@ class GastronomiaProducto(db.Model):
             'imagen_url': self.imagen_url,
             'disponible': bool(self.disponible),
             'visible': bool(self.visible),
+            'visible_en_tv': bool(self.visible_en_tv),
+            'control_stock_venta': bool(self.control_stock_venta),
+            'stock_disponible': self.stock_disponible,
             'activo': bool(self.activo),
             'orden': int(self.orden or 0),
         }

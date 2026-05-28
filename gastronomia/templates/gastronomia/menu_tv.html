@@ -125,12 +125,17 @@
             display: inline-block;
             margin-top: 10px;
             border-radius: 999px;
-            background: #f97316;
-            color: #111827;
-            padding: 6px 12px;
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+            color: #ffffff;
+            padding: 6px 14px;
             font-size: 16px;
             font-weight: 1000;
             text-transform: uppercase;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+            animation: menu-tv-soldout-pulse 2.1s ease-in-out infinite;
+        }
+        .menu-tv-soldout .menu-tv-price {
+            color: #ffffff;
         }
         .menu-tv-empty {
             border: 2px dashed rgba(255,255,255,0.22);
@@ -139,6 +144,16 @@
             text-align: center;
             font-size: clamp(28px, 3vw, 54px);
             font-weight: 900;
+        }
+        @keyframes menu-tv-soldout-pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+            }
+            50% {
+                transform: scale(1.045);
+                box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.1);
+            }
         }
         @media (max-width: 720px) {
             .menu-tv-grid { grid-template-columns: 1fr; }

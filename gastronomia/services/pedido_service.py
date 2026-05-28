@@ -11,6 +11,7 @@ from gastronomia.models import (
     GastronomiaPedidoItem,
     GastronomiaPedidoItemModificador,
     GastronomiaPedidoPago,
+    GastronomiaProducto,
 )
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
@@ -174,7 +175,11 @@ def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPed
     db.session.add(pedido)
     db.session.flush()
 
-    _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
+    try:
+        _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
+    except ValueError:
+        db.session.rollback()
+        raise
     db.session.commit()
     registrar_evento_pedido(pedido, 'pedido_creado')
     return pedido
@@ -194,7 +199,11 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
     pedido.mesa = pedido_data['mesa']
     pedido.referencia_entrega = pedido_data['referencia_entrega']
     pedido.notas = pedido_data['notas']
-    _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
+    try:
+        _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
+    except ValueError:
+        db.session.rollback()
+        raise
     db.session.commit()
     registrar_evento_pedido(pedido, 'pedido_actualizado')
     return pedido
@@ -220,6 +229,7 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
     estado = (estado or '').strip().lower()
     if estado not in ESTADOS_PEDIDO:
         raise ValueError('Estado invalido.')
+    estado_anterior = pedido.estado
     if pedido.estado == 'cobrado' and estado != 'cobrado':
         raise ValueError('No se puede modificar un pedido cobrado.')
     if estado == 'entregado' and pedido.estado not in {'listo', 'entregado'}:
@@ -233,6 +243,15 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
         pedido.fecha_listo = pedido.fecha_listo or datetime.utcnow()
     elif estado in {'entregado', 'cobrado'}:
         pedido.fecha_entrega = pedido.fecha_entrega or datetime.utcnow()
+    try:
+        if estado == 'cancelado' and estado_anterior != 'cancelado':
+            _restaurar_stock_items(pedido.items.all())
+        elif estado != 'cancelado' and estado_anterior == 'cancelado':
+            for item in pedido.items.all():
+                _consumir_stock_producto(cliente_id, item.producto_id, int(item.cantidad or 0))
+    except ValueError:
+        db.session.rollback()
+        raise
     db.session.commit()
     registrar_evento_pedido(pedido, f'pedido_{estado}')
     return pedido
@@ -273,7 +292,9 @@ def _validar_datos_pedido(data: dict) -> dict:
 
 
 def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_data: list[dict]) -> None:
-    for item in pedido.items.all():
+    items_anteriores = pedido.items.all()
+    _restaurar_stock_items(items_anteriores)
+    for item in items_anteriores:
         db.session.delete(item)
     db.session.flush()
 
@@ -294,6 +315,7 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
     producto = validado['producto']
     if not producto.get('visible') or not producto.get('disponible'):
         raise ValueError(f'El producto "{producto.get("nombre")}" no esta disponible.')
+    _consumir_stock_producto(cliente_id, producto['id_producto'], cantidad)
 
     precio_unitario = Decimal(str(validado['total']))
     subtotal = precio_unitario * Decimal(cantidad)
@@ -322,6 +344,47 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
             precio_delta=Decimal(str(seleccion['precio_delta'])),
         ))
     return item
+
+
+def _consumir_stock_producto(cliente_id: int, producto_id: int, cantidad: int) -> None:
+    producto = GastronomiaProducto.query.filter(
+        GastronomiaProducto.cliente_id == int(cliente_id),
+        GastronomiaProducto.id_producto == int(producto_id),
+        GastronomiaProducto.activo.is_(True),
+    ).first()
+    if not producto or not producto.control_stock_venta:
+        return
+    stock_actual = max(0, int(producto.stock_disponible or 0))
+    cantidad = max(0, int(cantidad or 0))
+    if cantidad > stock_actual:
+        raise ValueError(f'No hay stock suficiente de "{producto.nombre}". Quedan {stock_actual}.')
+    producto.stock_disponible = stock_actual - cantidad
+    if producto.stock_disponible <= 0:
+        producto.disponible = False
+    db.session.add(producto)
+
+
+def _restaurar_stock_items(items: list[GastronomiaPedidoItem]) -> None:
+    cantidades_por_producto: dict[int, int] = {}
+    cliente_id = None
+    for item in items:
+        cliente_id = int(item.cliente_id)
+        producto_id = int(item.producto_id)
+        cantidades_por_producto[producto_id] = cantidades_por_producto.get(producto_id, 0) + int(item.cantidad or 0)
+    if not cliente_id or not cantidades_por_producto:
+        return
+    productos = GastronomiaProducto.query.filter(
+        GastronomiaProducto.cliente_id == cliente_id,
+        GastronomiaProducto.id_producto.in_(cantidades_por_producto.keys()),
+        GastronomiaProducto.activo.is_(True),
+    ).all()
+    for producto in productos:
+        if not producto.control_stock_venta:
+            continue
+        producto.stock_disponible = max(0, int(producto.stock_disponible or 0)) + cantidades_por_producto[int(producto.id_producto)]
+        if producto.stock_disponible > 0:
+            producto.disponible = True
+        db.session.add(producto)
 
 
 def _grupo_snapshot(cliente_id: int, grupo_id: int) -> dict:

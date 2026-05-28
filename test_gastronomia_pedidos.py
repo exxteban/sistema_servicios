@@ -256,6 +256,64 @@ def test_pedido_abierto_se_puede_editar_y_recalcula_total():
         assert evento is not None
 
 
+def test_stock_controlado_descuenta_agota_y_se_restaura_al_cancelar():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id, _opcion_id = _crear_menu_para_pedidos(app, 'Resto Stock', 'resto_stock')
+    with app.app_context():
+        producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
+        producto.control_stock_venta = True
+        producto.stock_disponible = 3
+        db.session.commit()
+    _loguear(client, app, 'resto_stock')
+
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    crear_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 2}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert crear_resp.status_code == 201
+    pedido_id = crear_resp.get_json()['pedido']['id_pedido']
+
+    with app.app_context():
+        producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
+        assert producto.stock_disponible == 1
+        assert producto.disponible is True
+
+    editar_resp = client.put(
+        f'/api/gastronomia/pedidos/{pedido_id}',
+        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 3}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert editar_resp.status_code == 200
+    with app.app_context():
+        producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
+        assert producto.stock_disponible == 0
+        assert producto.disponible is False
+
+    sin_agotados = client.get('/api/gastronomia/productos?publico=1')
+    assert sin_agotados.status_code == 200
+    assert sin_agotados.get_json()['productos'] == []
+
+    con_agotados = client.get('/api/gastronomia/productos?publico=1&agotados=1')
+    assert con_agotados.status_code == 200
+    producto_publico = con_agotados.get_json()['productos'][0]
+    assert producto_publico['disponible'] is False
+    assert producto_publico['stock_disponible'] == 0
+
+    cancelar_resp = client.post(
+        f'/api/gastronomia/pedidos/{pedido_id}/estado',
+        json={'estado': 'cancelado'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cancelar_resp.status_code == 200
+    with app.app_context():
+        producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
+        assert producto.stock_disponible == 3
+        assert producto.disponible is True
+
+
 def test_pedido_no_se_puede_editar_despues_de_enviarse_a_cocina():
     app = create_app('testing')
     client = app.test_client()

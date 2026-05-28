@@ -67,6 +67,14 @@ def _crear_base(app, nombre_cliente: str, username: str, slug: str):
             precio=1,
             visible=False,
         )
+        solo_menu = GastronomiaProducto(
+            cliente_id=cliente.id_cliente,
+            categoria_id=categoria.id_categoria,
+            nombre='Solo menu',
+            precio=9000,
+            visible=True,
+            visible_en_tv=False,
+        )
         agotado = GastronomiaProducto(
             cliente_id=cliente.id_cliente,
             categoria_id=categoria.id_categoria,
@@ -75,7 +83,7 @@ def _crear_base(app, nombre_cliente: str, username: str, slug: str):
             disponible=False,
             orden=2,
         )
-        db.session.add_all([producto, oculto, agotado])
+        db.session.add_all([producto, oculto, solo_menu, agotado])
         db.session.commit()
         return cliente.id_cliente, producto.id_producto, agotado.id_producto
 
@@ -228,10 +236,11 @@ def test_menu_tv_publico_respeta_visibilidad_disponibilidad_y_estado():
     assert response.status_code == 200
     productos = response.get_json()['categorias'][0]['productos']
     nombres = [producto['nombre'] for producto in productos]
-    assert nombres == ['Milanesa']
+    assert nombres == ['Milanesa', 'Empanada']
     assert productos[0]['imagen_url'] == 'https://cdn.example.com/milanesa.jpg'
     assert 'Secreto' not in nombres
-    assert 'Empanada' not in nombres
+    assert 'Solo menu' not in nombres
+    assert productos[1]['disponible'] is False
 
     with app.app_context():
         config = GastronomiaClienteConfig.query.filter_by(cliente_id=cliente_id).first()

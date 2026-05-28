@@ -89,6 +89,9 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
             'imagen_url': 'https://cdn.example.com/clasica.jpg',
             'disponible': True,
             'visible': True,
+            'visible_en_tv': False,
+            'control_stock_venta': True,
+            'stock_disponible': 5,
             'ingredientes_removibles': 'Lechuga\nTomate\nCebolla',
         },
         headers={'X-CSRFToken': csrf},
@@ -98,6 +101,9 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     producto = producto_resp.get_json()['producto']
     assert producto['precio'] == 12500.5
     assert producto['imagen_url'] == 'https://cdn.example.com/clasica.jpg'
+    assert producto['visible_en_tv'] is False
+    assert producto['control_stock_venta'] is True
+    assert producto['stock_disponible'] == 5
     producto_publico = client.get(
         '/api/gastronomia/productos',
         query_string={'publico': '1', 'modificadores': '1'},
@@ -131,6 +137,8 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
             'precio': '14000',
             'disponible': True,
             'visible': True,
+            'visible_en_tv': True,
+            'control_stock_venta': False,
             'ingredientes_removibles': 'Lechuga\nCebolla morada',
         },
         headers={'X-CSRFToken': csrf},
@@ -143,10 +151,23 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     ).get_json()['producto']
     assert producto_editado['nombre'] == 'Clasica editada'
     assert producto_editado['precio'] == 14000
+    assert producto_editado['visible_en_tv'] is True
+    assert producto_editado['control_stock_venta'] is False
+    assert producto_editado['stock_disponible'] is None
     grupo_removible = next(
         grupo for grupo in producto_editado['grupos_opciones'] if grupo['tipo'] == 'ingrediente_removible'
     )
     assert [opcion['nombre'] for opcion in grupo_removible['opciones']] == ['Lechuga', 'Cebolla morada']
+
+    toggle_resp = client.put(
+        f'/api/gastronomia/productos/{producto["id_producto"]}/estado',
+        json={'visible': False, 'visible_en_tv': False},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert toggle_resp.status_code == 200
+    producto_toggle = toggle_resp.get_json()['producto']
+    assert producto_toggle['visible'] is False
+    assert producto_toggle['visible_en_tv'] is False
 
 
 def test_api_menu_no_filtra_datos_entre_clientes():
@@ -212,6 +233,7 @@ def test_api_menu_guarda_imagen_subida_y_reemplaza_archivo_anterior():
                 'precio': '18000',
                 'disponible': '1',
                 'visible': '1',
+                'visible_en_tv': '1',
                 'imagen_archivo': (_imagen_png('red'), 'burger.png'),
             },
             headers={'X-CSRFToken': csrf},
@@ -232,6 +254,7 @@ def test_api_menu_guarda_imagen_subida_y_reemplaza_archivo_anterior():
                 'precio': '19000',
                 'disponible': '1',
                 'visible': '1',
+                'visible_en_tv': '0',
                 'imagen_archivo': (_imagen_png('blue'), 'burger-2.png'),
             },
             headers={'X-CSRFToken': csrf},
@@ -242,4 +265,5 @@ def test_api_menu_guarda_imagen_subida_y_reemplaza_archivo_anterior():
         ruta_dos = Path(static_dir, *producto_actualizado['imagen_url'].replace('/static/', '').split('/'))
         assert ruta_dos.is_file()
         assert producto_actualizado['imagen_url'] != producto['imagen_url']
+        assert producto_actualizado['visible_en_tv'] is False
         assert not ruta_uno.exists()

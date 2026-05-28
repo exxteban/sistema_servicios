@@ -9,6 +9,7 @@ from gastronomia.services.menu_image_service import (
     guardar_imagen_producto_menu,
 )
 from gastronomia.services.menu_service import (
+    actualizar_estado_producto,
     eliminar_categoria,
     eliminar_producto,
     guardar_categoria,
@@ -152,7 +153,13 @@ def productos():
         return error
     categoria_id = request.args.get('categoria_id', type=int)
     incluir_ocultos = request.args.get('publico') != '1'
-    items = listar_productos(cliente_id, categoria_id=categoria_id, incluir_ocultos=incluir_ocultos)
+    incluir_agotados = request.args.get('agotados') == '1'
+    items = listar_productos(
+        cliente_id,
+        categoria_id=categoria_id,
+        incluir_ocultos=incluir_ocultos,
+        incluir_agotados=incluir_agotados,
+    )
     if request.args.get('modificadores') == '1':
         productos_data = [producto_con_modificadores(cliente_id, item.id_producto) for item in items]
     else:
@@ -239,6 +246,19 @@ def actualizar_producto(producto_id):
     except ValueError as exc:
         _limpiar_imagen_subida(imagen_nueva)
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'producto': producto.to_dict()})
+
+
+@gastronomia_api_bp.route('/productos/<int:producto_id>/estado', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def actualizar_estado_producto_api(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    producto = actualizar_estado_producto(cliente_id, producto_id, _payload())
+    if not producto:
+        return jsonify({'error': 'not_found'}), 404
     return jsonify({'ok': True, 'producto': producto.to_dict()})
 
 
