@@ -287,24 +287,24 @@
 
   const renderCart = () => {
     cartItems.innerHTML = cart.map((item) => `
-      <article class="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
-        <div class="grid grid-cols-[44px_1fr_auto] items-start gap-3">
-          <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm font-black text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">${item.cantidad}</span>
+      <article class="rounded-lg border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-900">
+        <div class="grid grid-cols-[38px_1fr_auto] items-start gap-2.5">
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm font-black text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">${item.cantidad}</span>
           <div class="min-w-0">
-            <h3 class="font-black leading-tight text-gray-900 dark:text-white">${escapeHtml(item.nombre)}</h3>
-            <p class="mt-1 text-xs text-gray-500">${escapeHtml(item.selecciones.map(formatModifierName).join(', '))}</p>
+            <h3 class="text-sm font-black leading-tight text-gray-900 dark:text-white">${escapeHtml(item.nombre)}</h3>
+            <p class="mt-0.5 text-xs text-gray-500">${escapeHtml(item.selecciones.map(formatModifierName).join(', '))}</p>
             ${item.notas ? `<p class="mt-1 rounded bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700 dark:bg-orange-500/10 dark:text-orange-200">${escapeHtml(item.notas)}</p>` : ''}
           </div>
           <div class="flex shrink-0 items-center gap-2">
-            <button type="button" data-edit="${item.key}" class="rounded-lg border border-amber-200 px-2 py-1 text-sm font-bold text-amber-700 hover:bg-amber-50" aria-label="Editar ${escapeHtml(item.nombre)}">
+            <button type="button" data-edit="${item.key}" class="rounded-lg border border-amber-200 px-2 py-1 text-xs font-bold text-amber-700 hover:bg-amber-50" aria-label="Editar ${escapeHtml(item.nombre)}">
               <i class="fas fa-pen" aria-hidden="true"></i>
             </button>
-            <button type="button" data-remove="${item.key}" class="rounded-lg border border-red-200 px-2 py-1 text-sm font-bold text-red-600 hover:bg-red-50" aria-label="Quitar ${escapeHtml(item.nombre)}">
+            <button type="button" data-remove="${item.key}" class="rounded-lg border border-red-200 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50" aria-label="Quitar ${escapeHtml(item.nombre)}">
               <i class="fas fa-times" aria-hidden="true"></i>
             </button>
           </div>
         </div>
-        <div class="mt-2 flex justify-between text-sm">
+        <div class="mt-1.5 flex justify-between text-sm">
           <span class="font-semibold text-gray-500">${money(item.precio_unitario)} c/u</span>
           <strong class="font-black text-gray-900 dark:text-white">${money(item.precio_unitario * item.cantidad)}</strong>
         </div>
