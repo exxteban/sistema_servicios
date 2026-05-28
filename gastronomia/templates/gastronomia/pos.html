@@ -3,7 +3,7 @@
 {% block title %}POS Gastronomia{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-7xl" data-gastro-pos data-mesa-inicial="{{ mesa_inicial }}" data-pedido-inicial-id="{{ pedido_inicial_id or '' }}">
+<div class="pos-shell mx-auto w-full" data-gastro-pos data-mesa-inicial="{{ mesa_inicial }}" data-pedido-inicial-id="{{ pedido_inicial_id or '' }}">
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
     <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -29,9 +29,9 @@
 
     <div id="pos-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_430px]">
+    <div class="pos-touch-layout grid gap-5">
         <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <div class="flex gap-2 overflow-x-auto pb-2" id="category-tabs">
+            <div class="pos-category-strip flex gap-2 overflow-x-auto pb-2" id="category-tabs">
                 <button type="button" data-category="" class="pos-category active"><i class="fas fa-border-all"></i>Todo</button>
                 {% for categoria in categorias %}
                 <button type="button" data-category="{{ categoria.id_categoria }}" class="pos-category"><i class="fas fa-hamburger"></i>{{ categoria.nombre }}</button>
@@ -47,7 +47,7 @@
                     <i class="fas fa-filter"></i>Filtros
                 </button>
             </div>
-            <div id="products-grid" class="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3"></div>
+            <div id="products-grid" class="pos-products-grid mt-4 grid gap-3"></div>
         </section>
 
         <aside class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -87,25 +87,32 @@
                 Notas del pedido
                 <textarea id="order-notes" rows="2" placeholder="Escribe una nota para la cocina (opcional)..." class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
             </label>
-            <div class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
-                <span class="text-lg font-bold text-gray-900 dark:text-white">Total</span>
-                <strong id="cart-total" class="text-3xl font-black text-orange-600 dark:text-orange-300">Gs. 0</strong>
+        </aside>
+
+        <aside class="pos-checkout-panel rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800" aria-label="Acciones del pedido">
+            <div class="flex items-center justify-between gap-3">
+                <p class="text-xs font-black uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">Acciones</p>
+                <span class="rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-black text-orange-700 dark:bg-orange-500/10 dark:text-orange-200">Pedido actual</span>
+            </div>
+            <div class="pos-total-card mt-3">
+                <span class="text-xs font-black uppercase text-gray-500 dark:text-gray-400">Total</span>
+                <strong id="cart-total" class="text-3xl font-black leading-none text-orange-600 dark:text-orange-300">Gs. 0</strong>
             </div>
             {% if puede_cobrar %}
-            <div class="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 dark:border-emerald-500/20 dark:bg-emerald-950/20">
-                <p class="text-sm font-black text-emerald-800 dark:text-emerald-200">Cobro avanzado</p>
-                <p class="mt-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">Usa el checkout comercial con clientes, fidelizacion, pagos mixtos, controles y caja central.</p>
+            <div class="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/75 px-3 py-2.5 dark:border-emerald-500/20 dark:bg-emerald-950/20">
+                <p class="text-xs font-black text-emerald-800 dark:text-emerald-200">Cobro avanzado</p>
+                <p class="mt-0.5 text-[11px] font-bold leading-snug text-emerald-700 dark:text-emerald-300">Clientes, pagos mixtos, caja y cocina en un flujo corto.</p>
             </div>
             {% endif %}
-            <div class="mt-4 grid gap-3">
-                <button type="button" id="save-order" class="rounded-xl bg-emerald-600 px-4 py-4 text-base font-bold text-white hover:bg-emerald-700">
+            <div class="mt-3 grid gap-2">
+                <button type="button" id="save-order" class="pos-order-action pos-order-action--save">
                     <i class="fas fa-check-square"></i> Guardar pedido
                 </button>
-                <button type="button" id="send-kitchen" class="rounded-xl bg-orange-600 px-4 py-4 text-base font-bold text-white hover:bg-orange-700">
+                <button type="button" id="send-kitchen" class="pos-order-action pos-order-action--kitchen">
                     <i class="fas fa-concierge-bell"></i> Enviar a cocina
                 </button>
                 {% if puede_cobrar %}
-                <button type="button" id="charge-send-kitchen" class="rounded-xl bg-slate-900 px-4 py-4 text-base font-bold text-white hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700">
+                <button type="button" id="charge-send-kitchen" class="pos-order-action pos-order-action--checkout">
                     <i class="fas fa-cash-register"></i> Cobro avanzado y cocina
                 </button>
                 {% endif %}
@@ -144,6 +151,9 @@
 
 {% block extra_css %}
 <style>
+    .pos-shell {
+        max-width: min(2200px, calc(100vw - 1.5rem));
+    }
     .pos-top-action {
         display: inline-flex;
         align-items: center;
@@ -155,6 +165,17 @@
         font-size: 0.875rem;
         font-weight: 800;
         color: rgb(31 41 55);
+    }
+    .pos-category-strip {
+        display: grid;
+        grid-auto-columns: max-content;
+        grid-auto-flow: column;
+        overscroll-behavior-inline: contain;
+        scrollbar-width: thin;
+    }
+    .pos-touch-layout {
+        align-items: start;
+        grid-template-columns: minmax(0, 1fr);
     }
     .pos-category {
         display: inline-flex;
@@ -182,11 +203,16 @@
         gap: 0.5rem;
         border: 1px solid rgb(209 213 219);
         border-radius: 12px;
-        min-height: 56px;
-        padding: 10px 12px;
+        min-height: 50px;
+        padding: 9px 10px;
+        font-size: 0.92rem;
         font-weight: 800;
         background: white;
         color: rgb(55 65 81);
+    }
+    .tipo-pedido-btn i,
+    .mesa-selector-btn i {
+        font-size: 0.95em;
     }
     .tipo-pedido-btn.activa {
         background: rgb(254 243 199);
@@ -241,20 +267,74 @@
         color: rgb(156 163 175);
         opacity: 1;
     }
+    .pos-products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+    .pos-checkout-panel {
+        width: 100%;
+        align-self: start;
+    }
+    .pos-total-card {
+        display: grid;
+        gap: 0.45rem;
+        border-radius: 1rem;
+        background: linear-gradient(135deg, rgb(255 247 237), rgb(255 255 255));
+        padding: 1rem;
+        box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.18);
+    }
+    .pos-order-action {
+        display: inline-flex;
+        min-height: 46px;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        border-radius: 0.85rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        font-weight: 900;
+        color: white;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+    }
+    .pos-order-action:hover {
+        transform: translateY(-1px);
+        filter: brightness(0.98);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+    }
+    .pos-order-action--save {
+        background: rgb(5 150 105);
+    }
+    .pos-order-action--kitchen {
+        background: rgb(234 88 12);
+    }
+    .pos-order-action--checkout {
+        background: rgb(15 23 42);
+    }
+    .dark .pos-order-action--checkout {
+        background: rgb(5 150 105);
+    }
+    .dark .pos-total-card {
+        background: linear-gradient(135deg, rgba(124, 45, 18, 0.35), rgba(17, 24, 39, 0.95));
+        box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.22);
+    }
     .pos-product-card {
         display: flex;
         min-width: 0;
         flex-direction: column;
     }
     .pos-product-image-wrap {
-        aspect-ratio: 16 / 10;
-        width: 100%;
+        aspect-ratio: 4 / 3;
+        width: min(100%, 180px);
+        height: clamp(88px, 10vw, 126px);
+        margin-inline: auto;
+        flex-shrink: 0;
     }
     .pos-product-image {
         display: block;
         height: 100%;
         width: 100%;
         object-fit: cover;
+        object-position: center;
     }
     .pos-soldout-badge {
         display: inline-flex;
@@ -281,6 +361,29 @@
         50% {
             transform: scale(1.04);
             box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.13);
+        }
+    }
+    @media (min-width: 1024px) {
+        .pos-touch-layout {
+            grid-template-columns: minmax(0, 1fr) 430px;
+        }
+        .pos-checkout-panel {
+            grid-column: 2;
+        }
+    }
+    @media (min-width: 1440px) {
+        .pos-touch-layout {
+            grid-template-columns: minmax(620px, 1fr) minmax(360px, 430px) minmax(280px, 320px);
+        }
+        .pos-checkout-panel {
+            position: sticky;
+            top: 1rem;
+            grid-column: auto;
+        }
+    }
+    @media (min-width: 1800px) {
+        .pos-products-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         }
     }
 </style>
