@@ -25,11 +25,19 @@ TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro', 'delivery'}
 ESTADOS_PEDIDO = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino', 'entregado', 'cobrado', 'cancelado'}
 
 
-def listar_pedidos(cliente_id: int, *, estados: list[str] | None = None) -> list[GastronomiaPedido]:
+def listar_pedidos(
+    cliente_id: int,
+    *,
+    estados: list[str] | None = None,
+    tipo_pedido: str | None = None,
+) -> list[GastronomiaPedido]:
     query = GastronomiaPedido.query.filter(GastronomiaPedido.cliente_id == int(cliente_id))
     estados_validos = [estado for estado in (estados or []) if estado in ESTADOS_PEDIDO]
     if estados_validos:
         query = query.filter(GastronomiaPedido.estado.in_(estados_validos))
+    tipo = (tipo_pedido or '').strip().lower()
+    if tipo in TIPOS_PEDIDO:
+        query = query.filter(GastronomiaPedido.tipo_pedido == tipo)
     return query.order_by(GastronomiaPedido.fecha_creacion.desc(), GastronomiaPedido.id_pedido.desc()).all()
 
 

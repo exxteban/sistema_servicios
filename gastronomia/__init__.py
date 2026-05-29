@@ -10,6 +10,7 @@ from gastronomia.routes.reportes_api_routes import gastronomia_reportes_api_bp
 from gastronomia.routes.salon_api_routes import gastronomia_salon_api_bp
 from gastronomia.routes import caja_routes as _caja_routes  # noqa: F401
 from gastronomia.routes import cocina_routes as _cocina_routes  # noqa: F401
+from gastronomia.routes import delivery_routes as _delivery_routes  # noqa: F401
 from gastronomia.routes import entregas_routes as _entregas_routes  # noqa: F401
 from gastronomia.routes import menu_routes as _menu_routes  # noqa: F401
 from gastronomia.routes import menu_tv_routes as _menu_tv_routes  # noqa: F401

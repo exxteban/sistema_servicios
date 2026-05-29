@@ -192,6 +192,9 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     client = app.test_client()
     _cliente_id, producto_id = _crear_producto(app, 'Resto Delivery', 'resto_delivery')
     _loguear(client, app, 'resto_delivery')
+    delivery_page = client.get('/gastronomia/delivery')
+    assert delivery_page.status_code == 200
+    assert 'Nuevo delivery' in delivery_page.get_data(as_text=True)
     csrf = _csrf(client.get('/gastronomia/pos?tipo=delivery').get_data(as_text=True))
 
     pedido_resp = client.post(
@@ -213,6 +216,9 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     assert pedido['direccion_entrega'] == 'Av. Siempre Viva 742'
     assert pedido['tiempo_estimado_minutos'] == 35
     assert pedido['codigo_publico']
+    filtrado_resp = client.get('/api/gastronomia/pedidos?tipo_pedido=delivery')
+    assert filtrado_resp.status_code == 200
+    assert [item['id_pedido'] for item in filtrado_resp.get_json()['pedidos']] == [pedido['id_pedido']]
 
     cocina_resp = client.post(
         f'/api/gastronomia/pedidos/{pedido["id_pedido"]}/enviar-cocina',

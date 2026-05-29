@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Delivery Gastronomia{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-5" data-gastro-delivery>
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-black uppercase tracking-wide text-orange-600 dark:text-orange-300">Gastronomia</p>
+            <h1 class="mt-1 text-2xl font-black text-gray-900 dark:text-white">Delivery</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Pedidos activos, contacto del cliente y seguimiento publico.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('gastronomia.pos', tipo='delivery') }}" class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-black text-white hover:bg-orange-700">
+                <i class="fas fa-plus"></i> Nuevo delivery
+            </a>
+            <a href="{{ url_for('gastronomia.dashboard') }}" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <div id="delivery-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+
+    <section class="grid gap-3 md:grid-cols-5" id="delivery-summary"></section>
+
+    <section class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <label class="relative flex-1">
+                <i class="fas fa-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input id="delivery-search" placeholder="Buscar por cliente, celular, direccion o producto" class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            </label>
+            <button type="button" id="delivery-refresh" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-black text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">
+                <i class="fas fa-rotate"></i> Actualizar
+            </button>
+        </div>
+    </section>
+
+    <section class="grid gap-4 xl:grid-cols-5" id="delivery-board"></section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/delivery.js', v='20260528-1') }}"></script>
+{% endblock %}

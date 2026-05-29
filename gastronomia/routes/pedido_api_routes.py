@@ -48,7 +48,8 @@ def pedidos():
     estados = [estado.strip() for estado in request.args.getlist('estado') if estado.strip()]
     if not estados and request.args.get('estados'):
         estados = [estado.strip() for estado in request.args.get('estados').split(',') if estado.strip()]
-    items = listar_pedidos(cliente_id, estados=estados)
+    tipo_pedido = request.args.get('tipo_pedido') or request.args.get('tipo')
+    items = listar_pedidos(cliente_id, estados=estados, tipo_pedido=tipo_pedido)
     return jsonify({'ok': True, 'pedidos': serializar_pedidos(items)})
 
 
