@@ -56,7 +56,7 @@
       actionClass: 'bg-sky-500 hover:bg-sky-400 focus:ring-sky-300',
     },
     preparando: {
-      label: 'En preparacion',
+      label: 'Preparando',
       pill: 'border-emerald-400/20 bg-emerald-400/15 text-emerald-300',
       action: 'Marcar como listo',
       actionClass: 'bg-emerald-500 hover:bg-emerald-400 focus:ring-emerald-300',
@@ -228,32 +228,32 @@
   `;
   const renderOrder = (order) => `
     <article class="kds-card" data-order="${order.id_pedido}">
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex min-w-0 gap-3">
-          <div class="border-r border-slate-700/80 pr-3">
-            <h2 class="text-2xl font-black leading-none text-slate-100">${deliveryCode(order)}</h2>
-            <p class="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Pedido #${order.id_pedido}</p>
-            <p class="mt-2 flex items-center gap-2 text-xs font-bold text-slate-400">
+      <div class="kds-order-top">
+        <div class="kds-order-code border-r border-slate-700/80 pr-3">
+          <h2 class="text-2xl font-black leading-none text-slate-100">${deliveryCode(order)}</h2>
+          <p class="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Pedido #${order.id_pedido}</p>
+          <p class="mt-2 flex items-center gap-2 text-xs font-bold text-slate-400">
               <span class="h-2 w-2 rounded-full shadow-lg ${timeDotClass(order)}"></span>
               ${elapsed(order.fecha_envio_cocina || order.fecha_creacion)}
-            </p>
+          </p>
+        </div>
+        <div class="kds-order-info">
+          <div class="flex items-start justify-between gap-2">
+            <p class="kds-origin text-sm font-black text-slate-200">${displayOrigin(order)}</p>
+            <span class="kds-state-pill shrink-0 rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${stateMeta[order.estado]?.pill || 'border-slate-600 bg-slate-800 text-slate-300'}">${stateMeta[order.estado]?.label || escapeHtml(order.estado)}</span>
           </div>
-          <div class="min-w-0 pt-0.5">
-            <p class="truncate text-sm font-black text-slate-200">${displayOrigin(order)}</p>
-            ${order.referencia_entrega ? `<p class="mt-1 truncate text-xs font-black uppercase tracking-wide text-sky-200">${escapeHtml(order.referencia_entrega)}</p>` : ''}
-            ${order.celular_cliente ? `<p class="mt-1 truncate text-xs font-bold text-slate-400">Cel: ${escapeHtml(order.celular_cliente)}</p>` : ''}
-            ${order.direccion_entrega ? `<p class="mt-1 truncate text-xs font-bold text-slate-400">${escapeHtml(order.direccion_entrega)}</p>` : ''}
-            <div class="mt-3 space-y-1.5">
-              ${(order.items || []).map((item) => `
-                <div class="grid grid-cols-[auto_1fr] gap-2 text-sm leading-tight">
-                  <span class="font-black text-slate-100">${item.cantidad}</span>
-                  <span class="text-slate-200">${escapeHtml(item.nombre_producto)}</span>
-                </div>
-              `).join('')}
-            </div>
+          ${order.referencia_entrega ? `<p class="mt-1 text-xs font-black uppercase tracking-wide text-sky-200">${escapeHtml(order.referencia_entrega)}</p>` : ''}
+          ${order.celular_cliente ? `<p class="mt-1 kds-contact text-xs font-bold text-slate-400">Cel: ${escapeHtml(order.celular_cliente)}</p>` : ''}
+          ${order.direccion_entrega ? `<p class="mt-1 kds-contact text-xs font-bold text-slate-400">Dir: ${escapeHtml(order.direccion_entrega)}</p>` : ''}
+          <div class="mt-3 space-y-1.5">
+            ${(order.items || []).map((item) => `
+              <div class="kds-item-row">
+                <span class="kds-item-qty font-black text-slate-100">${item.cantidad}</span>
+                <span class="kds-item-name text-slate-200">${escapeHtml(item.nombre_producto)}</span>
+              </div>
+            `).join('')}
           </div>
         </div>
-        <span class="shrink-0 rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${stateMeta[order.estado]?.pill || 'border-slate-600 bg-slate-800 text-slate-300'}">${stateMeta[order.estado]?.label || escapeHtml(order.estado)}</span>
       </div>
       <div class="mt-4 space-y-2">
         ${renderDetails(order)}

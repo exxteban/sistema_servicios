@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import case
 
@@ -158,6 +158,7 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
         'estado': pedido.estado,
         'notas': pedido.notas,
         'subtotal': float(pedido.subtotal or 0),
+        'costo_envio': float(pedido.costo_envio or 0),
         'total': float(pedido.total or 0),
         'fecha_creacion': pedido.fecha_creacion.isoformat() if pedido.fecha_creacion else None,
         'fecha_envio_cocina': pedido.fecha_envio_cocina.isoformat() if pedido.fecha_envio_cocina else None,
@@ -192,6 +193,7 @@ def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPed
         celular_cliente=pedido_data['celular_cliente'],
         direccion_entrega=pedido_data['direccion_entrega'],
         tiempo_estimado_minutos=pedido_data['tiempo_estimado_minutos'],
+        costo_envio=pedido_data['costo_envio'],
         notas=pedido_data['notas'],
         estado='abierto',
     )
@@ -226,6 +228,7 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
     pedido.celular_cliente = pedido_data['celular_cliente']
     pedido.direccion_entrega = pedido_data['direccion_entrega']
     pedido.tiempo_estimado_minutos = pedido_data['tiempo_estimado_minutos']
+    pedido.costo_envio = pedido_data['costo_envio']
     pedido.notas = pedido_data['notas']
     try:
         _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
@@ -332,6 +335,7 @@ def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
         'celular_cliente': celular_cliente,
         'direccion_entrega': direccion_entrega,
         'tiempo_estimado_minutos': _parse_estimated_minutes(data.get('tiempo_estimado_minutos')),
+        'costo_envio': _parse_nonnegative_money(data.get('costo_envio')) if tipo == 'delivery' else Decimal('0.00'),
         'notas': (data.get('notas') or '').strip() or None,
         'items': items_data,
     }
@@ -355,6 +359,18 @@ def _parse_estimated_minutes(value) -> int | None:
     return min(minutes, 1440)
 
 
+def _parse_nonnegative_money(value) -> Decimal:
+    if value in (None, ''):
+        return Decimal('0.00')
+    try:
+        amount = Decimal(str(value)).quantize(Decimal('0.01'))
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise ValueError('Monto invalido.') from exc
+    if amount < 0:
+        raise ValueError('El costo de envio no puede ser negativo.')
+    return amount
+
+
 def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_data: list[dict]) -> None:
     items_anteriores = pedido.items.all()
     _restaurar_stock_items(items_anteriores)
@@ -368,7 +384,7 @@ def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_d
         total += Decimal(str(item.subtotal or 0))
 
     pedido.subtotal = total
-    pedido.total = total
+    pedido.total = total + Decimal(str(pedido.costo_envio or 0)).quantize(Decimal('0.01'))
 
 
 def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) -> GastronomiaPedidoItem:

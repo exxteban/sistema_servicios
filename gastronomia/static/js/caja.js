@@ -5,6 +5,8 @@
   const alertBox = document.getElementById('caja-alert');
   const selectedSummary = document.getElementById('selected-summary');
   const discountInput = document.getElementById('discount-amount');
+  const shippingWrapper = document.getElementById('shipping-cost-wrapper');
+  const shippingInput = document.getElementById('shipping-cost');
   const paymentMethodInput = document.getElementById('payment-method');
   const paymentTotal = document.getElementById('payment-total');
   const chargeButton = document.getElementById('charge-order');
@@ -120,6 +122,7 @@
           <h2 class="text-xl font-black text-gray-900 dark:text-white">${deliveryCode(order)} ${escapeHtml(order.tipo_pedido)}</h2>
           <p class="mt-1 text-sm font-semibold text-gray-500">${order.mesa ? `Mesa ${escapeHtml(order.mesa)} - ` : ''}${escapeHtml(order.estado)}</p>
           ${order.referencia_entrega ? `<p class="mt-1 text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">${escapeHtml(order.referencia_entrega)}</p>` : ''}
+          ${(order.tipo_pedido || '').toLowerCase() === 'delivery' ? `<p class="mt-1 text-xs font-bold text-gray-500">Envio: ${money(order.costo_envio || 0)}</p>` : ''}
         </div>
         <strong class="text-xl text-emerald-700 dark:text-emerald-300">${money(order.total)}</strong>
       </div>
@@ -140,19 +143,34 @@
     const order = orders.find((item) => Number(item.id_pedido) === Number(selectedOrderId));
     if (!order) {
       selectedSummary.textContent = 'Selecciona un pedido pendiente.';
+      if (shippingWrapper) shippingWrapper.classList.add('hidden');
+      if (shippingInput) {
+        shippingInput.value = 0;
+        shippingInput.dataset.orderId = '';
+      }
       paymentTotal.textContent = money(0);
       updateChargeButton();
       return;
     }
     const discount = Math.max(0, Number(discountInput.value || 0));
+    const isDelivery = (order.tipo_pedido || '').toLowerCase() === 'delivery';
+    if (shippingWrapper) shippingWrapper.classList.toggle('hidden', !isDelivery);
+    if (shippingInput && shippingInput.dataset.orderId !== String(order.id_pedido)) {
+      shippingInput.value = isDelivery ? Number(order.costo_envio || 0) : 0;
+      shippingInput.dataset.orderId = String(order.id_pedido);
+    }
+    const shippingCost = isDelivery ? Math.max(0, Number(shippingInput?.value || order.costo_envio || 0)) : 0;
+    const subtotal = Number(order.subtotal || 0);
+    const total = Math.max(0, subtotal + shippingCost - discount);
     selectedSummary.innerHTML = `
       <div class="flex items-center justify-between gap-3">
         <strong class="text-gray-900 dark:text-white">Pedido ${deliveryCode(order)}</strong>
-        <span class="font-bold text-emerald-700 dark:text-emerald-300">${money(order.total)}</span>
+        <span class="font-bold text-emerald-700 dark:text-emerald-300">${money(subtotal + shippingCost)}</span>
       </div>
       <p class="mt-2 text-sm text-gray-500">${escapeHtml(order.tipo_pedido)}${order.mesa ? ` - Mesa ${escapeHtml(order.mesa)}` : ''}${order.referencia_entrega ? ` - ${escapeHtml(order.referencia_entrega)}` : ''}</p>
+      ${isDelivery ? `<p class="mt-2 text-xs font-semibold text-gray-500">Productos ${money(subtotal)} + envio ${money(shippingCost)}</p>` : ''}
     `;
-    paymentTotal.textContent = money(Math.max(0, Number(order.total || 0) - discount));
+    paymentTotal.textContent = money(total);
     updateChargeButton();
   };
   const chargeSelected = async (ticketWindow = null) => {
@@ -165,6 +183,7 @@
       body: JSON.stringify({
         metodo_pago: document.getElementById('payment-method').value,
         descuento_monto: Number(discountInput.value || 0),
+        costo_envio: Number(shippingInput?.value || 0),
         referencia: document.getElementById('payment-reference')?.value.trim() || '',
         observacion: document.getElementById('payment-note').value.trim(),
       }),
@@ -175,6 +194,10 @@
     else window.open(ticketUrl, '_blank');
     selectedOrderId = null;
     discountInput.value = 0;
+    if (shippingInput) {
+      shippingInput.value = 0;
+      shippingInput.dataset.orderId = '';
+    }
     const paymentReference = document.getElementById('payment-reference');
     if (paymentReference) paymentReference.value = '';
     document.getElementById('payment-note').value = '';
@@ -207,10 +230,13 @@
     const button = event.target.closest('[data-select]');
     if (!button) return;
     selectedOrderId = Number(button.dataset.select);
+    const order = orders.find((item) => Number(item.id_pedido) === Number(selectedOrderId));
+    if (shippingInput) shippingInput.value = Number(order?.costo_envio || 0);
     renderOrders();
     renderSelected();
   });
   discountInput?.addEventListener('input', renderSelected);
+  shippingInput?.addEventListener('input', renderSelected);
   document.querySelectorAll('[data-payment-method]').forEach((button) => {
     button.setAttribute('aria-pressed', button.classList.contains('active') ? 'true' : 'false');
     button.addEventListener('click', () => selectPaymentMethod(button));

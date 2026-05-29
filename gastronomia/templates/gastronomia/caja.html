@@ -90,6 +90,11 @@
                 <input id="discount-amount" type="number" min="0" step="100" value="0"
                        class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
             </label>
+            <label id="shipping-cost-wrapper" class="mt-4 hidden text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Costo de envio
+                <input id="shipping-cost" type="number" min="0" step="100" value="0"
+                       class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            </label>
             <label class="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-200">
                 Referencia de pago
                 <input id="payment-reference" maxlength="100" placeholder="Voucher, transferencia o QR"
@@ -217,5 +222,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/caja.js') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/caja.js', v='20260528-2') }}"></script>
 {% endblock %}

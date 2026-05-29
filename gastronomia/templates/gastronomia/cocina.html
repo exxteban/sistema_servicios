@@ -88,6 +88,40 @@
         border-color: rgba(37, 99, 235, 0.24);
         transform: translateY(-1px);
     }
+    .kds-order-top {
+        display: grid;
+        grid-template-columns: minmax(82px, 0.55fr) minmax(0, 1.45fr);
+        gap: 0.75rem;
+        align-items: start;
+    }
+    .kds-order-code {
+        min-width: 0;
+    }
+    .kds-order-info,
+    .kds-contact,
+    .kds-item-name {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+    .kds-origin {
+        line-height: 1.08;
+    }
+    .kds-state-pill {
+        max-width: 9.5rem;
+        white-space: nowrap;
+        font-size: clamp(0.56rem, 1.8vw, 0.68rem);
+    }
+    .kds-item-row {
+        display: grid;
+        grid-template-columns: 1.35rem minmax(0, 1fr);
+        gap: 0.45rem;
+        font-size: clamp(0.82rem, 2.35vw, 0.95rem);
+        line-height: 1.12;
+    }
+    .kds-item-qty {
+        text-align: center;
+    }
     .dark .kds-card {
         border-color: rgba(148, 163, 184, 0.15);
         background: linear-gradient(145deg, rgba(30, 41, 59, 0.90), rgba(15, 23, 42, 0.92));
@@ -229,9 +263,18 @@
             max-height: none;
         }
     }
+    @media (max-width: 430px) {
+        .kds-order-top {
+            grid-template-columns: 76px minmax(0, 1fr);
+            gap: 0.6rem;
+        }
+        .kds-card {
+            padding: 12px;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260525-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260528-1') }}"></script>
 {% endblock %}

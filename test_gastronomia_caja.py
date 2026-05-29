@@ -195,7 +195,9 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     delivery_page = client.get('/gastronomia/delivery')
     assert delivery_page.status_code == 200
     assert 'Nuevo delivery' in delivery_page.get_data(as_text=True)
-    csrf = _csrf(client.get('/gastronomia/pos?tipo=delivery').get_data(as_text=True))
+    pos_html = client.get('/gastronomia/pos?tipo=delivery').get_data(as_text=True)
+    csrf = _csrf(pos_html)
+    assert 'delivery-shipping-cost' in pos_html
 
     pedido_resp = client.post(
         '/api/gastronomia/pedidos',
@@ -205,6 +207,7 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
             'celular_cliente': '0981123456',
             'direccion_entrega': 'Av. Siempre Viva 742',
             'tiempo_estimado_minutos': 35,
+            'costo_envio': 7000,
             'items': [{'producto_id': producto_id, 'cantidad': 1}],
         },
         headers={'X-CSRFToken': csrf},
@@ -215,6 +218,9 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     assert pedido['celular_cliente'] == '0981123456'
     assert pedido['direccion_entrega'] == 'Av. Siempre Viva 742'
     assert pedido['tiempo_estimado_minutos'] == 35
+    assert pedido['costo_envio'] == 7000
+    assert pedido['subtotal'] == 30000
+    assert pedido['total'] == 37000
     assert pedido['codigo_publico']
     filtrado_resp = client.get('/api/gastronomia/pedidos?tipo_pedido=delivery')
     assert filtrado_resp.status_code == 200
@@ -242,9 +248,67 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     assert 'DELIVERY' in ticket_html
     assert '0981123456' in ticket_html
     assert 'Av. Siempre Viva 742' in ticket_html
+    assert 'Envio' in ticket_html
     seguimiento_html = client.get(f'/gastronomia/pedido/{pedido["codigo_publico"]}').get_data(as_text=True)
     assert 'Tu pedido ya salio con el delivery.' in seguimiento_html
     assert '35 minutos' in seguimiento_html
+
+
+def test_caja_actualiza_costo_envio_delivery_antes_de_cobrar():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto(app, 'Resto Caja Delivery', 'resto_caja_delivery')
+    _loguear(client, app, 'resto_caja_delivery')
+    _abrir_caja(app, 'resto_caja_delivery')
+    page = client.get('/gastronomia/caja')
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert 'shipping-cost' in html
+    csrf = _csrf(html)
+
+    pedido_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'delivery',
+            'referencia_entrega': 'Rosa',
+            'celular_cliente': '0981555444',
+            'direccion_entrega': 'Centro 123',
+            'costo_envio': 5000,
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert pedido_resp.status_code == 201
+    pedido_id = pedido_resp.get_json()['pedido']['id_pedido']
+
+    cobrar_resp = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'metodo_pago': 'efectivo', 'costo_envio': 8000},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cobrar_resp.status_code == 200
+    pedido = cobrar_resp.get_json()['pedido']
+    assert pedido['subtotal'] == 30000
+    assert pedido['costo_envio'] == 8000
+    assert pedido['total'] == 38000
+    assert pedido['pago']['subtotal'] == 38000
+    assert pedido['pago']['total_cobrado'] == 38000
+
+    ticket_html = client.get(f'/gastronomia/pedidos/{pedido_id}/ticket?preview=1').get_data(as_text=True)
+    assert 'Envio' in ticket_html
+    assert '38.000' in ticket_html
+
+    with app.app_context():
+        pedido_db = GastronomiaPedido.query.filter_by(cliente_id=cliente_id, id_pedido=pedido_id).first()
+        assert pedido_db is not None
+        assert float(pedido_db.costo_envio) == 8000
+        pago = pedido_db.pago
+        assert float(pago.total_cobrado) == 38000
+        venta = Venta.query.get(pago.id_venta)
+        assert venta is not None
+        assert float(venta.subtotal) == 38000
+        assert float(venta.total) == 38000
+        assert DetalleVenta.query.filter_by(id_venta=venta.id_venta).count() == 2
 
 
 def test_caja_no_cobra_pedido_ajeno_ni_duplica_cobro():

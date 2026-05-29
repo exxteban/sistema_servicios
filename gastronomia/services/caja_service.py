@@ -55,6 +55,7 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     if metodo_pago not in METODOS_PAGO:
         raise ValueError('Metodo de pago invalido.')
 
+    _actualizar_costo_envio_si_corresponde(pedido, data)
     subtotal = Decimal(str(pedido.total or 0)).quantize(Decimal('0.01'))
     descuento = _parse_decimal(data.get('descuento_monto'), Decimal('0.00'))
     if descuento < 0:
@@ -129,6 +130,16 @@ def _reservar_pago_pedido(
         db.session.rollback()
         raise ValueError('El pedido ya fue cobrado.')
     return pago
+
+
+def _actualizar_costo_envio_si_corresponde(pedido: GastronomiaPedido, data: dict) -> None:
+    if (pedido.tipo_pedido or '').strip().lower() != 'delivery' or 'costo_envio' not in data:
+        return
+    costo_envio = _parse_decimal(data.get('costo_envio'), Decimal('0.00'))
+    if costo_envio < 0:
+        raise ValueError('El costo de envio no puede ser negativo.')
+    pedido.costo_envio = costo_envio
+    pedido.total = Decimal(str(pedido.subtotal or 0)).quantize(Decimal('0.01')) + costo_envio
 
 
 def _parse_decimal(value, default: Decimal) -> Decimal:

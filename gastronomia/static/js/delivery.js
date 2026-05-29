@@ -96,16 +96,17 @@
     return `
       <article class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900" data-order="${order.id_pedido}">
         <div class="flex items-start justify-between gap-2">
-          <div>
+          <div class="min-w-0">
             <h3 class="text-lg font-black text-gray-900 dark:text-white">${escapeHtml(order.codigo_entrega || `#${order.id_pedido}`)}</h3>
             <p class="text-xs font-bold uppercase text-gray-500">${elapsed(order.fecha_creacion)}</p>
           </div>
-          <strong class="text-sm font-black text-orange-700 dark:text-orange-300">${money(order.total)}</strong>
+          <strong class="whitespace-nowrap text-sm font-black text-orange-700 dark:text-orange-300">${money(order.total)}</strong>
         </div>
-        <div class="mt-3 space-y-1 text-sm text-gray-700 dark:text-gray-200">
-          ${order.nombre_cliente || order.referencia_entrega ? `<p><strong>Cliente:</strong> ${escapeHtml(order.nombre_cliente || order.referencia_entrega)}</p>` : ''}
-          ${order.celular_cliente ? `<p><strong>Cel:</strong> ${escapeHtml(order.celular_cliente)}</p>` : ''}
-          ${order.direccion_entrega ? `<p><strong>Dir:</strong> ${escapeHtml(order.direccion_entrega)}</p>` : ''}
+        <div class="mt-3 space-y-1 text-sm leading-snug text-gray-700 dark:text-gray-200">
+          ${order.nombre_cliente || order.referencia_entrega ? `<p class="break-words"><strong>Cliente:</strong> ${escapeHtml(order.nombre_cliente || order.referencia_entrega)}</p>` : ''}
+          ${order.celular_cliente ? `<p class="break-words"><strong>Cel:</strong> ${escapeHtml(order.celular_cliente)}</p>` : ''}
+          ${order.direccion_entrega ? `<p class="break-words"><strong>Dir:</strong> ${escapeHtml(order.direccion_entrega)}</p>` : ''}
+          ${Number(order.costo_envio || 0) > 0 ? `<p><strong>Envio:</strong> ${money(order.costo_envio)}</p>` : ''}
           ${order.tiempo_estimado_minutos ? `<p><strong>Estimado:</strong> ${order.tiempo_estimado_minutos} min</p>` : ''}
         </div>
         <div class="mt-3 flex flex-wrap gap-1.5">
@@ -113,10 +114,10 @@
         </div>
         <div class="mt-3 grid gap-2">
           ${next ? `<button type="button" data-next="${next.estado}" class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-black text-white hover:bg-orange-700">${next.label}</button>` : ''}
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid gap-2" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 2.5rem;">
             <a href="/gastronomia/pedidos/${order.id_pedido}/ticket?preview=1" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Ticket</a>
             <a href="${escapeHtml(order.url_seguimiento || '#')}" target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Estado</a>
-            ${phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener" class="rounded-lg border border-emerald-200 px-2 py-2 text-center text-xs font-black text-emerald-700 hover:bg-emerald-50">WhatsApp</a>` : '<span class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-400">WhatsApp</span>'}
+            ${phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener" title="Abrir WhatsApp" aria-label="Abrir WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-green-200 text-lg text-green-700 hover:bg-green-50"><i class="fab fa-whatsapp"></i></a>` : '<span title="Sin celular" aria-label="Sin celular para WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fab fa-whatsapp"></i></span>'}
           </div>
         </div>
       </article>

@@ -185,6 +185,7 @@
         <hr class="sep">
         <table>
             <tr><td class="left">Subtotal</td><td class="right">{{ thermal_amount(subtotal) }}</td></tr>
+            {% if costo_envio > 0 %}<tr><td class="left">Envio</td><td class="right">{{ thermal_amount(costo_envio) }}</td></tr>{% endif %}
             {% if descuento > 0 %}<tr><td class="left">Descuento</td><td class="right">- {{ thermal_amount(descuento) }}</td></tr>{% endif %}
             <tr><td class="left bold">TOTAL</td><td class="right bold">{{ thermal_amount(total_cobrado) }}</td></tr>
             <tr><td class="left">Pago</td><td class="right">{{ metodo_pago_label|thermal_safe }}</td></tr>
@@ -222,6 +223,8 @@
 {% endif %}{{ thermal_pair('', item.cantidad ~ '  ' ~ thermal_amount(item.subtotal), thermal_width) }}
 {% endfor %}{{ '-' * thermal_width }}
 {{ thermal_pair('Subtotal', thermal_amount(subtotal), thermal_width) }}
+{% if costo_envio > 0 %}{{ thermal_pair('Envio', thermal_amount(costo_envio), thermal_width) }}
+{% endif %}
 {% if descuento > 0 %}{{ thermal_pair('Descuento', '- ' ~ thermal_amount(descuento), thermal_width) }}
 {% endif %}{{ thermal_pair('TOTAL', thermal_amount(total_cobrado), thermal_width) }}
 {{ thermal_pair('Pago', metodo_pago_label|thermal_safe, thermal_width) }}

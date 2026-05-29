@@ -253,6 +253,7 @@ class GastronomiaPedido(db.Model):
     estado = db.Column(db.String(30), nullable=False, default='abierto', index=True)
     notas = db.Column(db.Text)
     subtotal = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    costo_envio = db.Column(db.Numeric(15, 2), nullable=False, default=0, server_default='0')
     total = db.Column(db.Numeric(15, 2), nullable=False, default=0)
     fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     fecha_modificacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -289,6 +290,7 @@ class GastronomiaPedido(db.Model):
             'estado': self.estado,
             'notas': self.notas,
             'subtotal': float(self.subtotal or 0),
+            'costo_envio': float(self.costo_envio or 0),
             'total': float(self.total or 0),
             'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
             'fecha_envio_cocina': self.fecha_envio_cocina.isoformat() if self.fecha_envio_cocina else None,

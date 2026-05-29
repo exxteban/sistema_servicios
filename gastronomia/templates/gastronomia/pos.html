@@ -134,6 +134,7 @@
                     <input id="delivery-phone" maxlength="40" placeholder="Celular obligatorio" class="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm font-semibold dark:border-orange-500/30 dark:bg-gray-900 dark:text-gray-100">
                     <input id="delivery-address" maxlength="240" placeholder="Direccion de entrega" class="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm font-semibold dark:border-orange-500/30 dark:bg-gray-900 dark:text-gray-100">
                     <input id="delivery-estimate" type="number" min="1" max="1440" placeholder="Tiempo estimado en minutos" class="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm font-semibold dark:border-orange-500/30 dark:bg-gray-900 dark:text-gray-100">
+                    <input id="delivery-shipping-cost" type="number" min="0" step="100" value="0" placeholder="Costo de envio" class="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm font-semibold dark:border-orange-500/30 dark:bg-gray-900 dark:text-gray-100">
                 </div>
             </div>
             <p class="mt-3 text-sm font-semibold text-gray-700 dark:text-gray-200">Items del pedido</p>
@@ -305,12 +306,10 @@
     .pos-category > span:not([data-category-drag-handle]) {
         grid-column: 2;
         flex: 1 1 auto;
-        overflow: visible;
+        overflow: hidden;
         text-overflow: clip;
-        white-space: normal;
+        white-space: nowrap;
         line-height: 1.05;
-        overflow-wrap: anywhere;
-        word-break: break-word;
         text-align: left;
     }
     .pos-category-admin {
@@ -552,6 +551,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260528-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260528-4') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

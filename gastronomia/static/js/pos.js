@@ -22,6 +22,7 @@
   const deliveryPhoneInput = document.getElementById('delivery-phone');
   const deliveryAddressInput = document.getElementById('delivery-address');
   const deliveryEstimateInput = document.getElementById('delivery-estimate');
+  const deliveryShippingInput = document.getElementById('delivery-shipping-cost');
   const tableNameInput = document.getElementById('table-name');
   const tablePickerSection = document.getElementById('table-picker-section');
   const tableGrid = document.getElementById('table-grid');
@@ -134,6 +135,7 @@
     if (!orderTypeInput) return;
     orderTypeInput.value = type;
     syncOrderTypeUi();
+    renderCart();
   };
   const setMesa = (mesaNombre) => {
     if (!tableNameInput) return;
@@ -189,6 +191,7 @@
     if (deliveryPhoneInput) deliveryPhoneInput.value = '';
     if (deliveryAddressInput) deliveryAddressInput.value = '';
     if (deliveryEstimateInput) deliveryEstimateInput.value = '';
+    if (deliveryShippingInput) deliveryShippingInput.value = 0;
     if (tableNameInput) tableNameInput.value = '';
     const orderNotesInput = document.getElementById('order-notes');
     if (orderNotesInput) orderNotesInput.value = '';
@@ -203,6 +206,7 @@
     if (deliveryPhoneInput) deliveryPhoneInput.value = order.celular_cliente || '';
     if (deliveryAddressInput) deliveryAddressInput.value = order.direccion_entrega || '';
     if (deliveryEstimateInput) deliveryEstimateInput.value = order.tiempo_estimado_minutos || '';
+    if (deliveryShippingInput) deliveryShippingInput.value = order.costo_envio || 0;
     if (tableNameInput) tableNameInput.value = order.mesa || '';
     const orderNotesInput = document.getElementById('order-notes');
     if (orderNotesInput) orderNotesInput.value = order.notas || '';
@@ -323,8 +327,16 @@
         </div>
       </article>
     `).join('') || '<div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">Sin items.</div>';
-    cartTotal.textContent = money(cart.reduce((sum, item) => sum + item.precio_unitario * item.cantidad, 0));
+    cartTotal.textContent = money(cartTotalAmount());
   };
+
+  const cartSubtotal = () => cart.reduce((sum, item) => sum + item.precio_unitario * item.cantidad, 0);
+  const deliveryShippingCost = () => (
+    (orderTypeInput?.value || '') === 'delivery'
+      ? Math.max(0, Number(deliveryShippingInput?.value || 0))
+      : 0
+  );
+  const cartTotalAmount = () => cartSubtotal() + deliveryShippingCost();
 
   const buildOrderPayload = () => ({
     tipo_pedido: orderTypeInput?.value || 'mostrador',
@@ -334,6 +346,7 @@
     celular_cliente: deliveryPhoneInput?.value.trim() || '',
     direccion_entrega: deliveryAddressInput?.value.trim() || '',
     tiempo_estimado_minutos: deliveryEstimateInput?.value || null,
+    costo_envio: deliveryShippingCost(),
     notas: document.getElementById('order-notes').value.trim(),
     items: cart.map((item) => ({
       producto_id: item.producto_id,
@@ -455,6 +468,16 @@
       </span>
     `;
   };
+  const fitCategoryLabels = () => {
+    document.querySelectorAll('.pos-category > span:not([data-category-drag-handle])').forEach((label) => {
+      label.style.fontSize = '';
+      let size = parseFloat(getComputedStyle(label).fontSize || '11');
+      while (label.scrollWidth > label.clientWidth && size > 7.5) {
+        size -= 0.5;
+        label.style.fontSize = `${size}px`;
+      }
+    });
+  };
   document.getElementById('category-tabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-category]');
     if (!button) return;
@@ -464,6 +487,7 @@
     renderProducts();
   });
   productSearch?.addEventListener('input', renderProducts);
+  deliveryShippingInput?.addEventListener('input', renderCart);
   document.getElementById('order-type-buttons')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-order-type]');
     if (!button) return;
@@ -521,5 +545,7 @@
   syncOrderTypeUi();
   loadProducts().catch((error) => showAlert(error.message, false));
   loadMesas().catch((error) => showAlert(error.message, false));
+  fitCategoryLabels();
+  window.addEventListener('resize', fitCategoryLabels);
   renderCart();
 }());

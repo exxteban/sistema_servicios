@@ -14,6 +14,7 @@ ORDER_COLUMN_MIGRATIONS = (
     ('celular_cliente', 'VARCHAR(40)'),
     ('direccion_entrega', 'VARCHAR(240)'),
     ('tiempo_estimado_minutos', 'INTEGER'),
+    ('costo_envio', 'NUMERIC(15, 2) NOT NULL DEFAULT 0'),
     ('fecha_inicio_preparacion', 'DATETIME'),
     ('fecha_listo', 'DATETIME'),
     ('fecha_entrega', 'DATETIME'),
@@ -85,7 +86,8 @@ def _ensure_mysql_columns():
         return
     for column, column_type in ORDER_COLUMN_MIGRATIONS:
         if not _mysql_column_exists('gastronomia_pedidos', column):
-            db.session.execute(text(f'ALTER TABLE gastronomia_pedidos ADD COLUMN {column} {column_type} NULL'))
+            add_type = column_type if _declares_nullability_or_default(column_type) else f'{column_type} NULL'
+            db.session.execute(text(f'ALTER TABLE gastronomia_pedidos ADD COLUMN {column} {add_type}'))
     if _mysql_table_exists('gastronomia_pedido_pagos'):
         for column, column_type in PAYMENT_COLUMN_MIGRATIONS:
             if not _mysql_column_exists('gastronomia_pedido_pagos', column):
@@ -142,6 +144,11 @@ def _ensure_mysql_product_columns():
     for column, column_type in PRODUCT_COLUMN_MIGRATIONS:
         if not _mysql_column_exists('gastronomia_productos', column):
             db.session.execute(text(f'ALTER TABLE gastronomia_productos ADD COLUMN {column} {column_type}'))
+
+
+def _declares_nullability_or_default(column_type: str) -> bool:
+    normalized = (column_type or '').upper()
+    return ' NOT NULL' in normalized or ' DEFAULT ' in normalized
 
 
 def _backfill_menu_tv_slugs():

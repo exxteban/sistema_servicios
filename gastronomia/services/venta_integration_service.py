@@ -120,6 +120,7 @@ def crear_cola_cobro_central_desde_pedido(
         'gastronomia_referencia_entrega': (pedido.referencia_entrega or '').strip(),
         'gastronomia_celular_cliente': (pedido.celular_cliente or '').strip(),
         'gastronomia_direccion_entrega': (pedido.direccion_entrega or '').strip(),
+        'gastronomia_costo_envio': float(pedido.costo_envio or 0),
         'gastronomia_tipo_pedido': (pedido.tipo_pedido or '').strip(),
         'gastronomia_mesa': (pedido.mesa or '').strip(),
         'id_usuario_vendedor': int(pedido.usuario_id),
@@ -128,7 +129,7 @@ def crear_cola_cobro_central_desde_pedido(
         'permitir_editar_descuento': True,
         'permitir_beneficio_fidelizacion': True,
         'observaciones': _observaciones_venta(pedido, {}),
-        'items': [_item_cola_desde_pedido_item(item) for item in pedido.items.order_by(GastronomiaPedidoItem.id_item.asc()).all()],
+        'items': _items_cola_desde_pedido(pedido),
     }
     cola = ColaCobro(
         tipo_origen='gastronomia',
@@ -288,7 +289,54 @@ def _registrar_detalles(venta: Venta, pedido: GastronomiaPedido):
             subtotal=subtotal,
             es_kit=False,
         ))
+    costo_envio = Decimal(str(pedido.costo_envio or 0)).quantize(Decimal('0.01'))
+    if costo_envio > 0:
+        servicio = _servicio_envio_para_pedido(pedido)
+        monto_iva = _iva_incluido(costo_envio, int(servicio.porcentaje_iva or 0))
+        if int(servicio.porcentaje_iva or 0) == 10:
+            total_iva_10 += monto_iva
+        elif int(servicio.porcentaje_iva or 0) == 5:
+            total_iva_5 += monto_iva
+        else:
+            total_exenta += costo_envio
+        db.session.add(DetalleVenta(
+            id_venta=venta.id_venta,
+            id_servicio=servicio.id_servicio,
+            cantidad=1,
+            precio_unitario=costo_envio,
+            precio_original=costo_envio,
+            porcentaje_iva=int(servicio.porcentaje_iva or 0),
+            monto_iva=monto_iva,
+            subtotal=costo_envio,
+            es_kit=False,
+        ))
     return total_iva_10, total_iva_5, total_exenta
+
+
+def _items_cola_desde_pedido(pedido: GastronomiaPedido) -> list[dict]:
+    items = [
+        _item_cola_desde_pedido_item(item)
+        for item in pedido.items.order_by(GastronomiaPedidoItem.id_item.asc()).all()
+    ]
+    costo_envio = Decimal(str(pedido.costo_envio or 0)).quantize(Decimal('0.01'))
+    if costo_envio > 0:
+        servicio = _servicio_envio_para_pedido(pedido)
+        items.append({
+            'tipo': 'servicio',
+            'id': int(servicio.id_servicio),
+            'id_servicio': int(servicio.id_servicio),
+            'codigo': servicio.codigo,
+            'nombre': 'Costo de envio',
+            'precio': float(costo_envio),
+            'precio_base': float(costo_envio),
+            'cantidad': 1,
+            'es_servicio': True,
+            'stock': 0,
+            'stock_minimo': 0,
+            'iva': int(servicio.porcentaje_iva or 10),
+            'precio_manual': True,
+        })
+    return items
 
 
 def _item_cola_desde_pedido_item(item: GastronomiaPedidoItem) -> dict:
@@ -331,6 +379,31 @@ def _servicio_para_item(item) -> Servicio:
         db.session.flush()
         return servicio
     servicio.nombre = item.nombre_producto
+    servicio.precio = precio
+    servicio.activo = True
+    return servicio
+
+
+def _servicio_envio_para_pedido(pedido: GastronomiaPedido) -> Servicio:
+    codigo = f'GASTRO-ENVIO-{int(pedido.cliente_id)}'
+    servicio = Servicio.query.filter_by(codigo=codigo).first()
+    precio = Decimal(str(pedido.costo_envio or 0)).quantize(Decimal('0.01'))
+    if not servicio:
+        servicio = Servicio(
+            codigo=codigo,
+            nombre='Costo de envio',
+            categoria='Gastronomia Delivery',
+            descripcion='Servicio generado automaticamente para costo de envio delivery.',
+            costo=Decimal('0.00'),
+            precio=precio,
+            duracion_minutos=0,
+            porcentaje_iva=_gastronomia_iva_porcentaje(),
+            activo=True,
+        )
+        db.session.add(servicio)
+        db.session.flush()
+        return servicio
+    servicio.nombre = 'Costo de envio'
     servicio.precio = precio
     servicio.activo = True
     return servicio
