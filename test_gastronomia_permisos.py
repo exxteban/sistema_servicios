@@ -111,6 +111,32 @@ def test_roles_mozo_y_caja_tienen_accesos_operativos_separados():
     assert caja.get('/api/gastronomia/reportes/resumen').status_code == 403
 
 
+def test_dashboard_gastronomia_guarda_orden_manual_de_tarjetas():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_cliente_usuario(app, 'admin_orden_dashboard', 'Administrador')
+    _loguear(client, app, 'admin_orden_dashboard')
+
+    dashboard = client.get('/gastronomia/')
+    assert dashboard.status_code == 200
+    csrf = _csrf(dashboard.get_data(as_text=True))
+
+    response = client.put(
+        '/api/gastronomia/dashboard/orden',
+        json={'cards': ['caja', 'cocina', 'pos']},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['ok'] is True
+    assert payload['cards'][:3] == ['caja', 'cocina', 'pos']
+
+    dashboard_reordenado = client.get('/gastronomia/').get_data(as_text=True)
+    caja_index = dashboard_reordenado.index('data-dashboard-card-id="caja"')
+    pos_index = dashboard_reordenado.index('data-dashboard-card-id="pos"')
+    assert caja_index < pos_index
+
+
 def test_cajero_sin_cliente_usa_contexto_operativo_unico():
     app = create_app('testing')
     client = app.test_client()

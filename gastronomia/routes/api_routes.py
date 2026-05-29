@@ -1,8 +1,10 @@
 """API interna para configuracion de menu gastronomico."""
 from flask import Blueprint, current_app, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
+from app import db
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.dashboard_preferences import set_dashboard_card_order
 from gastronomia.services.menu_image_service import (
     eliminar_imagen_producto_menu,
     extension_permitida as extension_imagen_permitida,
@@ -34,9 +36,15 @@ from gastronomia.services.modificadores_service import (
 )
 from gastronomia.services.permisos import (
     PERMISO_ACCESO,
+    PERMISO_CAJA,
+    PERMISO_COCINA,
+    PERMISO_DELIVERY,
     PERMISO_MENU,
     PERMISO_POS,
+    PERMISO_REPORTES,
+    PERMISO_SALON,
     requiere_permiso_gastronomia,
+    tiene_permiso_gastronomia,
 )
 
 
@@ -90,6 +98,28 @@ def config():
     return jsonify({'ok': True, 'cliente_id': cliente_id})
 
 
+@gastronomia_api_bp.route('/dashboard/orden', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(
+    PERMISO_ACCESO,
+    PERMISO_MENU,
+    PERMISO_POS,
+    PERMISO_COCINA,
+    PERMISO_CAJA,
+    PERMISO_SALON,
+    PERMISO_DELIVERY,
+    PERMISO_REPORTES,
+)
+def actualizar_orden_dashboard():
+    data = _payload()
+    card_ids = data.get('cards') or data.get('card_ids') or data.get('ids') or []
+    if not isinstance(card_ids, list):
+        return jsonify({'error': 'validation_error', 'mensaje': 'El orden recibido no es valido.'}), 400
+    order = set_dashboard_card_order(current_user, card_ids, _permisos_dashboard())
+    db.session.commit()
+    return jsonify({'ok': True, 'cards': order})
+
+
 @gastronomia_api_bp.route('/categorias', methods=['GET'])
 @login_required
 @requiere_permiso_gastronomia(PERMISO_MENU, PERMISO_POS)
@@ -100,6 +130,19 @@ def categorias():
     incluir_ocultas = request.args.get('publico') != '1'
     items = listar_categorias(cliente_id, incluir_ocultas=incluir_ocultas)
     return jsonify({'ok': True, 'categorias': [item.to_dict() for item in items]})
+
+
+def _permisos_dashboard() -> dict[str, bool]:
+    return {
+        'menu': tiene_permiso_gastronomia(PERMISO_MENU),
+        'pos': tiene_permiso_gastronomia(PERMISO_POS),
+        'salon': tiene_permiso_gastronomia(PERMISO_SALON),
+        'cocina': tiene_permiso_gastronomia(PERMISO_COCINA),
+        'caja': tiene_permiso_gastronomia(PERMISO_CAJA),
+        'delivery': tiene_permiso_gastronomia(PERMISO_DELIVERY),
+        'entregas': tiene_permiso_gastronomia(PERMISO_CAJA, PERMISO_COCINA, PERMISO_SALON),
+        'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
+    }
 
 
 @gastronomia_api_bp.route('/categorias/orden', methods=['PUT'])

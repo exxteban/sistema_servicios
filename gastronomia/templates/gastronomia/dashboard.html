@@ -5,6 +5,7 @@
 {% block title %}Gastronomia{% endblock %}
 
 {% block content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 <div class="mx-auto max-w-6xl space-y-6">
     {% if not contexto_operativo %}
     <section class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
@@ -20,74 +21,35 @@
                 <p class="text-sm text-gray-600 dark:text-gray-400">Accesos directos para trabajar en el dia a dia.</p>
             </div>
         </div>
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {% if permisos.pos %}
-        <a href="{{ url_for('gastronomia.pos') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-            <i class="fas fa-tablet-alt text-2xl text-sky-500"></i>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">POS Touch</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Toma rapida de pedidos para mesa o mostrador.</p>
-        </a>
-        <a href="{{ url_for('gastronomia.delivery') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-orange-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-            <i class="fas fa-motorcycle text-2xl text-orange-500"></i>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Delivery</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Tablero activo, contacto, ticket y seguimiento publico.</p>
-        </a>
-        {% endif %}
-        {% if permisos.salon %}
-        <a href="{{ url_for('gastronomia.salon') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-            <i class="fas fa-chair text-2xl text-indigo-500"></i>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Salon</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Mesas, ocupacion y movimientos.</p>
-        </a>
-        {% endif %}
-        {% if permisos.cocina %}
-        <a href="{{ url_for('gastronomia.cocina') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-            <i class="fas fa-fire text-2xl text-rose-500"></i>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Cocina</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Pantalla KDS para pedidos pendientes.</p>
-        </a>
-        {% endif %}
-        {% if permisos.delivery %}
-        <a href="{{ url_for('gastronomia.delivery_ruta') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-orange-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-            <i class="fas fa-route text-2xl text-orange-500"></i>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Mi ruta delivery</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Pedidos asignados, salida y confirmacion de entrega.</p>
-        </a>
-        {% endif %}
-        {% if permisos.caja %}
-        <a href="{{ url_for('gastronomia.caja') if contexto_operativo else '#' }}" class="gastro-dashboard-card rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if caja_con_pendientes %}gastro-dashboard-card--alert{% endif %} {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-            <div class="flex items-start justify-between gap-3">
-                <i class="fas fa-cash-register text-2xl {% if caja_con_pendientes %}text-rose-600 dark:text-rose-300{% else %}text-emerald-500{% endif %}"></i>
-                {% if caja_con_pendientes %}
+        <div id="gastro-dashboard-cards" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {% for card in dashboard_cards %}
+        {% set card_alert = card.alert_count|default(0) > 0 %}
+        <a href="{{ url_for(card.endpoint) if contexto_operativo else '#' }}"
+            data-dashboard-card-id="{{ card.id }}"
+            draggable="true"
+            class="gastro-dashboard-card group relative rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition {{ card.hover_class }} hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if card_alert %}gastro-dashboard-card--alert{% endif %} {% if card.disabled %}pointer-events-none opacity-60{% endif %}">
+            <span data-dashboard-card-drag-handle
+                class="gastro-dashboard-card__handle"
+                role="button"
+                tabindex="0"
+                aria-label="Mover {{ card.title }}"
+                title="Mover">
+                <i class="fas fa-grip-vertical"></i>
+            </span>
+            <div class="flex items-start justify-between gap-3 pr-8">
+                <i class="{{ card.icon }} text-2xl {{ card.icon_class }}"></i>
+                {% if card_alert %}
                 <span class="rounded-full bg-rose-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">
-                    {{ pedidos_pendientes_caja }} pendiente{% if pedidos_pendientes_caja != 1 %}s{% endif %}
+                    {{ card.alert_count }} pendiente{% if card.alert_count != 1 %}s{% endif %}
                 </span>
                 {% endif %}
             </div>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Caja</h2>
-            <p class="mt-2 text-sm {% if caja_con_pendientes %}font-semibold text-rose-700 dark:text-rose-200{% else %}text-gray-600 dark:text-gray-400{% endif %}">
-                {% if caja_con_pendientes %}
-                Hay pedidos sin cobrar esperando en caja.
-                {% else %}
-                Cobro y cierre del flujo operativo.
-                {% endif %}
+            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">{{ card.title }}</h2>
+            <p class="mt-2 text-sm {% if card_alert %}font-semibold text-rose-700 dark:text-rose-200{% else %}text-gray-600 dark:text-gray-400{% endif %}">
+                {{ card.description }}
             </p>
         </a>
-        {% endif %}
-        {% if permisos.entregas %}
-        <a href="{{ url_for('gastronomia.entregas') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-            <i class="fas fa-truck-ramp-box text-2xl text-emerald-500"></i>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Entregas</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Pedidos entregados por dia y estado de pago.</p>
-        </a>
-        {% endif %}
-        {% if permisos.reportes %}
-        <a href="{{ url_for('gastronomia.reportes') if contexto_operativo else '#' }}" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-            <i class="fas fa-chart-line text-2xl text-violet-500"></i>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">Reportes</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Ventas, productos y tiempos de cocina.</p>
-        </a>
-        {% endif %}
+        {% endfor %}
         </div>
     </section>
 
@@ -131,6 +93,53 @@
         border-color: rgb(251 113 133);
         box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.16), 0 12px 30px rgba(0, 0, 0, 0.28);
     }
+    .gastro-dashboard-card__handle {
+        position: absolute;
+        right: 1rem;
+        top: 1rem;
+        display: inline-flex;
+        height: 2rem;
+        width: 2rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.75rem;
+        color: rgb(148 163 184);
+        cursor: grab;
+        opacity: 0;
+        transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    }
+    .gastro-dashboard-card:hover .gastro-dashboard-card__handle,
+    .gastro-dashboard-card:focus-within .gastro-dashboard-card__handle {
+        opacity: 1;
+    }
+    .gastro-dashboard-card__handle:hover,
+    .gastro-dashboard-card__handle:focus {
+        background-color: rgb(241 245 249);
+        color: rgb(15 23 42);
+        outline: none;
+    }
+    .dark .gastro-dashboard-card__handle:hover,
+    .dark .gastro-dashboard-card__handle:focus {
+        background-color: rgba(255, 255, 255, 0.08);
+        color: rgb(226 232 240);
+    }
+    .gastro-dashboard-card__handle:active {
+        cursor: grabbing;
+        transform: scale(0.96);
+    }
+    .gastro-dashboard-card.is-dragging {
+        opacity: 0.55;
+        transform: scale(0.98);
+    }
+    .gastro-dashboard-card.is-saving {
+        pointer-events: none;
+        opacity: 0.72;
+    }
+    @media (hover: none) {
+        .gastro-dashboard-card__handle {
+            opacity: 1;
+        }
+    }
     @keyframes gastro-card-pulse {
         0%,
         100% {
@@ -141,4 +150,8 @@
         }
     }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/dashboard_card_order.js', v='20260529-1') }}"></script>
 {% endblock %}

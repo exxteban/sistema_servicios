@@ -52,6 +52,7 @@
   const renderOrder = (order) => {
     const whatsappUrl = window.GastroWhatsApp?.buildOrderWhatsAppUrl(order, order.celular_cliente) || '';
     const whatsappTarget = escapeHtml(window.GastroWhatsApp?.target || 'gastro-whatsapp');
+    const trackingUrl = window.GastroWhatsApp?.trackingUrl(order) || '';
     return `
       <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800" data-order="${order.id_pedido}">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -70,7 +71,8 @@
         <div class="mt-4 flex flex-wrap gap-2">
           ${(order.items || []).map((item) => `<span class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200">${item.cantidad} x ${escapeHtml(item.nombre_producto)}</span>`).join('')}
         </div>
-        <div class="mt-4 grid gap-2 sm:grid-cols-3">
+        <div class="mt-4 grid gap-2 sm:grid-cols-4">
+          ${trackingUrl ? `<button type="button" data-copy-tracking="${order.id_pedido}" class="rounded-lg border border-sky-200 px-3 py-2 text-center text-sm font-black text-sky-700 hover:bg-sky-50"><i class="fas fa-link"></i> Copiar</button>` : ''}
           ${whatsappUrl ? `<a href="${escapeHtml(whatsappUrl)}" target="${whatsappTarget}" class="rounded-lg border border-green-200 px-3 py-2 text-center text-sm font-black text-green-700 hover:bg-green-50">WhatsApp</a>` : ''}
           ${order.estado === 'listo' ? `<button type="button" data-action="salir" data-order-id="${order.id_pedido}" class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-black text-white hover:bg-orange-700">Salgo ahora</button>` : ''}
           <button type="button" data-action="entregar" data-order-id="${order.id_pedido}" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-black text-white hover:bg-emerald-700">Entregado</button>
@@ -84,7 +86,19 @@
     showAlert(action === 'entregar' ? 'Pedido marcado como entregado.' : 'Pedido marcado en camino.', true);
     await load();
   };
+  const copyTrackingLink = async (orderId) => {
+    const order = orders.find((item) => Number(item.id_pedido) === Number(orderId));
+    if (!order) throw new Error('Pedido no encontrado.');
+    const copied = await window.GastroWhatsApp?.copyTrackingUrl(order);
+    if (!copied) throw new Error('No se pudo copiar el link.');
+    showAlert('Link de estado copiado.', true);
+  };
   ordersBox.addEventListener('click', (event) => {
+    const copyButton = event.target.closest('[data-copy-tracking]');
+    if (copyButton) {
+      copyTrackingLink(copyButton.dataset.copyTracking).catch((error) => showAlert(error.message, false));
+      return;
+    }
     const button = event.target.closest('[data-action]');
     if (!button) return;
     changeState(button.dataset.orderId, button.dataset.action).catch((error) => showAlert(error.message, false));

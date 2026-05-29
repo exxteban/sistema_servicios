@@ -4,6 +4,7 @@ from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.caja_service import contar_pedidos_caja
+from gastronomia.services.dashboard_preferences import build_dashboard_cards
 from gastronomia.services.modo_operacion import gastronomia_activa
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
@@ -44,6 +45,12 @@ def dashboard():
         'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
     }
     pedidos_pendientes_caja = contar_pedidos_caja(cliente_id) if cliente_id and permisos['caja'] else 0
+    dashboard_cards = build_dashboard_cards(
+        current_user,
+        permisos,
+        contexto_operativo=bool(cliente_id),
+        pedidos_pendientes_caja=pedidos_pendientes_caja,
+    )
 
     return render_template(
         'gastronomia/dashboard.html',
@@ -51,5 +58,6 @@ def dashboard():
         contexto_operativo=bool(cliente_id),
         cliente=getattr(current_user, 'cliente', None),
         permisos=permisos,
+        dashboard_cards=dashboard_cards,
         pedidos_pendientes_caja=pedidos_pendientes_caja,
     )

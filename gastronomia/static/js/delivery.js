@@ -111,6 +111,7 @@
   const renderOrder = (order) => {
     const whatsappUrl = window.GastroWhatsApp?.buildOrderWhatsAppUrl(order, order.celular_cliente) || '';
     const whatsappTarget = escapeHtml(window.GastroWhatsApp?.target || 'gastro-whatsapp');
+    const trackingUrl = window.GastroWhatsApp?.trackingUrl(order) || '';
     const assigned = order.repartidor ? escapeHtml(order.repartidor.nombre) : 'Sin repartidor';
     return `
       <article class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900" data-order="${order.id_pedido}">
@@ -140,10 +141,11 @@
             <option value="">Sin repartidor</option>
             ${drivers.filter((driver) => driver.activo || driver.id_repartidor === order.repartidor_id).map((driver) => `<option value="${driver.id_repartidor}" ${Number(order.repartidor_id || 0) === Number(driver.id_repartidor) ? 'selected' : ''}>${escapeHtml(driver.nombre)}</option>`).join('')}
           </select>
-          <div class="grid gap-2" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 2.5rem;">
+          <div class="grid gap-2" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 2.5rem 2.5rem;">
             <a href="/gastronomia/cocina" class="rounded-lg border border-orange-200 px-2 py-2 text-center text-xs font-black text-orange-800 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-200 dark:hover:bg-orange-500/10">Cocina</a>
             <a href="/gastronomia/pedidos/${order.id_pedido}/ticket?preview=1" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Ticket</a>
             <a href="${escapeHtml(order.url_seguimiento_publica || order.url_seguimiento || '#')}" target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Estado</a>
+            ${trackingUrl ? `<button type="button" data-copy-tracking="${order.id_pedido}" title="Copiar link de estado" aria-label="Copiar link de estado" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-sky-200 text-lg text-sky-700 hover:bg-sky-50"><i class="fas fa-link"></i></button>` : '<span title="Sin link de estado" aria-label="Sin link de estado" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fas fa-link"></i></span>'}
             ${whatsappUrl ? `<a href="${escapeHtml(whatsappUrl)}" target="${whatsappTarget}" title="Compartir seguimiento por WhatsApp" aria-label="Compartir seguimiento por WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-green-200 text-lg text-green-700 hover:bg-green-50"><i class="fab fa-whatsapp"></i></a>` : '<span title="Sin celular" aria-label="Sin celular para WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fab fa-whatsapp"></i></span>'}
           </div>
           <div class="grid gap-2 sm:grid-cols-2">
@@ -227,6 +229,13 @@
     });
     await load();
   };
+  const copyTrackingLink = async (orderId) => {
+    const order = orders.find((item) => Number(item.id_pedido) === Number(orderId));
+    if (!order) throw new Error('Pedido no encontrado.');
+    const copied = await window.GastroWhatsApp?.copyTrackingUrl(order);
+    if (!copied) throw new Error('No se pudo copiar el link.');
+    showAlert('Link de estado copiado.', true);
+  };
   searchInput?.addEventListener('input', render);
   refreshButton?.addEventListener('click', () => load().catch((error) => showAlert(error.message, false)));
   driverForm?.addEventListener('submit', (event) => saveDriver(event).catch((error) => showAlert(error.message, false)));
@@ -244,6 +253,11 @@
     assignDriver(select.dataset.driverSelect, select.value).catch((error) => showAlert(error.message, false));
   });
   board.addEventListener('click', (event) => {
+    const copyButton = event.target.closest('[data-copy-tracking]');
+    if (copyButton) {
+      copyTrackingLink(copyButton.dataset.copyTracking).catch((error) => showAlert(error.message, false));
+      return;
+    }
     const button = event.target.closest('[data-order-action]');
     if (!button) return;
     changeOrderState(button.dataset.orderAction, button.dataset.state).catch((error) => showAlert(error.message, false));
