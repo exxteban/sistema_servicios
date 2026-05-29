@@ -100,14 +100,17 @@
   };
 
   const setupShowcase = (data) => {
-    if (prefersReducedMotion.matches || !hasOverflow()) {
+    if (prefersReducedMotion.matches) {
       setStatus('');
       return;
     }
     const config = data.config || {};
     const mode = chooseRotationMode(config.modo_rotacion);
-    if (mode === 'slides') {
-      activateSlides(data);
+    if (mode === 'slides' && activateSlides(data)) {
+      return;
+    }
+    if (!hasOverflow()) {
+      setStatus('');
       return;
     }
     activateScroll();
@@ -123,8 +126,7 @@
   const activateSlides = (data) => {
     const pages = buildSlidePages(data);
     if (pages.length <= 1) {
-      setStatus('');
-      return;
+      return false;
     }
     document.body.classList.add('menu-tv-slides-active');
     content.className = 'menu-tv-slides';
@@ -134,6 +136,7 @@
       </section>
     `).join('');
     rotateSlides(0, pages.length);
+    return true;
   };
 
   const buildSlidePages = (data) => {
