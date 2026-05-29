@@ -160,3 +160,87 @@ def test_panel_tienda_gastronomia_muestra_menu_y_permite_guardar_config():
     finally:
         with app.app_context():
             Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
+
+
+def test_tienda_gastronomia_usa_cliente_del_menu_si_config_quedo_desfasada():
+    app = create_app('testing')
+    app.config['WTF_CSRF_ENABLED'] = False
+    client = app.test_client()
+
+    with app.app_context():
+        Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_GASTRONOMIA)
+        cliente_tienda = Cliente(nombre='Cliente tienda desfasada', tipo='minorista', activo=True)
+        cliente_menu = Cliente(nombre='Cliente menu gastronomico', tipo='minorista', activo=True)
+        db.session.add_all([cliente_tienda, cliente_menu])
+        db.session.flush()
+
+        config_gastro = GastronomiaClienteConfig(
+            cliente_id=cliente_menu.id_cliente,
+            modo_operacion=MODO_GASTRONOMIA,
+            gastronomia_activo=True,
+        )
+        categoria = GastronomiaCategoria(
+            cliente_id=cliente_menu.id_cliente,
+            nombre='Hamburguesas',
+            visible=True,
+            activo=True,
+        )
+        tienda = TiendaConfig(
+            id_cliente=cliente_tienda.id_cliente,
+            slug='gastro-config-desfasada',
+            nombre_tienda='Gastro Config Desfasada',
+            telefono_whatsapp='595981000000',
+            activa=True,
+        )
+        db.session.add_all([config_gastro, categoria, tienda])
+        db.session.flush()
+
+        producto = GastronomiaProducto(
+            cliente_id=cliente_menu.id_cliente,
+            categoria_id=categoria.id_categoria,
+            nombre='Big Cheese',
+            precio=35000,
+            disponible=True,
+            visible=True,
+            publicado_tienda=True,
+            activo=True,
+        )
+        db.session.add(producto)
+        db.session.commit()
+        tienda_id = tienda.id_config
+        tienda_cliente_id = cliente_tienda.id_cliente
+        menu_cliente_id = cliente_menu.id_cliente
+        slug = tienda.slug
+
+    _loguear_admin(client, app, cliente_id=tienda_cliente_id)
+
+    try:
+        bootstrap_response = client.get(f'/api/tienda/{slug}/bootstrap')
+        assert bootstrap_response.status_code == 200
+        bootstrap = bootstrap_response.get_json()
+        assert bootstrap['catalogo']['total'] == 1
+        assert bootstrap['catalogo']['productos'][0]['nombre'] == 'Big Cheese'
+        assert bootstrap['categorias'][0]['nombre'] == 'Hamburguesas'
+
+        panel_response = client.get('/tienda-admin')
+        assert panel_response.status_code == 200
+        html = panel_response.get_data(as_text=True)
+        assert 'Big Cheese' in html
+        assert '/tienda/gastro-config-desfasada' in html
+
+        save_response = client.post('/api/tienda/admin/config', json={
+            'id_config': tienda_id,
+            'slug_actual': slug,
+            'slug': slug,
+            'nombre_tienda': 'Gastro Config Reparada',
+            'telefono_whatsapp': '595981000000',
+        })
+        assert save_response.status_code == 200
+        assert save_response.get_json()['ok'] is True
+
+        with app.app_context():
+            tienda_actualizada = db.session.get(TiendaConfig, tienda_id)
+            assert tienda_actualizada.id_cliente == menu_cliente_id
+    finally:
+        with app.app_context():
+            Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)

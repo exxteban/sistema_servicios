@@ -15,7 +15,14 @@ GASTRONOMIA_CATALOG_CTA = 'Pedir presupuesto'
 def tienda_es_gastronomia(config: TiendaConfig | None) -> bool:
     if not config:
         return False
-    return gastronomia_activa_para_cliente(getattr(config, 'id_cliente', None))
+    if gastronomia_activa_para_cliente(getattr(config, 'id_cliente', None)):
+        return True
+    try:
+        from app.services.tienda_context import resolver_cliente_gastronomia_tienda
+        cliente_gastronomia = resolver_cliente_gastronomia_tienda(config)
+    except Exception:
+        return False
+    return bool(cliente_gastronomia and gastronomia_activa_para_cliente(cliente_gastronomia))
 
 
 def config_publica_tienda(config: TiendaConfig) -> dict:

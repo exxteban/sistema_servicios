@@ -2,9 +2,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 
 from app import db
-from app.models import Categoria, Producto, TiendaConfig, WebBotSesion
+from app.models import Categoria, Producto, WebBotSesion
 from app.services.ia_backoffice.security import es_usuario_root
-from app.services.tienda_context import resolver_cliente_tienda
+from app.services.tienda_context import buscar_config_tienda_admin, resolver_cliente_gastronomia_tienda, resolver_cliente_tienda
 from app.services.tienda_presupuesto import tienda_es_gastronomia
 from app.services.tienda_promociones import list_admin_promotions, serialize_admin_promotion
 from app.services.web_bot.admin_service import (
@@ -41,10 +41,7 @@ def panel():
     per_page = min(80, max(10, request.args.get('per_page', 20, type=int)))
 
     client_scope = _current_client_scope()
-    config_query = TiendaConfig.query
-    if client_scope:
-        config_query = config_query.filter(TiendaConfig.id_cliente == client_scope)
-    config = config_query.order_by(TiendaConfig.id_config.asc()).first()
+    config = buscar_config_tienda_admin(id_cliente=client_scope)
     es_gastronomia_tienda = bool(
         (config and tienda_es_gastronomia(config))
         or (client_scope and gastronomia_activa_para_cliente(client_scope))
@@ -53,8 +50,9 @@ def panel():
     if es_gastronomia_tienda:
         from gastronomia.models import GastronomiaProducto
 
+        gastro_scope = resolver_cliente_gastronomia_tienda(config) or client_scope
         query = GastronomiaProducto.query.filter(
-            GastronomiaProducto.cliente_id == int(config.id_cliente if config else client_scope),
+            GastronomiaProducto.cliente_id == int(gastro_scope),
             GastronomiaProducto.activo.is_(True),
         )
         if q:

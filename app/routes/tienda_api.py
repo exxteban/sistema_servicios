@@ -36,7 +36,7 @@ from app.services.tienda_promociones import (
     get_active_product_promotion_map,
     get_active_promotions_for_store,
 )
-from app.services.tienda_context import resolver_cliente_tienda
+from app.services.tienda_context import buscar_config_tienda_admin, resolver_cliente_tienda
 from app.services.tienda_scope import public_category_query, public_product_query, store_product_scope_filter
 from app.services.tienda_estadisticas import obtener_resumen_estadisticas_tienda
 from app.services.tienda_gastronomia_catalogo import (
@@ -1102,7 +1102,15 @@ def admin_guardar_config():
     if not id_cliente:
         return jsonify({'error': 'sin_cliente_asociado'}), 400
 
-    config = TiendaConfig.query.filter_by(id_cliente=id_cliente).first()
+    config = buscar_config_tienda_admin(data, id_cliente)
+    if config:
+        config_cliente = TiendaConfig.query.filter_by(id_cliente=id_cliente).first()
+        if config_cliente and config_cliente.id_config != config.id_config:
+            config = config_cliente
+        else:
+            config.id_cliente = int(id_cliente)
+    else:
+        config = TiendaConfig.query.filter_by(id_cliente=id_cliente).first()
     if not config:
         slug = str(data.get('slug', '')).strip().lower().replace(' ', '-')
         if slug == 'none':

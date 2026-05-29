@@ -5,7 +5,8 @@ from flask_login import current_user
 from app import db
 from app.models.cliente import Cliente
 from app.models.tienda import TiendaConfig
-from gastronomia.services.modo_operacion import asegurar_cliente_operativo_gastronomia
+from gastronomia.models import GastronomiaClienteConfig, GastronomiaProducto
+from gastronomia.services.modo_operacion import asegurar_cliente_operativo_gastronomia, gastronomia_activa
 
 
 DEFAULT_STORE_CLIENT_NAME = 'Negocio principal'
@@ -13,6 +14,11 @@ DEFAULT_STORE_CLIENT_RUC = 'tienda-default'
 
 
 def resolver_cliente_tienda(data: dict | None = None, *, crear_si_falta: bool = False) -> int | None:
+    if gastronomia_activa():
+        cliente_gastronomia = resolver_cliente_gastronomia_tienda()
+        if cliente_gastronomia:
+            return cliente_gastronomia
+
     usuario_cliente_id = _id_cliente_usuario()
     if usuario_cliente_id:
         return usuario_cliente_id
@@ -38,6 +44,79 @@ def resolver_cliente_tienda(data: dict | None = None, *, crear_si_falta: bool = 
     return None
 
 
+def buscar_config_tienda_admin(data: dict | None = None, id_cliente: int | None = None) -> TiendaConfig | None:
+    config = _config_desde_data(data or {})
+    if config:
+        return config
+
+    if id_cliente:
+        config = (
+            TiendaConfig.query
+            .filter(TiendaConfig.id_cliente == int(id_cliente))
+            .order_by(TiendaConfig.id_config.asc())
+            .first()
+        )
+        if config:
+            return config
+
+    configs = (
+        TiendaConfig.query
+        .filter(TiendaConfig.activa.is_(True))
+        .order_by(TiendaConfig.id_config.asc())
+        .limit(2)
+        .all()
+    )
+    if len(configs) == 1:
+        return configs[0]
+    return None
+
+
+def resolver_cliente_gastronomia_tienda(config: TiendaConfig | None = None) -> int | None:
+    cliente_config = _cliente_gastronomia_para_config(config)
+    if cliente_config:
+        return cliente_config
+
+    activos = (
+        GastronomiaClienteConfig.query
+        .filter(GastronomiaClienteConfig.gastronomia_activo.is_(True))
+        .order_by(GastronomiaClienteConfig.id_config.asc())
+        .limit(2)
+        .all()
+    )
+    if len(activos) == 1:
+        return int(activos[0].cliente_id)
+
+    productos_cliente = (
+        db.session.query(GastronomiaProducto.cliente_id)
+        .filter(GastronomiaProducto.activo.is_(True))
+        .distinct()
+        .order_by(GastronomiaProducto.cliente_id.asc())
+        .limit(2)
+        .all()
+    )
+    if len(productos_cliente) == 1:
+        return int(productos_cliente[0][0])
+
+    cliente_bootstrap = asegurar_cliente_operativo_gastronomia(
+        usuario_id=getattr(current_user, 'id_usuario', None),
+    )
+    if cliente_bootstrap:
+        return int(cliente_bootstrap)
+
+    if config and config.id_cliente:
+        return int(config.id_cliente)
+    return None
+
+
+def _cliente_gastronomia_para_config(config: TiendaConfig | None) -> int | None:
+    if not config or not config.id_cliente:
+        return None
+    config_gastro = GastronomiaClienteConfig.query.filter_by(cliente_id=int(config.id_cliente)).first()
+    if config_gastro and bool(config_gastro.gastronomia_activo):
+        return int(config.id_cliente)
+    return None
+
+
 def _id_cliente_usuario() -> int | None:
     try:
         id_cliente = int(getattr(current_user, 'id_cliente', 0) or 0)
@@ -47,6 +126,17 @@ def _id_cliente_usuario() -> int | None:
 
 
 def _cliente_desde_config(data: dict) -> int | None:
+    config = _config_desde_data(data)
+    if config:
+        return int(config.id_cliente)
+
+    configs = TiendaConfig.query.order_by(TiendaConfig.id_config.asc()).limit(2).all()
+    if len(configs) == 1:
+        return int(configs[0].id_cliente)
+    return None
+
+
+def _config_desde_data(data: dict) -> TiendaConfig | None:
     id_config_raw = data.get('id_config')
     try:
         id_config = int(id_config_raw)
@@ -55,17 +145,13 @@ def _cliente_desde_config(data: dict) -> int | None:
     if id_config:
         config = TiendaConfig.query.filter_by(id_config=id_config).first()
         if config:
-            return int(config.id_cliente)
+            return config
 
     slug_actual = str(data.get('slug_actual') or data.get('slug') or '').strip().lower()
     if slug_actual:
-        config = TiendaConfig.query.filter_by(slug=slug_actual, activa=True).first()
+        config = TiendaConfig.query.filter_by(slug=slug_actual).first()
         if config:
-            return int(config.id_cliente)
-
-    configs = TiendaConfig.query.order_by(TiendaConfig.id_config.asc()).limit(2).all()
-    if len(configs) == 1:
-        return int(configs[0].id_cliente)
+            return config
     return None
 
 

@@ -5,20 +5,24 @@ from urllib.parse import quote
 
 from app import db
 from app.models.tienda import TiendaConfig
+from app.services.tienda_context import resolver_cliente_gastronomia_tienda
 from app.utils.tienda_urls import build_category_public_path, build_product_public_path, slugify_tienda_text
 from gastronomia.models import GastronomiaCategoria, GastronomiaProducto
 from app.services.tienda_presupuesto import mensaje_whatsapp_producto
 
 
 def categorias_gastronomia_publicas(config: TiendaConfig) -> list[dict]:
+    cliente_id = resolver_cliente_gastronomia_tienda(config)
+    if not cliente_id:
+        return []
     categorias = (
         GastronomiaCategoria.query
         .join(GastronomiaProducto, GastronomiaProducto.categoria_id == GastronomiaCategoria.id_categoria)
         .filter(
-            GastronomiaCategoria.cliente_id == int(config.id_cliente),
+            GastronomiaCategoria.cliente_id == int(cliente_id),
             GastronomiaCategoria.activo.is_(True),
             GastronomiaCategoria.visible.is_(True),
-            GastronomiaProducto.cliente_id == int(config.id_cliente),
+            GastronomiaProducto.cliente_id == int(cliente_id),
             GastronomiaProducto.activo.is_(True),
             GastronomiaProducto.visible.is_(True),
             GastronomiaProducto.publicado_tienda.is_(True),
@@ -119,11 +123,14 @@ def detalle_producto_gastronomia(config: TiendaConfig, producto_id: int) -> dict
 
 
 def _query_productos_publicos(config: TiendaConfig):
+    cliente_id = resolver_cliente_gastronomia_tienda(config)
+    if not cliente_id:
+        return GastronomiaProducto.query.filter(db.false())
     return (
         GastronomiaProducto.query
         .join(GastronomiaCategoria, GastronomiaCategoria.id_categoria == GastronomiaProducto.categoria_id)
         .filter(
-            GastronomiaProducto.cliente_id == int(config.id_cliente),
+            GastronomiaProducto.cliente_id == int(cliente_id),
             GastronomiaProducto.activo.is_(True),
             GastronomiaProducto.visible.is_(True),
             GastronomiaProducto.publicado_tienda.is_(True),
