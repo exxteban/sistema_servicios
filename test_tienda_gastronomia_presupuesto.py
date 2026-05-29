@@ -1,7 +1,7 @@
 from urllib.parse import parse_qs, unquote, urlparse
 
 from app import create_app, db
-from app.models import Cliente, Configuracion, TiendaConfig
+from app.models import Cliente, Configuracion, TiendaConfig, Usuario
 from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaProducto
 from gastronomia.services.modo_operacion import (
     CLAVE_MODO_OPERACION_PRINCIPAL,
@@ -53,6 +53,19 @@ def _crear_tienda_gastronomia(slug='gastro-presupuesto-test'):
     return tienda, producto
 
 
+def _loguear_admin(client, app, cliente_id=None):
+    with app.app_context():
+        admin = Usuario.query.filter_by(username='admin').first()
+        assert admin is not None
+        if cliente_id is not None:
+            admin.id_cliente = cliente_id
+            db.session.commit()
+        admin_id = admin.id_usuario
+    with client.session_transaction() as session:
+        session['_user_id'] = str(admin_id)
+        session['_fresh'] = True
+
+
 def _whatsapp_message(url):
     query = parse_qs(urlparse(url).query)
     return unquote(query.get('text', [''])[0])
@@ -95,6 +108,42 @@ def test_tienda_gastronomia_adapta_cta_y_mensaje_de_presupuesto():
         assert 'Combo de bebidas' in mensaje
         assert 'Cantidad requerida:' in mensaje
         assert 'Bebidas, adicionales o servicio de atencion:' in mensaje
+    finally:
+        with app.app_context():
+            Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
+
+
+def test_panel_tienda_gastronomia_muestra_menu_y_permite_guardar_config():
+    app = create_app('testing')
+    app.config['WTF_CSRF_ENABLED'] = False
+    client = app.test_client()
+
+    with app.app_context():
+        Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_GASTRONOMIA)
+        tienda, producto = _crear_tienda_gastronomia(slug='gastro-admin-test')
+        cliente_id = tienda.id_cliente
+        config_id = tienda.id_config
+
+    _loguear_admin(client, app, cliente_id=cliente_id)
+
+    try:
+        response = client.get('/tienda-admin')
+        assert response.status_code == 200
+        html = response.get_data(as_text=True)
+        assert 'Menú Gastronomía' in html
+        assert 'Cargar menÃº' in html
+        assert 'Combo de bebidas' in html
+        assert '/tienda/gastro-admin-test' in html
+
+        save_response = client.post('/api/tienda/admin/config', json={
+            'id_config': config_id,
+            'slug_actual': 'gastro-admin-test',
+            'slug': 'gastro-admin-test',
+            'nombre_tienda': 'Gastro Admin Test',
+            'telefono_whatsapp': '595981000000',
+        })
+        assert save_response.status_code == 200
+        assert save_response.get_json()['ok'] is True
     finally:
         with app.app_context():
             Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)

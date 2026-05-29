@@ -36,6 +36,7 @@ from app.services.tienda_promociones import (
     get_active_product_promotion_map,
     get_active_promotions_for_store,
 )
+from app.services.tienda_context import resolver_cliente_tienda
 from app.services.tienda_scope import public_category_query, public_product_query, store_product_scope_filter
 from app.services.tienda_estadisticas import obtener_resumen_estadisticas_tienda
 from app.services.tienda_gastronomia_catalogo import (
@@ -212,37 +213,7 @@ def _obtener_relacionados_inteligentes(p: Producto, config: TiendaConfig, limit:
 
 
 def _resolver_id_cliente_actual(data: dict | None = None) -> int | None:
-    id_cliente = getattr(current_user, 'id_cliente', None)
-    try:
-        if id_cliente:
-            return int(id_cliente)
-    except (TypeError, ValueError):
-        pass
-
-    data = data or {}
-
-    id_config_raw = data.get('id_config')
-    try:
-        id_config = int(id_config_raw)
-    except (TypeError, ValueError):
-        id_config = None
-    if id_config:
-        config = TiendaConfig.query.filter_by(id_config=id_config).first()
-        if config:
-            return int(config.id_cliente)
-
-    slug_actual = str(data.get('slug_actual') or data.get('slug') or '').strip().lower()
-    if slug_actual:
-        config = _config_por_slug(slug_actual)
-        if config:
-            return int(config.id_cliente)
-
-    if current_user.es_admin():
-        configs = TiendaConfig.query.order_by(TiendaConfig.id_config.asc()).limit(2).all()
-        if len(configs) == 1:
-            return int(configs[0].id_cliente)
-
-    return None
+    return resolver_cliente_tienda(data)
 
 
 def _obtener_ip_cliente() -> str | None:
@@ -1127,7 +1098,7 @@ def admin_guardar_config():
     else:
         data = request.form.to_dict()
 
-    id_cliente = _resolver_id_cliente_actual(data)
+    id_cliente = resolver_cliente_tienda(data, crear_si_falta=True)
     if not id_cliente:
         return jsonify({'error': 'sin_cliente_asociado'}), 400
 

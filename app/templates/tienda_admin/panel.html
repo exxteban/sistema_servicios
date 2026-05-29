@@ -29,6 +29,11 @@
                 class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
                 <i class="fas fa-cog mr-2"></i> Configuración
             </button>
+            {% if es_gastronomia_tienda %}
+            <a href="{{ url_for('gastronomia.menu_config') }}" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition">
+                <i class="fas fa-utensils mr-2"></i> Menú Gastronomía
+            </a>
+            {% endif %}
             {% if tienda_config %}
             <a href="{{ url_for('tienda_public.tienda_spa', slug=tienda_config.slug) }}" target="_blank" class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition">
                 <i class="fas fa-external-link-alt mr-2"></i> Ver tienda
@@ -112,7 +117,7 @@
 
     <div id="tienda-admin-results" class="space-y-4">
         {% with ocultar_busqueda=true %}
-        {% include "tienda_admin/_panel_productos.html" %}
+        {% include productos_template %}
         {% endwith %}
     </div>
 </div>

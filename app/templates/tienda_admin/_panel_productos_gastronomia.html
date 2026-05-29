@@ -1,0 +1,103 @@
+{% set mostrar_busqueda = not ocultar_busqueda and request.headers.get('X-Requested-With') != 'XMLHttpRequest' %}
+
+{% if mostrar_busqueda %}
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+    <form id="tienda-admin-search-form" method="GET" action="{{ url_for('tienda_admin.panel') }}" class="flex gap-3 flex-wrap">
+        <div class="relative flex-1 min-w-64">
+            <input
+                id="tienda-admin-search-input"
+                type="text"
+                name="q"
+                value="{{ q }}"
+                placeholder="Buscar en el menú gastronómico..."
+                oninput="window.tiendaAdminProgramarAutoBusqueda && window.tiendaAdminProgramarAutoBusqueda()"
+                autocomplete="off"
+                class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 pl-3 pr-10 focus:border-blue-500 focus:outline-none">
+            <button
+                id="tienda-admin-search-clear"
+                type="button"
+                onclick="if (window.tiendaAdminLimpiarBusqueda) { window.tiendaAdminLimpiarBusqueda(); }"
+                class="absolute inset-y-0 right-0 {% if q %}flex{% else %}hidden{% endif %} items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                aria-label="Limpiar búsqueda">
+                <i class="fas fa-times-circle"></i>
+            </button>
+        </div>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-900 text-white transition">Buscar</button>
+    </form>
+</div>
+{% endif %}
+
+<div class="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-xl p-4">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <p class="text-xs uppercase tracking-wide font-semibold text-emerald-700 dark:text-emerald-300 mb-1">Modo Gastronomía</p>
+            <h2 class="text-base font-semibold text-gray-900 dark:text-white">La tienda muestra la carta cargada en Gastronomía</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Para cargar productos, precios, fotos y disponibilidad usá el menú gastronómico.</p>
+        </div>
+        <a href="{{ url_for('gastronomia.menu_config') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition">
+            <i class="fas fa-utensils"></i> Cargar menÃº
+        </a>
+    </div>
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700/50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Categoría</th>
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Producto</th>
+                    <th class="px-4 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-300">Precio</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Visible</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Disponible</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Imagen</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for p in productos.items %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{{ p.categoria.nombre if p.categoria else '-' }}</td>
+                    <td class="px-4 py-3">
+                        <div class="font-medium text-gray-800 dark:text-white">{{ p.nombre }}</div>
+                        {% if p.descripcion %}
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs" title="{{ p.descripcion }}">{{ p.descripcion }}</div>
+                        {% else %}
+                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Sin descripciÃ³n</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-200">₲ {{ "{:,.0f}".format(p.precio or 0).replace(",", ".") }}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold {{ 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' if p.visible else 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' }}">
+                            {{ 'Sí' if p.visible else 'No' }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold {{ 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' if p.disponible else 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' }}">
+                            {{ 'Disponible' if p.disponible else 'Agotado' }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-300">
+                        {{ 'Sí' if p.imagen_url else 'No' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">Todavía no hay productos gastronómicos para mostrar</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if productos.pages > 1 %}
+<div class="flex flex-wrap items-center justify-center gap-2">
+    {% if productos.has_prev %}
+    <a href="{{ url_for('tienda_admin.panel', page=productos.prev_num, q=q or none) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">Anterior</a>
+    {% endif %}
+    <span class="px-3 py-2 rounded-lg bg-emerald-600 text-white">{{ productos.page }} / {{ productos.pages }}</span>
+    {% if productos.has_next %}
+    <a href="{{ url_for('tienda_admin.panel', page=productos.next_num, q=q or none) }}" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">Siguiente</a>
+    {% endif %}
+</div>
+{% endif %}
