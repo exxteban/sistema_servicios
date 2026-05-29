@@ -16,12 +16,12 @@
     {key: 'listo', title: 'Listos'},
     {key: 'en_camino', title: 'En camino'},
   ];
-  const nextByState = {
-    abierto: {estado: 'enviado_cocina', label: 'Enviar a cocina'},
-    enviado_cocina: {estado: 'preparando', label: 'En preparacion'},
-    preparando: {estado: 'listo', label: 'Marcar listo'},
-    listo: {estado: 'en_camino', label: 'Sale delivery'},
-    en_camino: {estado: 'entregado', label: 'Entregado'},
+  const stateLabels = {
+    abierto: 'Recibido',
+    enviado_cocina: 'En cocina',
+    preparando: 'Preparando',
+    listo: 'Listo',
+    en_camino: 'En camino',
   };
   let orders = [];
 
@@ -91,7 +91,6 @@
   `;
   const emptyColumn = () => '<div class="rounded-lg border border-dashed border-gray-300 p-5 text-center text-sm font-semibold text-gray-500 dark:border-gray-700">Sin pedidos.</div>';
   const renderOrder = (order) => {
-    const next = nextByState[order.estado];
     const phone = phoneDigits(order.celular_cliente);
     return `
       <article class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900" data-order="${order.id_pedido}">
@@ -109,12 +108,15 @@
           ${Number(order.costo_envio || 0) > 0 ? `<p><strong>Envio:</strong> ${money(order.costo_envio)}</p>` : ''}
           ${order.tiempo_estimado_minutos ? `<p><strong>Estimado:</strong> ${order.tiempo_estimado_minutos} min</p>` : ''}
         </div>
+        <div class="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-200">
+          ${stateLabels[order.estado] || escapeHtml(order.estado)}
+        </div>
         <div class="mt-3 flex flex-wrap gap-1.5">
           ${(order.items || []).map((item) => `<span class="rounded bg-white px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-200">${item.cantidad} x ${escapeHtml(item.nombre_producto)}</span>`).join('')}
         </div>
         <div class="mt-3 grid gap-2">
-          ${next ? `<button type="button" data-next="${next.estado}" class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-black text-white hover:bg-orange-700">${next.label}</button>` : ''}
-          <div class="grid gap-2" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 2.5rem;">
+          <div class="grid gap-2" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 2.5rem;">
+            <a href="/gastronomia/cocina" class="rounded-lg border border-orange-200 px-2 py-2 text-center text-xs font-black text-orange-800 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-200 dark:hover:bg-orange-500/10">Cocina</a>
             <a href="/gastronomia/pedidos/${order.id_pedido}/ticket?preview=1" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Ticket</a>
             <a href="${escapeHtml(order.url_seguimiento || '#')}" target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Estado</a>
             ${phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener" title="Abrir WhatsApp" aria-label="Abrir WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-green-200 text-lg text-green-700 hover:bg-green-50"><i class="fab fa-whatsapp"></i></a>` : '<span title="Sin celular" aria-label="Sin celular para WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fab fa-whatsapp"></i></span>'}
@@ -132,26 +134,6 @@
     if (!digits) return '';
     return digits.startsWith('595') ? digits : `595${digits.replace(/^0+/, '')}`;
   };
-  const changeState = async (orderId, estado, button) => {
-    button.disabled = true;
-    const original = button.textContent;
-    button.textContent = 'Actualizando...';
-    try {
-      await apiJson(`/api/gastronomia/pedidos/${orderId}/estado`, {method: 'POST', body: JSON.stringify({estado})});
-      showAlert('Pedido actualizado.', true);
-      await load();
-    } finally {
-      button.disabled = false;
-      button.textContent = original;
-    }
-  };
-
-  board.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-next]');
-    const card = event.target.closest('[data-order]');
-    if (!button || !card) return;
-    changeState(card.dataset.order, button.dataset.next, button).catch((error) => showAlert(error.message, false));
-  });
   searchInput?.addEventListener('input', render);
   refreshButton?.addEventListener('click', () => load().catch((error) => showAlert(error.message, false)));
   load().catch((error) => showAlert(error.message, false));

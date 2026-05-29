@@ -91,8 +91,10 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
 
     page = client.get('/gastronomia/cocina')
     assert page.status_code == 200
-    assert 'Cocina' in page.get_data(as_text=True)
-    csrf = _csrf(page.get_data(as_text=True))
+    html = page.get_data(as_text=True)
+    assert 'Cocina' in html
+    assert 'Delivery' in html
+    csrf = _csrf(html)
     pedido_id = _crear_pedido_enviado(client, csrf, producto_id)
 
     cocina_resp = client.get('/api/gastronomia/cocina/pedidos')
@@ -153,6 +155,65 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
             'pedido_listo',
             'pedido_entregado',
         ]
+
+
+def test_cocina_muestra_delivery_en_camino_y_lo_entrega():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Delivery Cocina', 'resto_delivery_cocina')
+    _loguear(client, app, 'resto_delivery_cocina')
+
+    page = client.get('/gastronomia/cocina')
+    csrf = _csrf(page.get_data(as_text=True))
+    delivery_page = client.get('/gastronomia/delivery')
+    assert delivery_page.status_code == 200
+    assert 'Cocina' in delivery_page.get_data(as_text=True)
+
+    pedido_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'delivery',
+            'referencia_entrega': 'Carla',
+            'celular_cliente': '0981123456',
+            'direccion_entrega': 'Av. Siempre Viva 742',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert pedido_resp.status_code == 201
+    pedido_id = pedido_resp.get_json()['pedido']['id_pedido']
+    assert client.post(
+        f'/api/gastronomia/pedidos/{pedido_id}/enviar-cocina',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    ).status_code == 200
+    assert client.post(
+        f'/api/gastronomia/cocina/pedidos/{pedido_id}/listo',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    ).status_code == 200
+    salir_resp = client.post(
+        f'/api/gastronomia/cocina/pedidos/{pedido_id}/salir',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert salir_resp.status_code == 200
+    assert salir_resp.get_json()['pedido']['estado'] == 'en_camino'
+
+    cocina_resp = client.get('/api/gastronomia/cocina/pedidos')
+    assert cocina_resp.status_code == 200
+    pedidos = cocina_resp.get_json()['pedidos']
+    assert [pedido['id_pedido'] for pedido in pedidos] == [pedido_id]
+    assert [pedido['estado'] for pedido in pedidos] == ['en_camino']
+
+    entregar_resp = client.post(
+        f'/api/gastronomia/cocina/pedidos/{pedido_id}/entregar',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert entregar_resp.status_code == 200
+    assert entregar_resp.get_json()['pedido']['estado'] == 'entregado'
+    assert client.get('/api/gastronomia/cocina/pedidos').get_json()['pedidos'] == []
 
 
 def test_cocina_no_muestra_eventos_de_otro_cliente():

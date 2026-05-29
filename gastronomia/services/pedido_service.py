@@ -46,7 +46,7 @@ def listar_pedidos_cocina(cliente_id: int) -> list[GastronomiaPedido]:
         GastronomiaPedido.query
         .filter(
             GastronomiaPedido.cliente_id == int(cliente_id),
-            GastronomiaPedido.estado.in_(['enviado_cocina', 'preparando', 'listo']),
+            GastronomiaPedido.estado.in_(['enviado_cocina', 'preparando', 'listo', 'en_camino']),
         )
         .order_by(GastronomiaPedido.fecha_envio_cocina.asc(), GastronomiaPedido.id_pedido.asc())
         .all()

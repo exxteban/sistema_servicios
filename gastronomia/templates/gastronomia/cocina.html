@@ -20,6 +20,10 @@
                class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
                 <i class="fas fa-tablet-alt"></i>POS
             </a>
+            <a href="{{ url_for('gastronomia.delivery') }}"
+               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
+                <i class="fas fa-motorcycle"></i>Delivery
+            </a>
         </div>
     </div>
 
@@ -276,5 +280,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260528-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260528-2') }}"></script>
 {% endblock %}

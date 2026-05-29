@@ -12,6 +12,9 @@
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Pedidos activos, contacto del cliente y seguimiento publico.</p>
         </div>
         <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('gastronomia.cocina') }}" class="rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-black text-orange-800 hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-200">
+                <i class="fas fa-fire"></i> Cocina
+            </a>
             <a href="{{ url_for('gastronomia.pos', tipo='delivery') }}" class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-black text-white hover:bg-orange-700">
                 <i class="fas fa-plus"></i> Nuevo delivery
             </a>
@@ -42,5 +45,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/delivery.js', v='20260528-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/delivery.js', v='20260528-3') }}"></script>
 {% endblock %}
