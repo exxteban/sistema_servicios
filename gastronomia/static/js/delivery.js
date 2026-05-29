@@ -109,7 +109,8 @@
   `;
   const emptyColumn = () => '<div class="rounded-lg border border-dashed border-gray-300 p-5 text-center text-sm font-semibold text-gray-500 dark:border-gray-700">Sin pedidos.</div>';
   const renderOrder = (order) => {
-    const phone = phoneDigits(order.celular_cliente);
+    const whatsappUrl = window.GastroWhatsApp?.buildOrderWhatsAppUrl(order, order.celular_cliente) || '';
+    const whatsappTarget = escapeHtml(window.GastroWhatsApp?.target || 'gastro-whatsapp');
     const assigned = order.repartidor ? escapeHtml(order.repartidor.nombre) : 'Sin repartidor';
     return `
       <article class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900" data-order="${order.id_pedido}">
@@ -142,8 +143,8 @@
           <div class="grid gap-2" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 2.5rem;">
             <a href="/gastronomia/cocina" class="rounded-lg border border-orange-200 px-2 py-2 text-center text-xs font-black text-orange-800 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-200 dark:hover:bg-orange-500/10">Cocina</a>
             <a href="/gastronomia/pedidos/${order.id_pedido}/ticket?preview=1" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Ticket</a>
-            <a href="${escapeHtml(order.url_seguimiento || '#')}" target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Estado</a>
-            ${phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener" title="Abrir WhatsApp" aria-label="Abrir WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-green-200 text-lg text-green-700 hover:bg-green-50"><i class="fab fa-whatsapp"></i></a>` : '<span title="Sin celular" aria-label="Sin celular para WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fab fa-whatsapp"></i></span>'}
+            <a href="${escapeHtml(order.url_seguimiento_publica || order.url_seguimiento || '#')}" target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Estado</a>
+            ${whatsappUrl ? `<a href="${escapeHtml(whatsappUrl)}" target="${whatsappTarget}" title="Compartir seguimiento por WhatsApp" aria-label="Compartir seguimiento por WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-green-200 text-lg text-green-700 hover:bg-green-50"><i class="fab fa-whatsapp"></i></a>` : '<span title="Sin celular" aria-label="Sin celular para WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fab fa-whatsapp"></i></span>'}
           </div>
           <div class="grid gap-2 sm:grid-cols-2">
             ${order.estado === 'listo' ? `<button type="button" data-state="en_camino" data-order-action="${order.id_pedido}" class="rounded-lg bg-orange-600 px-3 py-2 text-xs font-black text-white hover:bg-orange-700">Sale a entrega</button>` : ''}
@@ -156,11 +157,6 @@
   const elapsed = (iso) => {
     const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso || Date.now()).getTime()) / 60000));
     return `${minutes} min desde ingreso`;
-  };
-  const phoneDigits = (phone) => {
-    const digits = String(phone || '').replace(/\D+/g, '');
-    if (!digits) return '';
-    return digits.startsWith('595') ? digits : `595${digits.replace(/^0+/, '')}`;
   };
   const renderDrivers = () => {
     if (!driversList || !driversCount) return;

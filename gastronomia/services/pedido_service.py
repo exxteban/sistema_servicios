@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import case
 
 from app import db
+from app.utils.public_url import build_public_url
 from gastronomia.models import (
     GastronomiaPedido,
     GastronomiaPedidoEvento,
@@ -141,6 +142,7 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
 
 def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPedidoPago | None, items: list[dict]) -> dict:
     pago_data = pago.to_dict() if pago else None
+    url_seguimiento = f'/gastronomia/pedido/{pedido.codigo_publico}' if pedido.codigo_publico else None
     return {
         'id_pedido': pedido.id_pedido,
         'codigo_entrega': pedido.codigo_entrega,
@@ -148,7 +150,8 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
         'usuario_id': pedido.usuario_id,
         'tipo_pedido': pedido.tipo_pedido,
         'codigo_publico': pedido.codigo_publico,
-        'url_seguimiento': f'/gastronomia/pedido/{pedido.codigo_publico}' if pedido.codigo_publico else None,
+        'url_seguimiento': url_seguimiento,
+        'url_seguimiento_publica': _url_seguimiento_publica(pedido.codigo_publico),
         'mesa': pedido.mesa,
         'referencia_entrega': pedido.referencia_entrega,
         'nombre_cliente': pedido.nombre_cliente,
@@ -173,6 +176,15 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
         'pago': pago_data,
         'items': items,
     }
+
+
+def _url_seguimiento_publica(codigo_publico: str | None) -> str | None:
+    if not codigo_publico:
+        return None
+    return build_public_url(
+        'gastronomia.seguimiento_pedido_publico',
+        codigo_publico=codigo_publico,
+    )
 
 
 def obtener_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido | None:

@@ -50,7 +50,8 @@
     ordersBox.innerHTML = orders.length ? orders.map(renderOrder).join('') : emptyRoute();
   };
   const renderOrder = (order) => {
-    const phone = phoneDigits(order.celular_cliente);
+    const whatsappUrl = window.GastroWhatsApp?.buildOrderWhatsAppUrl(order, order.celular_cliente) || '';
+    const whatsappTarget = escapeHtml(window.GastroWhatsApp?.target || 'gastro-whatsapp');
     return `
       <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800" data-order="${order.id_pedido}">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -70,7 +71,7 @@
           ${(order.items || []).map((item) => `<span class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200">${item.cantidad} x ${escapeHtml(item.nombre_producto)}</span>`).join('')}
         </div>
         <div class="mt-4 grid gap-2 sm:grid-cols-3">
-          ${phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener" class="rounded-lg border border-green-200 px-3 py-2 text-center text-sm font-black text-green-700 hover:bg-green-50">WhatsApp</a>` : ''}
+          ${whatsappUrl ? `<a href="${escapeHtml(whatsappUrl)}" target="${whatsappTarget}" class="rounded-lg border border-green-200 px-3 py-2 text-center text-sm font-black text-green-700 hover:bg-green-50">WhatsApp</a>` : ''}
           ${order.estado === 'listo' ? `<button type="button" data-action="salir" data-order-id="${order.id_pedido}" class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-black text-white hover:bg-orange-700">Salgo ahora</button>` : ''}
           <button type="button" data-action="entregar" data-order-id="${order.id_pedido}" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-black text-white hover:bg-emerald-700">Entregado</button>
         </div>
@@ -78,11 +79,6 @@
     `;
   };
   const emptyRoute = () => '<div class="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm font-semibold text-gray-500 dark:border-gray-700 dark:bg-gray-800">No tenes pedidos asignados para entregar.</div>';
-  const phoneDigits = (phone) => {
-    const digits = String(phone || '').replace(/\D+/g, '');
-    if (!digits) return '';
-    return digits.startsWith('595') ? digits : `595${digits.replace(/^0+/, '')}`;
-  };
   const changeState = async (orderId, action) => {
     await apiJson(`/api/gastronomia/delivery/ruta/pedidos/${orderId}/${action}`, {method: 'POST', body: '{}'});
     showAlert(action === 'entregar' ? 'Pedido marcado como entregado.' : 'Pedido marcado en camino.', true);
