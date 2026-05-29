@@ -9,6 +9,8 @@
   const driverForm = document.getElementById('delivery-driver-form');
   const driversList = document.getElementById('delivery-drivers-list');
   const driversCount = document.getElementById('delivery-drivers-count');
+  const tabs = [...document.querySelectorAll('[data-delivery-tab]')];
+  const panels = [...document.querySelectorAll('[data-delivery-panel]')];
   if (!root || !board || !summary || !alertBox) return;
 
   const activeStates = ['abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino'];
@@ -49,6 +51,13 @@
     const data = await response.json();
     if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
     return data;
+  };
+  const setActiveTab = (key) => {
+    tabs.forEach((tab) => {
+      const active = tab.dataset.deliveryTab === key;
+      tab.className = `delivery-tab rounded-lg px-4 py-2 text-sm font-black transition ${active ? 'bg-orange-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-900'}`;
+    });
+    panels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.deliveryPanel !== key));
   };
   const load = async () => {
     hideAlert();
@@ -177,6 +186,7 @@
     document.getElementById('delivery-driver-active').checked = true;
   };
   const fillDriverForm = (driver) => {
+    setActiveTab('drivers');
     document.getElementById('delivery-driver-id').value = driver.id_repartidor || '';
     document.getElementById('delivery-driver-name').value = driver.nombre || '';
     document.getElementById('delivery-driver-phone').value = driver.celular || '';
@@ -225,6 +235,7 @@
   refreshButton?.addEventListener('click', () => load().catch((error) => showAlert(error.message, false)));
   driverForm?.addEventListener('submit', (event) => saveDriver(event).catch((error) => showAlert(error.message, false)));
   document.getElementById('delivery-driver-cancel')?.addEventListener('click', resetDriverForm);
+  tabs.forEach((tab) => tab.addEventListener('click', () => setActiveTab(tab.dataset.deliveryTab)));
   driversList?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-edit-driver]');
     if (!button) return;
@@ -241,5 +252,6 @@
     if (!button) return;
     changeOrderState(button.dataset.orderAction, button.dataset.state).catch((error) => showAlert(error.message, false));
   });
+  setActiveTab('states');
   load().catch((error) => showAlert(error.message, false));
 }());
