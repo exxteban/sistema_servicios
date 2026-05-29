@@ -6,6 +6,9 @@
   const alertBox = document.getElementById('delivery-alert');
   const searchInput = document.getElementById('delivery-search');
   const refreshButton = document.getElementById('delivery-refresh');
+  const driverForm = document.getElementById('delivery-driver-form');
+  const driversList = document.getElementById('delivery-drivers-list');
+  const driversCount = document.getElementById('delivery-drivers-count');
   if (!root || !board || !summary || !alertBox) return;
 
   const activeStates = ['abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino'];
@@ -24,6 +27,7 @@
     en_camino: 'En camino',
   };
   let orders = [];
+  let drivers = [];
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -49,8 +53,12 @@
   const load = async () => {
     hideAlert();
     const params = new URLSearchParams({tipo_pedido: 'delivery', estados: activeStates.join(',')});
-    const data = await apiJson(`/api/gastronomia/pedidos?${params.toString()}`);
+    const [data, driverData] = await Promise.all([
+      apiJson(`/api/gastronomia/pedidos?${params.toString()}`),
+      apiJson('/api/gastronomia/delivery/repartidores?incluir_inactivos=1'),
+    ]);
     orders = data.pedidos || [];
+    drivers = driverData.repartidores || [];
     render();
   };
   const filteredOrders = () => {
@@ -71,6 +79,7 @@
     const grouped = Object.fromEntries(columns.map((column) => [column.key, []]));
     visible.forEach((order) => grouped[order.estado]?.push(order));
     board.innerHTML = columns.map((column) => renderColumn(column, grouped[column.key] || [])).join('');
+    renderDrivers();
   };
   const renderSummary = (visible) => {
     summary.innerHTML = columns.map((column) => `
@@ -92,6 +101,7 @@
   const emptyColumn = () => '<div class="rounded-lg border border-dashed border-gray-300 p-5 text-center text-sm font-semibold text-gray-500 dark:border-gray-700">Sin pedidos.</div>';
   const renderOrder = (order) => {
     const phone = phoneDigits(order.celular_cliente);
+    const assigned = order.repartidor ? escapeHtml(order.repartidor.nombre) : 'Sin repartidor';
     return `
       <article class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900" data-order="${order.id_pedido}">
         <div class="flex items-start justify-between gap-2">
@@ -107,6 +117,7 @@
           ${order.direccion_entrega ? `<p class="break-words"><strong>Dir:</strong> ${escapeHtml(order.direccion_entrega)}</p>` : ''}
           ${Number(order.costo_envio || 0) > 0 ? `<p><strong>Envio:</strong> ${money(order.costo_envio)}</p>` : ''}
           ${order.tiempo_estimado_minutos ? `<p><strong>Estimado:</strong> ${order.tiempo_estimado_minutos} min</p>` : ''}
+          <p><strong>Delivery:</strong> ${assigned}</p>
         </div>
         <div class="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-200">
           ${stateLabels[order.estado] || escapeHtml(order.estado)}
@@ -115,11 +126,19 @@
           ${(order.items || []).map((item) => `<span class="rounded bg-white px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-200">${item.cantidad} x ${escapeHtml(item.nombre_producto)}</span>`).join('')}
         </div>
         <div class="mt-3 grid gap-2">
+          <select data-driver-select="${order.id_pedido}" class="w-full rounded-lg border border-gray-200 px-2 py-2 text-xs font-black text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+            <option value="">Sin repartidor</option>
+            ${drivers.filter((driver) => driver.activo || driver.id_repartidor === order.repartidor_id).map((driver) => `<option value="${driver.id_repartidor}" ${Number(order.repartidor_id || 0) === Number(driver.id_repartidor) ? 'selected' : ''}>${escapeHtml(driver.nombre)}</option>`).join('')}
+          </select>
           <div class="grid gap-2" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 2.5rem;">
             <a href="/gastronomia/cocina" class="rounded-lg border border-orange-200 px-2 py-2 text-center text-xs font-black text-orange-800 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-200 dark:hover:bg-orange-500/10">Cocina</a>
             <a href="/gastronomia/pedidos/${order.id_pedido}/ticket?preview=1" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Ticket</a>
             <a href="${escapeHtml(order.url_seguimiento || '#')}" target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Estado</a>
             ${phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener" title="Abrir WhatsApp" aria-label="Abrir WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-green-200 text-lg text-green-700 hover:bg-green-50"><i class="fab fa-whatsapp"></i></a>` : '<span title="Sin celular" aria-label="Sin celular para WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fab fa-whatsapp"></i></span>'}
+          </div>
+          <div class="grid gap-2 sm:grid-cols-2">
+            ${order.estado === 'listo' ? `<button type="button" data-state="en_camino" data-order-action="${order.id_pedido}" class="rounded-lg bg-orange-600 px-3 py-2 text-xs font-black text-white hover:bg-orange-700">Sale a entrega</button>` : ''}
+            ${['listo', 'en_camino'].includes(order.estado) ? `<button type="button" data-state="entregado" data-order-action="${order.id_pedido}" class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white hover:bg-emerald-700">Marcar entregado</button>` : ''}
           </div>
         </div>
       </article>
@@ -134,7 +153,93 @@
     if (!digits) return '';
     return digits.startsWith('595') ? digits : `595${digits.replace(/^0+/, '')}`;
   };
+  const renderDrivers = () => {
+    if (!driversList || !driversCount) return;
+    driversCount.textContent = drivers.length;
+    driversList.innerHTML = drivers.length ? drivers.map((driver) => `
+      <article class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-700 dark:bg-gray-900">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-black text-gray-900 dark:text-white">${escapeHtml(driver.nombre)}</h3>
+            <p class="text-xs font-bold text-gray-500">${driver.usuario ? `Usuario: ${escapeHtml(driver.usuario)}` : 'Sin usuario de ruta'}</p>
+          </div>
+          <span class="rounded-full px-2 py-1 text-xs font-black ${driver.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}">${driver.activo ? 'Activo' : 'Inactivo'}</span>
+        </div>
+        <p class="mt-2 text-gray-700 dark:text-gray-200">${[driver.celular, driver.vehiculo, driver.patente].filter(Boolean).map(escapeHtml).join(' · ') || 'Sin datos extra'}</p>
+        <button type="button" data-edit-driver="${driver.id_repartidor}" class="mt-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Editar</button>
+      </article>
+    `).join('') : '<div class="rounded-lg border border-dashed border-gray-300 p-5 text-center text-sm font-semibold text-gray-500 dark:border-gray-700">Aun no hay repartidores.</div>';
+  };
+  const resetDriverForm = () => {
+    if (!driverForm) return;
+    driverForm.reset();
+    document.getElementById('delivery-driver-id').value = '';
+    document.getElementById('delivery-driver-active').checked = true;
+  };
+  const fillDriverForm = (driver) => {
+    document.getElementById('delivery-driver-id').value = driver.id_repartidor || '';
+    document.getElementById('delivery-driver-name').value = driver.nombre || '';
+    document.getElementById('delivery-driver-phone').value = driver.celular || '';
+    document.getElementById('delivery-driver-doc').value = driver.documento || '';
+    document.getElementById('delivery-driver-vehicle').value = driver.vehiculo || '';
+    document.getElementById('delivery-driver-plate').value = driver.patente || '';
+    document.getElementById('delivery-driver-user').value = driver.usuario_id || '';
+    document.getElementById('delivery-driver-active').checked = Boolean(driver.activo);
+    document.getElementById('delivery-driver-name').focus();
+  };
+  const driverPayload = () => ({
+    nombre: document.getElementById('delivery-driver-name').value,
+    celular: document.getElementById('delivery-driver-phone').value,
+    documento: document.getElementById('delivery-driver-doc').value,
+    vehiculo: document.getElementById('delivery-driver-vehicle').value,
+    patente: document.getElementById('delivery-driver-plate').value,
+    usuario_id: document.getElementById('delivery-driver-user').value,
+    activo: document.getElementById('delivery-driver-active').checked,
+  });
+  const saveDriver = async (event) => {
+    event.preventDefault();
+    const id = document.getElementById('delivery-driver-id').value;
+    await apiJson(id ? `/api/gastronomia/delivery/repartidores/${id}` : '/api/gastronomia/delivery/repartidores', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(driverPayload()),
+    });
+    resetDriverForm();
+    showAlert('Repartidor guardado.', true);
+    await load();
+  };
+  const assignDriver = async (orderId, repartidorId) => {
+    await apiJson(`/api/gastronomia/delivery/pedidos/${orderId}/repartidor`, {
+      method: 'POST',
+      body: JSON.stringify({repartidor_id: repartidorId}),
+    });
+    await load();
+  };
+  const changeOrderState = async (orderId, estado) => {
+    await apiJson(`/api/gastronomia/pedidos/${orderId}/estado`, {
+      method: 'POST',
+      body: JSON.stringify({estado}),
+    });
+    await load();
+  };
   searchInput?.addEventListener('input', render);
   refreshButton?.addEventListener('click', () => load().catch((error) => showAlert(error.message, false)));
+  driverForm?.addEventListener('submit', (event) => saveDriver(event).catch((error) => showAlert(error.message, false)));
+  document.getElementById('delivery-driver-cancel')?.addEventListener('click', resetDriverForm);
+  driversList?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-edit-driver]');
+    if (!button) return;
+    const driver = drivers.find((item) => Number(item.id_repartidor) === Number(button.dataset.editDriver));
+    if (driver) fillDriverForm(driver);
+  });
+  board.addEventListener('change', (event) => {
+    const select = event.target.closest('[data-driver-select]');
+    if (!select) return;
+    assignDriver(select.dataset.driverSelect, select.value).catch((error) => showAlert(error.message, false));
+  });
+  board.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-order-action]');
+    if (!button) return;
+    changeOrderState(button.dataset.orderAction, button.dataset.state).catch((error) => showAlert(error.message, false));
+  });
   load().catch((error) => showAlert(error.message, false));
 }());

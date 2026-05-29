@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Mi Ruta Delivery{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl space-y-5" data-gastro-delivery-route>
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <p class="text-sm font-black uppercase tracking-wide text-orange-600 dark:text-orange-300">Delivery</p>
+            <h1 class="mt-1 text-2xl font-black text-gray-900 dark:text-white">Mi hoja de ruta</h1>
+            <p id="route-driver-name" class="mt-2 text-sm text-gray-600 dark:text-gray-400">Pedidos asignados para entregar.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" id="route-refresh" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-black text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-rotate"></i> Actualizar
+            </button>
+            <a href="{{ url_for('gastronomia.dashboard') }}" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <div id="route-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+    <section id="route-summary" class="grid gap-3 sm:grid-cols-2"></section>
+    <section id="route-orders" class="grid gap-4"></section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/delivery_route.js', v='20260528-1') }}"></script>
+{% endblock %}

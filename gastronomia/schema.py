@@ -14,9 +14,11 @@ ORDER_COLUMN_MIGRATIONS = (
     ('celular_cliente', 'VARCHAR(40)'),
     ('direccion_entrega', 'VARCHAR(240)'),
     ('tiempo_estimado_minutos', 'INTEGER'),
+    ('repartidor_id', 'INTEGER'),
     ('costo_envio', 'NUMERIC(15, 2) NOT NULL DEFAULT 0'),
     ('fecha_inicio_preparacion', 'DATETIME'),
     ('fecha_listo', 'DATETIME'),
+    ('fecha_asignacion_delivery', 'DATETIME'),
     ('fecha_entrega', 'DATETIME'),
 )
 

@@ -70,6 +70,8 @@ def inicializar_datos_base(config_name=None):
         db.session.add(Rol(nombre='Mozo', descripcion='Toma de pedidos y gestion de salon gastronomico', nivel_jerarquia=12))
     if not Rol.query.filter_by(nombre='Caja Gastronomia').first():
         db.session.add(Rol(nombre='Caja Gastronomia', descripcion='Cobro de pedidos gastronomicos', nivel_jerarquia=15))
+    if not Rol.query.filter_by(nombre='Delivery Gastronomia').first():
+        db.session.add(Rol(nombre='Delivery Gastronomia', descripcion='Hoja de ruta y entrega de pedidos gastronomicos', nivel_jerarquia=8))
 
     permisos = [
         {'codigo': 'crear_venta', 'nombre': 'Crear Venta', 'descripcion': 'Permite realizar ventas', 'modulo': 'ventas', 'requiere_autorizacion': False},
@@ -172,6 +174,7 @@ def inicializar_datos_base(config_name=None):
         {'codigo': 'gastronomia_cocina', 'nombre': 'Gastronomia - Cocina', 'descripcion': 'Permite operar la pantalla de cocina/KDS', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
         {'codigo': 'gastronomia_caja', 'nombre': 'Gastronomia - Caja', 'descripcion': 'Permite cobrar pedidos gastronomicos', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
         {'codigo': 'gastronomia_salon', 'nombre': 'Gastronomia - Salon', 'descripcion': 'Permite gestionar mesas y mover pedidos entre mesas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_delivery', 'nombre': 'Gastronomia - Delivery', 'descripcion': 'Permite usar la hoja de ruta del repartidor y marcar entregas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
         {'codigo': 'gastronomia_reportes', 'nombre': 'Gastronomia - Reportes', 'descripcion': 'Permite ver reportes y metricas gastronomicas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
     ]
     for p in permisos:
@@ -396,74 +399,13 @@ def inicializar_datos_base(config_name=None):
 
     rol_ids = {r.nombre: r.id_rol for r in Rol.query.all()}
     permiso_ids = {p.codigo: p.id_permiso for p in Permiso.query.filter_by(activo=True).all()}
+    from app.utils.default_role_permissions import DEFAULT_ROLE_PERMISSION_CODES
 
-    supervisor_codigos = [
-        'crear_venta', 'ver_ventas', 'ver_detalle_venta', 'aplicar_descuento', 'venta_credito',
-        'vender_sin_stock',
-        'ver_inventario', 'crear_producto', 'editar_producto', 'ver_costo_compra',
-        'crear_compra', 'ver_compras', 'pagar_compra',
-        'abrir_caja', 'cerrar_caja', 'ver_caja', 'movimiento_caja', 'ver_otras_cajas',
-        'enviar_caja_venta', 'enviar_caja_reparacion', 'ver_cola_cobro', 'tomar_cola_cobro',
-        'crear_cliente', 'editar_cliente', 'ver_clientes',
-        'crear_proveedor', 'editar_proveedor', 'ver_proveedores',
-        'ver_reportes', 'ver_reporte_ventas', 'ver_reporte_inventario', 'ver_reporte_financiero', 'exportar_reportes',
-        'ver_configuracion',
-        'ver_reparaciones', 'crear_reparacion', 'editar_reparacion', 'cambiar_estado_reparacion', 'cobrar_reparacion',
-        'vincular_venta_reparacion',
-        'ver_recepcion_usados', 'crear_recepcion_usados',
-        'ver_presupuestos_empresariales', 'crear_presupuestos_empresariales',
-        'whatsapp_conversaciones', 'crm_whatsapp',
-        'crm_operar_como_asesor',
-            'agenda_acceso', 'agenda_ver_todas', 'agenda_crear', 'agenda_editar', 'agenda_completar', 'agenda_cancelar',
-            'ver_control_empleados', 'gestionar_control_empleados',
-            'ver_cobranzas', 'registrar_cobro_credito', 'anular_cobro_credito',
-            'gestionar_promesa_pago', 'enviar_recordatorio_cobranza', 'ver_reportes_cobranzas',
-            'ver_gastos_corrientes', 'crear_gastos_corrientes', 'editar_gastos_corrientes',
-            'registrar_pago_gasto_corriente', 'anular_pago_gasto_corriente',
-            'ver_reportes_gastos_corrientes', 'ver_flujo_caja', 'gestionar_flujo_caja',
-            'gastronomia_acceso', 'gastronomia_menu', 'gastronomia_pos',
-            'gastronomia_cocina', 'gastronomia_caja', 'gastronomia_salon',
-            'gastronomia_reportes',
-    ]
-    cajero_codigos = [
-        'crear_venta', 'ver_ventas', 'ver_detalle_venta', 'aplicar_descuento',
-        'vender_sin_stock',
-        'ver_inventario',
-        'abrir_caja', 'cerrar_caja', 'ver_caja', 'movimiento_caja',
-        'ver_cola_cobro', 'tomar_cola_cobro',
-        'crear_cliente', 'ver_clientes',
-        'ver_proveedores',
-        'ver_reparaciones', 'crear_reparacion', 'editar_reparacion', 'cambiar_estado_reparacion', 'cobrar_reparacion',
-        'vincular_venta_reparacion',
-            'ver_recepcion_usados', 'crear_recepcion_usados',
-            'ver_presupuestos_empresariales', 'crear_presupuestos_empresariales',
-            'agenda_acceso', 'agenda_ver_todas', 'agenda_crear', 'agenda_editar', 'agenda_completar', 'agenda_cancelar',
-            'ver_cobranzas', 'registrar_cobro_credito',
-            'ver_gastos_corrientes', 'crear_gastos_corrientes', 'editar_gastos_corrientes',
-            'registrar_pago_gasto_corriente',
-            'gastronomia_acceso', 'gastronomia_pos', 'gastronomia_caja',
-        ]
-    vendedor_codigos = [
-        'ver_inventario',
-        'crear_cliente', 'ver_clientes',
-        'enviar_caja_venta', 'enviar_caja_reparacion',
-        'ver_proveedores',
-        'ver_reparaciones', 'crear_reparacion',
-        'ver_recepcion_usados', 'crear_recepcion_usados',
-        'ver_presupuestos_empresariales', 'crear_presupuestos_empresariales',
-        'agenda_acceso', 'agenda_crear', 'agenda_editar', 'agenda_completar', 'agenda_cancelar',
-        'gastronomia_acceso', 'gastronomia_pos', 'gastronomia_salon',
-    ]
-    tecnico_codigos = [
-        'ver_clientes', 'crear_cliente',
-        'ver_reparaciones', 'crear_reparacion', 'editar_reparacion',
-        'cambiar_estado_reparacion',
-        'agenda_acceso', 'agenda_crear', 'agenda_editar', 'agenda_completar', 'agenda_cancelar',
-    ]
-    cocina_codigos = ['gastronomia_acceso', 'gastronomia_cocina']
-    mozo_codigos = ['gastronomia_acceso', 'gastronomia_pos', 'gastronomia_salon']
-    caja_gastronomia_codigos = ['gastronomia_acceso', 'gastronomia_caja']
-    auditoria_codigos = ['ver_auditoria']
+    supervisor_codigos = DEFAULT_ROLE_PERMISSION_CODES['Supervisor']
+    cajero_codigos = DEFAULT_ROLE_PERMISSION_CODES['Cajero']
+    vendedor_codigos = DEFAULT_ROLE_PERMISSION_CODES['Vendedor']
+    tecnico_codigos = DEFAULT_ROLE_PERMISSION_CODES['Tecnico']
+    auditoria_codigos = DEFAULT_ROLE_PERMISSION_CODES['Auditoria']
 
     admin_id = rol_ids.get('Administrador')
     supervisor_id = rol_ids.get('Supervisor')
@@ -474,6 +416,7 @@ def inicializar_datos_base(config_name=None):
     cocina_id = rol_ids.get('Cocina')
     mozo_id = rol_ids.get('Mozo')
     caja_gastronomia_id = rol_ids.get('Caja Gastronomia')
+    delivery_gastronomia_id = rol_ids.get('Delivery Gastronomia')
     root_id = rol_ids.get('Root')
 
     if admin_id:
@@ -586,9 +529,10 @@ def inicializar_datos_base(config_name=None):
                     )
 
     for role_id, codigos in (
-        (cocina_id, cocina_codigos),
-        (mozo_id, mozo_codigos),
-        (caja_gastronomia_id, caja_gastronomia_codigos),
+        (cocina_id, DEFAULT_ROLE_PERMISSION_CODES['Cocina']),
+        (mozo_id, DEFAULT_ROLE_PERMISSION_CODES['Mozo']),
+        (caja_gastronomia_id, DEFAULT_ROLE_PERMISSION_CODES['Caja Gastronomia']),
+        (delivery_gastronomia_id, DEFAULT_ROLE_PERMISSION_CODES['Delivery Gastronomia']),
     ):
         if not role_id:
             continue

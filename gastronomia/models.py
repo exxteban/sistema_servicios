@@ -250,6 +250,7 @@ class GastronomiaPedido(db.Model):
     celular_cliente = db.Column(db.String(40))
     direccion_entrega = db.Column(db.String(240))
     tiempo_estimado_minutos = db.Column(db.Integer)
+    repartidor_id = db.Column(db.Integer, db.ForeignKey('gastronomia_repartidores.id_repartidor'), nullable=True, index=True)
     estado = db.Column(db.String(30), nullable=False, default='abierto', index=True)
     notas = db.Column(db.Text)
     subtotal = db.Column(db.Numeric(15, 2), nullable=False, default=0)
@@ -260,10 +261,12 @@ class GastronomiaPedido(db.Model):
     fecha_envio_cocina = db.Column(db.DateTime)
     fecha_inicio_preparacion = db.Column(db.DateTime)
     fecha_listo = db.Column(db.DateTime)
+    fecha_asignacion_delivery = db.Column(db.DateTime)
     fecha_entrega = db.Column(db.DateTime)
 
     cliente = db.relationship('Cliente')
     usuario = db.relationship('Usuario')
+    repartidor = db.relationship('GastronomiaRepartidor')
     items = db.relationship('GastronomiaPedidoItem', backref='pedido', lazy='dynamic', cascade='all, delete-orphan')
     pago = db.relationship(
         'GastronomiaPedidoPago',
@@ -287,6 +290,8 @@ class GastronomiaPedido(db.Model):
             'celular_cliente': self.celular_cliente,
             'direccion_entrega': self.direccion_entrega,
             'tiempo_estimado_minutos': self.tiempo_estimado_minutos,
+            'repartidor_id': self.repartidor_id,
+            'repartidor': self.repartidor.to_dict() if self.repartidor else None,
             'estado': self.estado,
             'notas': self.notas,
             'subtotal': float(self.subtotal or 0),
@@ -296,6 +301,7 @@ class GastronomiaPedido(db.Model):
             'fecha_envio_cocina': self.fecha_envio_cocina.isoformat() if self.fecha_envio_cocina else None,
             'fecha_inicio_preparacion': self.fecha_inicio_preparacion.isoformat() if self.fecha_inicio_preparacion else None,
             'fecha_listo': self.fecha_listo.isoformat() if self.fecha_listo else None,
+            'fecha_asignacion_delivery': self.fecha_asignacion_delivery.isoformat() if self.fecha_asignacion_delivery else None,
             'fecha_entrega': self.fecha_entrega.isoformat() if self.fecha_entrega else None,
             'pagado': bool(self.pago),
             'estado_pago': 'pagado' if self.pago else 'pendiente',
@@ -314,6 +320,43 @@ def _codigo_entrega(pedido_id) -> str:
 
 def generar_codigo_publico_pedido() -> str:
     return secrets.token_urlsafe(6).replace('-', '').replace('_', '')[:10].upper()
+
+
+class GastronomiaRepartidor(db.Model):
+    __tablename__ = 'gastronomia_repartidores'
+
+    id_repartidor = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=True, index=True)
+    nombre = db.Column(db.String(120), nullable=False)
+    celular = db.Column(db.String(40))
+    documento = db.Column(db.String(40))
+    vehiculo = db.Column(db.String(80))
+    patente = db.Column(db.String(30))
+    activo = db.Column(db.Boolean, nullable=False, default=True, server_default='1', index=True)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    fecha_modificacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cliente = db.relationship('Cliente')
+    usuario = db.relationship('Usuario')
+
+    __table_args__ = (
+        db.UniqueConstraint('cliente_id', 'usuario_id', name='uq_gastronomia_repartidor_cliente_usuario'),
+    )
+
+    def to_dict(self):
+        return {
+            'id_repartidor': self.id_repartidor,
+            'cliente_id': self.cliente_id,
+            'usuario_id': self.usuario_id,
+            'usuario': self.usuario.username if self.usuario else None,
+            'nombre': self.nombre,
+            'celular': self.celular,
+            'documento': self.documento,
+            'vehiculo': self.vehiculo,
+            'patente': self.patente,
+            'activo': bool(self.activo),
+        }
 
 
 class GastronomiaPedidoItem(db.Model):

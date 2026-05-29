@@ -8,6 +8,7 @@ from gastronomia.services.modo_operacion import gastronomia_activa
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
     PERMISO_COCINA,
+    PERMISO_DELIVERY,
     PERMISO_MENU,
     PERMISO_POS,
     PERMISO_REPORTES,
@@ -38,6 +39,7 @@ def dashboard():
         'salon': tiene_permiso_gastronomia(PERMISO_SALON),
         'cocina': tiene_permiso_gastronomia(PERMISO_COCINA),
         'caja': tiene_permiso_gastronomia(PERMISO_CAJA),
+        'delivery': tiene_permiso_gastronomia(PERMISO_DELIVERY),
         'entregas': tiene_permiso_gastronomia(PERMISO_CAJA, PERMISO_COCINA, PERMISO_SALON),
         'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
     }
