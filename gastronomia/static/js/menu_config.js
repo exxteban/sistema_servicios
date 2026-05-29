@@ -255,6 +255,7 @@
     const badges = {
       visible: article.querySelector('[data-product-badge="visible"]'),
       tv: article.querySelector('[data-product-badge="tv"]'),
+      tienda: article.querySelector('[data-product-badge="tienda"]'),
       disponible: article.querySelector('[data-product-badge="disponible"]'),
       stock: article.querySelector('[data-product-badge="stock"]'),
     };
@@ -263,6 +264,9 @@
     }
     if (badges.tv) {
       badges.tv.textContent = producto.visible_en_tv ? 'Visible en TV' : 'Oculto en TV';
+    }
+    if (badges.tienda) {
+      badges.tienda.textContent = producto.publicado_tienda ? 'En tienda online' : 'Fuera de tienda online';
     }
     if (badges.disponible) {
       badges.disponible.textContent = producto.disponible ? 'Disponible' : 'Agotado';
@@ -286,6 +290,7 @@
     productoForm.disponible.checked = true;
     productoForm.visible.checked = true;
     productoForm.visible_en_tv.checked = true;
+    productoForm.publicado_tienda.checked = true;
     productoForm.control_stock_venta.checked = false;
     productoForm.stock_disponible.value = 0;
     productoSubmit.innerHTML = '<i class="fas fa-save"></i>Guardar producto';
@@ -310,6 +315,7 @@
     productoForm.disponible.checked = Boolean(producto.disponible);
     productoForm.visible.checked = Boolean(producto.visible);
     productoForm.visible_en_tv.checked = Boolean(producto.visible_en_tv);
+    productoForm.publicado_tienda.checked = Boolean(producto.publicado_tienda);
     productoForm.control_stock_venta.checked = Boolean(producto.control_stock_venta);
     productoForm.stock_disponible.value = Number(producto.stock_disponible || 0);
     productoForm.quitar_imagen.checked = false;
@@ -425,6 +431,7 @@
       const data = new FormData(event.currentTarget);
       data.set('visible', event.currentTarget.visible.checked ? '1' : '0');
       data.set('visible_en_tv', event.currentTarget.visible_en_tv.checked ? '1' : '0');
+      data.set('publicado_tienda', event.currentTarget.publicado_tienda.checked ? '1' : '0');
       data.set('control_stock_venta', event.currentTarget.control_stock_venta.checked ? '1' : '0');
       data.set('disponible', event.currentTarget.disponible.checked ? '1' : '0');
       data.set('quitar_imagen', event.currentTarget.quitar_imagen.checked ? '1' : '0');

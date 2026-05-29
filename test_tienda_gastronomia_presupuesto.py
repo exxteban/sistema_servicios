@@ -46,9 +46,21 @@ def _crear_tienda_gastronomia(slug='gastro-presupuesto-test'):
         imagen_url='https://cdn.example.com/combo-bebidas.jpg',
         disponible=True,
         visible=True,
+        publicado_tienda=True,
         activo=True,
     )
-    db.session.add_all([tienda, producto])
+    oculto_tienda = GastronomiaProducto(
+        cliente_id=cliente.id_cliente,
+        categoria_id=categoria.id_categoria,
+        nombre='Menú interno',
+        descripcion='No debe aparecer en tienda online.',
+        precio=99000,
+        disponible=True,
+        visible=True,
+        publicado_tienda=False,
+        activo=True,
+    )
+    db.session.add_all([tienda, producto, oculto_tienda])
     db.session.commit()
     return tienda, producto
 
@@ -94,6 +106,7 @@ def test_tienda_gastronomia_adapta_cta_y_mensaje_de_presupuesto():
         bootstrap = bootstrap_response.get_json()
         assert bootstrap['categorias'][0]['nombre'] == 'Bebidas para eventos'
         catalog_product = bootstrap['catalogo']['productos'][0]
+        assert bootstrap['catalogo']['total'] == 1
         assert catalog_product['tipo_catalogo'] == 'gastronomia'
         assert catalog_product['nombre'] == 'Combo de bebidas'
         assert catalog_product['precio'] == 150000

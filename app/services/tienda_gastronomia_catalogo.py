@@ -21,6 +21,7 @@ def categorias_gastronomia_publicas(config: TiendaConfig) -> list[dict]:
             GastronomiaProducto.cliente_id == int(config.id_cliente),
             GastronomiaProducto.activo.is_(True),
             GastronomiaProducto.visible.is_(True),
+            GastronomiaProducto.publicado_tienda.is_(True),
             GastronomiaProducto.disponible.is_(True),
         )
         .distinct()
@@ -125,6 +126,7 @@ def _query_productos_publicos(config: TiendaConfig):
             GastronomiaProducto.cliente_id == int(config.id_cliente),
             GastronomiaProducto.activo.is_(True),
             GastronomiaProducto.visible.is_(True),
+            GastronomiaProducto.publicado_tienda.is_(True),
             GastronomiaProducto.disponible.is_(True),
             GastronomiaCategoria.activo.is_(True),
             GastronomiaCategoria.visible.is_(True),
@@ -154,6 +156,7 @@ def _serializar_producto_card(producto: GastronomiaProducto, config: TiendaConfi
         'modelo': None,
         'es_servicio': False,
         'disponible': bool(producto.disponible),
+        'publicado_tienda': bool(producto.publicado_tienda),
         'imagenes': _imagenes_producto(producto)[:1],
         'whatsapp_link': _build_whatsapp_link(producto, config),
         'vistas': 0,

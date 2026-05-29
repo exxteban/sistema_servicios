@@ -136,6 +136,7 @@
                             <label class="inline-flex items-center gap-2"><input name="disponible" type="checkbox" checked> Disponible</label>
                             <label class="inline-flex items-center gap-2"><input name="visible" type="checkbox" checked> Visible en menu</label>
                             <label class="inline-flex items-center gap-2"><input name="visible_en_tv" type="checkbox" checked> Visible en TV</label>
+                            <label class="inline-flex items-center gap-2"><input name="publicado_tienda" type="checkbox" checked> Mostrar en tienda online</label>
                         </div>
                         <div class="grid gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700 sm:grid-cols-[1fr_150px]">
                             <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
@@ -239,12 +240,13 @@
                                 <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                                     <span data-product-badge="visible" class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.visible %}Visible en menu{% else %}Oculto en menu{% endif %}</span>
                                     <span data-product-badge="tv" class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.visible_en_tv %}Visible en TV{% else %}Oculto en TV{% endif %}</span>
+                                    <span data-product-badge="tienda" class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">{% if producto.publicado_tienda %}En tienda online{% else %}Fuera de tienda online{% endif %}</span>
                                     <span data-product-badge="disponible" class="rounded-full px-2 py-1 {% if producto.disponible %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200{% else %}gastro-soldout-badge{% endif %}">{% if producto.disponible %}Disponible{% else %}Agotado{% endif %}</span>
                                     <span data-product-badge="stock" class="rounded-full bg-gray-100 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
                                         {% if producto.control_stock_venta %}Stock: {{ producto.stock_disponible or 0 }}{% else %}Sin control stock{% endif %}
                                     </span>
                                 </div>
-                                <div class="mt-4 grid gap-2 sm:grid-cols-3">
+                                <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                                     <label class="gastro-inline-toggle">
                                         <span>Mostrar en menu</span>
                                         <input type="checkbox" data-toggle-product-field="visible" data-product-id="{{ producto.id_producto }}" {% if producto.visible %}checked{% endif %}>
@@ -252,6 +254,10 @@
                                     <label class="gastro-inline-toggle">
                                         <span>Mostrar en TV</span>
                                         <input type="checkbox" data-toggle-product-field="visible_en_tv" data-product-id="{{ producto.id_producto }}" {% if producto.visible_en_tv %}checked{% endif %}>
+                                    </label>
+                                    <label class="gastro-inline-toggle">
+                                        <span>Tienda online</span>
+                                        <input type="checkbox" data-toggle-product-field="publicado_tienda" data-product-id="{{ producto.id_producto }}" {% if producto.publicado_tienda %}checked{% endif %}>
                                     </label>
                                     <label class="gastro-inline-toggle">
                                         <span>Disponible</span>
@@ -466,6 +472,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='20260527-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='20260529-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

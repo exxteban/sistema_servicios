@@ -43,6 +43,7 @@ CONFIG_COLUMN_MIGRATIONS = (
 
 PRODUCT_COLUMN_MIGRATIONS = (
     ('visible_en_tv', 'BOOLEAN NOT NULL DEFAULT 1'),
+    ('publicado_tienda', 'BOOLEAN NOT NULL DEFAULT 1'),
     ('control_stock_venta', 'BOOLEAN NOT NULL DEFAULT 0'),
     ('stock_disponible', 'INTEGER'),
 )

@@ -143,6 +143,10 @@ def guardar_producto(cliente_id: int, data: dict, producto: GastronomiaProducto 
         data.get('visible_en_tv'),
         True if producto.id_producto is None else bool(producto.visible_en_tv),
     )
+    producto.publicado_tienda = parse_bool(
+        data.get('publicado_tienda'),
+        True if producto.id_producto is None else bool(producto.publicado_tienda),
+    )
     producto.control_stock_venta = parse_bool(data.get('control_stock_venta'), False)
     producto.stock_disponible = _stock_disponible_desde_payload(data) if producto.control_stock_venta else None
     if producto.control_stock_venta and producto.stock_disponible <= 0:
@@ -161,6 +165,8 @@ def actualizar_estado_producto(cliente_id: int, producto_id: int, data: dict) ->
         producto.visible = parse_bool(data.get('visible'), bool(producto.visible))
     if 'visible_en_tv' in data:
         producto.visible_en_tv = parse_bool(data.get('visible_en_tv'), bool(producto.visible_en_tv))
+    if 'publicado_tienda' in data:
+        producto.publicado_tienda = parse_bool(data.get('publicado_tienda'), bool(producto.publicado_tienda))
     if 'disponible' in data:
         producto.disponible = parse_bool(data.get('disponible'), bool(producto.disponible))
     if 'control_stock_venta' in data:
