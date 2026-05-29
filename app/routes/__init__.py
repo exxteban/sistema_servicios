@@ -12,6 +12,7 @@ from app.routes.reportes import reportes_bp
 from app.routes.reportes_tecnicos import reportes_tecnicos_bp
 from app.routes.autorizaciones import bp as autorizaciones_bp
 from app.routes.usuarios import usuarios_bp
+from app.routes import usuarios_config_general
 from app.routes import usuarios_config_ia
 from app.routes import usuarios_config_ia_backoffice
 from app.routes import usuarios_config_modulos

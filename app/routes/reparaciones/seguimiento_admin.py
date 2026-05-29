@@ -10,6 +10,7 @@ from app import db
 from app.models import Configuracion, Reparacion
 from app.models.reparacion_seguimiento import ReparacionSeguimiento, SeguimientoAcceso
 from app.services.whatsapp.verificacion_service import generar_codigo
+from app.utils.public_url import build_public_url
 from app.utils.seguimiento_utils import generar_qr_svg, generar_token, hash_token
 
 from .base import REPARACION_TICKET_FOOTER_DEFAULT, _get_reparacion_or_404_safe, reparaciones_bp
@@ -77,7 +78,7 @@ def ticket(id):
     if reparacion.cliente and reparacion.cliente.telefono:
         codigo_bot = generar_codigo(reparacion.cliente.telefono, reparacion.id_reparacion)
 
-    seguimiento_url = url_for('seguimiento.ver_seguimiento', token=token, _external=True)
+    seguimiento_url = build_public_url('seguimiento.ver_seguimiento', token=token)
     qr_svg = None
     try:
         qr_svg = generar_qr_svg(seguimiento_url)

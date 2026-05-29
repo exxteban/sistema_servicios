@@ -162,6 +162,20 @@
                     </p>
                 </div>
                 <div class="lg:col-span-2">
+                    <label for="url_publica_sistema" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        URL pública del sistema
+                    </label>
+                    <input id="url_publica_sistema"
+                           name="url_publica_sistema"
+                           type="url"
+                           value="{{ url_publica_sistema }}"
+                           placeholder="Ej: https://mi-negocio.com"
+                           class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
+                        Se usa para links compartidos por WhatsApp y QR. Evita que salgan URLs internas como 127.0.0.1.
+                    </p>
+                </div>
+                <div class="lg:col-span-2">
                     <label for="mensaje_whatsapp_seguimiento" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Mensaje WhatsApp para link de seguimiento
                     </label>

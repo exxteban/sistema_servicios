@@ -5,7 +5,7 @@ Rutas de administración de usuarios
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db
-from app.models import Usuario, Rol, Permiso, Configuracion, Cliente
+from app.models import Usuario, Rol, Permiso, Cliente
 from app.services.usuarios_admin import (
     agrupar_permisos,
     map_permisos_por_rol,
@@ -15,42 +15,10 @@ from app.services.usuarios_admin import (
     set_permisos_adicionales,
     tiene_otro_admin_activo,
 )
-from app.services.ia_backoffice.security import puede_gestionar_asistente_ia
-from app.services.ia_backoffice.settings import obtener_configuracion_asistente
-from app.services.usuarios_branding import guardar_logo_empresa
 from app.utils.auditoria_utils import registrar_auditoria
 
 
 usuarios_bp = Blueprint('usuarios', __name__)
-CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS = 'pos_ocultar_selector_vendedor_cajero'
-DESC_OCULTAR_SELECTOR_VENDEDOR_POS = 'Muestra selector de vendedor/cajero en POS (desactivado: usa usuario actual)'
-CLAVE_CAJA_FLUJO_ENVIADO = 'caja_flujo_enviado_desde_vendedor'
-DESC_CAJA_FLUJO_ENVIADO = 'Habilita flujo vendedor -> caja para cobro final'
-CLAVE_CAJA_ALERTA_PENDIENTES = 'caja_alerta_pendientes_activa'
-DESC_CAJA_ALERTA_PENDIENTES = 'Muestra alerta visual de pendientes de cobro para cajero'
-CLAVE_CAJA_EXIGIR_CAJERO = 'caja_exigir_cajero_para_cobro'
-DESC_CAJA_EXIGIR_CAJERO = 'Bloquea cobro directo cuando el flujo de caja está activo'
-FORM_MODO_COBRO_EXCLUSIVO_CAJERO = 'modo_cobro_exclusivo_cajero'
-CLAVE_NOMBRE_EMPRESA_UI = 'nombre_empresa_ui'
-DESC_NOMBRE_EMPRESA_UI = 'Nombre visible de la empresa en el encabezado'
-CLAVE_LOGO_EMPRESA_UI = 'logo_empresa_ui_path'
-DESC_LOGO_EMPRESA_UI = 'Ruta del logo de la empresa para el encabezado'
-CLAVE_MENSAJE_WHATSAPP_SEGUIMIENTO = 'reparacion_whatsapp_mensaje_link'
-DESC_MENSAJE_WHATSAPP_SEGUIMIENTO = 'Plantilla de mensaje WhatsApp para compartir link de seguimiento de reparación'
-MENSAJE_WHATSAPP_SEGUIMIENTO_DEFAULT = 'Hola! Este es su link de {empresa} para ver el estado de reparación de su equipo:\n\n{link}'
-
-def _ocultar_selector_vendedor_pos():
-    # Compatibilidad: la clave histórica se reutiliza como flag "mostrar selector".
-    # Si está desactivado (0), se oculta el selector y se usa el usuario actual.
-    mostrar_selector = Configuracion.obtener_bool(CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS, default=False)
-    return not mostrar_selector
-
-
-def _modo_cobro_exclusivo_cajero_activo():
-    return (
-        Configuracion.obtener_bool(CLAVE_CAJA_FLUJO_ENVIADO, default=False)
-        and Configuracion.obtener_bool(CLAVE_CAJA_EXIGIR_CAJERO, default=False)
-    )
 
 
 def _clientes_asignables():
@@ -120,113 +88,6 @@ def listar():
         rol_id=rol_id,
         estado=estado,
         active_tab='usuarios'
-    )
-
-
-@usuarios_bp.route('/configuracion', methods=['GET', 'POST'])
-@login_required
-def configuracion():
-    if not current_user.tiene_permiso('gestionar_usuarios'):
-        if getattr(current_user, 'modo_demo', False):
-            flash('Modo demo: esta acción está deshabilitada.', 'warning')
-        else:
-            flash('No tienes permisos para gestionar usuarios.', 'danger')
-        return redirect(url_for('main.dashboard'))
-
-    if request.method == 'POST':
-        def _leer_toggle(nombre, default=False):
-            valores = request.form.getlist(nombre)
-            raw = valores[-1] if valores else None
-            return Configuracion.parse_bool(raw, default=default)
-
-        mostrar_selector = _leer_toggle('mostrar_selector_vendedor_pos', default=False)
-        valores_modo_cobro_exclusivo = request.form.getlist(FORM_MODO_COBRO_EXCLUSIVO_CAJERO)
-        if valores_modo_cobro_exclusivo:
-            modo_cobro_exclusivo_cajero = Configuracion.parse_bool(
-                valores_modo_cobro_exclusivo[-1],
-                default=False
-            )
-        else:
-            modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
-        caja_flujo_enviado = modo_cobro_exclusivo_cajero
-        valores_alerta_pendientes = request.form.getlist('caja_alerta_pendientes_activa')
-        if valores_alerta_pendientes:
-            caja_alerta_pendientes = Configuracion.parse_bool(
-                valores_alerta_pendientes[-1],
-                default=False
-            )
-        else:
-            caja_alerta_pendientes = Configuracion.obtener_bool(CLAVE_CAJA_ALERTA_PENDIENTES, default=False)
-        caja_exigir_cajero = modo_cobro_exclusivo_cajero
-        nombre_empresa_ui = (request.form.get('nombre_empresa_ui') or '').strip()
-        mensaje_whatsapp_seguimiento = (request.form.get('mensaje_whatsapp_seguimiento') or '').strip()
-        logo_empresa_archivo = request.files.get('logo_empresa_ui')
-
-        Configuracion.establecer_bool(
-            CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS,
-            mostrar_selector,
-            DESC_OCULTAR_SELECTOR_VENDEDOR_POS
-        )
-        Configuracion.establecer_bool(
-            CLAVE_CAJA_FLUJO_ENVIADO,
-            caja_flujo_enviado,
-            DESC_CAJA_FLUJO_ENVIADO
-        )
-        Configuracion.establecer_bool(
-            CLAVE_CAJA_ALERTA_PENDIENTES,
-            caja_alerta_pendientes,
-            DESC_CAJA_ALERTA_PENDIENTES
-        )
-        Configuracion.establecer_bool(
-            CLAVE_CAJA_EXIGIR_CAJERO,
-            caja_exigir_cajero,
-            DESC_CAJA_EXIGIR_CAJERO
-        )
-        Configuracion.establecer(
-            CLAVE_NOMBRE_EMPRESA_UI,
-            nombre_empresa_ui,
-            DESC_NOMBRE_EMPRESA_UI
-        )
-        Configuracion.establecer(
-            CLAVE_MENSAJE_WHATSAPP_SEGUIMIENTO,
-            mensaje_whatsapp_seguimiento,
-            DESC_MENSAJE_WHATSAPP_SEGUIMIENTO
-        )
-
-        ruta_logo_guardada, error_logo = guardar_logo_empresa(
-            logo_empresa_archivo,
-            ruta_anterior=(Configuracion.obtener(CLAVE_LOGO_EMPRESA_UI, '') or '').strip(),
-        )
-        if error_logo:
-            flash(error_logo, 'warning')
-        elif ruta_logo_guardada:
-            Configuracion.establecer(
-                CLAVE_LOGO_EMPRESA_UI,
-                ruta_logo_guardada,
-                DESC_LOGO_EMPRESA_UI
-            )
-
-        flash('Configuración actualizada correctamente.', 'success')
-        return redirect(url_for('usuarios.configuracion'))
-
-    return render_template(
-        'usuarios/configuracion.html',
-        active_tab='configuracion',
-        mostrar_selector_vendedor_pos=(not _ocultar_selector_vendedor_pos()),
-        modo_cobro_exclusivo_cajero=_modo_cobro_exclusivo_cajero_activo(),
-        caja_flujo_enviado_activo=Configuracion.obtener_bool(CLAVE_CAJA_FLUJO_ENVIADO, default=False),
-        caja_alerta_pendientes_activa=Configuracion.obtener_bool(CLAVE_CAJA_ALERTA_PENDIENTES, default=False),
-        caja_exigir_cajero_para_cobro=Configuracion.obtener_bool(CLAVE_CAJA_EXIGIR_CAJERO, default=False),
-        nombre_empresa_ui=(Configuracion.obtener(CLAVE_NOMBRE_EMPRESA_UI, '') or '').strip(),
-        mensaje_whatsapp_seguimiento=(
-            (Configuracion.obtener(CLAVE_MENSAJE_WHATSAPP_SEGUIMIENTO, MENSAJE_WHATSAPP_SEGUIMIENTO_DEFAULT) or '').strip()
-            or MENSAJE_WHATSAPP_SEGUIMIENTO_DEFAULT
-        ),
-        logo_empresa_ui_path=(Configuracion.obtener(CLAVE_LOGO_EMPRESA_UI, '') or '').strip(),
-        logo_tamano_recomendado='280 × 80 px',
-        logo_tamano_maximo_mb=2,
-        ia_backoffice_config=obtener_configuracion_asistente(),
-        ia_backoffice_puede_gestionar=puede_gestionar_asistente_ia(current_user),
     )
 
 

@@ -3,6 +3,7 @@ Utilidad para inicializar datos base del sistema
 """
 import os
 from app import db
+from app.utils.public_url import CLAVE_URL_PUBLICA_SISTEMA, DESC_URL_PUBLICA_SISTEMA
 
 
 def _require_safe_bootstrap_password(var_name: str, disallowed) -> str:
@@ -281,6 +282,7 @@ def inicializar_datos_base(config_name=None):
     # Configuración inicial
     configuraciones = [
         ('nombre_empresa', "Pablito's Cell", 'Nombre de la empresa'),
+        (CLAVE_URL_PUBLICA_SISTEMA, '', DESC_URL_PUBLICA_SISTEMA),
         ('ruc_empresa', '00000000-0', 'RUC de la empresa'),
         ('direccion_empresa', 'Santa Rosa c/ 10 de Agosto', 'Dirección fiscal'),
         ('telefono_empresa', '0984758819', 'Teléfono de contacto'),
