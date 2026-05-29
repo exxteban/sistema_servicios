@@ -21,21 +21,21 @@ def _csrf(html: str) -> str:
     return match.group(1)
 
 
-def _crear_contexto(app):
+def _crear_contexto(app, suffix: str = ''):
     with app.app_context():
-        cliente = Cliente(nombre='Resto Delivery Ruta', ruc_ci='delivery_ruta', tipo='minorista', activo=True)
+        cliente = Cliente(nombre=f'Resto Delivery Ruta{suffix}', ruc_ci=f'delivery_ruta{suffix}', tipo='minorista', activo=True)
         db.session.add(cliente)
         db.session.flush()
         admin = Usuario(
             id_cliente=cliente.id_cliente,
-            username='admin_delivery_ruta',
+            username=f'admin_delivery_ruta{suffix}',
             nombre_completo='Admin Delivery Ruta',
             id_rol=1,
             activo=True,
         )
         delivery = Usuario(
             id_cliente=cliente.id_cliente,
-            username='repartidor_delivery_ruta',
+            username=f'repartidor_delivery_ruta{suffix}',
             nombre_completo='Repartidor Delivery Ruta',
             id_rol=1,
             activo=True,
@@ -128,3 +128,42 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
         ).all()
         assert 'pedido_repartidor_asignado' in [evento.tipo for evento in eventos]
         assert eventos[-1].tipo == 'pedido_entregado'
+
+
+def test_delivery_ruta_operativa_muestra_pedidos_sin_repartidor_vinculado():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id, _delivery_user_id = _crear_contexto(app, '_operativa')
+    _loguear(client, app, 'admin_delivery_ruta_operativa')
+
+    csrf = _csrf(client.get('/gastronomia/delivery').get_data(as_text=True))
+    pedido_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'delivery',
+            'referencia_entrega': 'Laura',
+            'celular_cliente': '0981123456',
+            'direccion_entrega': 'Calle 1',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert pedido_resp.status_code == 201
+    pedido_id = pedido_resp.get_json()['pedido']['id_pedido']
+    assert client.post(f'/api/gastronomia/pedidos/{pedido_id}/enviar-cocina', json={}, headers={'X-CSRFToken': csrf}).status_code == 200
+    assert client.post(f'/api/gastronomia/cocina/pedidos/{pedido_id}/listo', json={}, headers={'X-CSRFToken': csrf}).status_code == 200
+
+    ruta_resp = client.get('/api/gastronomia/delivery/ruta')
+    assert ruta_resp.status_code == 200
+    ruta_data = ruta_resp.get_json()
+    assert ruta_data['modo'] == 'operativo'
+    assert [pedido['id_pedido'] for pedido in ruta_data['pedidos']] == [pedido_id]
+
+    csrf_ruta = _csrf(client.get('/gastronomia/delivery/ruta').get_data(as_text=True))
+    salir_resp = client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/salir',
+        json={},
+        headers={'X-CSRFToken': csrf_ruta},
+    )
+    assert salir_resp.status_code == 200
+    assert salir_resp.get_json()['pedido']['estado'] == 'en_camino'

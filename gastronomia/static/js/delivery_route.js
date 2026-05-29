@@ -9,13 +9,15 @@
   if (!root || !ordersBox || !summary || !alertBox) return;
 
   let orders = [];
+  let routeMode = 'repartidor';
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
   const showAlert = (message, ok) => {
+    const warning = ok === 'warning';
     alertBox.textContent = message;
-    alertBox.className = `rounded-lg border px-4 py-3 text-sm font-semibold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
+    alertBox.className = `rounded-lg border px-4 py-3 text-sm font-semibold ${ok === true ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : warning ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}`;
   };
   const hideAlert = () => {
     alertBox.className = 'hidden rounded-lg border px-4 py-3 text-sm font-semibold';
@@ -33,8 +35,16 @@
   const load = async () => {
     hideAlert();
     const data = await apiJson('/api/gastronomia/delivery/ruta');
+    routeMode = data.modo || 'repartidor';
     orders = data.pedidos || [];
-    driverName.textContent = data.repartidor ? `Ruta de ${data.repartidor.nombre}` : 'Pedidos asignados para entregar.';
+    if (data.repartidor) {
+      driverName.textContent = `Ruta de ${data.repartidor.nombre}`;
+    } else if (routeMode === 'operativo') {
+      driverName.textContent = 'Vista operativa de pedidos delivery listos o en camino.';
+    } else {
+      driverName.textContent = 'Usuario sin repartidor vinculado.';
+    }
+    if (data.mensaje) showAlert(data.mensaje, routeMode === 'sin_repartidor' ? 'warning' : true);
     render();
   };
   const render = () => {
@@ -80,7 +90,12 @@
       </article>
     `;
   };
-  const emptyRoute = () => '<div class="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm font-semibold text-gray-500 dark:border-gray-700 dark:bg-gray-800">No tenes pedidos asignados para entregar.</div>';
+  const emptyRoute = () => {
+    const message = routeMode === 'sin_repartidor'
+      ? 'Vincula este usuario a un repartidor activo desde Delivery > Repartidores.'
+      : 'No tenes pedidos asignados para entregar.';
+    return `<div class="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm font-semibold text-gray-500 dark:border-gray-700 dark:bg-gray-800">${message}</div>`;
+  };
   const changeState = async (orderId, action) => {
     await apiJson(`/api/gastronomia/delivery/ruta/pedidos/${orderId}/${action}`, {method: 'POST', body: '{}'});
     showAlert(action === 'entregar' ? 'Pedido marcado como entregado.' : 'Pedido marcado en camino.', true);

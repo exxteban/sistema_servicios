@@ -82,6 +82,23 @@ def listar_ruta_repartidor(cliente_id: int, usuario_id: int) -> tuple[Gastronomi
     return repartidor, pedidos
 
 
+def listar_ruta_operativa(cliente_id: int) -> list[GastronomiaPedido]:
+    return (
+        GastronomiaPedido.query
+        .filter(
+            GastronomiaPedido.cliente_id == int(cliente_id),
+            GastronomiaPedido.tipo_pedido == 'delivery',
+            GastronomiaPedido.estado.in_(ESTADOS_RUTA),
+        )
+        .order_by(
+            GastronomiaPedido.fecha_asignacion_delivery.asc(),
+            GastronomiaPedido.fecha_listo.asc(),
+            GastronomiaPedido.id_pedido.asc(),
+        )
+        .all()
+    )
+
+
 def marcar_pedido_ruta(cliente_id: int, usuario_id: int, pedido_id: int, estado: str) -> GastronomiaPedido:
     repartidor = obtener_repartidor_usuario(cliente_id, usuario_id)
     if not repartidor:
@@ -89,6 +106,14 @@ def marcar_pedido_ruta(cliente_id: int, usuario_id: int, pedido_id: int, estado:
     pedido = _obtener_pedido_delivery(cliente_id, pedido_id)
     if int(pedido.repartidor_id or 0) != int(repartidor.id_repartidor):
         raise ValueError('El pedido no esta asignado a este repartidor.')
+    estado = (estado or '').strip().lower()
+    if estado not in {'en_camino', 'entregado'}:
+        raise ValueError('Estado de ruta invalido.')
+    return cambiar_estado_pedido(cliente_id, pedido_id, estado)
+
+
+def marcar_pedido_ruta_operativa(cliente_id: int, pedido_id: int, estado: str) -> GastronomiaPedido:
+    _obtener_pedido_delivery(cliente_id, pedido_id)
     estado = (estado or '').strip().lower()
     if estado not in {'en_camino', 'entregado'}:
         raise ValueError('Estado de ruta invalido.')

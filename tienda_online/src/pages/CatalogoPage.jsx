@@ -17,6 +17,7 @@ import { useProductos } from '../hooks/useProductos'
 import { useTiendaConfig } from '../hooks/useTiendaConfig'
 import { trackMetaPixelContact } from '../services/metaPixel'
 import { resolveStoreTheme } from '../themes/storeTheme'
+import { getStoreWhatsAppMessage } from '../utils/gastronomiaBudget'
 import { buildCategoryPath, isTruthyFlag, normalizeCategoryRef } from '../utils/storeFormatting'
 
 export default function CatalogoPage() {
@@ -323,7 +324,7 @@ export default function CatalogoPage() {
       <Footer config={config} themeKey={theme.key} />
       <FloatingWhatsApp
         phone={config?.telefono_whatsapp}
-        message={config?.mensaje_whatsapp_general || config?.mensaje_whatsapp || "Hola, vengo de la tienda web."}
+        message={getStoreWhatsAppMessage(config)}
         onClick={() => trackCatalogWhatsAppClick()}
       />
       <WebBotWidget slug={slug} />

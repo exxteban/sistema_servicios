@@ -8,8 +8,11 @@ from gastronomia.services.delivery_service import (
     asignar_repartidor_pedido,
     crear_repartidor,
     listar_repartidores,
+    listar_ruta_operativa,
     listar_ruta_repartidor,
+    marcar_pedido_ruta_operativa,
     marcar_pedido_ruta,
+    obtener_repartidor_usuario,
 )
 from gastronomia.services.pedido_service import serializar_pedidos
 from gastronomia.services.permisos import (
@@ -18,6 +21,7 @@ from gastronomia.services.permisos import (
     PERMISO_DELIVERY,
     PERMISO_POS,
     requiere_permiso_gastronomia,
+    tiene_permiso_gastronomia,
 )
 
 
@@ -99,11 +103,31 @@ def ruta_delivery():
     cliente_id, error = _cliente_o_error()
     if error:
         return error
-    try:
-        repartidor, pedidos = listar_ruta_repartidor(cliente_id, current_user.id_usuario)
-    except ValueError as exc:
-        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'repartidor': repartidor.to_dict(), 'pedidos': serializar_pedidos(pedidos)})
+    repartidor = obtener_repartidor_usuario(cliente_id, current_user.id_usuario)
+    if repartidor:
+        _repartidor, pedidos = listar_ruta_repartidor(cliente_id, current_user.id_usuario)
+        return jsonify({
+            'ok': True,
+            'modo': 'repartidor',
+            'repartidor': _repartidor.to_dict(),
+            'pedidos': serializar_pedidos(pedidos),
+        })
+    if _puede_ver_ruta_operativa():
+        pedidos = listar_ruta_operativa(cliente_id)
+        return jsonify({
+            'ok': True,
+            'modo': 'operativo',
+            'repartidor': None,
+            'pedidos': serializar_pedidos(pedidos),
+            'mensaje': 'Vista operativa: pedidos delivery listos o en camino.',
+        })
+    return jsonify({
+        'ok': True,
+        'modo': 'sin_repartidor',
+        'repartidor': None,
+        'pedidos': [],
+        'mensaje': 'Este usuario aun no esta vinculado a un repartidor activo.',
+    })
 
 
 @gastronomia_delivery_api_bp.route('/delivery/ruta/pedidos/<int:pedido_id>/salir', methods=['POST'])
@@ -125,7 +149,16 @@ def _marcar_ruta(pedido_id: int, estado: str):
     if error:
         return error
     try:
-        pedido = marcar_pedido_ruta(cliente_id, current_user.id_usuario, pedido_id, estado)
+        if obtener_repartidor_usuario(cliente_id, current_user.id_usuario):
+            pedido = marcar_pedido_ruta(cliente_id, current_user.id_usuario, pedido_id, estado)
+        elif _puede_ver_ruta_operativa():
+            pedido = marcar_pedido_ruta_operativa(cliente_id, pedido_id, estado)
+        else:
+            raise ValueError('Este usuario no esta vinculado a un repartidor activo.')
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+
+
+def _puede_ver_ruta_operativa() -> bool:
+    return tiene_permiso_gastronomia(PERMISO_POS, PERMISO_CAJA, PERMISO_COCINA)

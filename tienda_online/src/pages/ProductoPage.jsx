@@ -13,6 +13,7 @@ import TrustSignals from '../components/ui/TrustSignals'
 import { useMetaPixelPageView, useMetaPixelProductView } from '../hooks/useMetaPixel'
 import { trackMetaPixelContact } from '../services/metaPixel'
 import { resolveStoreTheme } from '../themes/storeTheme'
+import { getStoreWhatsAppMessage } from '../utils/gastronomiaBudget'
 import { buildProductPath, isTruthyFlag, normalizeText, parseProductIdFromParam } from '../utils/storeFormatting'
 import WebBotWidget from '../features/web-bot/components/WebBotWidget'
 
@@ -224,7 +225,7 @@ export default function ProductoPage() {
       <Footer config={config} themeKey={theme.key} />
       <FloatingWhatsApp
         phone={config?.telefono_whatsapp}
-        message={config?.mensaje_whatsapp_general || config?.mensaje_whatsapp || `Hola, me interesa ${producto.nombre}`}
+        message={getStoreWhatsAppMessage(config, `Hola, me interesa ${producto.nombre}`)}
         onClick={() => trackProductWhatsAppClick()}
       />
       <WebBotWidget slug={slug} />

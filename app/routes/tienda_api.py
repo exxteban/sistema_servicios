@@ -38,6 +38,12 @@ from app.services.tienda_promociones import (
 )
 from app.services.tienda_scope import public_category_query, public_product_query, store_product_scope_filter
 from app.services.tienda_estadisticas import obtener_resumen_estadisticas_tienda
+from app.services.tienda_gastronomia_catalogo import (
+    categorias_gastronomia_publicas,
+    detalle_producto_gastronomia,
+    productos_gastronomia_payload,
+)
+from app.services.tienda_presupuesto import config_publica_tienda, mensaje_whatsapp_producto, tienda_es_gastronomia
 from app.utils.helpers import today_local, parse_iso_date, utc_bounds_for_local_dates
 from app.utils.permisos import requiere_permiso
 from app.utils.tienda_urls import build_category_public_path, build_product_public_path, slugify_tienda_text
@@ -724,7 +730,7 @@ def _build_wa_link(p: Producto, config: TiendaConfig) -> str | None:
         return None
     # Limpia el número: solo dígitos
     numero = ''.join(c for c in config.telefono_whatsapp if c.isdigit())
-    mensaje = _render_whatsapp_message(config.mensaje_whatsapp_producto, p)
+    mensaje = mensaje_whatsapp_producto(config.mensaje_whatsapp_producto, p, config)
     import urllib.parse
     return f"https://wa.me/{numero}?text={urllib.parse.quote(mensaje)}"
 
@@ -739,7 +745,7 @@ def get_config(slug: str):
     config = _config_por_slug(slug)
     if not config:
         return jsonify({'error': 'tienda_no_encontrada'}), 404
-    return jsonify(config.to_public_dict())
+    return jsonify(config_publica_tienda(config))
 
 
 @tienda_api_bp.route('/<slug>/categorias', methods=['GET'])
@@ -753,6 +759,9 @@ def get_categorias(slug: str):
 
 
 def _categorias_publicas(config: TiendaConfig) -> list[dict]:
+    if tienda_es_gastronomia(config):
+        return categorias_gastronomia_publicas(config)
+
     categorias = public_category_query(config).order_by(Categoria.nombre).all()
     return [
         {
@@ -766,6 +775,9 @@ def _categorias_publicas(config: TiendaConfig) -> list[dict]:
 
 
 def _build_productos_payload(config: TiendaConfig, q: str = '', cat_id: int | None = None, page: int = 1, per_page: int = 20) -> dict:
+    if tienda_es_gastronomia(config):
+        return productos_gastronomia_payload(config, q=q, cat_id=cat_id, page=page, per_page=per_page)
+
     query = public_product_query(config)
 
     if q:
@@ -874,7 +886,7 @@ def get_bootstrap(slug: str):
         return jsonify({'error': 'tienda_no_encontrada'}), 404
 
     return jsonify({
-        'config': config.to_public_dict(),
+        'config': config_publica_tienda(config),
         'categorias': _categorias_publicas(config),
         'catalogo': _build_productos_payload(config, page=1, per_page=12),
     })
@@ -886,6 +898,12 @@ def get_producto_detalle(slug: str, id_producto: int):
     config = _config_por_slug(slug)
     if not config:
         return jsonify({'error': 'tienda_no_encontrada'}), 404
+
+    if tienda_es_gastronomia(config):
+        data = detalle_producto_gastronomia(config, id_producto)
+        if not data:
+            return jsonify({'error': 'producto_no_encontrado'}), 404
+        return jsonify(data)
 
     p = public_product_query(config).filter_by(id_producto=id_producto).first()
     if not p:
