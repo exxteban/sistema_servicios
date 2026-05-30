@@ -170,28 +170,28 @@
         </aside>
     </div>
 
-    <div id="modifier-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
-        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900">
-            <div class="flex items-start justify-between gap-3">
-                <div>
-                    <p id="modal-mode-label" class="text-sm font-bold text-orange-600 dark:text-orange-300">Configurar producto</p>
-                    <h2 id="modal-product-name" class="text-xl font-bold text-gray-900 dark:text-white"></h2>
-                    <p id="modal-product-price" class="mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300"></p>
+    <div id="modifier-modal" class="pos-modal-overlay fixed inset-0 hidden items-center justify-center bg-black/50 p-4">
+        <div class="pos-modal-card max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900">
+            <div class="pos-modal-header flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <p id="modal-mode-label" class="pos-modal-kicker text-sm font-bold text-orange-600 dark:text-orange-300">Configurar producto</p>
+                    <h2 id="modal-product-name" class="pos-modal-title text-xl font-bold text-gray-900 dark:text-white"></h2>
+                    <p id="modal-product-price" class="pos-modal-price mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300"></p>
                 </div>
-                <button type="button" id="close-modal" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:text-gray-200">Cerrar</button>
+                <button type="button" id="close-modal" class="pos-modal-close rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:text-gray-200">Cerrar</button>
             </div>
             <div id="modifier-groups" class="mt-5 space-y-4"></div>
             <div class="mt-5 grid gap-3 sm:grid-cols-[140px_1fr]">
-                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                <label class="pos-modal-field block text-sm font-semibold text-gray-700 dark:text-gray-200">
                     Cantidad
-                    <input id="modal-qty" type="number" min="1" value="1" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                    <input id="modal-qty" type="number" min="1" value="1" class="pos-modal-input mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
                 </label>
-                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                <label class="pos-modal-field block text-sm font-semibold text-gray-700 dark:text-gray-200">
                     Nota del item
-                    <input id="modal-note" placeholder="Ej: sin lechuga, agregar panceta..." class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                    <input id="modal-note" placeholder="Ej: sin lechuga, agregar panceta..." class="pos-modal-input mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
                 </label>
             </div>
-            <button type="button" id="add-configured-product" class="mt-5 w-full rounded-xl bg-orange-600 px-4 py-4 text-base font-bold text-white hover:bg-orange-700">
+            <button type="button" id="add-configured-product" class="pos-modal-submit mt-5 w-full rounded-xl bg-orange-600 px-4 py-4 text-base font-bold text-white hover:bg-orange-700">
                 Agregar
             </button>
         </div>
@@ -220,6 +220,194 @@
         font-size: 0.82rem;
         font-weight: 800;
         color: rgb(31 41 55);
+    }
+    .pos-modal-overlay {
+        z-index: 220;
+        background: rgba(15, 23, 42, 0.48);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+    .pos-modal-card {
+        position: relative;
+        z-index: 221;
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+        box-shadow: 0 28px 90px rgba(15, 23, 42, 0.28);
+    }
+    .pos-modal-header {
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgb(226 232 240);
+    }
+    .pos-modal-kicker {
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .pos-modal-title {
+        margin-top: 0.2rem;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+    }
+    .pos-modal-price {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 0.75rem;
+        padding: 0.45rem 0.8rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.06));
+        border: 1px solid rgba(16, 185, 129, 0.18);
+        font-size: 0.9rem;
+        font-weight: 900;
+    }
+    .pos-modal-close {
+        border-color: rgb(226 232 240);
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+    .pos-modal-field {
+        color: rgb(51 65 85);
+    }
+    .pos-modal-input {
+        border-color: rgb(226 232 240);
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+        transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+    .pos-modal-input:focus {
+        outline: none;
+        border-color: rgba(249, 115, 22, 0.7);
+        box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.12);
+        background: white;
+    }
+    .pos-modal-submit {
+        position: sticky;
+        bottom: 0;
+        box-shadow: 0 18px 42px rgba(234, 88, 12, 0.28);
+        background: linear-gradient(135deg, rgb(249 115 22), rgb(234 88 12));
+    }
+    .pos-modal-submit:hover {
+        filter: brightness(1.02);
+        transform: translateY(-1px);
+    }
+    .pos-modifier-group {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+    .pos-modifier-group-head {
+        align-items: flex-start;
+    }
+    .pos-modifier-group-limit {
+        flex-shrink: 0;
+        padding: 0.28rem 0.55rem;
+        border-radius: 999px;
+        background: rgb(241 245 249);
+        color: rgb(100 116 139);
+    }
+    .pos-modifier-group-helper {
+        max-width: 42ch;
+    }
+    .pos-modifier-option {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.75rem;
+        border-color: rgb(226 232 240);
+        background: rgba(255, 255, 255, 0.88);
+        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+    .pos-modifier-option:hover {
+        transform: translateY(-1px);
+        border-color: rgba(249, 115, 22, 0.24);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+    .pos-modifier-option-copy {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55rem;
+        min-width: 0;
+        line-height: 1.35;
+    }
+    .pos-modifier-option-copy span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    .pos-modifier-option-input {
+        width: 1rem;
+        height: 1rem;
+        margin-top: 0.12rem;
+        flex-shrink: 0;
+        accent-color: rgb(249 115 22);
+    }
+    .pos-modifier-option-name {
+        color: rgb(15 23 42);
+    }
+    .pos-modifier-option-price {
+        flex-shrink: 0;
+        white-space: nowrap;
+        text-align: right;
+        padding: 0.28rem 0.55rem;
+        border-radius: 999px;
+        background: rgb(248 250 252);
+        color: rgb(71 85 105);
+        font-size: 0.76rem;
+        font-weight: 900;
+        letter-spacing: 0.01em;
+    }
+    .pos-modifier-option:has(.pos-modifier-option-input:checked) {
+        border-color: rgba(249, 115, 22, 0.55);
+        background: linear-gradient(135deg, rgba(255, 247, 237, 0.98), rgba(255, 255, 255, 0.98));
+        box-shadow: 0 18px 34px rgba(249, 115, 22, 0.12);
+    }
+    .pos-modifier-option:has(.pos-modifier-option-input:checked) .pos-modifier-option-price {
+        background: rgba(249, 115, 22, 0.12);
+        color: rgb(194 65 12);
+    }
+    .dark .pos-modal-card {
+        border-color: rgba(71, 85, 105, 0.75);
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 0.98));
+        box-shadow: 0 28px 90px rgba(2, 6, 23, 0.55);
+    }
+    .dark .pos-modal-header {
+        border-bottom-color: rgb(51 65 85);
+    }
+    .dark .pos-modal-close {
+        background: rgba(30, 41, 59, 0.92);
+        border-color: rgb(71 85 105);
+    }
+    .dark .pos-modal-input {
+        border-color: rgb(71 85 105);
+        background: rgba(15, 23, 42, 0.88);
+        box-shadow: inset 0 1px 2px rgba(2, 6, 23, 0.42);
+    }
+    .dark .pos-modal-input:focus {
+        background: rgb(15 23 42);
+    }
+    .dark .pos-modifier-group {
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(17, 24, 39, 0.92));
+    }
+    .dark .pos-modifier-group-limit,
+    .dark .pos-modifier-option-price {
+        background: rgba(30, 41, 59, 0.95);
+        color: rgb(203 213 225);
+    }
+    .dark .pos-modifier-option {
+        border-color: rgb(71 85 105);
+        background: rgba(15, 23, 42, 0.9);
+    }
+    .dark .pos-modifier-option-name {
+        color: rgb(241 245 249);
+    }
+    .dark .pos-modifier-option:hover {
+        border-color: rgba(251, 146, 60, 0.32);
+        box-shadow: 0 16px 32px rgba(2, 6, 23, 0.28);
+    }
+    .dark .pos-modifier-option:has(.pos-modifier-option-input:checked) {
+        border-color: rgba(251, 146, 60, 0.55);
+        background: linear-gradient(135deg, rgba(124, 45, 18, 0.32), rgba(15, 23, 42, 0.96));
+        box-shadow: 0 18px 34px rgba(234, 88, 12, 0.18);
+    }
+    .dark .pos-modifier-option:has(.pos-modifier-option-input:checked) .pos-modifier-option-price {
+        background: rgba(249, 115, 22, 0.18);
+        color: rgb(254 215 170);
     }
     .pos-category-panel,
     .pos-product-panel,
@@ -551,6 +739,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260528-4') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260530-2') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-3') }}"></script>
 {% endblock %}
