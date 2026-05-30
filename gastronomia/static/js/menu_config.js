@@ -309,6 +309,9 @@
     productoForm.nombre.value = producto.nombre || '';
     productoForm.descripcion.value = producto.descripcion || '';
     productoForm.ingredientes_removibles.value = ingredientesRemovibles(producto);
+    if (productoForm.adicionales_precio) {
+      productoForm.adicionales_precio.value = producto.adicionales_precio || '';
+    }
     productoForm.precio.value = producto.precio || 0;
     productoForm.orden.value = producto.orden || 0;
     productoForm.imagen_url.value = producto.imagen_url || '';

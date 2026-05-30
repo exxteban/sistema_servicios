@@ -48,6 +48,10 @@ def parse_price(value) -> Decimal:
     raw = str(value if value is not None else '').strip()
     if ',' in raw:
         raw = raw.replace('.', '').replace(',', '.')
+    elif '.' in raw:
+        partes = raw.split('.')
+        if len(partes) > 1 and all(len(parte) == 3 for parte in partes[1:]):
+            raw = ''.join(partes)
     else:
         raw = raw.replace(',', '')
     try:

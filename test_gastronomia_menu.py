@@ -105,6 +105,7 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
             'control_stock_venta': True,
             'stock_disponible': 5,
             'ingredientes_removibles': 'Lechuga\nTomate\nCebolla',
+            'adicionales_precio': 'Carne extra | 8000\nTomate extra | 2000',
         },
         headers={'X-CSRFToken': csrf},
     )
@@ -127,6 +128,9 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     grupos = producto_pos['grupos_opciones']
     assert grupos[0]['tipo'] == 'ingrediente_removible'
     assert [opcion['nombre'] for opcion in grupos[0]['opciones']] == ['Lechuga', 'Tomate', 'Cebolla']
+    grupo_adicionales = next(grupo for grupo in grupos if grupo['nombre'] == 'Adicionales')
+    assert [opcion['nombre'] for opcion in grupo_adicionales['opciones']] == ['Carne extra', 'Tomate extra']
+    assert [opcion['precio_delta'] for opcion in grupo_adicionales['opciones']] == [8000, 2000]
     with app.app_context():
         assert GastronomiaCategoria.query.filter_by(cliente_id=cliente_id).count() == 1
         assert GastronomiaProducto.query.filter_by(cliente_id=cliente_id).count() == 1
@@ -153,6 +157,7 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
             'visible_en_tv': True,
             'control_stock_venta': False,
             'ingredientes_removibles': 'Lechuga\nCebolla morada',
+            'adicionales_precio': 'Carne extra | 9000',
         },
         headers={'X-CSRFToken': csrf},
     )
@@ -164,6 +169,7 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     ).get_json()['producto']
     assert producto_editado['nombre'] == 'Clasica editada'
     assert producto_editado['precio'] == 14000
+    assert producto_editado['adicionales_precio'] == 'Carne extra | 9000'
     assert producto_editado['visible_en_tv'] is True
     assert producto_editado['control_stock_venta'] is False
     assert producto_editado['stock_disponible'] is None
@@ -171,6 +177,8 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
         grupo for grupo in producto_editado['grupos_opciones'] if grupo['tipo'] == 'ingrediente_removible'
     )
     assert [opcion['nombre'] for opcion in grupo_removible['opciones']] == ['Lechuga', 'Cebolla morada']
+    grupo_adicionales_editado = next(grupo for grupo in producto_editado['grupos_opciones'] if grupo['nombre'] == 'Adicionales')
+    assert [opcion['precio_delta'] for opcion in grupo_adicionales_editado['opciones']] == [9000]
 
     toggle_resp = client.put(
         f'/api/gastronomia/productos/{producto["id_producto"]}/estado',
@@ -195,6 +203,34 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
         assert producto_db is not None
         assert categoria_db.activo is False
         assert producto_db.activo is False
+
+
+def test_parsea_precio_con_punto_de_miles_en_menu():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_restaurante(app, 'Resto Miles', 'resto_miles')
+    _loguear(client, app, 'resto_miles')
+    csrf = _csrf(client.get('/gastronomia/menu').get_data(as_text=True))
+    categoria = client.post(
+        '/api/gastronomia/categorias',
+        json={'nombre': 'Hamburguesas'},
+        headers={'X-CSRFToken': csrf},
+    ).get_json()['categoria']
+
+    response = client.post(
+        '/api/gastronomia/productos',
+        json={
+            'categoria_id': categoria['id_categoria'],
+            'nombre': 'Big Cheese',
+            'precio': '35.000',
+            'disponible': True,
+            'visible': True,
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+
+    assert response.status_code == 201
+    assert response.get_json()['producto']['precio'] == 35000
 
 
 def test_api_menu_no_filtra_datos_entre_clientes():

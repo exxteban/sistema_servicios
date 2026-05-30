@@ -32,6 +32,7 @@ from gastronomia.services.modificadores_service import (
     obtener_grupo,
     obtener_opcion,
     producto_con_modificadores,
+    sincronizar_adicionales_precio,
     sincronizar_ingredientes_removibles,
     validar_selecciones_producto,
 )
@@ -263,6 +264,12 @@ def crear_producto():
                 producto.id_producto,
                 data.get('ingredientes_removibles'),
             )
+        if 'adicionales_precio' in data:
+            sincronizar_adicionales_precio(
+                cliente_id,
+                producto.id_producto,
+                data.get('adicionales_precio'),
+            )
     except PermissionError:
         _limpiar_imagen_subida(imagen_nueva)
         return jsonify({'error': 'sin_permisos_uploads', 'mensaje': 'No hay permisos para guardar la imagen.'}), 500
@@ -309,6 +316,12 @@ def actualizar_producto(producto_id):
                 cliente_id,
                 producto.id_producto,
                 data.get('ingredientes_removibles'),
+            )
+        if 'adicionales_precio' in data:
+            sincronizar_adicionales_precio(
+                cliente_id,
+                producto.id_producto,
+                data.get('adicionales_precio'),
             )
         if imagen_anterior and imagen_anterior != producto.imagen_url:
             try:

@@ -154,6 +154,70 @@ def sincronizar_ingredientes_removibles(cliente_id: int, producto_id: int, ingre
     return grupo
 
 
+def sincronizar_adicionales_precio(cliente_id: int, producto_id: int, adicionales) -> GastronomiaGrupoOpciones | None:
+    """Crea/actualiza un grupo simple de adicionales con precio para el POS."""
+    producto = obtener_producto(cliente_id, producto_id)
+    if not producto:
+        raise ValueError('El producto no existe para este cliente.')
+
+    items = _normalizar_adicionales(adicionales)
+    grupos = GastronomiaGrupoOpciones.query.filter(
+        GastronomiaGrupoOpciones.cliente_id == int(cliente_id),
+        GastronomiaGrupoOpciones.producto_id == int(producto_id),
+        GastronomiaGrupoOpciones.tipo == 'extra',
+        GastronomiaGrupoOpciones.nombre == 'Adicionales',
+        GastronomiaGrupoOpciones.activo.is_(True),
+    ).order_by(GastronomiaGrupoOpciones.id_grupo.asc()).all()
+    grupo = grupos[0] if grupos else None
+    for grupo_extra in grupos[1:]:
+        grupo_extra.activo = False
+        for opcion in grupo_extra.opciones.filter_by(activo=True).all():
+            opcion.activo = False
+
+    if not items:
+        if grupo:
+            grupo.activo = False
+            for opcion in grupo.opciones.filter_by(activo=True).all():
+                opcion.activo = False
+            db.session.commit()
+        return None
+
+    if not grupo:
+        grupo = GastronomiaGrupoOpciones(cliente_id=int(cliente_id), producto_id=int(producto_id))
+    grupo.nombre = 'Adicionales'
+    grupo.tipo = 'extra'
+    grupo.obligatorio = False
+    grupo.min_selecciones = 0
+    grupo.max_selecciones = max(1, len(items))
+    grupo.orden = -90
+    grupo.visible = True
+    grupo.activo = True
+    db.session.add(grupo)
+    db.session.flush()
+
+    opciones_activas = {
+        opcion.nombre.strip().lower(): opcion
+        for opcion in grupo.opciones.filter_by(activo=True).all()
+    }
+    nombres_activos = {nombre.lower() for nombre, _precio in items}
+    for orden, (nombre, precio) in enumerate(items):
+        opcion = opciones_activas.get(nombre.lower())
+        if not opcion:
+            opcion = GastronomiaOpcionProducto(cliente_id=int(cliente_id), grupo_id=grupo.id_grupo)
+        opcion.nombre = nombre[:140]
+        opcion.precio_delta = precio
+        opcion.disponible = True
+        opcion.visible = True
+        opcion.orden = orden
+        opcion.activo = True
+        db.session.add(opcion)
+    for nombre, opcion in opciones_activas.items():
+        if nombre not in nombres_activos:
+            opcion.activo = False
+    db.session.commit()
+    return grupo
+
+
 def eliminar_grupo(cliente_id: int, grupo_id: int) -> bool:
     grupo = obtener_grupo(cliente_id, grupo_id)
     if not grupo:
@@ -183,6 +247,7 @@ def producto_con_modificadores(cliente_id: int, producto_id: int) -> dict:
         grupo.to_dict()
         for grupo in listar_grupos_producto(cliente_id, producto_id, incluir_ocultos=False)
     ]
+    data['adicionales_precio'] = _adicionales_texto(data['grupos_opciones'])
     return data
 
 
@@ -254,6 +319,54 @@ def _normalizar_nombres_ingredientes(ingredientes) -> list[str]:
         vistos.add(clave)
         nombres.append(nombre[:140])
     return nombres
+
+
+def _normalizar_adicionales(adicionales) -> list[tuple[str, Decimal]]:
+    if isinstance(adicionales, str):
+        partes = adicionales.replace(';', '\n').splitlines()
+    elif isinstance(adicionales, list):
+        partes = [item.get('nombre') if isinstance(item, dict) else item for item in adicionales]
+    else:
+        partes = []
+    items = []
+    vistos = set()
+    for item in partes:
+        texto = str(item or '').strip()
+        if not texto:
+            continue
+        nombre, precio = _parse_adicional_linea(texto)
+        clave = nombre.lower()
+        if not nombre or clave in vistos:
+            continue
+        vistos.add(clave)
+        items.append((nombre[:140], precio))
+    return items
+
+
+def _parse_adicional_linea(texto: str) -> tuple[str, Decimal]:
+    separadores = ('|', '=', ':', ',')
+    for separador in separadores:
+        if separador in texto:
+            nombre, precio = texto.rsplit(separador, 1)
+            return nombre.strip(), parse_price(precio.strip() or 0)
+    partes = texto.rsplit(' ', 1)
+    if len(partes) == 2:
+        try:
+            return partes[0].strip(), parse_price(partes[1])
+        except ValueError:
+            pass
+    return texto.strip(), Decimal('0.00')
+
+
+def _adicionales_texto(grupos: list[dict]) -> str:
+    for grupo in grupos:
+        if grupo.get('tipo') == 'extra' and grupo.get('nombre') == 'Adicionales':
+            lineas = []
+            for opcion in grupo.get('opciones') or []:
+                precio = Decimal(str(opcion.get('precio_delta') or 0))
+                lineas.append(f"{opcion.get('nombre')} | {precio:.0f}")
+            return '\n'.join(lineas)
+    return ''
 
 
 def _normalizar_ids(opciones_ids: list[int]) -> list[int]:
