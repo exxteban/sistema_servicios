@@ -5,6 +5,8 @@
   const list = document.getElementById('modificadores-lista');
   const alertBox = document.getElementById('modificadores-alert');
   const groupSelect = document.getElementById('modificador-opcion-grupo');
+  const emptyState = document.getElementById('modificadores-empty');
+  const editor = document.getElementById('modificadores-editor');
   let currentProductId = '';
   let pollCount = 0;
 
@@ -16,10 +18,21 @@
     alertBox.className = `mt-3 rounded-lg border px-3 py-2 text-xs font-bold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
   };
 
-  const hidePanel = () => {
+  const showEmptyState = () => {
     currentProductId = '';
-    panel.classList.add('hidden');
+    panel.classList.remove('hidden');
+    emptyState?.classList.remove('hidden');
+    editor?.classList.add('hidden');
     list.innerHTML = '';
+    if (groupSelect) {
+      groupSelect.innerHTML = '<option value="">Primero guarda o edita un producto</option>';
+    }
+  };
+
+  const showEditor = () => {
+    panel.classList.remove('hidden');
+    emptyState?.classList.add('hidden');
+    editor?.classList.remove('hidden');
   };
 
   const apiJson = async (url, {method = 'GET', body = null} = {}) => {
@@ -82,18 +95,22 @@
 
   const loadModifiers = async (productId) => {
     if (!productId) {
-      hidePanel();
+      showEmptyState();
       return;
     }
     currentProductId = String(productId);
-    panel.classList.remove('hidden');
+    showEditor();
     const data = await apiJson(`/api/gastronomia/productos/${currentProductId}?modificadores=1`);
     render(data.producto?.grupos_opciones || []);
   };
 
   const createGroup = async () => {
     const nombre = document.getElementById('modificador-grupo-nombre')?.value?.trim();
-    if (!currentProductId || !nombre) return;
+    if (!currentProductId) {
+      showAlert('Primero guarda el producto para poder cargar extras.', false);
+      return;
+    }
+    if (!nombre) return;
     await apiJson(`/api/gastronomia/productos/${currentProductId}/grupos-opciones`, {
       method: 'POST',
       body: {
@@ -110,6 +127,10 @@
   const createOption = async () => {
     const grupoId = groupSelect?.value;
     const nombre = document.getElementById('modificador-opcion-nombre')?.value?.trim();
+    if (!currentProductId) {
+      showAlert('Primero guarda el producto para poder cargar extras.', false);
+      return;
+    }
     if (!grupoId || !nombre) return;
     const data = new FormData();
     data.set('nombre', nombre);
@@ -150,14 +171,14 @@
     setTimeout(() => loadModifiers(button.dataset.editProduct).catch((error) => showAlert(error.message, false)), 350);
   });
 
-  document.getElementById('producto-cancel-edit')?.addEventListener('click', hidePanel);
+  document.getElementById('producto-cancel-edit')?.addEventListener('click', showEmptyState);
 
   const detectProductId = () => {
     const value = productForm.id_producto?.value || '';
     if (value && value !== currentProductId) {
       loadModifiers(value).catch((error) => showAlert(error.message, false));
     }
-    if (!value && currentProductId) hidePanel();
+    if (!value && currentProductId) showEmptyState();
     pollCount += 1;
     if (pollCount < 18) window.setTimeout(detectProductId, 700);
   };
@@ -167,5 +188,6 @@
   }[char]));
   const escapeAttr = escapeHtml;
 
+  showEmptyState();
   detectProductId();
 }());
