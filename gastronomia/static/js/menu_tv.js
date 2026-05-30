@@ -70,15 +70,18 @@
 
   const renderProduct = (product, config) => {
     const image = renderProductImage(product);
+    const price = config.mostrar_precios ? `<strong class="menu-tv-price">${money(product.precio)}</strong>` : '';
     return `
     <div class="menu-tv-product ${image ? 'menu-tv-product--with-image' : ''} ${product.disponible ? '' : 'menu-tv-soldout'}">
       ${image}
-      <div>
-        <h3>${escapeHtml(product.nombre)}</h3>
+      <div class="menu-tv-product-details">
+        <div class="menu-tv-product-head">
+          <h3>${escapeHtml(product.nombre)}</h3>
+          ${price}
+        </div>
         ${product.descripcion ? `<p>${escapeHtml(product.descripcion)}</p>` : ''}
         ${product.disponible ? '' : '<span class="menu-tv-badge">Agotado</span>'}
       </div>
-      ${config.mostrar_precios ? `<strong class="menu-tv-price">${money(product.precio)}</strong>` : ''}
     </div>
   `;
   };
