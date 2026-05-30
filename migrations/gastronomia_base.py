@@ -130,7 +130,8 @@ def run_migration() -> None:
         gastronomia_models.GastronomiaPedidoPago.__table__,
     ]
     with app.app_context():
-        db.create_all(tables=tables)
+        for table in tables:
+            table.create(bind=db.engine, checkfirst=True)
         ensure_gastronomia_schema()
         db.session.commit()
     print('Migracion base de Gastronomia completada.')
