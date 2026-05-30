@@ -8,6 +8,7 @@ from gastronomia.services.dashboard_preferences import set_dashboard_card_order
 from gastronomia.services.menu_image_service import (
     eliminar_imagen_producto_menu,
     extension_permitida as extension_imagen_permitida,
+    guardar_imagen_opcion_menu,
     guardar_imagen_producto_menu,
 )
 from gastronomia.services.menu_service import (
@@ -75,6 +76,21 @@ def _adjuntar_imagen_producto(cliente_id: int, data: dict, producto_actual=None)
     if not extension_imagen_permitida(archivo.filename):
         raise ValueError('La imagen debe ser PNG, JPG, JPEG, WEBP o GIF.')
     nueva_imagen = guardar_imagen_producto_menu(archivo, current_app.static_folder, cliente_id)
+    data['imagen_url'] = nueva_imagen
+    return data, imagen_anterior, nueva_imagen
+
+
+def _adjuntar_imagen_opcion(cliente_id: int, data: dict, opcion_actual=None):
+    archivo = request.files.get('imagen_archivo')
+    quitar_imagen = str(data.get('quitar_imagen') or '').strip().lower() in {'1', 'true', 'on', 'si', 'yes'}
+    imagen_anterior = opcion_actual.imagen_url if opcion_actual else None
+    if quitar_imagen:
+        data['imagen_url'] = ''
+    if not archivo or not getattr(archivo, 'filename', ''):
+        return data, imagen_anterior, None
+    if not extension_imagen_permitida(archivo.filename):
+        raise ValueError('La imagen debe ser PNG, JPG, JPEG, WEBP o GIF.')
+    nueva_imagen = guardar_imagen_opcion_menu(archivo, current_app.static_folder, cliente_id)
     data['imagen_url'] = nueva_imagen
     return data, imagen_anterior, nueva_imagen
 
@@ -399,9 +415,16 @@ def crear_opcion_grupo(grupo_id):
     cliente_id, error = _cliente_o_error()
     if error:
         return error
+    imagen_nueva = None
     try:
-        opcion = guardar_opcion(cliente_id, grupo_id, _payload())
+        data = _payload()
+        data, _, imagen_nueva = _adjuntar_imagen_opcion(cliente_id, data)
+        opcion = guardar_opcion(cliente_id, grupo_id, data)
+    except PermissionError:
+        _limpiar_imagen_subida(imagen_nueva)
+        return jsonify({'error': 'sin_permisos_uploads', 'mensaje': 'No hay permisos para guardar la imagen.'}), 500
     except ValueError as exc:
+        _limpiar_imagen_subida(imagen_nueva)
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'opcion': opcion.to_dict()}), 201
 
@@ -416,9 +439,25 @@ def actualizar_opcion(opcion_id):
     opcion = obtener_opcion(cliente_id, opcion_id)
     if not opcion:
         return jsonify({'error': 'not_found'}), 404
+    imagen_anterior = None
+    imagen_nueva = None
     try:
-        opcion = guardar_opcion(cliente_id, opcion.grupo_id, _payload(), opcion=opcion)
+        data = _payload()
+        data, imagen_anterior, imagen_nueva = _adjuntar_imagen_opcion(cliente_id, data, opcion_actual=opcion)
+        opcion = guardar_opcion(cliente_id, opcion.grupo_id, data, opcion=opcion)
+        if imagen_anterior and imagen_anterior != opcion.imagen_url:
+            try:
+                eliminar_imagen_producto_menu(imagen_anterior, current_app.static_folder)
+            except OSError:
+                current_app.logger.warning(
+                    'No se pudo eliminar la imagen anterior de la opcion gastronomica %s',
+                    opcion.id_opcion,
+                )
+    except PermissionError:
+        _limpiar_imagen_subida(imagen_nueva)
+        return jsonify({'error': 'sin_permisos_uploads', 'mensaje': 'No hay permisos para guardar la imagen.'}), 500
     except ValueError as exc:
+        _limpiar_imagen_subida(imagen_nueva)
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'opcion': opcion.to_dict()})
 

@@ -81,6 +81,8 @@ def guardar_opcion(cliente_id: int, grupo_id: int, data: dict, opcion=None) -> G
     opcion = opcion or GastronomiaOpcionProducto(cliente_id=int(cliente_id), grupo_id=int(grupo_id))
     opcion.nombre = nombre[:140]
     opcion.precio_delta = parse_price(data.get('precio_delta', 0))
+    if 'imagen_url' in data:
+        opcion.imagen_url = (data.get('imagen_url') or '').strip()[:500] or None
     opcion.disponible = parse_bool(data.get('disponible'), True)
     opcion.visible = parse_bool(data.get('visible'), True)
     opcion.orden = parse_int(data.get('orden'), 0)

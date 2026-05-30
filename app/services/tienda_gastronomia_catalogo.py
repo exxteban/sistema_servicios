@@ -7,7 +7,7 @@ from app import db
 from app.models.tienda import TiendaConfig
 from app.services.tienda_context import resolver_cliente_gastronomia_tienda
 from app.utils.tienda_urls import build_category_public_path, build_product_public_path, slugify_tienda_text
-from gastronomia.models import GastronomiaCategoria, GastronomiaProducto
+from gastronomia.models import GastronomiaCategoria, GastronomiaGrupoOpciones, GastronomiaProducto
 from app.services.tienda_presupuesto import mensaje_whatsapp_producto
 
 
@@ -145,6 +145,7 @@ def _serializar_producto(producto: GastronomiaProducto, config: TiendaConfig) ->
     data = _serializar_producto_card(producto, config)
     data['descripcion'] = producto.descripcion or ''
     data['imagenes'] = _imagenes_producto(producto)
+    data['grupos_opciones'] = _grupos_opciones_producto(producto)
     return data
 
 
@@ -186,6 +187,27 @@ def _imagenes_producto(producto: GastronomiaProducto) -> list[dict]:
         'width': None,
         'height': None,
     }]
+
+
+def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
+    grupos = (
+        producto.grupos_opciones
+        .filter_by(activo=True, visible=True)
+        .order_by(GastronomiaGrupoOpciones.orden.asc(), GastronomiaGrupoOpciones.nombre.asc())
+    )
+    resultado = []
+    for grupo in grupos.all():
+        opciones = [
+            opcion.to_dict()
+            for opcion in grupo.opciones_ordenadas()
+            if opcion.visible and opcion.disponible
+        ]
+        if not opciones:
+            continue
+        data = grupo.to_dict(incluir_opciones=False)
+        data['opciones'] = opciones
+        resultado.append(data)
+    return resultado
 
 
 def _build_whatsapp_link(producto: GastronomiaProducto, config: TiendaConfig) -> str | None:

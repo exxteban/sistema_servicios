@@ -10,11 +10,12 @@ import ProductoPageSkeleton from '../components/ui/ProductoPageSkeleton'
 import ProductPriceBlock from '../components/ui/ProductPriceBlock'
 import ProductoCard from '../components/ui/ProductoCard'
 import TrustSignals from '../components/ui/TrustSignals'
+import ProductModifiersSelector, { getModifiersTotal, getSelectedModifiers } from '../components/ui/ProductModifiersSelector'
 import { useMetaPixelPageView, useMetaPixelProductView } from '../hooks/useMetaPixel'
 import { trackMetaPixelContact } from '../services/metaPixel'
 import { resolveStoreTheme } from '../themes/storeTheme'
 import { getStoreWhatsAppMessage } from '../utils/gastronomiaBudget'
-import { buildProductPath, isTruthyFlag, normalizeText, parseProductIdFromParam } from '../utils/storeFormatting'
+import { buildProductPath, formatGs, isTruthyFlag, normalizeText, parseProductIdFromParam } from '../utils/storeFormatting'
 import WebBotWidget from '../features/web-bot/components/WebBotWidget'
 
 export default function ProductoPage() {
@@ -23,6 +24,7 @@ export default function ProductoPage() {
   const { config, error: configError, retry: retryConfig } = useTiendaConfig(slug)
   const theme = resolveStoreTheme(config?.estilo_tienda)
   const [producto, setProducto] = useState(null)
+  const [modifierSelections, setModifierSelections] = useState({})
   const [error, setError] = useState('')
   const productId = parseProductIdFromParam(productRef)
 
@@ -37,7 +39,10 @@ export default function ProductoPage() {
     setError('')
     tiendaApi.getProducto(slug, productId, { signal: controller.signal })
       .then((data) => {
-        if (alive) setProducto(data)
+        if (alive) {
+          setProducto(data)
+          setModifierSelections({})
+        }
       })
       .catch(() => {
         if (!alive) return
@@ -79,6 +84,13 @@ export default function ProductoPage() {
   useMetaPixelPageView(metaPixelId)
   useMetaPixelProductView(metaPixelId, producto)
 
+  const selectedModifiers = getSelectedModifiers(producto?.grupos_opciones || [], modifierSelections)
+  const modifiersTotal = getModifiersTotal(selectedModifiers)
+  const productTotal = Number(producto?.precio || 0) + modifiersTotal
+  const dynamicWhatsAppHref = selectedModifiers.length
+    ? buildProductWhatsAppHref(config, producto, selectedModifiers, productTotal)
+    : ''
+
   const trackProductWhatsAppClick = (item = producto) => {
     if (!metaPixelId) return
     trackMetaPixelContact(metaPixelId, {
@@ -86,7 +98,7 @@ export default function ProductoPage() {
       content_ids: item?.id ? [String(item.id)] : undefined,
       content_type: item?.id ? 'product' : 'product_group',
       currency: 'PYG',
-      value: Number(item?.precio) || 0
+      value: item?.id === producto?.id ? productTotal : Number(item?.precio) || 0
     })
   }
 
@@ -132,7 +144,7 @@ export default function ProductoPage() {
   const beneficios = config?.beneficios_producto_items || []
   const senalesProducto = isTruthyFlag(config?.mostrar_bloque_confianza_producto) ? config?.senales_confianza || [] : []
   const mostrarRelacionados = isTruthyFlag(config?.mostrar_relacionados ?? true) && producto.relacionados?.length > 0
-  const whatsappHref = producto.whatsapp_link || (config?.telefono_whatsapp ? `https://wa.me/${String(config.telefono_whatsapp).replace(/\D/g, '')}` : '')
+  const whatsappHref = dynamicWhatsAppHref || producto.whatsapp_link || (config?.telefono_whatsapp ? `https://wa.me/${String(config.telefono_whatsapp).replace(/\D/g, '')}` : '')
 
   return (
     <div className={`theme-wrapper ${theme.wrapperClass}`} style={{ '--brand': config?.color_primario || '#2563eb' }}>
@@ -175,6 +187,12 @@ export default function ProductoPage() {
             <div className="product-page-description">
               <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.6, fontSize: '1.05rem', whiteSpace: 'pre-line' }}>{producto.descripcion || 'Sin descripción disponible.'}</p>
             </div>
+            <ProductModifiersSelector
+              grupos={producto.grupos_opciones || []}
+              selections={modifierSelections}
+              onChange={setModifierSelections}
+              basePrice={producto.precio}
+            />
             {beneficios.length > 0 && (
               <div className="product-detail-panel">
                 <h2 className="product-detail-panel-title">Lo más importante</h2>
@@ -258,4 +276,22 @@ function applyPageMeta(title, description) {
     document.head.appendChild(descriptionMeta)
   }
   descriptionMeta.setAttribute('content', description)
+}
+
+function buildProductWhatsAppHref(config, producto, selectedModifiers, total) {
+  const phone = String(config?.telefono_whatsapp || '').replace(/\D/g, '')
+  if (!phone || !producto) return ''
+  const lines = [
+    `Hola, vengo de la tienda web y quiero pedir: ${producto.nombre}`,
+    `Precio base: ${formatGs(producto.precio)}`
+  ]
+  if (selectedModifiers.length) {
+    lines.push('Opciones:')
+    selectedModifiers.forEach((item) => {
+      const lineTotal = Number(item.precio_delta || 0) * Number(item.cantidad || 0)
+      lines.push(`- ${item.nombre} x${item.cantidad}: ${lineTotal > 0 ? formatGs(lineTotal) : 'sin costo'}`)
+    })
+  }
+  lines.push(`Total estimado: ${formatGs(total)}`)
+  return `https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`
 }

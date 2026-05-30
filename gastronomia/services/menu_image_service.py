@@ -15,7 +15,7 @@ def extension_permitida(filename: str) -> bool:
     return '.' in nombre and nombre.rsplit('.', 1)[1] in ALLOWED_IMAGE_EXTENSIONS
 
 
-def guardar_imagen_producto_menu(archivo, static_folder: str, cliente_id: int) -> str:
+def guardar_imagen_menu(archivo, static_folder: str, cliente_id: int, prefijo: str) -> str:
     carpeta_destino = os.path.join(
         static_folder,
         *GASTRONOMIA_MENU_UPLOAD_ROOT,
@@ -24,7 +24,7 @@ def guardar_imagen_producto_menu(archivo, static_folder: str, cliente_id: int) -
     nombre_final = procesar_y_guardar_imagen(
         archivo,
         carpeta_destino,
-        prefijo=f'gastro_menu_{int(cliente_id)}',
+        prefijo=f'{prefijo}_{int(cliente_id)}',
         max_size=(1400, 1400),
         calidad=82,
     )
@@ -35,6 +35,14 @@ def guardar_imagen_producto_menu(archivo, static_folder: str, cliente_id: int) -
         int(cliente_id),
         nombre_final,
     )
+
+
+def guardar_imagen_producto_menu(archivo, static_folder: str, cliente_id: int) -> str:
+    return guardar_imagen_menu(archivo, static_folder, cliente_id, 'gastro_menu')
+
+
+def guardar_imagen_opcion_menu(archivo, static_folder: str, cliente_id: int) -> str:
+    return guardar_imagen_menu(archivo, static_folder, cliente_id, 'gastro_opcion')
 
 
 def eliminar_imagen_producto_menu(url_imagen: str, static_folder: str) -> bool:

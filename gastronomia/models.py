@@ -179,6 +179,7 @@ class GastronomiaOpcionProducto(db.Model):
     grupo_id = db.Column(db.Integer, db.ForeignKey('gastronomia_grupos_opciones.id_grupo', ondelete='CASCADE'), nullable=False, index=True)
     nombre = db.Column(db.String(140), nullable=False)
     precio_delta = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    imagen_url = db.Column(db.String(500))
     disponible = db.Column(db.Boolean, nullable=False, default=True)
     visible = db.Column(db.Boolean, nullable=False, default=True)
     orden = db.Column(db.Integer, nullable=False, default=0)
@@ -195,6 +196,7 @@ class GastronomiaOpcionProducto(db.Model):
             'grupo_id': self.grupo_id,
             'nombre': self.nombre,
             'precio_delta': float(self.precio_delta or 0),
+            'imagen_url': self.imagen_url,
             'disponible': bool(self.disponible),
             'visible': bool(self.visible),
             'orden': int(self.orden or 0),

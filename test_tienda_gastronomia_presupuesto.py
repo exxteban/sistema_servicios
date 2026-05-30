@@ -2,7 +2,13 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from app import create_app, db
 from app.models import Cliente, Configuracion, TiendaConfig, Usuario
-from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaProducto
+from gastronomia.models import (
+    GastronomiaCategoria,
+    GastronomiaClienteConfig,
+    GastronomiaGrupoOpciones,
+    GastronomiaOpcionProducto,
+    GastronomiaProducto,
+)
 from gastronomia.services.modo_operacion import (
     CLAVE_MODO_OPERACION_PRINCIPAL,
     MODO_GASTRONOMIA,
@@ -121,6 +127,52 @@ def test_tienda_gastronomia_adapta_cta_y_mensaje_de_presupuesto():
         assert 'Combo de bebidas' in mensaje
         assert 'Cantidad requerida:' in mensaje
         assert 'Bebidas, adicionales o servicio de atencion:' in mensaje
+    finally:
+        with app.app_context():
+            Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
+
+
+def test_tienda_gastronomia_expone_modificadores_con_foto_y_precio():
+    app = create_app('testing')
+    client = app.test_client()
+
+    with app.app_context():
+        Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_GASTRONOMIA)
+        tienda, producto = _crear_tienda_gastronomia(slug='gastro-extras-test')
+        grupo = GastronomiaGrupoOpciones(
+            cliente_id=tienda.id_cliente,
+            producto_id=producto.id_producto,
+            nombre='Extras',
+            tipo='extra',
+            max_selecciones=3,
+            visible=True,
+            activo=True,
+        )
+        db.session.add(grupo)
+        db.session.flush()
+        db.session.add(GastronomiaOpcionProducto(
+            cliente_id=tienda.id_cliente,
+            grupo_id=grupo.id_grupo,
+            nombre='Carne extra',
+            precio_delta=8000,
+            imagen_url='/static/tienda_uploads/gastronomia/menu/carne-extra.webp',
+            disponible=True,
+            visible=True,
+            activo=True,
+        ))
+        db.session.commit()
+        slug = tienda.slug
+        producto_id = producto.id_producto
+
+    try:
+        response = client.get(f'/api/tienda/{slug}/producto/{producto_id}')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['grupos_opciones'][0]['nombre'] == 'Extras'
+        opcion = data['grupos_opciones'][0]['opciones'][0]
+        assert opcion['nombre'] == 'Carne extra'
+        assert opcion['precio_delta'] == 8000
+        assert opcion['imagen_url'].endswith('carne-extra.webp')
     finally:
         with app.app_context():
             Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)

@@ -123,6 +123,18 @@ function normalizeProduct(producto) {
             card_fallback_urls: resolveMediaCandidates(cardSource)
           }
         })
+      : [],
+    grupos_opciones: Array.isArray(producto.grupos_opciones)
+      ? producto.grupos_opciones.map((grupo) => ({
+          ...grupo,
+          opciones: Array.isArray(grupo.opciones)
+            ? grupo.opciones.map((opcion) => ({
+                ...opcion,
+                imagen_url: resolveMediaUrl(opcion?.imagen_url),
+                fallback_urls: resolveMediaCandidates(opcion?.imagen_url)
+              }))
+            : []
+        }))
       : []
   }
 }
