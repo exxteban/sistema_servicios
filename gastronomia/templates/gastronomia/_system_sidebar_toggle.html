@@ -1,0 +1,160 @@
+<div class="gastro-system-sidebar-toolbar" data-gastro-sidebar-toggle-host>
+    <button type="button"
+        class="gastro-system-sidebar-toggle"
+        data-gastro-sidebar-toggle
+        aria-pressed="false"
+        title="Ocultar o mostrar la barra lateral del sistema">
+        <i class="fas fa-bars-staggered" aria-hidden="true"></i>
+        <span class="gastro-system-sidebar-toggle__hide">Ocultar barra</span>
+        <span class="gastro-system-sidebar-toggle__show">Mostrar barra</span>
+    </button>
+</div>
+
+<style>
+    .gastro-system-sidebar-toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 35;
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 0.75rem;
+        pointer-events: none;
+    }
+
+    .gastro-system-sidebar-toggle {
+        display: inline-flex;
+        min-height: 2.25rem;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.94);
+        color: #111827;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.78rem;
+        font-weight: 800;
+        line-height: 1;
+        pointer-events: auto;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+
+    .gastro-system-sidebar-toggle:hover,
+    .gastro-system-sidebar-toggle:focus {
+        border-color: rgba(249, 115, 22, 0.45);
+        box-shadow: 0 10px 24px rgba(249, 115, 22, 0.18);
+        outline: none;
+        transform: translateY(-1px);
+    }
+
+    .gastro-system-sidebar-toggle__show,
+    .gastro-system-sidebar-toggle.is-active .gastro-system-sidebar-toggle__hide {
+        display: none;
+    }
+
+    .gastro-system-sidebar-toggle.is-active .gastro-system-sidebar-toggle__show {
+        display: inline;
+    }
+
+    .dark .gastro-system-sidebar-toggle {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(17, 24, 39, 0.96);
+        color: #f9fafb;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+    }
+
+    body.gastro-system-sidebar-hidden .app-shell-sidebar {
+        display: none !important;
+    }
+
+    @media (max-width: 640px) {
+        .gastro-system-sidebar-toolbar {
+            justify-content: stretch;
+        }
+
+        .gastro-system-sidebar-toggle {
+            width: 100%;
+        }
+    }
+</style>
+
+<script>
+    (function () {
+        const storageKey = 'gastroSystemSidebarHidden';
+
+        function getPreference() {
+            try {
+                return localStorage.getItem(storageKey) === '1';
+            } catch {
+                return false;
+            }
+        }
+
+        function setPreference(hidden) {
+            try {
+                localStorage.setItem(storageKey, hidden ? '1' : '0');
+            } catch { }
+        }
+
+        function hasActiveGastroPanel() {
+            const activePanel = document.querySelector('.app-tab-panel[aria-hidden="false"]');
+            if (activePanel) {
+                return Boolean(activePanel.querySelector('[data-gastro-sidebar-toggle-host]'));
+            }
+            return Boolean(document.querySelector('[data-gastro-sidebar-toggle-host]'));
+        }
+
+        function syncButtons(hidden) {
+            document.querySelectorAll('[data-gastro-sidebar-toggle]').forEach((button) => {
+                button.classList.toggle('is-active', hidden);
+                button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+            });
+        }
+
+        function syncSidebar() {
+            const hidden = getPreference();
+            const shouldHide = hidden && hasActiveGastroPanel();
+            document.body.classList.toggle('gastro-system-sidebar-hidden', shouldHide);
+            syncButtons(hidden);
+        }
+
+        window.__syncGastroSystemSidebar = syncSidebar;
+
+        if (!window.__gastroSystemSidebarToggleInit) {
+            window.__gastroSystemSidebarToggleInit = true;
+
+            document.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-gastro-sidebar-toggle]');
+                if (!button) {
+                    return;
+                }
+                const nextHidden = !getPreference();
+                setPreference(nextHidden);
+                syncSidebar();
+            });
+
+            window.addEventListener('storage', (event) => {
+                if (event.key === storageKey) {
+                    syncSidebar();
+                }
+            });
+
+            window.addEventListener('pageshow', syncSidebar);
+            window.addEventListener('focus', syncSidebar);
+
+            if (typeof MutationObserver === 'function') {
+                const observer = new MutationObserver(syncSidebar);
+                const observeTarget = document.getElementById('app-tab-panels') || document.body;
+                observer.observe(observeTarget, {
+                    attributes: true,
+                    attributeFilter: ['aria-hidden'],
+                    childList: true,
+                    subtree: true
+                });
+            }
+        }
+
+        syncSidebar();
+    })();
+</script>

@@ -10,6 +10,7 @@ from app.models import Caja, ColaCobro, Configuracion, MovimientoCaja, SesionCaj
 from app.routes.caja import caja_bp
 from app.routes.caja.cola_cobro import obtener_contexto_cola_cobro, puede_acceder_cola_cobro
 from app.routes.caja.common import _enriquecer_motivos_movimientos
+from app.routes.caja.regularizacion_cola import regularizar_pendientes_ya_cobrados_para_cierre
 from app.utils.auditoria_utils import registrar_auditoria
 from app.utils.helpers import local_strftime
 
@@ -23,6 +24,8 @@ def _resumen_pendientes_para_cierre(pendientes):
             tipo = 'Cobro crédito'
         elif pendiente.tipo_origen == 'pedido':
             tipo = 'Pedido'
+        elif pendiente.tipo_origen == 'gastronomia':
+            tipo = 'Pedido gastronomia'
         monto = f'₲ {float(pendiente.monto_total or 0):,.0f}'
         items.append(f'#{pendiente.id} {tipo} · {cliente} · {monto}')
     return ' | '.join(items)
@@ -444,6 +447,7 @@ def cerrar():
         .order_by(ColaCobro.fecha_toma.asc(), ColaCobro.id.asc())
         .all()
     )
+    pendientes_en_proceso = regularizar_pendientes_ya_cobrados_para_cierre(pendientes_en_proceso)
     if pendientes_en_proceso:
         pendientes_mostrados = _resumen_pendientes_para_cierre(pendientes_en_proceso)
         sufijo = '...' if len(pendientes_en_proceso) > 5 else ''
@@ -467,6 +471,7 @@ def cerrar():
             .order_by(ColaCobro.fecha_envio.asc(), ColaCobro.id.asc())
             .all()
         )
+        pendientes_bloqueantes = regularizar_pendientes_ya_cobrados_para_cierre(pendientes_bloqueantes)
         if pendientes_bloqueantes:
             pendientes_mostrados = _resumen_pendientes_para_cierre(pendientes_bloqueantes)
             sufijo = '...' if len(pendientes_bloqueantes) > 5 else ''

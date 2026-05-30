@@ -145,6 +145,36 @@ def crear_cola_cobro_central_desde_pedido(
     return cola
 
 
+def cerrar_colas_activas_gastronomia_pedido(
+    pedido: GastronomiaPedido,
+    venta,
+    usuario_id: int,
+) -> list[ColaCobro]:
+    """Marca como cobradas colas activas del pedido cuando se cobra por caja directa."""
+    ahora = datetime.utcnow()
+    colas = (
+        ColaCobro.query
+        .filter(
+            ColaCobro.tipo_origen == 'gastronomia',
+            ColaCobro.id_origen == int(pedido.id_pedido),
+            ColaCobro.estado.in_(['pendiente', 'en_proceso']),
+        )
+        .all()
+    )
+    for cola in colas:
+        metadata = cola.get_metadata()
+        metadata['venta_id'] = int(venta.id_venta)
+        metadata['cerrado_por_usuario'] = int(usuario_id)
+        metadata['gastronomia_pago_registrado'] = True
+        metadata['gastronomia_cobro_directo_caja'] = True
+        cola.estado = 'cobrado'
+        cola.id_usuario_destino = int(usuario_id)
+        cola.fecha_toma = cola.fecha_toma or ahora
+        cola.fecha_cobro = ahora
+        cola.set_metadata(metadata)
+    return colas
+
+
 def registrar_pago_gastronomia_desde_venta_central(cola_metadata: dict, venta, usuario_id: int) -> list[dict]:
     pedido_id = cola_metadata.get('gastronomia_pedido_id')
     if not pedido_id:

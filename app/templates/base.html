@@ -46,6 +46,12 @@
     </style>
     {% endif %}
     {% endwith %}
+    {% set mostrar_gastro_sidebar_toggle = current_user.is_authenticated
+        and (request.endpoint or '').startswith('gastronomia.')
+        and request.endpoint not in ['gastronomia.menu_tv_publico', 'gastronomia.seguimiento_pedido_publico', 'gastronomia.ticket_pedido'] %}
+    {% if mostrar_gastro_sidebar_toggle %}
+    {% include 'gastronomia/_system_sidebar_toggle.html' %}
+    {% endif %}
     {% block content %}{% endblock %}
 </div>
 <div id="partial-scripts">

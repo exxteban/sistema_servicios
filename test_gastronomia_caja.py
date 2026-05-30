@@ -187,6 +187,99 @@ def test_caja_lista_y_cobra_pedido_con_descuento():
     assert client.get('/api/gastronomia/caja/pedidos').get_json()['pedidos'] == []
 
 
+def test_cobro_directo_cierra_cola_gastronomia_activa():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto(app, 'Resto Cola Directa', 'resto_cola_directa')
+    _loguear(client, app, 'resto_cola_directa')
+    _abrir_caja(app, 'resto_cola_directa')
+
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+    pedido_id = _crear_pedido_listo(client, csrf, producto_id)
+
+    with app.app_context():
+        from gastronomia.services.venta_integration_service import crear_cola_cobro_central_desde_pedido
+
+        usuario = Usuario.query.filter_by(username='resto_cola_directa').first()
+        pedido = GastronomiaPedido.query.get(pedido_id)
+        cola = crear_cola_cobro_central_desde_pedido(
+            pedido,
+            usuario.id_usuario,
+            enviar_cocina=False,
+        )
+        cola.estado = 'en_proceso'
+        cola.id_usuario_destino = usuario.id_usuario
+        db.session.commit()
+        cola_id = cola.id
+
+    cobrar_resp = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'metodo_pago': 'efectivo'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cobrar_resp.status_code == 200
+
+    with app.app_context():
+        cola = ColaCobro.query.get(cola_id)
+        assert cola.estado == 'cobrado'
+        assert cola.id_usuario_destino is not None
+        assert cola.fecha_cobro is not None
+        metadata = cola.get_metadata()
+        assert metadata['gastronomia_pago_registrado'] is True
+        assert metadata['gastronomia_cobro_directo_caja'] is True
+        assert metadata['venta_id']
+        pago = GastronomiaPedidoPago.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).first()
+        assert pago is not None
+        assert metadata['venta_id'] == pago.id_venta
+
+
+def test_cierre_caja_regulariza_cola_gastronomia_ya_cobrada():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Cierre Cola', 'resto_cierre_cola')
+    _loguear(client, app, 'resto_cierre_cola')
+    _abrir_caja(app, 'resto_cierre_cola')
+
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+    pedido_id = _crear_pedido_listo(client, csrf, producto_id)
+
+    with app.app_context():
+        from gastronomia.services.venta_integration_service import crear_cola_cobro_central_desde_pedido
+
+        usuario = Usuario.query.filter_by(username='resto_cierre_cola').first()
+        pedido = GastronomiaPedido.query.get(pedido_id)
+        cola = crear_cola_cobro_central_desde_pedido(pedido, usuario.id_usuario, enviar_cocina=False)
+        cola.estado = 'en_proceso'
+        cola.id_usuario_destino = usuario.id_usuario
+        db.session.commit()
+        cola_id = cola.id
+
+    cobrar_resp = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'metodo_pago': 'efectivo'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cobrar_resp.status_code == 200
+
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username='resto_cierre_cola').first()
+        cola = ColaCobro.query.get(cola_id)
+        cola.estado = 'en_proceso'
+        cola.id_usuario_destino = usuario.id_usuario
+        cola.fecha_cobro = None
+        db.session.commit()
+
+    cierre_resp = client.get('/caja/cerrar')
+    assert cierre_resp.status_code == 200
+    assert 'No puede cerrar la caja mientras tenga pendientes' not in cierre_resp.get_data(as_text=True)
+
+    with app.app_context():
+        cola = ColaCobro.query.get(cola_id)
+        assert cola.estado == 'cobrado'
+        assert cola.fecha_cobro is not None
+        assert cola.get_metadata()['regularizado_en_cierre_caja'] is True
+
+
 def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     app = create_app('testing')
     client = app.test_client()

@@ -9,7 +9,10 @@ from app import db
 from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
 from gastronomia.services.pedido_service import obtener_pedido, registrar_evento_pedido
-from gastronomia.services.venta_integration_service import crear_venta_central_desde_pedido
+from gastronomia.services.venta_integration_service import (
+    cerrar_colas_activas_gastronomia_pedido,
+    crear_venta_central_desde_pedido,
+)
 
 
 METODOS_PAGO = {'efectivo', 'tarjeta', 'transferencia', 'qr', 'mixto'}
@@ -85,6 +88,7 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     pago.id_venta = int(venta.id_venta)
     pago.id_movimiento_caja = int(movimiento.id_movimiento_caja) if movimiento else None
     pago.metodo_pago = integracion['metodo_slug'] or metodo_pago
+    cerrar_colas_activas_gastronomia_pedido(pedido, venta, usuario_id)
     registrar_auditoria(
         accion='cobrar_pedido_gastronomia',
         modulo='gastronomia',
