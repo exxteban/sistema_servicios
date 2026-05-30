@@ -68,8 +68,8 @@
         }
         .menu-tv-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-            gap: clamp(18px, 2.4vw, 34px);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+            gap: clamp(20px, 2.6vw, 36px);
         }
         .menu-tv-slides {
             display: block;
@@ -78,8 +78,8 @@
         }
         .menu-tv-slide {
             display: none;
-            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-            gap: clamp(18px, 2.4vw, 34px);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+            gap: clamp(20px, 2.6vw, 36px);
         }
         .menu-tv-slide.is-active {
             display: grid;
@@ -92,7 +92,7 @@
             border-radius: 30px;
             background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05));
             box-shadow: 0 24px 80px rgba(0,0,0,0.22);
-            padding: clamp(22px, 2.5vw, 36px);
+            padding: clamp(24px, 2.8vw, 38px);
             backdrop-filter: blur(18px);
             animation: menu-tv-card-rise 720ms cubic-bezier(.16, 1, .3, 1) both;
         }
@@ -116,23 +116,21 @@
         .menu-tv-product {
             display: grid;
             grid-template-columns: minmax(0, 1fr);
-            gap: 18px;
+            gap: 16px;
             align-items: start;
             border-top: 1px solid rgba(255,255,255,0.12);
-            padding: 18px 0;
+            padding: 16px 0;
             animation: menu-tv-product-pop 640ms cubic-bezier(.16, 1, .3, 1) both;
         }
         .menu-tv-product--with-image {
-            grid-template-columns: clamp(92px, 8vw, 150px) minmax(0, 1fr);
+            grid-template-columns: clamp(88px, 7vw, 118px) minmax(0, 1fr);
+            column-gap: 18px;
         }
         .menu-tv-product-details {
             min-width: 0;
         }
         .menu-tv-product-head {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 16px;
+            display: block;
         }
         .menu-tv-product:first-of-type { border-top: 0; }
         .menu-tv-product-image-wrap {
@@ -149,24 +147,30 @@
         }
         .menu-tv-product h3 {
             margin: 0;
-            font-size: clamp(24px, 2.2vw, 42px);
-            line-height: 1.05;
-            overflow-wrap: anywhere;
+            color: #f8fafc;
+            font-size: clamp(22px, 1.9vw, 34px);
+            line-height: 1.12;
+            word-break: normal;
+            overflow-wrap: break-word;
+            hyphens: auto;
         }
         .menu-tv-product p {
-            margin: 8px 0 0;
+            margin: 6px 0 0;
             color: #ffedd5;
-            font-size: clamp(16px, 1.35vw, 24px);
+            font-size: clamp(15px, 1.05vw, 20px);
             font-weight: 700;
+            line-height: 1.25;
         }
         .menu-tv-price {
+            display: block;
+            margin-top: 8px;
             color: #bbf7d0;
-            font-size: clamp(24px, 2.2vw, 44px);
+            font-size: clamp(22px, 1.9vw, 34px);
             font-weight: 1000;
             white-space: nowrap;
             line-height: 1;
             flex: 0 0 auto;
-            text-align: right;
+            text-align: left;
         }
         .menu-tv-soldout { opacity: 0.55; }
         .menu-tv-badge {
@@ -247,11 +251,6 @@
             .menu-tv-grid { grid-template-columns: 1fr; }
             .menu-tv-slide { grid-template-columns: 1fr; }
             .menu-tv-product--with-image { grid-template-columns: 96px minmax(0, 1fr); }
-            .menu-tv-product-head {
-                flex-direction: column;
-                gap: 8px;
-            }
-            .menu-tv-price { text-align: left; }
         }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
@@ -276,6 +275,6 @@
         <section id="menu-tv-content" class="menu-tv-grid"></section>
         <div id="menu-tv-status" class="menu-tv-status" aria-live="polite"></div>
     </main>
-    <script src="{{ url_for('gastronomia.static', filename='js/menu_tv.js', v='20260529-1') }}"></script>
+    <script src="{{ url_for('gastronomia.static', filename='js/menu_tv.js', v='20260529-2') }}"></script>
 </body>
 </html>

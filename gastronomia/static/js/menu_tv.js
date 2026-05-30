@@ -165,8 +165,8 @@
   const estimateSlideLayout = () => {
     const headerBottom = root.querySelector('.menu-tv-header')?.getBoundingClientRect().bottom || 180;
     const availableHeight = Math.max(320, window.innerHeight - headerBottom - 72);
-    const columns = Math.max(1, Math.floor(content.clientWidth / 440));
-    const rowHeight = window.innerWidth >= 1200 ? 126 : 156;
+    const columns = Math.max(1, Math.floor(content.clientWidth / 540));
+    const rowHeight = window.innerWidth >= 1200 ? 134 : 150;
     return {
       columns,
       productsPerCard: Math.max(2, Math.floor(availableHeight / rowHeight) - 1),
