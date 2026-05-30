@@ -1,0 +1,26 @@
+/* Keep app modals above the persistent navigation shell. */
+:root {
+    --app-modal-layer-z-index: 12250;
+    --app-modal-backdrop-z-index: 12240;
+}
+
+.modal {
+    z-index: var(--app-modal-layer-z-index) !important;
+}
+
+.modal-backdrop {
+    z-index: var(--app-modal-backdrop-z-index) !important;
+}
+
+[role="dialog"][aria-modal="true"],
+[id^="modal"][class*="fixed"][class*="inset-0"],
+[id*="modal"][class*="fixed"][class*="inset-0"],
+[id*="Modal"][class*="fixed"][class*="inset-0"],
+[data-inteligencia-modal],
+[x-show][class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"],
+[x-show][class*="fixed"][class*="inset-0"][class*="overflow-y-auto"],
+[x-cloak][class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"],
+[x-cloak][class*="fixed"][class*="inset-0"][class*="overflow-y-auto"],
+.app-alert-overlay {
+    z-index: var(--app-modal-layer-z-index) !important;
+}

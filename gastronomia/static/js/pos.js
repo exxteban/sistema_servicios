@@ -6,6 +6,7 @@
   const cartTotal = document.getElementById('cart-total');
   const productsCount = document.getElementById('products-count');
   const alertBox = document.getElementById('pos-alert');
+  const clearProductSearchButton = document.getElementById('clear-product-search');
   const editingOrderBanner = document.getElementById('editing-order-banner');
   const modal = document.getElementById('modifier-modal');
   const modalName = document.getElementById('modal-product-name');
@@ -72,6 +73,11 @@
     const data = await apiJson('/api/gastronomia/salon/mesas');
     mesas = data.mesas || [];
     renderMesas();
+  };
+  const syncProductSearchClearButton = () => {
+    if (!clearProductSearchButton) return;
+    const hasValue = Boolean((productSearch?.value || '').trim());
+    clearProductSearchButton.classList.toggle('hidden', !hasValue);
   };
 
   const renderProducts = () => {
@@ -489,7 +495,17 @@
     button.classList.add('active');
     renderProducts();
   });
-  productSearch?.addEventListener('input', renderProducts);
+  productSearch?.addEventListener('input', () => {
+    syncProductSearchClearButton();
+    renderProducts();
+  });
+  clearProductSearchButton?.addEventListener('click', () => {
+    if (!productSearch) return;
+    productSearch.value = '';
+    syncProductSearchClearButton();
+    renderProducts();
+    productSearch.focus();
+  });
   deliveryShippingInput?.addEventListener('input', renderCart);
   document.getElementById('order-type-buttons')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-order-type]');
@@ -548,6 +564,7 @@
   syncOrderTypeUi();
   loadProducts().catch((error) => showAlert(error.message, false));
   loadMesas().catch((error) => showAlert(error.message, false));
+  syncProductSearchClearButton();
   fitCategoryLabels();
   window.addEventListener('resize', fitCategoryLabels);
   renderCart();
