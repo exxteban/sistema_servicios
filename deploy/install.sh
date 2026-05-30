@@ -136,10 +136,21 @@ as_root() {
   fi
 }
 
-if [ -z "$db_root_password" ]; then
-  echo "Falta DB_ROOT_PASSWORD"
-  exit 1
-fi
+shell_quote() {
+  python3 - "$1" <<'PY'
+import shlex
+import sys
+
+print(shlex.quote(sys.argv[1]))
+PY
+}
+
+append_env_line() {
+  local file_path="$1"
+  local key="$2"
+  local value="${3-}"
+  printf '%s=%s\n' "$key" "$(shell_quote "$value")" >> "$file_path"
+}
 
 if [ -z "$db_password" ]; then
   if have_cmd openssl; then
@@ -231,7 +242,7 @@ else
   exit 1
 fi
 
-mysql_root_auth="password"
+mysql_root_auth=""
 
 mysql_root_with_password() {
   as_root env MYSQL_PWD="$db_root_password" "$mysql_cmd" --user=root "$@"
@@ -241,7 +252,7 @@ mysql_root_with_socket() {
   as_root "$mysql_cmd" --user=root "$@"
 }
 
-if mysql_root_with_password -e "SELECT 1" >/dev/null 2>&1; then
+if [ -n "$db_root_password" ] && mysql_root_with_password -e "SELECT 1" >/dev/null 2>&1; then
   mysql_root_auth="password"
 elif mysql_root_with_socket -e "SELECT 1" >/dev/null 2>&1; then
   mysql_root_auth="socket"
@@ -258,10 +269,6 @@ mysql_root() {
     mysql_root_with_password "$@"
   fi
 }
-
-mysql_root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$db_root_password';" >/dev/null 2>&1 || \
-mysql_root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$db_root_password';"
-mysql_root_auth="password"
 
 if [[ ! "$db_name" =~ ^[A-Za-z0-9_]+$ ]]; then
   echo "DB_NAME inválido: $db_name"
@@ -393,69 +400,69 @@ PY
 fi
 
 extra_env_tmp="$(mktemp)"
-cleanup_tmp() { rm -f "$extra_env_tmp"; }
+env_tmp="$(mktemp)"
+cleanup_tmp() { rm -f "$extra_env_tmp" "$env_tmp"; }
 trap cleanup_tmp EXIT
 
 if [ -f "$env_file_path" ]; then
   as_root cat "$env_file_path" | grep -vE '^(APP_CONFIG|FORCE_PRODUCTION_CONFIG|SERVER|HOST|PORT|SECRET_KEY|DATABASE_URL|USE_PROXY_FIX|APP_BOOTSTRAP_ADMIN_PASSWORD|APP_BOOTSTRAP_ROOT_USERNAME|APP_BOOTSTRAP_ROOT_PASSWORD|SESSION_COOKIE_SECURE|REMEMBER_COOKIE_SECURE|SESSION_COOKIE_SAMESITE|REMEMBER_COOKIE_SAMESITE|RCLONE_DEST_DIR|RCLONE_OP|RCLONE_FAIL_OPEN|WHATSAPP_ENABLED|WHATSAPP_PHONE_NUMBER_ID|WHATSAPP_PHONE_ID|WHATSAPP_ACCESS_TOKEN|WHATSAPP_TOKEN|WHATSAPP_WEBHOOK_VERIFY_TOKEN|WHATSAPP_VERIFY_TOKEN|WHATSAPP_DRY_RUN|WHATSAPP_RATE_LIMIT_PER_PHONE|WHATSAPP_RATE_LIMIT_GLOBAL|WHATSAPP_SESION_HORAS|WHATSAPP_CODIGO_EXPIRACION_DIAS|WHATSAPP_MAX_INTENTOS_CODIGO|WHATSAPP_ASESOR_TIMEOUT_SEGUNDOS|WHATSAPP_ASESOR_HEARTBEAT_SEGUNDOS|WHATSAPP_ASESOR_MAX_CONVERSACIONES|WHATSAPP_TIMEOUT_SCHEDULER|WHATSAPP_TIMEOUT_INTERVAL_SECONDS|WHATSAPP_NOTIFICAR_LISTO|WHATSAPP_NOTIFICAR_ESPERA_CLIENTE|WHATSAPP_NOTIFICAR_NO_SE_PUDO|CRM_ENABLED|CRM_BANDEJA_JEFE_MIN_NIVEL|AI_ENABLED|AI_PROVIDER|AI_MODEL|AI_REASONING_EFFORT|AI_MAX_TOKENS|AI_TEMPERATURE|AI_API_KEY|AI_BASE_URL|DEEPSEEK_API_KEY|DEEPSEEK_BASE_URL|LOG_LEVEL|LOG_REQUEST_ACCESS|LOG_REQUEST_VERBOSE|LOG_REQUEST_BODY|LOG_WHATSAPP_WEBHOOK|LOG_DB_COMMITS)=' > "$extra_env_tmp" || true
 fi
 
-as_root bash -lc "umask 027; cat > '$env_file_path' <<EOF
-APP_CONFIG=$app_config
-FORCE_PRODUCTION_CONFIG=$force_production_config
-SERVER=$app_server
-HOST=$bind_host
-PORT=$app_port
-SECRET_KEY=$secret_key
-DATABASE_URL=$database_url
-USE_PROXY_FIX=$use_proxy_fix
-APP_BOOTSTRAP_ADMIN_PASSWORD=$bootstrap_admin_password
-APP_BOOTSTRAP_ROOT_USERNAME=$bootstrap_root_username
-APP_BOOTSTRAP_ROOT_PASSWORD=$bootstrap_root_password
-SESSION_COOKIE_SECURE=$cookie_secure
-REMEMBER_COOKIE_SECURE=$cookie_secure
-SESSION_COOKIE_SAMESITE=$cookie_samesite
-REMEMBER_COOKIE_SAMESITE=$cookie_samesite
-WHATSAPP_ENABLED=${WHATSAPP_ENABLED:-0}
-WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-${WHATSAPP_PHONE_ID:-}}
-WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-${WHATSAPP_TOKEN:-}}
-WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-${WHATSAPP_VERIFY_TOKEN:-}}
-WHATSAPP_DRY_RUN=${WHATSAPP_DRY_RUN:-0}
-WHATSAPP_RATE_LIMIT_PER_PHONE=${WHATSAPP_RATE_LIMIT_PER_PHONE:-20}
-WHATSAPP_RATE_LIMIT_GLOBAL=${WHATSAPP_RATE_LIMIT_GLOBAL:-500}
-WHATSAPP_SESION_HORAS=${WHATSAPP_SESION_HORAS:-24}
-WHATSAPP_CODIGO_EXPIRACION_DIAS=${WHATSAPP_CODIGO_EXPIRACION_DIAS:-30}
-WHATSAPP_MAX_INTENTOS_CODIGO=${WHATSAPP_MAX_INTENTOS_CODIGO:-3}
-WHATSAPP_ASESOR_TIMEOUT_SEGUNDOS=${WHATSAPP_ASESOR_TIMEOUT_SEGUNDOS:-180}
-WHATSAPP_ASESOR_HEARTBEAT_SEGUNDOS=${WHATSAPP_ASESOR_HEARTBEAT_SEGUNDOS:-30}
-WHATSAPP_ASESOR_MAX_CONVERSACIONES=${WHATSAPP_ASESOR_MAX_CONVERSACIONES:-5}
-WHATSAPP_TIMEOUT_SCHEDULER=${WHATSAPP_TIMEOUT_SCHEDULER:-1}
-WHATSAPP_TIMEOUT_INTERVAL_SECONDS=${WHATSAPP_TIMEOUT_INTERVAL_SECONDS:-30}
-WHATSAPP_NOTIFICAR_LISTO=${WHATSAPP_NOTIFICAR_LISTO:-1}
-WHATSAPP_NOTIFICAR_ESPERA_CLIENTE=${WHATSAPP_NOTIFICAR_ESPERA_CLIENTE:-1}
-WHATSAPP_NOTIFICAR_NO_SE_PUDO=${WHATSAPP_NOTIFICAR_NO_SE_PUDO:-0}
-CRM_ENABLED=${CRM_ENABLED:-1}
-CRM_BANDEJA_JEFE_MIN_NIVEL=${CRM_BANDEJA_JEFE_MIN_NIVEL:-100}
-AI_ENABLED=${AI_ENABLED:-0}
-AI_PROVIDER=${AI_PROVIDER:-openai}
-AI_MODEL=${AI_MODEL:-gpt-4o-mini}
-AI_REASONING_EFFORT=${AI_REASONING_EFFORT:-low}
-AI_MAX_TOKENS=${AI_MAX_TOKENS:-500}
-AI_TEMPERATURE=${AI_TEMPERATURE:-0.7}
-AI_API_KEY=${AI_API_KEY:-}
-AI_BASE_URL=${AI_BASE_URL:-}
-DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-}
-LOG_LEVEL=${LOG_LEVEL:-}
-LOG_REQUEST_ACCESS=${LOG_REQUEST_ACCESS:-0}
-LOG_REQUEST_VERBOSE=${LOG_REQUEST_VERBOSE:-0}
-LOG_REQUEST_BODY=${LOG_REQUEST_BODY:-0}
-LOG_WHATSAPP_WEBHOOK=${LOG_WHATSAPP_WEBHOOK:-0}
-LOG_DB_COMMITS=${LOG_DB_COMMITS:-0}
-RCLONE_DEST_DIR=
-RCLONE_OP=copy
-RCLONE_FAIL_OPEN=0
-EOF"
+append_env_line "$env_tmp" "APP_CONFIG" "$app_config"
+append_env_line "$env_tmp" "FORCE_PRODUCTION_CONFIG" "$force_production_config"
+append_env_line "$env_tmp" "SERVER" "$app_server"
+append_env_line "$env_tmp" "HOST" "$bind_host"
+append_env_line "$env_tmp" "PORT" "$app_port"
+append_env_line "$env_tmp" "SECRET_KEY" "$secret_key"
+append_env_line "$env_tmp" "DATABASE_URL" "$database_url"
+append_env_line "$env_tmp" "USE_PROXY_FIX" "$use_proxy_fix"
+append_env_line "$env_tmp" "APP_BOOTSTRAP_ADMIN_PASSWORD" "$bootstrap_admin_password"
+append_env_line "$env_tmp" "APP_BOOTSTRAP_ROOT_USERNAME" "$bootstrap_root_username"
+append_env_line "$env_tmp" "APP_BOOTSTRAP_ROOT_PASSWORD" "$bootstrap_root_password"
+append_env_line "$env_tmp" "SESSION_COOKIE_SECURE" "$cookie_secure"
+append_env_line "$env_tmp" "REMEMBER_COOKIE_SECURE" "$cookie_secure"
+append_env_line "$env_tmp" "SESSION_COOKIE_SAMESITE" "$cookie_samesite"
+append_env_line "$env_tmp" "REMEMBER_COOKIE_SAMESITE" "$cookie_samesite"
+append_env_line "$env_tmp" "WHATSAPP_ENABLED" "${WHATSAPP_ENABLED:-0}"
+append_env_line "$env_tmp" "WHATSAPP_PHONE_NUMBER_ID" "${WHATSAPP_PHONE_NUMBER_ID:-${WHATSAPP_PHONE_ID:-}}"
+append_env_line "$env_tmp" "WHATSAPP_ACCESS_TOKEN" "${WHATSAPP_ACCESS_TOKEN:-${WHATSAPP_TOKEN:-}}"
+append_env_line "$env_tmp" "WHATSAPP_WEBHOOK_VERIFY_TOKEN" "${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-${WHATSAPP_VERIFY_TOKEN:-}}"
+append_env_line "$env_tmp" "WHATSAPP_DRY_RUN" "${WHATSAPP_DRY_RUN:-0}"
+append_env_line "$env_tmp" "WHATSAPP_RATE_LIMIT_PER_PHONE" "${WHATSAPP_RATE_LIMIT_PER_PHONE:-20}"
+append_env_line "$env_tmp" "WHATSAPP_RATE_LIMIT_GLOBAL" "${WHATSAPP_RATE_LIMIT_GLOBAL:-500}"
+append_env_line "$env_tmp" "WHATSAPP_SESION_HORAS" "${WHATSAPP_SESION_HORAS:-24}"
+append_env_line "$env_tmp" "WHATSAPP_CODIGO_EXPIRACION_DIAS" "${WHATSAPP_CODIGO_EXPIRACION_DIAS:-30}"
+append_env_line "$env_tmp" "WHATSAPP_MAX_INTENTOS_CODIGO" "${WHATSAPP_MAX_INTENTOS_CODIGO:-3}"
+append_env_line "$env_tmp" "WHATSAPP_ASESOR_TIMEOUT_SEGUNDOS" "${WHATSAPP_ASESOR_TIMEOUT_SEGUNDOS:-180}"
+append_env_line "$env_tmp" "WHATSAPP_ASESOR_HEARTBEAT_SEGUNDOS" "${WHATSAPP_ASESOR_HEARTBEAT_SEGUNDOS:-30}"
+append_env_line "$env_tmp" "WHATSAPP_ASESOR_MAX_CONVERSACIONES" "${WHATSAPP_ASESOR_MAX_CONVERSACIONES:-5}"
+append_env_line "$env_tmp" "WHATSAPP_TIMEOUT_SCHEDULER" "${WHATSAPP_TIMEOUT_SCHEDULER:-1}"
+append_env_line "$env_tmp" "WHATSAPP_TIMEOUT_INTERVAL_SECONDS" "${WHATSAPP_TIMEOUT_INTERVAL_SECONDS:-30}"
+append_env_line "$env_tmp" "WHATSAPP_NOTIFICAR_LISTO" "${WHATSAPP_NOTIFICAR_LISTO:-1}"
+append_env_line "$env_tmp" "WHATSAPP_NOTIFICAR_ESPERA_CLIENTE" "${WHATSAPP_NOTIFICAR_ESPERA_CLIENTE:-1}"
+append_env_line "$env_tmp" "WHATSAPP_NOTIFICAR_NO_SE_PUDO" "${WHATSAPP_NOTIFICAR_NO_SE_PUDO:-0}"
+append_env_line "$env_tmp" "CRM_ENABLED" "${CRM_ENABLED:-1}"
+append_env_line "$env_tmp" "CRM_BANDEJA_JEFE_MIN_NIVEL" "${CRM_BANDEJA_JEFE_MIN_NIVEL:-100}"
+append_env_line "$env_tmp" "AI_ENABLED" "${AI_ENABLED:-0}"
+append_env_line "$env_tmp" "AI_PROVIDER" "${AI_PROVIDER:-openai}"
+append_env_line "$env_tmp" "AI_MODEL" "${AI_MODEL:-gpt-4o-mini}"
+append_env_line "$env_tmp" "AI_REASONING_EFFORT" "${AI_REASONING_EFFORT:-low}"
+append_env_line "$env_tmp" "AI_MAX_TOKENS" "${AI_MAX_TOKENS:-500}"
+append_env_line "$env_tmp" "AI_TEMPERATURE" "${AI_TEMPERATURE:-0.7}"
+append_env_line "$env_tmp" "AI_API_KEY" "${AI_API_KEY:-}"
+append_env_line "$env_tmp" "AI_BASE_URL" "${AI_BASE_URL:-}"
+append_env_line "$env_tmp" "DEEPSEEK_API_KEY" "${DEEPSEEK_API_KEY:-}"
+append_env_line "$env_tmp" "DEEPSEEK_BASE_URL" "${DEEPSEEK_BASE_URL:-}"
+append_env_line "$env_tmp" "LOG_LEVEL" "${LOG_LEVEL:-}"
+append_env_line "$env_tmp" "LOG_REQUEST_ACCESS" "${LOG_REQUEST_ACCESS:-0}"
+append_env_line "$env_tmp" "LOG_REQUEST_VERBOSE" "${LOG_REQUEST_VERBOSE:-0}"
+append_env_line "$env_tmp" "LOG_REQUEST_BODY" "${LOG_REQUEST_BODY:-0}"
+append_env_line "$env_tmp" "LOG_WHATSAPP_WEBHOOK" "${LOG_WHATSAPP_WEBHOOK:-0}"
+append_env_line "$env_tmp" "LOG_DB_COMMITS" "${LOG_DB_COMMITS:-0}"
+append_env_line "$env_tmp" "RCLONE_DEST_DIR" ""
+append_env_line "$env_tmp" "RCLONE_OP" "copy"
+append_env_line "$env_tmp" "RCLONE_FAIL_OPEN" "0"
+as_root cp "$env_tmp" "$env_file_path"
 
 if [ -s "$extra_env_tmp" ]; then
   as_root bash -lc "printf '\n' >> '$env_file_path'"

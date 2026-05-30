@@ -218,6 +218,11 @@ if [ "$run_app_bootstrap_migrations" = "1" ]; then
   "$python_bin" -c "import os; from app import create_app; create_app(os.environ.get('APP_CONFIG') or 'default'); print('bootstrap_migrations_ok')"
 fi
 if [ -n "$service_name" ] && command -v systemctl >/dev/null 2>&1; then
-  sudo systemctl restart "$service_name" 2>/dev/null || true
+  as_root systemctl restart "$service_name"
+  if ! as_root systemctl is-active --quiet "$service_name"; then
+    as_root systemctl status "$service_name" --no-pager || true
+    echo "El servicio $service_name no quedó activo tras el deploy." >&2
+    exit 1
+  fi
 fi
 echo "OK"

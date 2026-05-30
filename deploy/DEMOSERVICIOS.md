@@ -29,7 +29,7 @@ nano deploy/demoservicios.env
 bash deploy/install_demoservicios.sh
 ```
 
-Minimo cambia `DB_ROOT_PASSWORD`. Si dejas vacios `DB_PASSWORD`, `SECRET_KEY`, `APP_BOOTSTRAP_ADMIN_PASSWORD` y `APP_BOOTSTRAP_ROOT_PASSWORD`, el instalador genera valores seguros.
+Si MariaDB `root` usa password, define `DB_ROOT_PASSWORD`. Si el servidor usa `auth_socket` y ejecutas el instalador con `sudo/root`, puede quedar vacio. Si dejas vacios `DB_PASSWORD`, `SECRET_KEY`, `APP_BOOTSTRAP_ADMIN_PASSWORD` y `APP_BOOTSTRAP_ROOT_PASSWORD`, el instalador genera valores seguros. El deploy ejecuta tambien la migracion base de gastronomia (`RUN_GASTRONOMIA_MIGRATIONS=1`).
 
 ## Actualizar Codigo Despues
 
