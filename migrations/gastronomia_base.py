@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -9,6 +10,9 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 ENV_FILE_CANDIDATES = (
     os.environ.get('ENV_FILE_PATH'),
     '/etc/sistema_cliente2.env',
