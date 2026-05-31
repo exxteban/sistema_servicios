@@ -90,7 +90,16 @@ fix_upload_permissions() {
 }
 
 resolve_env_file_path
+if [ ! -f "$env_file_path" ] && [ -z "${DATABASE_URL:-}" ]; then
+  echo "No se encontro el archivo de entorno: $env_file_path" >&2
+  echo "Ejecuta con ENV_FILE_PATH=/ruta/instancia.env SERVICE_NAME=nombre-servicio bash deploy/update_min.sh" >&2
+  exit 1
+fi
 load_env_file
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "DATABASE_URL no esta definido. Revisa ENV_FILE_PATH antes de ejecutar migraciones." >&2
+  exit 1
+fi
 cd "$app_dir"
 if [ "$skip_git" != "1" ]; then
   if [ -d .git ]; then

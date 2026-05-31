@@ -3,11 +3,11 @@
 ## Migracion y backup
 
 1. Verificar `DATABASE_URL` y `ENV_FILE_PATH` del servidor.
-2. Ejecutar `bash deploy/update_min.sh`; por defecto corre `migrations/gastronomia_base.py`.
+2. Ejecutar `ENV_FILE_PATH=/etc/instancia.env SERVICE_NAME=nombre-servicio bash deploy/update_min.sh`; por defecto corre `migrations/gastronomia_base.py`.
 3. Confirmar en la salida la ruta `Backup pre-migracion OK`.
 4. Si ya existe un backup externo validado, se puede omitir el backup local con `SKIP_GASTRONOMIA_BACKUP=1`, pero no es recomendado.
 
-El script crea un backup antes de tocar la base y asegura las tablas/columnas actuales de Gastronomia. Si se necesita correrlo manualmente: `python migrations/gastronomia_base.py`. Para desactivar solo esta migracion en un update: `RUN_GASTRONOMIA_MIGRATIONS=0 bash deploy/update_min.sh`. Para omitir el backup local cuando ya existe un backup externo validado: `SKIP_GASTRONOMIA_BACKUP=1`.
+El script crea un backup antes de tocar la base y asegura las tablas/columnas actuales de Gastronomia. Siempre debe recibir `ENV_FILE_PATH` y `SERVICE_NAME` de la instancia desplegada. Si se necesita correr la migracion manualmente, primero se debe cargar el env correcto y luego ejecutar `python migrations/gastronomia_base.py`. Para desactivar solo esta migracion en un update: `RUN_GASTRONOMIA_MIGRATIONS=0 ENV_FILE_PATH=/etc/instancia.env SERVICE_NAME=nombre-servicio bash deploy/update_min.sh`. Para omitir el backup local cuando ya existe un backup externo validado: `SKIP_GASTRONOMIA_BACKUP=1`.
 
 ## Reglas de caja
 
