@@ -153,8 +153,6 @@ def guardar_producto(cliente_id: int, data: dict, producto: GastronomiaProducto 
     )
     producto.control_stock_venta = parse_bool(data.get('control_stock_venta'), False)
     producto.stock_disponible = _stock_disponible_desde_payload(data) if producto.control_stock_venta else None
-    if producto.control_stock_venta and producto.stock_disponible <= 0:
-        producto.disponible = False
     producto.orden = parse_int(data.get('orden'), 0)
     db.session.add(producto)
     _commit_or_raise_duplicate('Ya existe un producto con ese nombre.')
@@ -177,8 +175,6 @@ def actualizar_estado_producto(cliente_id: int, producto_id: int, data: dict) ->
         producto.control_stock_venta = parse_bool(data.get('control_stock_venta'), bool(producto.control_stock_venta))
     if 'stock_disponible' in data:
         producto.stock_disponible = _stock_disponible_desde_payload(data)
-    if producto.control_stock_venta and producto.stock_disponible is not None and producto.stock_disponible <= 0:
-        producto.disponible = False
     db.session.add(producto)
     db.session.commit()
     return producto

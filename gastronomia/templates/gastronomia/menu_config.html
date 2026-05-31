@@ -20,6 +20,7 @@
     <div class="gastro-main-tabs flex flex-wrap gap-2" role="tablist" aria-label="Secciones de menu">
         <button type="button" class="gastro-main-tab activa" data-main-tab="menu" role="tab" aria-selected="true">Menu</button>
         <button type="button" class="gastro-main-tab" data-main-tab="menu-cargado" role="tab" aria-selected="false">Menu cargado</button>
+        <button type="button" class="gastro-main-tab" data-main-tab="stock" role="tab" aria-selected="false">Stock y recetas</button>
     </div>
 
     <div id="gastro-menu-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
@@ -361,6 +362,10 @@
             </div>
         </section>
     </div>
+
+    <div data-main-tab-panel="stock" class="hidden" role="tabpanel">
+        {% include "gastronomia/_stock_config.html" %}
+    </div>
 </div>
 {% endblock %}
 
@@ -491,4 +496,5 @@
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='20260531-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/category_order.js', v='20260528-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/stock_config.js', v='20260531-1') }}"></script>
 {% endblock %}

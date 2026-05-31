@@ -52,6 +52,10 @@ OPTION_COLUMN_MIGRATIONS = (
     ('imagen_url', 'VARCHAR(500)'),
 )
 
+CENTRAL_PRODUCT_COLUMN_MIGRATIONS = (
+    ('unidad_stock', "VARCHAR(20) NOT NULL DEFAULT 'unidad'"),
+)
+
 
 def ensure_gastronomia_schema():
     dialect = db.engine.dialect.name
@@ -62,6 +66,7 @@ def ensure_gastronomia_schema():
 
 
 def _ensure_sqlite_columns():
+    _ensure_sqlite_central_product_columns()
     _ensure_sqlite_config_columns()
     _ensure_sqlite_product_columns()
     _ensure_sqlite_option_columns()
@@ -87,6 +92,7 @@ def _ensure_sqlite_columns():
 
 
 def _ensure_mysql_columns():
+    _ensure_mysql_central_product_columns()
     _ensure_mysql_config_columns()
     _ensure_mysql_product_columns()
     _ensure_mysql_option_columns()
@@ -145,6 +151,18 @@ def _ensure_sqlite_option_columns():
             db.session.execute(text(f'ALTER TABLE gastronomia_opciones_producto ADD COLUMN {column} {column_type}'))
 
 
+def _ensure_sqlite_central_product_columns():
+    if not _sqlite_table_exists('productos'):
+        return
+    columns = {
+        row[1]
+        for row in db.session.execute(text('PRAGMA table_info(productos)')).fetchall()
+    }
+    for column, column_type in CENTRAL_PRODUCT_COLUMN_MIGRATIONS:
+        if column not in columns:
+            db.session.execute(text(f'ALTER TABLE productos ADD COLUMN {column} {column_type}'))
+
+
 def _ensure_mysql_config_columns():
     if not _mysql_table_exists('gastronomia_cliente_config'):
         return
@@ -173,6 +191,14 @@ def _ensure_mysql_option_columns():
     for column, column_type in OPTION_COLUMN_MIGRATIONS:
         if not _mysql_column_exists('gastronomia_opciones_producto', column):
             db.session.execute(text(f'ALTER TABLE gastronomia_opciones_producto ADD COLUMN {column} {column_type} NULL'))
+
+
+def _ensure_mysql_central_product_columns():
+    if not _mysql_table_exists('productos'):
+        return
+    for column, column_type in CENTRAL_PRODUCT_COLUMN_MIGRATIONS:
+        if not _mysql_column_exists('productos', column):
+            db.session.execute(text(f'ALTER TABLE productos ADD COLUMN {column} {column_type}'))
 
 
 def _declares_nullability_or_default(column_type: str) -> bool:

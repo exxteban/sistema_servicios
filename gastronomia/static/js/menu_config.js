@@ -24,7 +24,7 @@
     menuTab: 'gastro_menu_tab',
     editProductId: 'gastro_edit_product',
   };
-  const allowedMainTabs = new Set(['menu', 'menu-cargado']);
+  const allowedMainTabs = new Set(['menu', 'menu-cargado', 'stock']);
   const allowedEntryTabs = new Set(['categoria', 'producto']);
   const allowedMenuTabs = new Set(['categorias', 'productos', 'promociones', 'tv']);
   const persistedAlertKey = 'gastro-menu-alert';

@@ -398,6 +398,7 @@ def create_app(config_name='default'):
         gastronomia_pedidos_api_bp,
         gastronomia_reportes_api_bp,
         gastronomia_salon_api_bp,
+        gastronomia_stock_api_bp,
     )
     from pedidos import pedidos_bp, pedidos_api_bp, pedidos_caja_bp
     from cobranzas.routes_clientes import cobranzas_clientes_bp
@@ -453,6 +454,7 @@ def create_app(config_name='default'):
     app.register_blueprint(gastronomia_pedidos_api_bp, url_prefix='/api/gastronomia')
     app.register_blueprint(gastronomia_reportes_api_bp, url_prefix='/api/gastronomia')
     app.register_blueprint(gastronomia_salon_api_bp, url_prefix='/api/gastronomia')
+    app.register_blueprint(gastronomia_stock_api_bp, url_prefix='/api/gastronomia')
     app.register_blueprint(pedidos_bp, url_prefix='/pedidos')
     app.register_blueprint(pedidos_api_bp, url_prefix='/pedidos')
     app.register_blueprint(pedidos_caja_bp, url_prefix='/pedidos')

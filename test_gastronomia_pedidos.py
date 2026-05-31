@@ -2,7 +2,15 @@ import re
 from datetime import datetime, timedelta
 
 from app import create_app, db
-from app.models import Cliente, TiendaPromocion, TiendaPromocionGastronomiaProducto, Usuario
+from app.models import (
+    Categoria,
+    Cliente,
+    MovimientoStock,
+    Producto,
+    TiendaPromocion,
+    TiendaPromocionGastronomiaProducto,
+    Usuario,
+)
 from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
@@ -102,6 +110,28 @@ def _agregar_mesa(app, cliente_id: int, nombre: str) -> None:
     with app.app_context():
         db.session.add(GastronomiaMesa(cliente_id=cliente_id, nombre=nombre))
         db.session.commit()
+
+
+def _agregar_insumo(app, cliente_id: int, nombre: str, stock: int, unidad='unidad') -> int:
+    with app.app_context():
+        categoria = Categoria.query.filter_by(nombre='Insumos cocina').first()
+        if not categoria:
+            categoria = Categoria(nombre='Insumos cocina')
+            db.session.add(categoria)
+            db.session.flush()
+        insumo = Producto(
+            codigo=f'INS-{nombre.upper().replace(" ", "-")}',
+            nombre=nombre,
+            id_categoria=categoria.id_categoria,
+            id_cliente=cliente_id,
+            precio_compra=0,
+            precio_venta=0,
+            stock_actual=stock,
+            unidad_stock=unidad,
+        )
+        db.session.add(insumo)
+        db.session.commit()
+        return insumo.id_producto
 
 
 def test_pos_page_carga_y_pedido_se_guarda_con_totales_backend():
@@ -310,7 +340,7 @@ def test_pedido_abierto_se_puede_editar_y_recalcula_total():
         assert evento is not None
 
 
-def test_stock_controlado_descuenta_agota_y_se_restaura_al_cancelar():
+def test_stock_controlado_descuenta_sin_agotar_y_se_restaura_al_cancelar():
     app = create_app('testing')
     client = app.test_client()
     cliente_id, producto_id, _opcion_id = _crear_menu_para_pedidos(app, 'Resto Stock', 'resto_stock')
@@ -344,16 +374,16 @@ def test_stock_controlado_descuenta_agota_y_se_restaura_al_cancelar():
     with app.app_context():
         producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
         assert producto.stock_disponible == 0
-        assert producto.disponible is False
+        assert producto.disponible is True
 
     sin_agotados = client.get('/api/gastronomia/productos?publico=1')
     assert sin_agotados.status_code == 200
-    assert sin_agotados.get_json()['productos'] == []
+    assert len(sin_agotados.get_json()['productos']) == 1
 
     con_agotados = client.get('/api/gastronomia/productos?publico=1&agotados=1')
     assert con_agotados.status_code == 200
     producto_publico = con_agotados.get_json()['productos'][0]
-    assert producto_publico['disponible'] is False
+    assert producto_publico['disponible'] is True
     assert producto_publico['stock_disponible'] == 0
 
     cancelar_resp = client.post(
@@ -368,7 +398,7 @@ def test_stock_controlado_descuenta_agota_y_se_restaura_al_cancelar():
         assert producto.disponible is True
 
 
-def test_stock_controlado_rechaza_sobreventa_y_conserva_stock():
+def test_stock_controlado_alerta_sobreventa_y_conserva_pedido():
     app = create_app('testing')
     client = app.test_client()
     cliente_id, producto_id, _opcion_id = _crear_menu_para_pedidos(app, 'Resto Sin Sobreventa', 'resto_sin_sobreventa')
@@ -385,13 +415,88 @@ def test_stock_controlado_rechaza_sobreventa_y_conserva_stock():
         json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 2}]},
         headers={'X-CSRFToken': csrf},
     )
-    assert crear_resp.status_code == 400
-    assert 'No hay stock suficiente' in crear_resp.get_json()['mensaje']
+    assert crear_resp.status_code == 201
+    alertas = crear_resp.get_json()['pedido']['alertas_stock']
+    assert len(alertas) == 1
+    assert alertas[0]['faltante'] == 1
+    assert alertas[0]['nombre'] == 'Clasica'
 
     with app.app_context():
         producto = GastronomiaProducto.query.filter_by(cliente_id=cliente_id, id_producto=producto_id).one()
-        assert producto.stock_disponible == 1
+        assert producto.stock_disponible == -1
         assert producto.disponible is True
+
+
+def test_receta_descuenta_insumo_central_alerta_y_restaura_al_cancelar():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id, _opcion_id = _crear_menu_para_pedidos(app, 'Resto Receta', 'resto_receta')
+    insumo_id = _agregar_insumo(app, cliente_id, 'Medallon', 1)
+    _loguear(client, app, 'resto_receta')
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+
+    receta_resp = client.put(
+        f'/api/gastronomia/stock/productos/{producto_id}/receta',
+        json={'items': [{'insumo_id': insumo_id, 'cantidad': 1}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert receta_resp.status_code == 200
+
+    crear_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={'tipo_pedido': 'mostrador', 'items': [{'producto_id': producto_id, 'cantidad': 2}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert crear_resp.status_code == 201
+    pedido = crear_resp.get_json()['pedido']
+    assert pedido['alertas_stock'][0]['nombre'] == 'Medallon'
+    assert pedido['alertas_stock'][0]['stock_nuevo'] == -1
+
+    with app.app_context():
+        assert db.session.get(Producto, insumo_id).stock_actual == -1
+        salida = MovimientoStock.query.filter_by(id_producto=insumo_id, referencia_tipo='gastronomia_pedido').one()
+        assert salida.cantidad == 2
+
+    cancelar_resp = client.post(
+        f"/api/gastronomia/pedidos/{pedido['id_pedido']}/estado",
+        json={'estado': 'cancelado'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cancelar_resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Producto, insumo_id).stock_actual == 1
+        assert MovimientoStock.query.filter_by(id_producto=insumo_id, referencia_tipo='gastronomia_restaura').count() == 1
+
+
+def test_presentacion_convierte_entrada_a_unidad_base():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, _producto_id, _opcion_id = _crear_menu_para_pedidos(app, 'Resto Presentacion', 'resto_presentacion')
+    insumo_id = _agregar_insumo(app, cliente_id, 'Mayonesa', 0)
+    _loguear(client, app, 'resto_presentacion')
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+
+    config_resp = client.put(
+        f'/api/gastronomia/stock/insumos/{insumo_id}',
+        json={'unidad_stock': 'g', 'stock_minimo': 500},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert config_resp.status_code == 200
+    presentacion_resp = client.post(
+        f'/api/gastronomia/stock/insumos/{insumo_id}/presentaciones',
+        json={'nombre': 'Envase 1 Kg', 'factor_unidad_base': 1000},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert presentacion_resp.status_code == 201
+    presentacion_id = presentacion_resp.get_json()['presentacion']['id_presentacion']
+    entrada_resp = client.post(
+        f'/api/gastronomia/stock/insumos/{insumo_id}/entradas',
+        json={'presentacion_id': presentacion_id, 'cantidad': 2},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert entrada_resp.status_code == 200
+    assert entrada_resp.get_json()['insumo']['stock_actual'] == 2000
+    assert entrada_resp.get_json()['insumo']['unidad_stock'] == 'g'
 
 
 def test_pedido_no_se_puede_editar_despues_de_enviarse_a_cocina():

@@ -9,6 +9,7 @@ from gastronomia.routes.menu_tv_api_routes import gastronomia_menu_tv_api_bp
 from gastronomia.routes.pedido_api_routes import gastronomia_pedidos_api_bp
 from gastronomia.routes.reportes_api_routes import gastronomia_reportes_api_bp
 from gastronomia.routes.salon_api_routes import gastronomia_salon_api_bp
+from gastronomia.routes.stock_api_routes import gastronomia_stock_api_bp
 from gastronomia.routes import caja_routes as _caja_routes  # noqa: F401
 from gastronomia.routes import cocina_routes as _cocina_routes  # noqa: F401
 from gastronomia.routes import delivery_routes as _delivery_routes  # noqa: F401
@@ -32,4 +33,5 @@ __all__ = [
     'gastronomia_pedidos_api_bp',
     'gastronomia_reportes_api_bp',
     'gastronomia_salon_api_bp',
+    'gastronomia_stock_api_bp',
 ]

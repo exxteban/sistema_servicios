@@ -4,8 +4,6 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
-from sqlalchemy import case
-
 from app import db
 from app.services.promociones_calculo import calculate_promotion_totals, money
 from app.utils.public_url import build_public_url
@@ -21,6 +19,11 @@ from gastronomia.models import (
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
+from gastronomia.services.stock_service import (
+    alertas_stock_pedido,
+    consumir_stock_item,
+    restaurar_stock_items as _restaurar_stock_items,
+)
 
 
 TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro', 'delivery'}
@@ -181,6 +184,7 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
         'estado_pago': 'pagado' if pago else 'pendiente',
         'pago': pago_data,
         'items': items,
+        'alertas_stock': alertas_stock_pedido(pedido.id_pedido),
     }
 
 
@@ -302,7 +306,7 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
             _restaurar_stock_items(pedido.items.all())
         elif estado != 'cancelado' and estado_anterior == 'cancelado':
             for item in pedido.items.all():
-                _consumir_stock_producto(cliente_id, item.producto_id, int(item.cantidad or 0))
+                consumir_stock_item(item)
     except ValueError:
         db.session.rollback()
         raise
@@ -418,8 +422,6 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
     producto = validado['producto']
     if not producto.get('visible') or not producto.get('disponible'):
         raise ValueError(f'El producto "{producto.get("nombre")}" no esta disponible.')
-    _consumir_stock_producto(cliente_id, producto['id_producto'], cantidad)
-
     precio_base = money(producto.get('precio_base', producto['precio']))
     modificadores = money(validado['total_modificadores'])
     promotion = get_active_gastronomia_product_promotion(cliente_id, producto['id_producto'])
@@ -455,84 +457,9 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
             tipo_grupo=_tipo_grupo_para_opcion(cliente_id, seleccion['grupo_id']),
             precio_delta=Decimal(str(seleccion['precio_delta'])),
         ))
+    db.session.flush()
+    consumir_stock_item(item)
     return item
-
-
-def _consumir_stock_producto(cliente_id: int, producto_id: int, cantidad: int) -> None:
-    cantidad = max(0, int(cantidad or 0))
-    if cantidad <= 0:
-        return
-
-    producto = db.session.query(
-        GastronomiaProducto.nombre,
-        GastronomiaProducto.control_stock_venta,
-    ).filter(
-        GastronomiaProducto.cliente_id == int(cliente_id),
-        GastronomiaProducto.id_producto == int(producto_id),
-        GastronomiaProducto.activo.is_(True),
-    ).first()
-    if not producto or not producto.control_stock_venta:
-        return
-
-    stock_restante = GastronomiaProducto.stock_disponible - cantidad
-    filas_actualizadas = (
-        GastronomiaProducto.query
-        .filter(
-            GastronomiaProducto.cliente_id == int(cliente_id),
-            GastronomiaProducto.id_producto == int(producto_id),
-            GastronomiaProducto.activo.is_(True),
-            GastronomiaProducto.control_stock_venta.is_(True),
-            GastronomiaProducto.stock_disponible >= cantidad,
-        )
-        .update(
-            {
-                GastronomiaProducto.stock_disponible: stock_restante,
-                GastronomiaProducto.disponible: case(
-                    (stock_restante <= 0, False),
-                    else_=GastronomiaProducto.disponible,
-                ),
-            },
-            synchronize_session=False,
-        )
-    )
-    if filas_actualizadas:
-        return
-
-    stock_actual = (
-        db.session.query(GastronomiaProducto.stock_disponible)
-        .filter(
-            GastronomiaProducto.cliente_id == int(cliente_id),
-            GastronomiaProducto.id_producto == int(producto_id),
-            GastronomiaProducto.activo.is_(True),
-            GastronomiaProducto.control_stock_venta.is_(True),
-        )
-        .scalar()
-    )
-    stock_actual = max(0, int(stock_actual or 0))
-    raise ValueError(f'No hay stock suficiente de "{producto.nombre}". Quedan {stock_actual}.')
-
-
-def _restaurar_stock_items(items: list[GastronomiaPedidoItem]) -> None:
-    cantidades_por_producto: dict[int, int] = {}
-    cliente_id = None
-    for item in items:
-        cliente_id = int(item.cliente_id)
-        producto_id = int(item.producto_id)
-        cantidades_por_producto[producto_id] = cantidades_por_producto.get(producto_id, 0) + int(item.cantidad or 0)
-    if not cliente_id or not cantidades_por_producto:
-        return
-    productos = GastronomiaProducto.query.filter(
-        GastronomiaProducto.cliente_id == cliente_id,
-        GastronomiaProducto.id_producto.in_(cantidades_por_producto.keys()),
-        GastronomiaProducto.activo.is_(True),
-    ).all()
-    for producto in productos:
-        if not producto.control_stock_venta:
-            continue
-        producto.stock_disponible = max(0, int(producto.stock_disponible or 0)) + cantidades_por_producto[int(producto.id_producto)]
-        if producto.stock_disponible > 0:
-            producto.disponible = True
-        db.session.add(producto)
 
 
 def _grupo_snapshot(cliente_id: int, grupo_id: int) -> dict:

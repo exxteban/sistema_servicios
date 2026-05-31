@@ -55,6 +55,7 @@ class Producto(db.Model):
     stock_actual = db.Column(db.Integer, nullable=False, default=0)
     stock_minimo = db.Column(db.Integer, nullable=False, default=5)
     stock_maximo = db.Column(db.Integer)
+    unidad_stock = db.Column(db.String(20), nullable=False, default='unidad', server_default='unidad')
     
     # Tipo
     es_kit = db.Column(db.Boolean, default=False)

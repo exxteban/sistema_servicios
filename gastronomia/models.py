@@ -287,6 +287,8 @@ class GastronomiaPedido(db.Model):
     )
 
     def to_dict(self):
+        from gastronomia.services.stock_service import alertas_stock_pedido
+
         return {
             'id_pedido': self.id_pedido,
             'codigo_entrega': self.codigo_entrega,
@@ -318,6 +320,7 @@ class GastronomiaPedido(db.Model):
             'estado_pago': 'pagado' if self.pago else 'pendiente',
             'pago': self.pago.to_dict() if self.pago else None,
             'items': [item.to_dict() for item in self.items.order_by(GastronomiaPedidoItem.id_item.asc()).all()],
+            'alertas_stock': alertas_stock_pedido(self.id_pedido),
         }
 
     @property

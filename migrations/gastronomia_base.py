@@ -110,7 +110,9 @@ def run_migration() -> None:
 
     os.environ['DATABASE_URL'] = database_url
     from app import create_app, db
+    from app.models.producto_presentacion import ProductoPresentacionStock
     from gastronomia import models as gastronomia_models
+    from gastronomia import stock_models as gastronomia_stock_models
     from gastronomia.schema import ensure_gastronomia_schema
 
     config_name = os.environ.get('FLASK_CONFIG') or os.environ.get('APP_CONFIG') or 'production'
@@ -128,6 +130,10 @@ def run_migration() -> None:
         gastronomia_models.GastronomiaPedidoItemModificador.__table__,
         gastronomia_models.GastronomiaPedidoEvento.__table__,
         gastronomia_models.GastronomiaPedidoPago.__table__,
+        ProductoPresentacionStock.__table__,
+        gastronomia_stock_models.GastronomiaRecetaInsumo.__table__,
+        gastronomia_stock_models.GastronomiaOpcionInsumo.__table__,
+        gastronomia_stock_models.GastronomiaPedidoItemConsumo.__table__,
     ]
     with app.app_context():
         for table in tables:

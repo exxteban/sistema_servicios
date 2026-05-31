@@ -43,6 +43,10 @@
     alertBox.textContent = message;
     alertBox.className = `mb-4 rounded-lg border px-4 py-3 text-sm font-semibold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
   };
+  const showSavedOrderAlert = (order, message) => {
+    const warnings = (order?.alertas_stock || []).map((item) => item.mensaje).join(' ');
+    showAlert(warnings ? `${message} Alerta: ${warnings}` : message, !warnings);
+  };
   const apiJson = async (url, options = {}) => {
     const response = await fetch(url, {
       ...options,
@@ -395,7 +399,7 @@
     lastOrderId = savedOrderId;
     if (orderId) {
       hydrateOrder(data.pedido);
-      showAlert(`Pedido #${lastOrderId} actualizado.`, true);
+      showSavedOrderAlert(data.pedido, `Pedido #${lastOrderId} actualizado.`);
       return lastOrderId;
     }
     if (resetAfterCreate) {
@@ -403,7 +407,7 @@
     } else {
       hydrateOrder(data.pedido);
     }
-    showAlert(`Pedido #${savedOrderId} guardado.`, true);
+    showSavedOrderAlert(data.pedido, `Pedido #${savedOrderId} guardado.`);
     return savedOrderId;
   };
 

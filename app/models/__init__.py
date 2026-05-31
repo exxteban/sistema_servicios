@@ -7,6 +7,7 @@ from app.models.permiso import Permiso
 from app.models.autorizacion import Autorizacion
 from app.models.auditoria import Auditoria
 from app.models.producto import Producto, Categoria, ProductoCompuesto, ProductoRepuesto, ProductoPrecioOpcion
+from app.models.producto_presentacion import ProductoPresentacionStock
 from app.models.servicio import Servicio, ServicioPrecioOpcion, ClienteServicio
 from app.models.cliente import Cliente, ClienteObservacion
 from app.models.cliente_calificacion import ClienteCalificacionRegla, ClienteCalificacionHistorial
@@ -53,6 +54,11 @@ from gastronomia.models import (
     GastronomiaPedidoPago,
     GastronomiaProducto,
 )
+from gastronomia.stock_models import (
+    GastronomiaOpcionInsumo,
+    GastronomiaPedidoItemConsumo,
+    GastronomiaRecetaInsumo,
+)
 from pedidos.models import PedidoCliente, PedidoClienteDetalle, PedidoClienteHistorial, PedidoClientePago
 from cobranzas.models import PlanCreditoVenta, CuotaCreditoVenta, PagoCuentaCobrarAplicacion
 from flujo_caja.models import FlujoCajaMovimiento, FlujoCajaPlantilla, FlujoCajaSemana
@@ -61,7 +67,7 @@ from gastos_corrientes.models import GastoCorriente, PagoGastoCorriente
 __all__ = [
     'Usuario', 'PreferenciaUsuario', 'Rol', 'Permiso', 'Autorizacion', 'Auditoria',
     'Producto', 'Categoria', 'ProductoCompuesto', 'ProductoRepuesto',
-    'ProductoPrecioOpcion', 'Servicio', 'ServicioPrecioOpcion', 'ClienteServicio',
+    'ProductoPrecioOpcion', 'ProductoPresentacionStock', 'Servicio', 'ServicioPrecioOpcion', 'ClienteServicio',
     'Cliente', 'ClienteObservacion', 'ClienteCalificacionRegla', 'ClienteCalificacionHistorial',
     'ClienteFidelizacionMovimiento',
     'Proveedor',
@@ -88,6 +94,7 @@ __all__ = [
     'GastronomiaGrupoOpciones', 'GastronomiaOpcionProducto', 'GastronomiaMesa',
     'GastronomiaPedido', 'GastronomiaPedidoItem', 'GastronomiaPedidoItemModificador',
     'GastronomiaPedidoEvento', 'GastronomiaPedidoPago',
+    'GastronomiaRecetaInsumo', 'GastronomiaOpcionInsumo', 'GastronomiaPedidoItemConsumo',
     'PedidoCliente', 'PedidoClienteDetalle', 'PedidoClienteHistorial', 'PedidoClientePago',
     'PlanCreditoVenta', 'CuotaCreditoVenta', 'PagoCuentaCobrarAplicacion',
     'FlujoCajaSemana', 'FlujoCajaMovimiento', 'FlujoCajaPlantilla',
