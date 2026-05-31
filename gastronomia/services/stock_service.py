@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
 from app import db
@@ -24,7 +24,7 @@ from gastronomia.stock_models import (
 )
 
 
-UNIDADES_STOCK = {'unidad', 'g', 'ml', 'mazo'}
+UNIDADES_STOCK = {'unidad', 'porcion', 'g', 'ml', 'mazo'}
 
 
 def listar_insumos(cliente_id: int) -> list[Producto]:
@@ -173,6 +173,35 @@ def obtener_receta(cliente_id: int, producto_id: int) -> dict:
     }
 
 
+def listar_resumen_recetas(cliente_id: int) -> list[dict]:
+    conteos = dict(
+        db.session.query(
+            GastronomiaRecetaInsumo.producto_id,
+            func.count(GastronomiaRecetaInsumo.id_receta_insumo),
+        )
+        .filter(
+            GastronomiaRecetaInsumo.cliente_id == int(cliente_id),
+            GastronomiaRecetaInsumo.activo.is_(True),
+        )
+        .group_by(GastronomiaRecetaInsumo.producto_id)
+        .all()
+    )
+    return [
+        {
+            'producto_id': int(producto.id_producto),
+            'producto_nombre': producto.nombre,
+            'cantidad_insumos': int(conteos.get(producto.id_producto, 0)),
+            'receta_activa': bool(conteos.get(producto.id_producto, 0)),
+        }
+        for producto in (
+            GastronomiaProducto.query
+            .filter_by(cliente_id=int(cliente_id), activo=True)
+            .order_by(GastronomiaProducto.nombre.asc())
+            .all()
+        )
+    ]
+
+
 def guardar_receta(cliente_id: int, producto_id: int, data: dict) -> dict:
     producto = _obtener_producto_menu(cliente_id, producto_id)
     items = _normalizar_receta(cliente_id, data.get('items') or [])
@@ -241,6 +270,7 @@ def restaurar_stock_items(items: list[GastronomiaPedidoItem]) -> None:
         if consumo.tipo_origen == 'producto_menu':
             producto = item.producto if item else None
             if producto:
+                producto = _bloquear_producto_menu(producto)
                 producto.stock_disponible = int(producto.stock_disponible or 0) + int(consumo.cantidad or 0)
         elif consumo.insumo:
             _mover_stock_central(
@@ -257,7 +287,7 @@ def restaurar_stock_items(items: list[GastronomiaPedidoItem]) -> None:
 
 
 def alertas_stock_pedido(pedido_id: int) -> list[dict]:
-    return [
+    alertas = [
         consumo.alerta_dict()
         for consumo in (
             GastronomiaPedidoItemConsumo.query
@@ -271,6 +301,44 @@ def alertas_stock_pedido(pedido_id: int) -> list[dict]:
             .all()
         )
     ]
+    items_sin_control_directo = (
+        GastronomiaPedidoItem.query
+        .join(GastronomiaProducto, GastronomiaProducto.id_producto == GastronomiaPedidoItem.producto_id)
+        .filter(
+            GastronomiaPedidoItem.pedido_id == int(pedido_id),
+            GastronomiaProducto.control_stock_venta.isnot(True),
+        )
+        .all()
+    )
+    if not items_sin_control_directo:
+        return alertas
+    producto_ids = {int(item.producto_id) for item in items_sin_control_directo}
+    productos_con_receta = {
+        int(row[0])
+        for row in (
+            db.session.query(GastronomiaRecetaInsumo.producto_id)
+            .filter(
+                GastronomiaRecetaInsumo.producto_id.in_(producto_ids),
+                GastronomiaRecetaInsumo.activo.is_(True),
+            )
+            .distinct()
+            .all()
+        )
+    }
+    for item in items_sin_control_directo:
+        if int(item.producto_id) in productos_con_receta:
+            continue
+        alertas.append({
+            'item_id': int(item.id_item),
+            'producto_id': int(item.producto_id),
+            'tipo_origen': 'sin_receta',
+            'nombre': item.nombre_producto,
+            'mensaje': (
+                f'"{item.nombre_producto}" no tiene receta de stock configurada. '
+                'El pedido se guardo sin descontar insumos.'
+            ),
+        })
+    return alertas
 
 
 def _cantidades_receta_item(item: GastronomiaPedidoItem) -> Counter:
@@ -294,6 +362,7 @@ def _cantidades_receta_item(item: GastronomiaPedidoItem) -> Counter:
 
 
 def _consumir_producto_menu(item, producto: GastronomiaProducto, cantidad: int):
+    producto = _bloquear_producto_menu(producto)
     stock_anterior = int(producto.stock_disponible or 0)
     producto.stock_disponible = stock_anterior - max(0, cantidad)
     return _registrar_consumo(item, None, cantidad, stock_anterior, producto.nombre)
@@ -318,6 +387,7 @@ def _registrar_consumo(item, insumo, cantidad: int, stock_anterior: int, nombre:
 
 
 def _mover_stock_central(insumo, diferencia: int, *, usuario_id, referencia_tipo, motivo, referencia_id=None):
+    insumo = _bloquear_insumo(insumo)
     stock_anterior = int(insumo.stock_actual or 0)
     insumo.stock_actual = stock_anterior + int(diferencia or 0)
     db.session.add(MovimientoStock(
@@ -331,6 +401,27 @@ def _mover_stock_central(insumo, diferencia: int, *, usuario_id, referencia_tipo
         referencia_id=referencia_id,
         motivo=motivo,
     ))
+    return insumo
+
+
+def _bloquear_insumo(insumo: Producto) -> Producto:
+    return (
+        Producto.query
+        .populate_existing()
+        .filter(Producto.id_producto == int(insumo.id_producto))
+        .with_for_update()
+        .one()
+    )
+
+
+def _bloquear_producto_menu(producto: GastronomiaProducto) -> GastronomiaProducto:
+    return (
+        GastronomiaProducto.query
+        .populate_existing()
+        .filter(GastronomiaProducto.id_producto == int(producto.id_producto))
+        .with_for_update()
+        .one()
+    )
 
 
 def _normalizar_receta(cliente_id: int, items: list[dict]) -> Counter:

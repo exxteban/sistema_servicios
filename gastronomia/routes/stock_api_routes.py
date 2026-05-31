@@ -11,6 +11,7 @@ from gastronomia.services.stock_service import (
     guardar_presentacion,
     guardar_receta,
     listar_insumos,
+    listar_resumen_recetas,
     obtener_receta,
     registrar_entrada,
     serializar_insumo,
@@ -124,6 +125,16 @@ def receta(producto_id):
     except ValueError as exc:
         return jsonify({'error': 'not_found', 'mensaje': str(exc)}), 404
     return jsonify({'ok': True, 'receta': data})
+
+
+@gastronomia_stock_api_bp.route('/stock/recetas/resumen', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def resumen_recetas():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    return jsonify({'ok': True, 'productos': listar_resumen_recetas(cliente_id)})
 
 
 @gastronomia_stock_api_bp.route('/stock/productos/<int:producto_id>/receta', methods=['PUT'])

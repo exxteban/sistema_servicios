@@ -175,6 +175,8 @@ def test_pos_page_carga_y_pedido_se_guarda_con_totales_backend():
     assert pedido['total'] == 35000
     assert pedido['items'][0]['precio_unitario'] == 17500
     assert pedido['items'][0]['modificadores'][0]['nombre_opcion'] == 'Queso'
+    assert pedido['alertas_stock'][0]['tipo_origen'] == 'sin_receta'
+    assert 'no tiene receta de stock configurada' in pedido['alertas_stock'][0]['mensaje']
     with app.app_context():
         assert GastronomiaPedido.query.filter_by(cliente_id=cliente_id).count() == 1
 
@@ -497,6 +499,35 @@ def test_presentacion_convierte_entrada_a_unidad_base():
     assert entrada_resp.status_code == 200
     assert entrada_resp.get_json()['insumo']['stock_actual'] == 2000
     assert entrada_resp.get_json()['insumo']['unidad_stock'] == 'g'
+
+
+def test_resumen_recetas_distingue_platos_sin_descuento_y_activos():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id, _opcion_id = _crear_menu_para_pedidos(app, 'Resto Resumen', 'resto_resumen')
+    insumo_id = _agregar_insumo(app, cliente_id, 'Lechuga repollada', 1, unidad='mazo')
+    _loguear(client, app, 'resto_resumen')
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+
+    resumen_vacio = client.get('/api/gastronomia/stock/recetas/resumen')
+    assert resumen_vacio.status_code == 200
+    assert resumen_vacio.get_json()['productos'] == [{
+        'cantidad_insumos': 0,
+        'producto_id': producto_id,
+        'producto_nombre': 'Clasica',
+        'receta_activa': False,
+    }]
+
+    guardar_resp = client.put(
+        f'/api/gastronomia/stock/productos/{producto_id}/receta',
+        json={'items': [{'insumo_id': insumo_id, 'cantidad': 1}]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert guardar_resp.status_code == 200
+    resumen_activo = client.get('/api/gastronomia/stock/recetas/resumen')
+    assert resumen_activo.status_code == 200
+    assert resumen_activo.get_json()['productos'][0]['receta_activa'] is True
+    assert resumen_activo.get_json()['productos'][0]['cantidad_insumos'] == 1
 
 
 def test_pedido_no_se_puede_editar_despues_de_enviarse_a_cocina():

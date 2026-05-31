@@ -11,6 +11,7 @@
   let insumos = [];
   let recipeItems = [];
   let recipeOptions = [];
+  let recipeSummaries = [];
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
@@ -31,6 +32,7 @@
   };
   const selectedInsumo = () => insumos.find((item) => String(item.id_producto) === String(insumoSelect.value));
   const selectedRecipeInsumo = () => insumos.find((item) => String(item.id_producto) === String(recipeInsumo.value));
+  const selectedRecipeSummary = () => recipeSummaries.find((item) => String(item.producto_id) === String(recipeProduct.value));
   const formObject = (form) => Object.fromEntries(new FormData(form).entries());
 
   const fillInsumoOptions = () => {
@@ -75,6 +77,42 @@
     renderRecipe();
   };
 
+  const syncRecipeControls = () => {
+    const enabled = Boolean(recipeProduct.value);
+    [recipeInsumo, recipeQuantity, document.getElementById('stock-recipe-add'), document.getElementById('stock-recipe-save')]
+      .forEach((control) => { control.disabled = !enabled; });
+    const summary = selectedRecipeSummary();
+    const state = document.getElementById('stock-recipe-state');
+    if (!enabled) {
+      state.textContent = 'Selecciona un producto del menu para configurar su receta.';
+      return;
+    }
+    state.textContent = summary?.receta_activa
+      ? `Receta activa de ${summary.producto_nombre}: descuenta ${summary.cantidad_insumos} insumo(s).`
+      : `${summary?.producto_nombre || 'Este producto'} todavia no descuenta insumos. Agrega el primer insumo.`;
+  };
+
+  const renderRecipeSummaries = () => {
+    document.getElementById('stock-recipe-summary').innerHTML = recipeSummaries.map((item) => `
+      <div class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${item.receta_activa ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-400/30 dark:bg-emerald-500/10' : 'border-red-200 bg-red-50 dark:border-red-400/30 dark:bg-red-500/10'}">
+        <div>
+          <strong class="text-gray-900 dark:text-white">${escapeHtml(item.producto_nombre)}</strong>
+          <span class="ml-2 text-xs font-bold ${item.receta_activa ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200'}">
+            ${item.receta_activa ? `${item.cantidad_insumos} insumo(s), receta activa` : 'Sin receta: no descuenta'}
+          </span>
+        </div>
+        <button type="button" data-edit-recipe-product="${item.producto_id}" class="text-xs font-bold text-amber-700 dark:text-amber-200">Configurar</button>
+      </div>
+    `).join('') || '<p class="text-xs font-semibold text-gray-500">No hay productos cargados en el menu.</p>';
+    syncRecipeControls();
+  };
+
+  const loadRecipeSummaries = async () => {
+    const data = await apiJson('/api/gastronomia/stock/recetas/resumen');
+    recipeSummaries = data.productos || [];
+    renderRecipeSummaries();
+  };
+
   const renderRecipe = () => {
     const container = document.getElementById('stock-recipe-items');
     container.innerHTML = recipeItems.map((row, index) => `
@@ -90,18 +128,39 @@
       recipeItems = [];
       recipeOptions = [];
       renderRecipe();
+      syncRecipeControls();
       return;
     }
     const data = await apiJson(`/api/gastronomia/stock/productos/${recipeProduct.value}/receta`);
     recipeItems = data.receta?.items || [];
     recipeOptions = data.receta?.opciones || [];
     renderRecipe();
+    syncRecipeControls();
   };
 
   insumoSelect.addEventListener('change', renderInsumo);
   recipeProduct.addEventListener('change', () => loadRecipe().catch((error) => showAlert(error.message, false)));
 
-  document.getElementById('stock-recipe-add').addEventListener('click', () => {
+  const persistRecipe = async ({confirmation = false} = {}) => {
+    if (!recipeProduct.value) throw new Error('Paso 1: selecciona el producto del menu que quieres configurar.');
+    const data = await apiJson(`/api/gastronomia/stock/productos/${recipeProduct.value}/receta`, {
+      method: 'PUT',
+      body: {items: recipeItems.map(({insumo_id, cantidad}) => ({insumo_id, cantidad})), opciones: recipeOptions},
+    });
+    recipeItems = data.receta?.items || [];
+    recipeOptions = data.receta?.opciones || [];
+    await loadRecipeSummaries();
+    renderRecipe();
+    syncRecipeControls();
+    const plato = data.receta?.producto_nombre || 'Producto';
+    showAlert(recipeItems.length
+      ? `${plato}: receta activa con ${recipeItems.length} insumo(s). Los proximos pedidos descontaran stock automaticamente.`
+      : `${plato}: receta vacia. Este producto no descontara insumos.`,
+    recipeItems.length > 0);
+  };
+
+  document.getElementById('stock-recipe-add').addEventListener('click', async () => {
+    if (!recipeProduct.value) return showAlert('Paso 1: selecciona el producto del menu antes de agregar insumos.', false);
     const insumo = selectedRecipeInsumo();
     const cantidad = Math.max(0, Number(recipeQuantity.value || 0));
     if (!insumo || cantidad <= 0) return showAlert('Selecciona un insumo y una cantidad valida.', false);
@@ -117,26 +176,38 @@
       });
     }
     renderRecipe();
+    try {
+      await persistRecipe();
+    } catch (error) {
+      showAlert(error.message, false);
+    }
   });
 
-  document.getElementById('stock-recipe-items').addEventListener('click', (event) => {
+  document.getElementById('stock-recipe-items').addEventListener('click', async (event) => {
     const button = event.target.closest('[data-delete-recipe-index]');
     if (!button) return;
     recipeItems.splice(Number(button.dataset.deleteRecipeIndex), 1);
     renderRecipe();
+    try {
+      await persistRecipe();
+    } catch (error) {
+      showAlert(error.message, false);
+    }
   });
 
   document.getElementById('stock-recipe-save').addEventListener('click', async () => {
     try {
-      if (!recipeProduct.value) throw new Error('Selecciona un producto del menu.');
-      await apiJson(`/api/gastronomia/stock/productos/${recipeProduct.value}/receta`, {
-        method: 'PUT',
-        body: {items: recipeItems.map(({insumo_id, cantidad}) => ({insumo_id, cantidad})), opciones: recipeOptions},
-      });
-      showAlert('Receta guardada.');
+      await persistRecipe({confirmation: true});
     } catch (error) {
       showAlert(error.message, false);
     }
+  });
+
+  document.getElementById('stock-recipe-summary').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-edit-recipe-product]');
+    if (!button) return;
+    recipeProduct.value = button.dataset.editRecipeProduct;
+    loadRecipe().catch((error) => showAlert(error.message, false));
   });
 
   document.getElementById('stock-insumo-config').addEventListener('submit', async (event) => {
@@ -204,5 +275,6 @@
     }
   });
 
-  loadInsumos().catch((error) => showAlert(error.message, false));
+  syncRecipeControls();
+  Promise.all([loadInsumos(), loadRecipeSummaries()]).catch((error) => showAlert(error.message, false));
 }());
