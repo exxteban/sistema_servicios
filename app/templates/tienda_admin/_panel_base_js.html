@@ -1,6 +1,10 @@
-var tiendaAdminAutoBusquedaTimer = null;
-var tiendaAdminUltimaBusqueda = {{ q|tojson }};
-var tiendaAdminBusquedaController = null;
+window.clearTimeout(window.tiendaAdminAutoBusquedaTimer);
+window.tiendaAdminAutoBusquedaTimer = null;
+window.tiendaAdminUltimaBusqueda = {{ q|tojson }};
+if (window.tiendaAdminBusquedaController) {
+    window.tiendaAdminBusquedaController.abort();
+}
+window.tiendaAdminBusquedaController = null;
 
 function tiendaAdminObtenerElementosBusqueda() {
     return {
@@ -55,10 +59,10 @@ async function tiendaAdminCargarResultados(url, { restaurarFoco = false } = {}) 
     const selectionStart = input.selectionStart;
     const selectionEnd = input.selectionEnd;
 
-    if (tiendaAdminBusquedaController) {
-        tiendaAdminBusquedaController.abort();
+    if (window.tiendaAdminBusquedaController) {
+        window.tiendaAdminBusquedaController.abort();
     }
-    tiendaAdminBusquedaController = new AbortController();
+    window.tiendaAdminBusquedaController = new AbortController();
 
     const partialUrl = new URL(url.toString());
     partialUrl.searchParams.set('partial', '1');
@@ -69,14 +73,14 @@ async function tiendaAdminCargarResultados(url, { restaurarFoco = false } = {}) 
     try {
         const response = await fetch(partialUrl.toString(), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            signal: tiendaAdminBusquedaController.signal
+            signal: window.tiendaAdminBusquedaController.signal
         });
         if (!response.ok) {
             throw new Error('No se pudo actualizar la búsqueda');
         }
         const html = await response.text();
         results.innerHTML = html;
-        tiendaAdminUltimaBusqueda = (input.value || '').trim();
+        window.tiendaAdminUltimaBusqueda = (input.value || '').trim();
         window.history.replaceState({}, '', url.toString());
         if (restaurarFoco) {
             window.requestAnimationFrame(() => tiendaAdminRestaurarFoco(selectionStart, selectionEnd));
@@ -86,7 +90,7 @@ async function tiendaAdminCargarResultados(url, { restaurarFoco = false } = {}) 
         window.location.assign(url.toString());
     } finally {
         results.classList.remove('opacity-60', 'pointer-events-none');
-        tiendaAdminBusquedaController = null;
+        window.tiendaAdminBusquedaController = null;
     }
 }
 
@@ -97,9 +101,9 @@ function tiendaAdminProgramarAutoBusqueda() {
     tiendaAdminActualizarBotonLimpiar();
 
     const termino = (input.value || '').trim();
-    window.clearTimeout(tiendaAdminAutoBusquedaTimer);
+    window.clearTimeout(window.tiendaAdminAutoBusquedaTimer);
 
-    if (termino === tiendaAdminUltimaBusqueda) {
+    if (termino === window.tiendaAdminUltimaBusqueda) {
         return;
     }
 
@@ -107,8 +111,8 @@ function tiendaAdminProgramarAutoBusqueda() {
         return;
     }
 
-    tiendaAdminAutoBusquedaTimer = window.setTimeout(() => {
-        tiendaAdminUltimaBusqueda = termino;
+    window.tiendaAdminAutoBusquedaTimer = window.setTimeout(() => {
+        window.tiendaAdminUltimaBusqueda = termino;
         tiendaAdminEnviarBusqueda();
     }, 350);
 }
@@ -116,9 +120,9 @@ function tiendaAdminProgramarAutoBusqueda() {
 function tiendaAdminLimpiarBusqueda() {
     const { input } = tiendaAdminObtenerElementosBusqueda();
     if (!input) return;
-    window.clearTimeout(tiendaAdminAutoBusquedaTimer);
+    window.clearTimeout(window.tiendaAdminAutoBusquedaTimer);
     input.value = '';
-    tiendaAdminUltimaBusqueda = '';
+    window.tiendaAdminUltimaBusqueda = '';
     tiendaAdminActualizarBotonLimpiar();
     tiendaAdminEnviarBusqueda();
 }

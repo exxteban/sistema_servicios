@@ -29,7 +29,11 @@ def test_tienda_admin_scripts_allow_tab_runtime_reload():
     for template_name, state_names in reloadable_state.items():
         source = (TIENDA_ADMIN_TEMPLATES / template_name).read_text(encoding="utf-8")
         for state_name in state_names:
-            assert re.search(rf"^var {state_name}\b", source, flags=re.MULTILINE), (
+            assert re.search(rf"^(?:var {state_name}\b|window\.{state_name}\s*=)", source, flags=re.MULTILINE), (
+                template_name,
+                state_name,
+            )
+            assert not re.search(rf"^(?:let|const) {state_name}\b", source, flags=re.MULTILINE), (
                 template_name,
                 state_name,
             )

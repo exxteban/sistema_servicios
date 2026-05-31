@@ -188,6 +188,12 @@ function abrirModalPromocionParaProducto(productId, productName) {
     });
 }
 
+function abrirModalPromocionParaProductoGastronomia(productId, productName, productPrice) {
+    abrirModalPromocion({
+        productos: [{ id_producto: Number(productId), nombre: productName || '', codigo: 'GASTRO', precio_venta: Number(productPrice || 0), tipo_catalogo: 'gastronomia' }],
+    });
+}
+
 function cerrarModalPromocion() {
     document.getElementById('modalPromocionBackdrop')?.classList.remove('opacity-100');
     document.getElementById('modalPromocionPanel')?.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');

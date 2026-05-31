@@ -52,6 +52,7 @@
                     <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Visible</th>
                     <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Disponible</th>
                     <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Imagen</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300">Acciones</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -85,10 +86,18 @@
                     <td class="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-300">
                         {{ 'Sí' if p.imagen_url else 'No' }}
                     </td>
+                    <td class="px-4 py-3 text-center">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-rose-100 hover:bg-rose-200 text-rose-700 dark:bg-rose-900/30 dark:hover:bg-rose-800/40 dark:text-rose-300 transition"
+                            onclick='abrirModalPromocionParaProductoGastronomia({{ p.id_producto }}, {{ p.nombre|tojson }}, {{ (p.precio or 0)|float }})'>
+                            <i class="fas fa-badge-percent"></i> <span class="hidden sm:inline">Promo</span>
+                        </button>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">Todavía no hay productos gastronómicos para mostrar</td>
+                    <td colspan="8" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">Todavía no hay productos gastronómicos para mostrar</td>
                 </tr>
                 {% endfor %}
             </tbody>

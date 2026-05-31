@@ -110,7 +110,10 @@
 </div>
 
 <script>
-var tiendaStatsState = {
+if (window.tiendaStatsState?.chart) {
+    window.tiendaStatsState.chart.destroy();
+}
+window.tiendaStatsState = {
     productId: null,
     productName: '',
     range: 'week',
@@ -175,7 +178,7 @@ function actualizarRangoFechasPorPreset(range) {
 }
 
 function seleccionarRangoEstadisticasProducto(range) {
-    tiendaStatsState.range = range;
+    window.tiendaStatsState.range = range;
     actualizarBotonesRangeEstadisticas(range);
     if (range !== 'custom') {
         actualizarRangoFechasPorPreset(range);
@@ -185,17 +188,17 @@ function seleccionarRangoEstadisticasProducto(range) {
 
 function manejarCambioFechasEstadisticasProducto() {
     const { from, to } = obtenerControlesEstadisticasProducto();
-    tiendaStatsState.range = from.value === to.value ? 'day' : 'custom';
-    actualizarBotonesRangeEstadisticas(tiendaStatsState.range);
+    window.tiendaStatsState.range = from.value === to.value ? 'day' : 'custom';
+    actualizarBotonesRangeEstadisticas(window.tiendaStatsState.range);
     cargarEstadisticasProducto();
 }
 
 function construirQueryEstadisticasProducto() {
     const { from, to } = obtenerControlesEstadisticasProducto();
     const params = new URLSearchParams();
-    params.set('range', tiendaStatsState.range);
+    params.set('range', window.tiendaStatsState.range);
 
-    if (tiendaStatsState.range === 'day') {
+    if (window.tiendaStatsState.range === 'day') {
         params.set('fecha', from.value || to.value);
         return params.toString();
     }
@@ -206,9 +209,9 @@ function construirQueryEstadisticasProducto() {
 }
 
 function descargarEstadisticasProducto(format) {
-    if (!tiendaStatsState.productId) return;
+    if (!window.tiendaStatsState.productId) return;
     const query = construirQueryEstadisticasProducto();
-    window.location.href = `/api/tienda/admin/producto/${tiendaStatsState.productId}/estadisticas/export?${query}&format=${format}`;
+    window.location.href = `/api/tienda/admin/producto/${window.tiendaStatsState.productId}/estadisticas/export?${query}&format=${format}`;
 }
 
 async function renderizarChartEstadisticasProducto(data) {
@@ -216,11 +219,11 @@ async function renderizarChartEstadisticasProducto(data) {
     const ChartLib = await window.ensureChartJs();
     const ctx = chart.getContext('2d');
 
-    if (tiendaStatsState.chart) {
-        tiendaStatsState.chart.destroy();
+    if (window.tiendaStatsState.chart) {
+        window.tiendaStatsState.chart.destroy();
     }
 
-    tiendaStatsState.chart = new ChartLib(ctx, {
+    window.tiendaStatsState.chart = new ChartLib(ctx, {
         type: 'line',
         data: {
             labels: data.labels,
@@ -285,14 +288,14 @@ function renderizarTablaEstadisticasProducto(data) {
 }
 
 async function cargarEstadisticasProducto() {
-    if (!tiendaStatsState.productId) return;
+    if (!window.tiendaStatsState.productId) return;
 
     const controls = obtenerControlesEstadisticasProducto();
     controls.loading.classList.remove('hidden');
 
     try {
         const query = construirQueryEstadisticasProducto();
-        const res = await fetch(`/api/tienda/admin/producto/${tiendaStatsState.productId}/estadisticas?${query}`);
+        const res = await fetch(`/api/tienda/admin/producto/${window.tiendaStatsState.productId}/estadisticas?${query}`);
         const data = await res.json();
 
         if (!res.ok || !data.ok) {
@@ -311,9 +314,9 @@ async function cargarEstadisticasProducto() {
         await renderizarChartEstadisticasProducto(data);
     } catch (error) {
         controls.table.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-sm text-red-500">${error.message}</td></tr>`;
-        if (tiendaStatsState.chart) {
-            tiendaStatsState.chart.destroy();
-            tiendaStatsState.chart = null;
+        if (window.tiendaStatsState.chart) {
+            window.tiendaStatsState.chart.destroy();
+            window.tiendaStatsState.chart = null;
         }
     } finally {
         controls.loading.classList.add('hidden');
@@ -322,9 +325,9 @@ async function cargarEstadisticasProducto() {
 
 function abrirModalEstadisticasProducto(idProducto, nombreProducto) {
     const { modal } = obtenerControlesEstadisticasProducto();
-    tiendaStatsState.productId = idProducto;
-    tiendaStatsState.productName = nombreProducto || '';
-    tiendaStatsState.range = 'week';
+    window.tiendaStatsState.productId = idProducto;
+    window.tiendaStatsState.productName = nombreProducto || '';
+    window.tiendaStatsState.range = 'week';
     actualizarBotonesRangeEstadisticas('week');
     actualizarRangoFechasPorPreset('week');
     modal.classList.remove('hidden');
@@ -334,17 +337,17 @@ function abrirModalEstadisticasProducto(idProducto, nombreProducto) {
 function cerrarModalEstadisticasProducto() {
     const { modal } = obtenerControlesEstadisticasProducto();
     modal.classList.add('hidden');
-    if (tiendaStatsState.chart) {
-        tiendaStatsState.chart.destroy();
-        tiendaStatsState.chart = null;
+    if (window.tiendaStatsState.chart) {
+        window.tiendaStatsState.chart.destroy();
+        window.tiendaStatsState.chart = null;
     }
 }
 
 function inicializarEstadisticasProducto() {
-    if (tiendaStatsState.initialized) {
+    if (window.tiendaStatsState.initialized) {
         return;
     }
-    tiendaStatsState.initialized = true;
+    window.tiendaStatsState.initialized = true;
 
     const controls = obtenerControlesEstadisticasProducto();
 
