@@ -25,6 +25,7 @@ from app.services.tienda_promociones import (
     get_active_promotions_for_store,
     serialize_public_promotion,
 )
+from app.services.tienda_promociones_public import store_promotion_catalog_type
 from app.services.tienda_scope import public_product_query
 from app.utils.tienda_urls import build_product_public_path
 
@@ -408,9 +409,10 @@ def _handle_listar_promociones_activas(args: dict, contexto: dict) -> dict:
     config = contexto['config']
     busqueda = _normalize_search_text((args.get('busqueda') or '').strip())
     promociones = get_active_promotions_for_store(config)
+    catalog_type = store_promotion_catalog_type(config)
     resultados = []
     for promotion in promociones:
-        serialized = serialize_public_promotion(promotion, include_products=True)
+        serialized = serialize_public_promotion(promotion, include_products=True, catalog_type=catalog_type)
         hay_match = not busqueda
         if busqueda:
             candidate_texts = [

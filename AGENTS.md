@@ -1,6 +1,6 @@
 # Reglas de Desarrollo del Proyecto y Tienda Online
 
-Todas las inteligencias artificiales, desarrolladores o agentes trabajando en este repositorio **DEBEN** adherirse de forma incondicional a las siguientes reglas para mantener la estabilidad del SaaS actual y asegurar la escalabilidad.
+Todas las inteligencias artificiales, desarrolladores o agentes trabajando en este repositorio **DEBEN** adherirse de forma incondicional a las siguientes reglas para mantener la estabilidad del sistema actual y asegurar la escalabilidad.
 
 ## 1. Aislamiento del Nuevo Módulo "Tienda Online"
 
@@ -25,7 +25,13 @@ Con el fin de asegurar mantenibilidad y evitar la aparición de "Componentes Dio
 - **No Reutilización Forzada:** NO debes reutilizar o modificar una función existente si eso mezcla responsabilidades, rompe compatibilidad, agrega condicionales específicos de un solo caso o vuelve más difícil entender el código.
 - **Patrón Correcto en Caso de Duda:** Si existe lógica parecida pero no encaja limpiamente, extrae la parte común a una utilidad compartida o crea un adaptador delgado; no dupliques ni deformes una función sana para un caso nuevo.
 
-## 4. Manejo Tecnológico Backend
+## 4. Modelo de Despliegue y Manejo Tecnológico Backend
 
-Cualquier desarrollo en el backend de Python/Flask (`sistema_silvio_cel`) no debe romper los modelos pre-existentes de los clientes. Los nuevos campos siempre deben tener valores o alternativas por defecto (Default) o soportar Nulos.
-Todos los datos visuales de la tienda multi-tenant están atados semánticamente al `cliente_id`. No hay escapes trans-cliente bajo ninguna circunstancia.
+Este sistema **NO** es un SaaS multi-tenant compartido.
+
+- Cada cliente se instala como una instancia independiente, con base de datos y servicios separados.
+- Un mismo servidor puede alojar hasta 3 instancias, pero cada instancia conserva su propia configuración, procesos y base de datos.
+- Los campos `id_cliente` existentes deben respetarse por compatibilidad y aislamiento lógico interno.
+- No agregar infraestructura multi-tenant, selectores de tenant ni abstracciones cross-tenant salvo que una funcionalidad lo requiera explícitamente.
+- No mezclar datos entre clientes dentro de una misma instalación cuando existan registros diferenciados por `id_cliente`.
+- Cualquier desarrollo en el backend de Python/Flask (`sistema_silvio_cel`) no debe romper los modelos pre-existentes de los clientes. Los nuevos campos siempre deben tener valores o alternativas por defecto (`default`) o soportar nulos.

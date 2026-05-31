@@ -16,7 +16,7 @@ from app.services.web_bot.admin_service import (
 from gastronomia.services.modo_operacion import gastronomia_activa_para_cliente
 
 tienda_admin_bp = Blueprint('tienda_admin', __name__)
-TIENDA_ADMIN_DEBUG_VERSION = 'tienda-admin-promos-runtime-v4-2026-05-31'
+TIENDA_ADMIN_DEBUG_VERSION = 'tienda-admin-promos-runtime-v6-2026-05-31'
 
 
 def _can_manage_store() -> bool:

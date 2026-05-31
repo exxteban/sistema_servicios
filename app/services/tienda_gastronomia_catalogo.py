@@ -6,6 +6,7 @@ from urllib.parse import quote
 from app import db
 from app.models.tienda import TiendaConfig
 from app.services.tienda_promociones import (
+    active_promotions_query,
     attach_gastronomia_promotion_to_product_data,
     get_active_gastronomia_product_promotion,
     get_active_gastronomia_product_promotion_map,
@@ -56,6 +57,7 @@ def productos_gastronomia_payload(
     per_page: int = 20,
 ) -> dict:
     query = _query_productos_publicos(config)
+    cliente_id = resolver_cliente_gastronomia_tienda(config)
     if q:
         like = f'%{q}%'
         query = query.filter(
@@ -78,13 +80,36 @@ def productos_gastronomia_payload(
         .all()
     )
     promotions = get_active_gastronomia_product_promotion_map(
-        resolver_cliente_gastronomia_tienda(config),
+        cliente_id,
         [producto.id_producto for producto in productos],
     )
     cards = [
         _serializar_producto_card(producto, config, promotions.get(int(producto.id_producto)))
         for producto in productos
     ]
+    ofertas = []
+    if cliente_id and page == 1 and not q and not cat_id:
+        promotion_product_ids = {
+            rel.id_producto
+            for promotion in active_promotions_query(cliente_id).all()
+            for rel in promotion.gastronomia_productos_rel
+        }
+        if promotion_product_ids:
+            productos_oferta = (
+                _query_productos_publicos(config)
+                .filter(GastronomiaProducto.id_producto.in_(promotion_product_ids))
+                .order_by(GastronomiaProducto.orden.asc(), GastronomiaProducto.nombre.asc())
+                .limit(8)
+                .all()
+            )
+            promociones_oferta = get_active_gastronomia_product_promotion_map(
+                cliente_id,
+                [producto.id_producto for producto in productos_oferta],
+            )
+            ofertas = [
+                _serializar_producto_card(producto, config, promociones_oferta.get(int(producto.id_producto)))
+                for producto in productos_oferta
+            ]
 
     return {
         'total': total,
@@ -92,7 +117,7 @@ def productos_gastronomia_payload(
         'pages': int(ceil(total / per_page)) if total else 0,
         'productos': cards,
         'destacados': [],
-        'ofertas': [],
+        'ofertas': ofertas,
         'recomendados': [],
         'imperdibles': [],
     }

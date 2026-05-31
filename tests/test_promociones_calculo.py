@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from app.routes.ventas.parte3_helpers import _construir_detalle_servicio
 from app.services.promociones_calculo import calculate_promotion_totals
+from app.services.tienda_promociones import validate_promotion_payload
 
 
 def _promotion(tipo, **values):
@@ -27,6 +28,19 @@ def test_calcula_descuento_porcentaje_sobre_toda_la_linea():
 
     assert metrics['subtotal_base'] == 54000
     assert metrics['descuento_linea'] == 6000
+
+
+def test_rechaza_descuento_porcentaje_superior_a_cien():
+    _normalized, error = validate_promotion_payload({
+        'nombre': 'Porcentaje imposible',
+        'tipo': 'porcentaje',
+        'valor': 150,
+        'fecha_inicio': '2026-05-31T10:00',
+        'fecha_fin': '2026-05-31T11:00',
+        'productos': [1],
+    })
+
+    assert error == 'valor_invalido'
 
 
 def test_cola_gastronomica_conserva_subtotal_exacto_si_el_promedio_redondea():

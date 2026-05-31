@@ -1,7 +1,18 @@
+from datetime import datetime, timedelta
 from urllib.parse import parse_qs, unquote, urlparse
 
 from app import create_app, db
-from app.models import Cliente, Configuracion, TiendaConfig, Usuario
+from app.models import (
+    Categoria,
+    Cliente,
+    Configuracion,
+    Producto,
+    TiendaConfig,
+    TiendaPromocion,
+    TiendaPromocionGastronomiaProducto,
+    TiendaPromocionProducto,
+    Usuario,
+)
 from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
@@ -127,6 +138,96 @@ def test_tienda_gastronomia_adapta_cta_y_mensaje_de_presupuesto():
         assert 'Combo de bebidas' in mensaje
         assert 'Cantidad requerida:' in mensaje
         assert 'Bebidas, adicionales o servicio de atencion:' in mensaje
+    finally:
+        with app.app_context():
+            Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
+
+
+def test_tienda_gastronomia_expone_promociones_activas_como_ofertas():
+    app = create_app('testing')
+    client = app.test_client()
+
+    with app.app_context():
+        Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_GASTRONOMIA)
+        tienda, producto = _crear_tienda_gastronomia(slug='gastro-ofertas-test')
+        promocion = TiendaPromocion(
+            id_cliente=tienda.id_cliente,
+            nombre='Promo bebidas',
+            tipo='porcentaje',
+            valor=10,
+            fecha_inicio=datetime.utcnow() - timedelta(hours=1),
+            fecha_fin=datetime.utcnow() + timedelta(hours=1),
+            activa=True,
+        )
+        db.session.add(promocion)
+        db.session.flush()
+        db.session.add(TiendaPromocionGastronomiaProducto(
+            id_promocion=promocion.id_promocion,
+            id_producto=producto.id_producto,
+        ))
+        oculto_tienda = GastronomiaProducto.query.filter_by(
+            cliente_id=tienda.id_cliente,
+            publicado_tienda=False,
+        ).one()
+        db.session.add(TiendaPromocionGastronomiaProducto(
+            id_promocion=promocion.id_promocion,
+            id_producto=oculto_tienda.id_producto,
+        ))
+        categoria_inventario = Categoria(nombre='Inventario ajeno al menu', activo=True)
+        db.session.add(categoria_inventario)
+        db.session.flush()
+        producto_inventario = Producto(
+            id_cliente=tienda.id_cliente,
+            id_categoria=categoria_inventario.id_categoria,
+            codigo='INV-AJENO-MENU',
+            nombre='Producto de inventario ajeno al menu',
+            precio_compra=50000,
+            precio_venta=100000,
+            stock_actual=5,
+            stock_minimo=0,
+            activo=True,
+            publicado_tienda=True,
+        )
+        promocion_inventario = TiendaPromocion(
+            id_cliente=tienda.id_cliente,
+            nombre='Promo inventario ajena al menu',
+            tipo='porcentaje',
+            valor=10,
+            fecha_inicio=datetime.utcnow() - timedelta(hours=1),
+            fecha_fin=datetime.utcnow() + timedelta(hours=1),
+            activa=True,
+        )
+        db.session.add_all([producto_inventario, promocion_inventario])
+        db.session.flush()
+        db.session.add(TiendaPromocionProducto(
+            id_promocion=promocion_inventario.id_promocion,
+            id_producto=producto_inventario.id_producto,
+        ))
+        db.session.add(TiendaPromocionProducto(
+            id_promocion=promocion.id_promocion,
+            id_producto=producto_inventario.id_producto,
+        ))
+        db.session.commit()
+        slug = tienda.slug
+        producto_id = producto.id_producto
+
+    try:
+        response = client.get(f'/api/tienda/{slug}/productos')
+        assert response.status_code == 200
+        ofertas = response.get_json()['ofertas']
+        assert [oferta['nombre'] for oferta in ofertas] == ['Combo de bebidas']
+        assert ofertas[0]['precio'] == 135000
+        assert ofertas[0]['precio_anterior'] == 150000
+        assert ofertas[0]['promocion_activa']['etiqueta'] == '-10%'
+        promociones_response = client.get(f'/api/tienda/{slug}/promociones')
+        assert promociones_response.status_code == 200
+        promociones = promociones_response.get_json()
+        assert [item['nombre'] for item in promociones] == ['Promo bebidas']
+        assert promociones[0]['productos'] == [{
+            'id': producto_id,
+            'nombre': 'Combo de bebidas',
+            'tipo_catalogo': 'gastronomia',
+        }]
     finally:
         with app.app_context():
             Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)

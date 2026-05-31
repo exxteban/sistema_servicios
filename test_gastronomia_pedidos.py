@@ -1,7 +1,8 @@
 import re
+from datetime import datetime, timedelta
 
 from app import create_app, db
-from app.models import Cliente, Usuario
+from app.models import Cliente, TiendaPromocion, TiendaPromocionGastronomiaProducto, Usuario
 from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
@@ -146,6 +147,50 @@ def test_pos_page_carga_y_pedido_se_guarda_con_totales_backend():
     assert pedido['items'][0]['modificadores'][0]['nombre_opcion'] == 'Queso'
     with app.app_context():
         assert GastronomiaPedido.query.filter_by(cliente_id=cliente_id).count() == 1
+
+
+def test_pedido_aplica_promocion_al_precio_base_y_suma_extras_aparte():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id, opcion_id = _crear_menu_para_pedidos(app, 'Resto Promo', 'resto_promo')
+    with app.app_context():
+        promocion = TiendaPromocion(
+            id_cliente=cliente_id,
+            nombre='Promo hamburguesa',
+            tipo='porcentaje',
+            valor=10,
+            fecha_inicio=datetime.utcnow() - timedelta(hours=1),
+            fecha_fin=datetime.utcnow() + timedelta(hours=1),
+            activa=True,
+        )
+        db.session.add(promocion)
+        db.session.flush()
+        db.session.add(TiendaPromocionGastronomiaProducto(
+            id_promocion=promocion.id_promocion,
+            id_producto=producto_id,
+        ))
+        db.session.commit()
+        promocion_id = promocion.id_promocion
+    _loguear(client, app, 'resto_promo')
+
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    response = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'mostrador',
+            'items': [{'producto_id': producto_id, 'cantidad': 2, 'opciones': [opcion_id]}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+
+    assert response.status_code == 201
+    item = response.get_json()['pedido']['items'][0]
+    assert item['precio_original'] == 17500
+    assert item['descuento_linea'] == 3000
+    assert item['subtotal'] == 32000
+    assert item['precio_unitario'] == 16000
+    assert item['id_promocion_aplicada'] == promocion_id
+    assert item['promocion_descripcion'] == '10.00% de descuento'
 
 
 def test_pedido_se_envia_a_cocina_y_no_se_filtra_entre_clientes():

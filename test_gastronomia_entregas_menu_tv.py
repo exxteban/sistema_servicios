@@ -1,8 +1,8 @@
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from app import create_app, db
-from app.models import Cliente, Usuario
+from app.models import Cliente, TiendaPromocion, TiendaPromocionGastronomiaProducto, Usuario
 from app.utils.helpers import today_local, utc_bounds_for_local_dates
 from gastronomia.models import (
     GastronomiaCategoria,
@@ -257,6 +257,37 @@ def test_menu_tv_publico_respeta_visibilidad_disponibilidad_y_estado():
         db.session.commit()
     assert client.get('/api/gastronomia/public/menu-tv/resto-tv').status_code == 404
     assert client.get('/gastronomia/menu-tv/resto-tv').status_code == 404
+
+
+def test_menu_tv_publico_muestra_promocion_gastronomica_activa():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id, _agotado_id = _crear_base(app, 'Resto TV Promo', 'resto_tv_promo', 'resto-tv-promo')
+    with app.app_context():
+        promocion = TiendaPromocion(
+            id_cliente=cliente_id,
+            nombre='Promo TV',
+            tipo='porcentaje',
+            valor=20,
+            fecha_inicio=datetime.utcnow() - timedelta(hours=1),
+            fecha_fin=datetime.utcnow() + timedelta(hours=1),
+            activa=True,
+        )
+        db.session.add(promocion)
+        db.session.flush()
+        db.session.add(TiendaPromocionGastronomiaProducto(
+            id_promocion=promocion.id_promocion,
+            id_producto=producto_id,
+        ))
+        db.session.commit()
+
+    response = client.get('/api/gastronomia/public/menu-tv/resto-tv-promo')
+
+    assert response.status_code == 200
+    producto = response.get_json()['categorias'][0]['productos'][0]
+    assert producto['precio'] == 20000
+    assert producto['precio_anterior'] == 25000
+    assert producto['promocion_activa']['etiqueta'] == '-20%'
 
 
 def test_menu_tv_config_guarda_modo_rotacion():

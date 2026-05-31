@@ -19,6 +19,7 @@ from app.models.tienda_promocion import (
     TiendaPromocionProducto,
 )
 from app.services.promociones_calculo import calculate_promotion_totals, money
+from app.services.tienda_promociones_public import is_public_store_product, store_promotion_catalog_type
 from app.utils.helpers import get_app_timezone, utc_naive_to_local
 
 
@@ -114,19 +115,21 @@ def serialize_public_promotion(
     *,
     include_products: bool = True,
     product_limit: int = 6,
+    catalog_type: str | None = None,
 ) -> dict:
     products = []
-    if include_products:
+    if include_products and catalog_type != 'gastronomia':
         for rel in promotion.productos_rel[:product_limit]:
-            if rel.producto:
+            if is_public_store_product(rel.producto, 'producto', promotion.id_cliente):
                 products.append({
                     'id': rel.producto.id_producto,
                     'nombre': rel.producto.nombre,
                     'tipo_catalogo': 'producto',
                 })
+    if include_products and catalog_type != 'producto':
         remaining = max(0, product_limit - len(products))
         for rel in promotion.gastronomia_productos_rel[:remaining]:
-            if rel.producto:
+            if is_public_store_product(rel.producto, 'gastronomia', promotion.id_cliente):
                 products.append({
                     'id': rel.producto.id_producto,
                     'nombre': rel.producto.nombre,
@@ -288,13 +291,21 @@ def get_active_gastronomia_product_promotion(
 def get_active_promotions_for_store(config: TiendaConfig, now: datetime | None = None) -> list[TiendaPromocion]:
     if not config or not config.id_cliente:
         return []
-    return active_promotions_query(int(config.id_cliente), now=now).all()
+    catalog_type = store_promotion_catalog_type(config)
+    relation_name = 'gastronomia_productos_rel' if catalog_type == 'gastronomia' else 'productos_rel'
+    return [
+        promotion
+        for promotion in active_promotions_query(int(config.id_cliente), now=now).all()
+        if any(is_public_store_product(rel.producto, catalog_type, promotion.id_cliente)
+               for rel in getattr(promotion, relation_name))
+    ]
 
 
 def serialize_context_promotions(config: TiendaConfig, limit: int = 8) -> list[dict]:
     promotions = get_active_promotions_for_store(config)[:limit]
+    catalog_type = store_promotion_catalog_type(config)
     return [
-        serialize_public_promotion(promotion, include_products=True, product_limit=4)
+        serialize_public_promotion(promotion, include_products=True, product_limit=4, catalog_type=catalog_type)
         for promotion in promotions
     ]
 
@@ -387,6 +398,8 @@ def validate_promotion_payload(data: dict) -> tuple[dict, str | None]:
         except Exception:
             return normalized, 'valor_invalido'
         if normalized['valor'] <= Decimal('0'):
+            return normalized, 'valor_invalido'
+        if normalized['tipo'] == 'porcentaje' and normalized['valor'] > Decimal('100'):
             return normalized, 'valor_invalido'
         normalized['cantidad_lleva'] = None
         normalized['cantidad_paga'] = None

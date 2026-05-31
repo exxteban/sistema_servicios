@@ -95,11 +95,11 @@
     </div>
 </section>
 
-<div id="modalPromocion" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-promocion-title" role="dialog" aria-modal="true">
-    <div id="modalPromocionBackdrop" class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 transition-opacity backdrop-blur-sm"></div>
+<div id="modalPromocion" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-promocion-title" role="dialog" aria-modal="true" data-app-transient-overlay>
+    <div id="modalPromocionBackdrop" class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 transition-opacity backdrop-blur-sm" data-app-modal-backdrop aria-hidden="true"></div>
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
         <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div id="modalPromocionPanel" class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl border border-gray-200 dark:border-gray-700">
+            <div id="modalPromocionPanel" class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl border border-gray-200 dark:border-gray-700" data-app-modal-panel>
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
                     <div>
                         <h3 id="modal-promocion-title" class="text-lg font-semibold text-gray-900 dark:text-white">Nueva promoción</h3>
@@ -114,6 +114,9 @@
                 <form id="formPromocion" class="px-6 py-6 space-y-6">
                     <input type="hidden" name="promotion_id" value="">
                     <input type="hidden" name="slug_actual" value="{{ tienda_config.slug if tienda_config else '' }}">
+                    <input type="hidden" name="cliente_id_gastronomia" value="{{ promociones_cliente_gastronomia_id|default('') }}">
+                    <input type="hidden" name="catalogo_promocion" value="{{ promociones_catalogo|default('') }}">
+                    <input type="hidden" name="promociones_return_url" value="{{ promociones_return_url|default('/tienda-admin') }}">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la promo</label>

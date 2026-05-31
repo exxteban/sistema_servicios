@@ -197,13 +197,14 @@ function inicializarTogglesContacto() {
 
 function abrirConfiguracion() {
     const modal = document.getElementById('modalConfiguracion');
+    if (!modal) return;
     limpiarTextoNoneEnFormulario();
     inicializarTogglesContacto();
     modal.classList.remove('hidden');
-    setTimeout(() => {
-        modal.querySelector('.fixed.inset-0.bg-gray-500\\/75').classList.add('opacity-100');
-        modal.querySelector('.transform').classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
-    }, 10);
+    const backdrop = modal.querySelector('.fixed.inset-0.bg-gray-500\\/75');
+    const panel = modal.querySelector('.transform');
+    backdrop?.classList.add('opacity-100');
+    panel?.classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -215,11 +216,10 @@ tiendaAdminInicializarBusqueda();
 
 function cerrarConfiguracion() {
     const modal = document.getElementById('modalConfiguracion');
-    modal.querySelector('.fixed.inset-0.bg-gray-500\\/75').classList.remove('opacity-100');
-    modal.querySelector('.transform').classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
-    setTimeout(() => {
-        modal.classList.add('hidden');
-    }, 300);
+    if (!modal) return;
+    modal.querySelector('.fixed.inset-0.bg-gray-500\\/75')?.classList.remove('opacity-100');
+    modal.querySelector('.transform')?.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+    modal.classList.add('hidden');
 }
 
 async function copiarLinkTienda(inputId, trigger) {

@@ -179,6 +179,9 @@
                     <div class="gastro-menu-tabs flex flex-wrap gap-2" role="tablist" aria-label="Panel de menu">
                         <button type="button" class="gastro-menu-tab activa" data-menu-tab="categorias" role="tab" aria-selected="true">Categorias</button>
                         <button type="button" class="gastro-menu-tab" data-menu-tab="productos" role="tab" aria-selected="false">Productos</button>
+                        {% if puede_gestionar_promociones %}
+                        <button type="button" class="gastro-menu-tab" data-menu-tab="promociones" role="tab" aria-selected="false">Promociones</button>
+                        {% endif %}
                         {% if menu_tv_config %}
                         <button type="button" class="gastro-menu-tab" data-menu-tab="tv" role="tab" aria-selected="false">Pantalla TV</button>
                         {% endif %}
@@ -283,6 +286,12 @@
                             {% endfor %}
                         </div>
                     </div>
+
+                    {% if puede_gestionar_promociones %}
+                    <div data-menu-tab-panel="promociones" class="hidden" role="tabpanel">
+                        {% include "tienda_admin/_panel_promociones.html" %}
+                    </div>
+                    {% endif %}
 
                     {% if menu_tv_config %}
                     <div data-menu-tab-panel="tv" class="hidden" role="tabpanel">
@@ -480,6 +489,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='20260529-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='20260531-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

@@ -1,10 +1,11 @@
 import re
+from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from app import create_app, db
-from app.models import Cliente, Usuario
+from app.models import Categoria, Cliente, Producto, Usuario
 from gastronomia.models import (
     GastronomiaClienteConfig,
     GastronomiaCategoria,
@@ -203,6 +204,85 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
         assert producto_db is not None
         assert categoria_db.activo is False
         assert producto_db.activo is False
+
+
+def test_menu_promociones_filtra_catalogo_gastronomico_y_respeta_cliente():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id = _crear_restaurante(app, 'Resto Promos', 'resto_promos')
+    otro_cliente_id = _crear_restaurante(app, 'Resto Ajeno', 'resto_ajeno')
+
+    with app.app_context():
+        categoria_menu = GastronomiaCategoria(cliente_id=cliente_id, nombre='Combos')
+        categoria_inventario = Categoria(nombre='Inventario promociones', activo=True)
+        db.session.add_all([categoria_menu, categoria_inventario])
+        db.session.flush()
+        producto_gastronomico = GastronomiaProducto(
+                cliente_id=cliente_id,
+                categoria_id=categoria_menu.id_categoria,
+                nombre='Combo gastronomico',
+                precio=45000,
+                activo=True,
+            )
+        db.session.add_all([
+            producto_gastronomico,
+            Producto(
+                id_cliente=cliente_id,
+                id_categoria=categoria_inventario.id_categoria,
+                codigo='INV-PROMO-001',
+                nombre='Producto de inventario',
+                precio_compra=10000,
+                precio_venta=20000,
+                stock_actual=5,
+                stock_minimo=0,
+                activo=True,
+            ),
+        ])
+        db.session.commit()
+        producto_gastronomico_id = producto_gastronomico.id_producto
+
+    _loguear(client, app, 'resto_promos')
+
+    page = client.get('/gastronomia/menu')
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    csrf = _csrf(html)
+    assert 'data-menu-tab="promociones"' in html
+    assert f'name="cliente_id_gastronomia" value="{cliente_id}"' in html
+    assert 'name="catalogo_promocion" value="gastronomia"' in html
+
+    response = client.get('/api/tienda/admin/promociones/productos', query_string={
+        'cliente_id_gastronomia': cliente_id,
+        'tipo_catalogo': 'gastronomia',
+    })
+    assert response.status_code == 200
+    productos = response.get_json()['productos']
+    assert [producto['nombre'] for producto in productos] == ['Combo gastronomico']
+    assert productos[0]['tipo_catalogo'] == 'gastronomia'
+
+    create_promotion = client.post(
+        '/api/tienda/admin/promociones',
+        json={
+            'cliente_id_gastronomia': cliente_id,
+            'nombre': 'Promo combo',
+            'tipo': 'porcentaje',
+            'valor': 15,
+            'fecha_inicio': (datetime.now() - timedelta(hours=1)).isoformat(timespec='minutes'),
+            'fecha_fin': (datetime.now() + timedelta(hours=1)).isoformat(timespec='minutes'),
+            'productos_gastronomia': [producto_gastronomico_id],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert create_promotion.status_code == 201, create_promotion.get_json()
+    promo_data = create_promotion.get_json()['promocion']
+    assert promo_data['productos'][0]['nombre'] == 'Combo gastronomico'
+    assert promo_data['productos'][0]['tipo_catalogo'] == 'gastronomia'
+
+    cross_tenant = client.get('/api/tienda/admin/promociones/productos', query_string={
+        'cliente_id_gastronomia': otro_cliente_id,
+        'tipo_catalogo': 'gastronomia',
+    })
+    assert cross_tenant.status_code == 404
 
 
 def test_parsea_precio_con_punto_de_miles_en_menu():

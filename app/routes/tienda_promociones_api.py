@@ -14,6 +14,7 @@ from app.services.tienda_promociones import (
     serialize_admin_promotion,
     serialize_public_promotion,
 )
+from app.services.tienda_promociones_public import store_promotion_catalog_type
 from app.utils.permisos import requiere_permiso
 from app.routes.tienda_api import _config_por_slug, _resolver_id_cliente_actual
 from gastronomia.models import GastronomiaProducto
@@ -23,7 +24,19 @@ tienda_promociones_api_bp = Blueprint('tienda_promociones_api', __name__)
 
 
 def _resolve_client_id(data: dict | None = None) -> int | None:
-    client_id = _resolver_id_cliente_actual(data or {})
+    data = data or {}
+    gastronomia_client_id = data.get('cliente_id_gastronomia')
+    if gastronomia_client_id not in (None, ''):
+        from gastronomia.services.access import cliente_id_actual_gastronomia
+
+        try:
+            requested_client_id = int(gastronomia_client_id)
+            current_client_id = int(cliente_id_actual_gastronomia() or 0)
+        except (TypeError, ValueError):
+            return None
+        return requested_client_id if requested_client_id == current_client_id else None
+
+    client_id = _resolver_id_cliente_actual(data)
     try:
         return int(client_id) if client_id else None
     except (TypeError, ValueError):
@@ -44,8 +57,9 @@ def get_public_promotions(slug: str):
         return jsonify({'error': 'tienda_no_encontrada'}), 404
 
     promotions = get_active_promotions_for_store(config)
+    catalog_type = store_promotion_catalog_type(config)
     return jsonify([
-        serialize_public_promotion(promotion, include_products=True)
+        serialize_public_promotion(promotion, include_products=True, catalog_type=catalog_type)
         for promotion in promotions
     ])
 
@@ -133,36 +147,43 @@ def admin_search_promotion_products():
 
     q = (request.args.get('q') or '').strip()
     limit = min(30, max(5, request.args.get('limit', 12, type=int)))
+    catalog_type = (request.args.get('tipo_catalogo') or '').strip().lower()
+    if catalog_type not in {'', 'producto', 'gastronomia'}:
+        return jsonify({'error': 'tipo_catalogo_invalido'}), 400
 
-    query = Producto.query.filter(
-        Producto.activo.is_(True),
-        db.or_(Producto.id_cliente == client_id, Producto.id_cliente.is_(None)),
-    )
-    if q:
-        like = f'%{q}%'
-        query = query.filter(
-            db.or_(
-                Producto.nombre.ilike(like),
-                Producto.codigo.ilike(like),
-                Producto.marca.ilike(like),
-                Producto.modelo.ilike(like),
-            )
+    products = []
+    if catalog_type != 'gastronomia':
+        query = Producto.query.filter(
+            Producto.activo.is_(True),
+            db.or_(Producto.id_cliente == client_id, Producto.id_cliente.is_(None)),
         )
+        if q:
+            like = f'%{q}%'
+            query = query.filter(
+                db.or_(
+                    Producto.nombre.ilike(like),
+                    Producto.codigo.ilike(like),
+                    Producto.marca.ilike(like),
+                    Producto.modelo.ilike(like),
+                )
+            )
+        products = query.order_by(Producto.nombre.asc()).limit(limit).all()
 
-    products = query.order_by(Producto.nombre.asc()).limit(limit).all()
-    gastro_query = GastronomiaProducto.query.filter(
-        GastronomiaProducto.cliente_id == int(client_id),
-        GastronomiaProducto.activo.is_(True),
-    )
-    if q:
-        like = f'%{q}%'
-        gastro_query = gastro_query.filter(
-            db.or_(
-                GastronomiaProducto.nombre.ilike(like),
-                GastronomiaProducto.descripcion.ilike(like),
-            )
+    gastro_products = []
+    if catalog_type != 'producto':
+        gastro_query = GastronomiaProducto.query.filter(
+            GastronomiaProducto.cliente_id == int(client_id),
+            GastronomiaProducto.activo.is_(True),
         )
-    gastro_products = gastro_query.order_by(GastronomiaProducto.nombre.asc()).limit(limit).all()
+        if q:
+            like = f'%{q}%'
+            gastro_query = gastro_query.filter(
+                db.or_(
+                    GastronomiaProducto.nombre.ilike(like),
+                    GastronomiaProducto.descripcion.ilike(like),
+                )
+            )
+        gastro_products = gastro_query.order_by(GastronomiaProducto.nombre.asc()).limit(limit).all()
     return jsonify({
         'ok': True,
         'productos': ([

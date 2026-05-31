@@ -1,0 +1,20 @@
+<script>
+(function() {
+    if (window.appCloseTransientOverlays) return;
+
+    window.appCloseTransientOverlays = function(root = document) {
+        if (!root?.querySelectorAll) return;
+
+        root.querySelectorAll('[data-app-transient-overlay]').forEach((overlay) => {
+            overlay.classList.add('hidden');
+            overlay.style.removeProperty('display');
+            overlay.querySelectorAll('[data-app-modal-backdrop]').forEach((backdrop) => {
+                backdrop.classList.remove('opacity-100');
+            });
+            overlay.querySelectorAll('[data-app-modal-panel]').forEach((panel) => {
+                panel.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+            });
+        });
+    };
+})();
+</script>

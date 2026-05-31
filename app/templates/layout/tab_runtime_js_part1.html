@@ -290,6 +290,7 @@
                 for (const [id, panel] of tabPanelsById.entries()) {
                     if (!panel) continue;
                     const selected = id === tabId;
+                    if (!selected) window.appCloseTransientOverlays?.(panel);
                     panel.hidden = !selected;
                     panel.setAttribute('aria-hidden', selected ? 'false' : 'true');
                 }

@@ -8,6 +8,8 @@ TAB_RUNTIME_PART2 = Path("app/templates/layout/tab_runtime_js_part2.html")
 TIENDA_ADMIN_ROUTE = Path("app/routes/tienda_admin.py")
 RELOADABLE_SCRIPT_GUARD = Path("app/templates/layout/reloadable_script_guard.html")
 PROMOCIONES_RUNTIME = Path("app/templates/layout/tienda_admin_promociones_runtime.html")
+TRANSIENT_OVERLAY_RUNTIME = Path("app/templates/layout/transient_overlay_runtime.html")
+MODAL_LAYERS_CSS = Path("app/static/css/modal_layers.css")
 
 
 def test_tienda_admin_scripts_allow_tab_runtime_reload():
@@ -89,12 +91,43 @@ def test_tienda_admin_partial_does_not_reinject_page_scripts():
     layout_source = Path("app/templates/layout_refactored.html").read_text(encoding="utf-8")
     route_source = TIENDA_ADMIN_ROUTE.read_text(encoding="utf-8")
 
-    assert "request.endpoint != 'tienda_admin.panel'" in base_source
-    assert "tienda-admin partial scripts suppressed" in base_source
+    assert "request.endpoint != 'tienda_admin.panel'" not in base_source
     assert "not request.args.get('partial')" in panel_source
     assert "tienda-admin-debug-version" in panel_source
+    assert "_panel_promociones_js.html" not in panel_source
     assert "abrirModalPromocion" in runtime_source
     assert "guardarPromocion" in runtime_source
+    assert "mostrarModalPromocion" in runtime_source
     assert "runtime instalado" in runtime_source
     assert "X-Tienda-Admin-Debug-Version" in route_source
     assert "tienda_admin_promociones_runtime.html" in layout_source
+
+
+def test_modal_backdrops_stay_below_dialog_panels():
+    css_source = MODAL_LAYERS_CSS.read_text(encoding="utf-8")
+    modal_templates = (
+        "_panel_promociones.html",
+        "_modal_imagenes.html",
+        "_modal_oferta.html",
+        "_estadisticas_tienda.html",
+        "_estadisticas_producto.html",
+    )
+
+    assert ":not([data-app-modal-backdrop])" in css_source
+    assert "[data-app-modal-backdrop]" in css_source
+    assert "z-index: 0 !important" in css_source
+    for template_name in modal_templates:
+        source = (TIENDA_ADMIN_TEMPLATES / template_name).read_text(encoding="utf-8")
+        assert "data-app-modal-backdrop" in source, template_name
+
+
+def test_tab_navigation_closes_transient_overlays():
+    layout_source = Path("app/templates/layout_refactored.html").read_text(encoding="utf-8")
+    tab_runtime_source = TAB_RUNTIME_PART1.read_text(encoding="utf-8")
+    overlay_runtime_source = TRANSIENT_OVERLAY_RUNTIME.read_text(encoding="utf-8")
+    panel_source = (TIENDA_ADMIN_TEMPLATES / "panel.html").read_text(encoding="utf-8")
+
+    assert "transient_overlay_runtime.html" in layout_source
+    assert "window.appCloseTransientOverlays?.(panel)" in tab_runtime_source
+    assert "[data-app-transient-overlay]" in overlay_runtime_source
+    assert "data-app-transient-overlay" in panel_source
