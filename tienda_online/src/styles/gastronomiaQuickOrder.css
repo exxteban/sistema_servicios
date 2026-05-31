@@ -1,0 +1,248 @@
+.gastronomia-order-panel {
+  position: sticky;
+  top: 92px;
+  z-index: 20;
+  margin-top: 18px;
+  margin-bottom: 28px;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--brand-color) 18%, #cbd5e1);
+  border-radius: 22px;
+  background: color-mix(in srgb, #ffffff 92%, var(--brand-color) 8%);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.gastronomia-order-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.gastronomia-order-panel__eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-color);
+}
+
+.gastronomia-order-panel__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.gastronomia-order-panel__description {
+  margin: 10px 0 0;
+  max-width: 720px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.gastronomia-order-panel__clear {
+  border: 0;
+  background: transparent;
+  color: var(--brand-color);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gastronomia-order-panel__empty {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text-secondary);
+}
+
+.gastronomia-order-panel__items {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.gastronomia-order-panel__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-color);
+}
+
+.gastronomia-order-panel__item-name,
+.gastronomia-order-panel__item-price {
+  margin: 0;
+}
+
+.gastronomia-order-panel__item-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gastronomia-order-panel__item-price {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.gastronomia-order-panel__modifiers {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.gastronomia-order-panel__item-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gastronomia-order-panel__item-subtotal {
+  min-width: 96px;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+.gastronomia-order-panel__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.gastronomia-order-panel__totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-secondary);
+}
+
+.gastronomia-order-panel__totals strong {
+  font-size: 1.35rem;
+  color: var(--text-primary);
+}
+
+.gastronomia-order-panel__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gastronomia-order-panel__notice {
+  margin: 12px 0 0;
+  color: #b45309;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.gastronomia-qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: #ffffff;
+}
+
+.gastronomia-qty-stepper button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-color) 14%, white);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gastronomia-qty-stepper span {
+  min-width: 22px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gastronomia-qty-stepper-compact button {
+  width: 28px;
+  height: 28px;
+}
+
+.product-quick-order {
+  display: grid;
+  gap: 10px;
+}
+
+.product-quick-order__hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.product-quick-order__link {
+  color: var(--brand-color);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.gastronomia-order-floating {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 120;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.94);
+  color: #ffffff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+}
+
+.gastronomia-order-floating__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gastronomia-order-floating__submit {
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .gastronomia-order-panel {
+    position: static;
+    padding: 18px 16px;
+    margin-bottom: 18px;
+  }
+
+  .gastronomia-order-panel__header,
+  .gastronomia-order-panel__item,
+  .gastronomia-order-panel__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gastronomia-order-panel__item-actions {
+    justify-content: space-between;
+  }
+
+  .gastronomia-order-panel__item-subtotal {
+    min-width: 0;
+  }
+
+  .gastronomia-order-floating {
+    display: flex;
+  }
+}

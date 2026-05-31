@@ -7,10 +7,12 @@ import HeroBanner from '../components/layout/HeroBanner'
 import CatalogDesktopShowcase from '../components/layout/CatalogDesktopShowcase'
 import SocialSideRails from '../components/layout/SocialSideRails'
 import ProductoCard from '../components/ui/ProductoCard'
+import GastronomiaOrderPanel from '../components/ui/GastronomiaOrderPanel'
 import CatalogHighlightsCarousel from '../components/ui/CatalogHighlightsCarousel'
 import SkeletonCard from '../components/ui/SkeletonCard'
 import CategoryFilter from '../components/ui/CategoryFilter'
 import WebBotWidget from '../features/web-bot/components/WebBotWidget'
+import { useQuickOrderCart } from '../hooks/useQuickOrderCart'
 import { useMetaPixelPageView } from '../hooks/useMetaPixel'
 import { useCategorias } from '../hooks/useCategorias'
 import { useProductos } from '../hooks/useProductos'
@@ -18,6 +20,7 @@ import { useTiendaConfig } from '../hooks/useTiendaConfig'
 import { trackMetaPixelContact } from '../services/metaPixel'
 import { resolveStoreTheme } from '../themes/storeTheme'
 import { getStoreWhatsAppMessage } from '../utils/gastronomiaBudget'
+import { buildGastronomiaOrderHref, buildGastronomiaOrderMessage } from '../utils/gastronomiaOrder'
 import { buildCategoryPath, isTruthyFlag, normalizeCategoryRef } from '../utils/storeFormatting'
 
 export default function CatalogoPage() {
@@ -47,6 +50,24 @@ export default function CatalogoPage() {
     hasMore,
     retry: retryProductos
   } = useProductos(slug, query, categoriaId, productsEnabled)
+  const quickOrderEnabled = isTruthyFlag(config?.es_gastronomia)
+  const quickOrderProducts = useMemo(() => {
+    const seenIds = new Set()
+    return [productos, destacados, ofertas, recomendados, imperdibles].flatMap((collection) => collection || []).filter((producto) => {
+      if (!producto?.id || seenIds.has(producto.id)) return false
+      seenIds.add(producto.id)
+      return true
+    })
+  }, [destacados, imperdibles, ofertas, productos, recomendados])
+  const {
+    items: quickOrderItems,
+    totalItems: quickOrderCount,
+    totalAmount: quickOrderTotal,
+    increment: incrementQuickOrder,
+    decrement: decrementQuickOrder,
+    clearCart: clearQuickOrder,
+    getQuantity: getQuickOrderQuantity
+  } = useQuickOrderCart(quickOrderEnabled ? slug : '', quickOrderProducts)
   const skeletons = useMemo(() => Array.from({ length: 8 }), [])
   const ctaCatalogo = config?.texto_cta_catalogo || 'Consultar'
   const mostrarHero = isTruthyFlag(config?.mostrar_hero_tienda ?? true)
@@ -97,6 +118,16 @@ export default function CatalogoPage() {
     }
     return ''
   }, [destacados, mostrarDestacados, mostrarOfertas, ofertas, tituloDestacados, tituloOfertas])
+  const quickOrderWhatsAppHref = useMemo(
+    () => buildGastronomiaOrderHref(config, quickOrderItems),
+    [config, quickOrderItems]
+  )
+  const floatingWhatsAppMessage = useMemo(() => {
+    if (quickOrderEnabled && quickOrderItems.length > 0) {
+      return buildGastronomiaOrderMessage(config, quickOrderItems)
+    }
+    return getStoreWhatsAppMessage(config)
+  }, [config, quickOrderEnabled, quickOrderItems])
 
   useMetaPixelPageView(metaPixelId)
 
@@ -145,13 +176,27 @@ export default function CatalogoPage() {
     })
   }
 
+  const renderProductCard = (producto) => (
+    <ProductoCard
+      key={producto.id}
+      slug={slug}
+      producto={producto}
+      brandColor={config?.color_primario}
+      themeKey={theme.key}
+      ctaText={ctaCatalogo}
+      onWhatsAppClick={trackCatalogWhatsAppClick}
+      quickOrderEnabled={quickOrderEnabled}
+      selectedQuantity={quickOrderEnabled ? getQuickOrderQuantity(producto.id) : 0}
+      onIncrementQuickOrder={incrementQuickOrder}
+      onDecrementQuickOrder={decrementQuickOrder}
+    />
+  )
+
   const renderProductSection = (id, title, items) => (
     <div id={id} className={`catalog-block catalog-block-${theme.key}`}>
       <h2 className="catalog-section-title">{title}</h2>
       <section className={`grid catalog-grid catalog-grid-${theme.key}`}>
-        {items.map((p) => (
-          <ProductoCard key={p.id} slug={slug} producto={p} brandColor={config?.color_primario} themeKey={theme.key} ctaText={ctaCatalogo} onWhatsAppClick={trackCatalogWhatsAppClick} />
-        ))}
+        {items.map((p) => renderProductCard(p))}
       </section>
     </div>
   )
@@ -205,6 +250,18 @@ export default function CatalogoPage() {
           selectedSlug={selectedCategory?.slug || ''}
           themeKey={theme.key}
         />
+        {quickOrderEnabled ? (
+          <GastronomiaOrderPanel
+            items={quickOrderItems}
+            totalItems={quickOrderCount}
+            totalAmount={quickOrderTotal}
+            whatsAppHref={quickOrderWhatsAppHref}
+            onIncrement={incrementQuickOrder}
+            onDecrement={decrementQuickOrder}
+            onClear={clearQuickOrder}
+            onWhatsAppClick={() => trackCatalogWhatsAppClick()}
+          />
+        ) : null}
       </div>
     ),
     destacados: isHome && mostrarDestacados && !loading && destacados?.length > 0 ? renderProductSection('destacados', tituloDestacados, destacados) : null,
@@ -231,9 +288,7 @@ export default function CatalogoPage() {
         ) : null}
         <section className={`grid catalog-grid catalog-grid-${theme.key}`}>
           {loading && skeletons.map((_, i) => <SkeletonCard key={i} />)}
-          {!loading && productos.map((p) => (
-            <ProductoCard key={p.id} slug={slug} producto={p} brandColor={config?.color_primario} themeKey={theme.key} ctaText={ctaCatalogo} onWhatsAppClick={trackCatalogWhatsAppClick} />
-          ))}
+          {!loading && productos.map((p) => renderProductCard(p))}
           {!loading && !productosError && productos.length === 0 && (
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 0', color: 'var(--text-secondary)' }}>
               No se encontraron productos.
@@ -322,11 +377,13 @@ export default function CatalogoPage() {
       </main>
       <SocialSideRails config={config} />
       <Footer config={config} themeKey={theme.key} />
-      <FloatingWhatsApp
-        phone={config?.telefono_whatsapp}
-        message={getStoreWhatsAppMessage(config)}
-        onClick={() => trackCatalogWhatsAppClick()}
-      />
+      {!(quickOrderEnabled && quickOrderCount > 0) ? (
+        <FloatingWhatsApp
+          phone={config?.telefono_whatsapp}
+          message={floatingWhatsAppMessage}
+          onClick={() => trackCatalogWhatsAppClick()}
+        />
+      ) : null}
       <WebBotWidget slug={slug} />
     </div>
   )

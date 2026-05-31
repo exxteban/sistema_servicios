@@ -606,6 +606,11 @@
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok || !data || !data.success) {
+                if (data && data.redirect_url) {
+                    mostrarNotificacion(data.error || 'Debe abrir una caja antes de continuar.', 'warning');
+                    window.location.href = data.redirect_url;
+                    return;
+                }
                 mostrarNotificacion((data && data.error) ? data.error : 'No se pudo enviar la venta a caja', 'error');
                 return;
             }

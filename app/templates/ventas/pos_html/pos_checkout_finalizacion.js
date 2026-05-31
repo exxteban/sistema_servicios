@@ -287,6 +287,11 @@
                     return;
                 }
             } else {
+                if (data && data.redirect_url) {
+                    mostrarNotificacion(data.error || 'Debe abrir una caja antes de continuar.', 'warning');
+                    window.location.href = data.redirect_url;
+                    return;
+                }
                 let mensajeError = 'Error: ' + data.error;
                 if (data.stock_warnings && data.stock_warnings.length > 0) {
                     mensajeError += '\n\nProductos con problema de stock:\n' + data.stock_warnings.map(w => `- ${w.codigo} ${w.producto} (disp: ${w.stock_disponible}, sol: ${w.cantidad_solicitada})`).join('\n');

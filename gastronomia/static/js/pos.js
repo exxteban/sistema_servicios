@@ -59,7 +59,9 @@
       const fallbackMessage = response.status === 404
         ? 'No se encontro el recurso solicitado. Recarga la pantalla e intenta de nuevo.'
         : 'Solicitud invalida.';
-      throw new Error(data.mensaje || data.error || fallbackMessage);
+      const error = new Error(data.mensaje || data.error || fallbackMessage);
+      error.redirectUrl = data.redirect_url || '';
+      throw error;
     }
     return data;
   };
@@ -421,6 +423,10 @@
       method: 'POST',
       body: JSON.stringify({enviar_cocina: true}),
     });
+    if (data.redirect_url) {
+      window.location.href = data.redirect_url;
+      return;
+    }
     const checkoutUrl = data.checkout_url || (data.cola_id ? `/ventas/pos?cola_id=${encodeURIComponent(data.cola_id)}` : '');
     if (!checkoutUrl) throw new Error('No se pudo abrir el checkout central.');
     resetDraft();
@@ -446,6 +452,11 @@
     try {
       await action();
     } catch (error) {
+      if (error?.redirectUrl) {
+        showAlert(error.message, false);
+        window.location.href = error.redirectUrl;
+        return;
+      }
       showAlert(error.message, false);
     } finally {
       if (button) {

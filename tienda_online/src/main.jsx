@@ -7,6 +7,7 @@ import './themes/storeLayout.css'
 import './themes/storeThemeVariants.css'
 import './themes/catalogMockup.css'
 import './styles/productModifiers.css'
+import './styles/gastronomiaQuickOrder.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

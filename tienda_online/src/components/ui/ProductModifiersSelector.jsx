@@ -79,7 +79,8 @@ export function getSelectedModifiers(grupos = [], selections = {}) {
     .map((opcion) => ({
       ...opcion,
       cantidad: Number(selections[opcion.id_opcion] || 0),
-      nombre_grupo: grupo.nombre
+      nombre_grupo: grupo.nombre,
+      tipo_grupo: grupo.tipo || ''
     }))
     .filter((opcion) => opcion.cantidad > 0))
 }

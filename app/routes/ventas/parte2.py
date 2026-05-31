@@ -237,9 +237,6 @@ def pos():
     modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
 
     # En modo exclusivo, vendedor sin permiso de caja entra al módulo de registro.
-    if modo_cobro_exclusivo_cajero and not _usuario_puede_tomar_cola_cobro():
-        return redirect(url_for('ventas.registro_vendedor', **request.args.to_dict(flat=True)))
-
     sesion = SesionCaja.query.filter_by(
         id_usuario=current_user.id_usuario,
         estado='abierta'
@@ -247,6 +244,9 @@ def pos():
     if not sesion:
         flash('Debe abrir una caja antes de realizar esta operación.', 'warning')
         return redirect(url_for('caja.abrir'))
+
+    if modo_cobro_exclusivo_cajero and not _usuario_puede_tomar_cola_cobro():
+        return redirect(url_for('ventas.registro_vendedor', **request.args.to_dict(flat=True)))
 
     return _render_pos_interface(sesion=sesion, solo_registro_vendedor=False)
 
@@ -269,7 +269,15 @@ def registro_vendedor():
     if _usuario_puede_tomar_cola_cobro():
         return redirect(url_for('ventas.pos', **request.args.to_dict(flat=True)))
 
-    return _render_pos_interface(sesion=None, solo_registro_vendedor=True)
+    sesion = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta'
+    ).first()
+    if not sesion:
+        flash('Debe abrir una caja antes de registrar ventas.', 'warning')
+        return redirect(url_for('caja.abrir'))
+
+    return _render_pos_interface(sesion=sesion, solo_registro_vendedor=True)
 
 @ventas_bp.route('/registro-vendedor/enviadas')
 @login_required
@@ -452,6 +460,17 @@ def enviar_a_caja():
             if getattr(current_user, 'modo_demo', False):
                 return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
             return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
+
+        sesion = SesionCaja.query.filter_by(
+            id_usuario=current_user.id_usuario,
+            estado='abierta',
+        ).first()
+        if not sesion:
+            return jsonify({
+                'success': False,
+                'error': 'Debe abrir una caja antes de enviar o cobrar la venta.',
+                'redirect_url': url_for('caja.abrir'),
+            }), 400
 
         data = request.get_json() or {}
         items = data.get('items', [])

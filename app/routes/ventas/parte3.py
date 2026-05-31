@@ -58,7 +58,10 @@ def _procesar_venta_payload(data):
         estado='abierta'
     ).first()
     if not sesion:
-        return {'error': 'No hay caja abierta'}, 400
+        return {
+            'error': 'Debe abrir una caja antes de registrar la venta.',
+            'redirect_url': url_for('caja.abrir'),
+        }, 400
 
     items = data.get('items', [])
     pagos = data.get('pagos', [])

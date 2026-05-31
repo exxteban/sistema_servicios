@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Footer from '../components/layout/Footer'
 import FloatingWhatsApp from '../components/layout/FloatingWhatsApp'
@@ -9,12 +9,15 @@ import ImageGallery from '../components/ui/ImageGallery'
 import ProductoPageSkeleton from '../components/ui/ProductoPageSkeleton'
 import ProductPriceBlock from '../components/ui/ProductPriceBlock'
 import ProductoCard from '../components/ui/ProductoCard'
+import GastronomiaOrderPanel from '../components/ui/GastronomiaOrderPanel'
 import TrustSignals from '../components/ui/TrustSignals'
 import ProductModifiersSelector, { getModifiersTotal, getSelectedModifiers } from '../components/ui/ProductModifiersSelector'
+import { useQuickOrderCart } from '../hooks/useQuickOrderCart'
 import { useMetaPixelPageView, useMetaPixelProductView } from '../hooks/useMetaPixel'
 import { trackMetaPixelContact } from '../services/metaPixel'
 import { resolveStoreTheme } from '../themes/storeTheme'
 import { getStoreWhatsAppMessage } from '../utils/gastronomiaBudget'
+import { buildGastronomiaOrderHref } from '../utils/gastronomiaOrder'
 import { buildProductPath, formatGs, isTruthyFlag, normalizeText, parseProductIdFromParam } from '../utils/storeFormatting'
 import WebBotWidget from '../features/web-bot/components/WebBotWidget'
 
@@ -25,6 +28,8 @@ export default function ProductoPage() {
   const theme = resolveStoreTheme(config?.estilo_tienda)
   const [producto, setProducto] = useState(null)
   const [modifierSelections, setModifierSelections] = useState({})
+  const [productQuantity, setProductQuantity] = useState(1)
+  const [quickOrderNotice, setQuickOrderNotice] = useState('')
   const [error, setError] = useState('')
   const productId = parseProductIdFromParam(productRef)
 
@@ -42,6 +47,8 @@ export default function ProductoPage() {
         if (alive) {
           setProducto(data)
           setModifierSelections({})
+          setProductQuantity(1)
+          setQuickOrderNotice('')
         }
       })
       .catch(() => {
@@ -87,6 +94,25 @@ export default function ProductoPage() {
   const selectedModifiers = getSelectedModifiers(producto?.grupos_opciones || [], modifierSelections)
   const modifiersTotal = getModifiersTotal(selectedModifiers)
   const productTotal = Number(producto?.precio || 0) + modifiersTotal
+  const quickOrderEnabled = isTruthyFlag(config?.es_gastronomia)
+  const productHasOptions = Boolean(producto?.tiene_opciones || producto?.grupos_opciones?.some((grupo) => grupo?.opciones?.length > 0))
+  const modifierRequirementMessage = getModifierRequirementMessage(producto?.grupos_opciones || [], modifierSelections)
+  const quickOrderProducts = useMemo(
+    () => (producto ? [producto, ...(producto.relacionados || [])] : []),
+    [producto]
+  )
+  const {
+    items: quickOrderItems,
+    totalItems: quickOrderCount,
+    totalAmount: quickOrderTotal,
+    setQuantity: setQuickOrderQuantity,
+    addCustomizedItem: addCustomizedQuickOrderItem,
+    increment: incrementQuickOrder,
+    decrement: decrementQuickOrder,
+    clearCart: clearQuickOrder,
+    getQuantity: getQuickOrderQuantity
+  } = useQuickOrderCart(quickOrderEnabled ? slug : '', quickOrderProducts)
+  const quickOrderWhatsAppHref = buildGastronomiaOrderHref(config, quickOrderItems)
   const dynamicWhatsAppHref = selectedModifiers.length
     ? buildProductWhatsAppHref(config, producto, selectedModifiers, productTotal)
     : ''
@@ -100,6 +126,27 @@ export default function ProductoPage() {
       currency: 'PYG',
       value: item?.id === producto?.id ? productTotal : Number(item?.precio) || 0
     })
+  }
+
+  const changeProductQuantity = (nextQuantity) => {
+    const numericValue = Number(nextQuantity || 1)
+    if (!Number.isFinite(numericValue)) return
+    setProductQuantity(Math.max(1, Math.min(99, Math.round(numericValue))))
+  }
+
+  const handleAddToQuickOrder = () => {
+    if (!producto) return
+    if (modifierRequirementMessage) {
+      setQuickOrderNotice(modifierRequirementMessage)
+      return
+    }
+
+    if (productHasOptions) {
+      addCustomizedQuickOrderItem(producto, selectedModifiers, productTotal, productQuantity)
+    } else {
+      setQuickOrderQuantity(producto, getQuickOrderQuantity(producto.id) + productQuantity)
+    }
+    setQuickOrderNotice(`${producto.nombre} agregado al pedido.`)
   }
 
   if (!producto && !error) return (
@@ -209,23 +256,69 @@ export default function ProductoPage() {
                 <TrustSignals items={senalesProducto} />
               </div>
             )}
-            <a
-              className={btnClass}
-              href={whatsappHref || undefined}
-              onClick={() => trackProductWhatsAppClick()}
-              target="_blank"
-              rel="noreferrer"
-              aria-disabled={!whatsappHref}
-              style={{ width: '100%', padding: '16px 24px', fontSize: '1.1rem', pointerEvents: whatsappHref ? 'auto' : 'none', opacity: whatsappHref ? 1 : 0.6, ...btnStyle }}
-            >
-              <svg style={{ width: 24, height: 24 }} fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 21.054a9.05 9.05 0 0 1-4.609-1.257l-.33-.195-3.424.897.913-3.338-.214-.342a9.04 9.04 0 0 1-1.386-4.765 9.05 9.05 0 1 1 9.05 9.05M12 1.15A10.82 10.82 0 0 0 1.171 11.97 10.82 10.82 0 0 0 2.651 17.3l-1.48 5.41 5.539-1.452h.001c1.636.896 3.475 1.366 5.318 1.366A10.81 10.81 0 1 0 12 1.151z" /></svg>
-              {ctaProducto}
-            </a>
-            {!whatsappHref ? <p className="product-cta-support">Este producto no tiene un enlace de compra disponible en este momento.</p> : null}
+            {quickOrderEnabled ? (
+              <section className="product-detail-order-box">
+                <div className="product-detail-order-box__top">
+                  <div>
+                    <span>Cantidad</span>
+                    <strong>{formatGs(productTotal * productQuantity)}</strong>
+                  </div>
+                  <div className="gastronomia-qty-stepper">
+                    <button type="button" onClick={() => changeProductQuantity(productQuantity - 1)} aria-label={`Quitar una unidad de ${producto.nombre}`}>
+                      -
+                    </button>
+                    <span>{productQuantity}</span>
+                    <button type="button" onClick={() => changeProductQuantity(productQuantity + 1)} aria-label={`Agregar una unidad de ${producto.nombre}`}>
+                      +
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={btnClass}
+                  onClick={handleAddToQuickOrder}
+                  disabled={Boolean(modifierRequirementMessage)}
+                  style={{ width: '100%', padding: '16px 24px', fontSize: '1.1rem', ...btnStyle }}
+                >
+                  Agregar al pedido
+                </button>
+                {modifierRequirementMessage ? <p className="product-detail-order-box__warning">{modifierRequirementMessage}</p> : null}
+                {quickOrderNotice ? <p className="product-detail-order-box__notice">{quickOrderNotice}</p> : null}
+                <Link to={`/tienda/${slug}#catalogo-main`} className="product-detail-order-box__continue">
+                  Seguir agregando productos
+                </Link>
+              </section>
+            ) : (
+              <a
+                className={btnClass}
+                href={whatsappHref || undefined}
+                onClick={() => trackProductWhatsAppClick()}
+                target="_blank"
+                rel="noreferrer"
+                aria-disabled={!whatsappHref}
+                style={{ width: '100%', padding: '16px 24px', fontSize: '1.1rem', pointerEvents: whatsappHref ? 'auto' : 'none', opacity: whatsappHref ? 1 : 0.6, ...btnStyle }}
+              >
+                <svg style={{ width: 24, height: 24 }} fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 21.054a9.05 9.05 0 0 1-4.609-1.257l-.33-.195-3.424.897.913-3.338-.214-.342a9.04 9.04 0 0 1-1.386-4.765 9.05 9.05 0 1 1 9.05 9.05M12 1.15A10.82 10.82 0 0 0 1.171 11.97 10.82 10.82 0 0 0 2.651 17.3l-1.48 5.41 5.539-1.452h.001c1.636.896 3.475 1.366 5.318 1.366A10.81 10.81 0 1 0 12 1.151z" /></svg>
+                {ctaProducto}
+              </a>
+            )}
+            {!quickOrderEnabled && !whatsappHref ? <p className="product-cta-support">Este producto no tiene un enlace de compra disponible en este momento.</p> : null}
             {textoApoyo ? <p className="product-cta-support">{textoApoyo}</p> : null}
             {recordatorio ? <p className="product-cta-reminder">{recordatorio}</p> : null}
           </div>
         </div>
+        {quickOrderEnabled ? (
+          <GastronomiaOrderPanel
+            items={quickOrderItems}
+            totalItems={quickOrderCount}
+            totalAmount={quickOrderTotal}
+            whatsAppHref={quickOrderWhatsAppHref}
+            onIncrement={incrementQuickOrder}
+            onDecrement={decrementQuickOrder}
+            onClear={clearQuickOrder}
+            onWhatsAppClick={() => trackProductWhatsAppClick()}
+          />
+        ) : null}
         {mostrarRelacionados && (
           <div style={{ marginTop: 48 }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 20 }}>
@@ -233,7 +326,19 @@ export default function ProductoPage() {
             </h3>
             <div className="grid">
               {producto.relacionados.map((r) => (
-                <ProductoCard key={r.id} slug={slug} producto={r} brandColor={config?.color_primario} themeKey={theme.key} ctaText={ctaCatalogo} onWhatsAppClick={trackProductWhatsAppClick} />
+                <ProductoCard
+                  key={r.id}
+                  slug={slug}
+                  producto={r}
+                  brandColor={config?.color_primario}
+                  themeKey={theme.key}
+                  ctaText={ctaCatalogo}
+                  onWhatsAppClick={trackProductWhatsAppClick}
+                  quickOrderEnabled={quickOrderEnabled}
+                  selectedQuantity={quickOrderEnabled ? getQuickOrderQuantity(r.id) : 0}
+                  onIncrementQuickOrder={incrementQuickOrder}
+                  onDecrementQuickOrder={decrementQuickOrder}
+                />
               ))}
             </div>
           </div>
@@ -241,11 +346,13 @@ export default function ProductoPage() {
       </main>
       <SocialSideRails config={config} />
       <Footer config={config} themeKey={theme.key} />
-      <FloatingWhatsApp
-        phone={config?.telefono_whatsapp}
-        message={getStoreWhatsAppMessage(config, `Hola, me interesa ${producto.nombre}`)}
-        onClick={() => trackProductWhatsAppClick()}
-      />
+      {!(quickOrderEnabled && quickOrderCount > 0) ? (
+        <FloatingWhatsApp
+          phone={config?.telefono_whatsapp}
+          message={getStoreWhatsAppMessage(config, `Hola, me interesa ${producto.nombre}`)}
+          onClick={() => trackProductWhatsAppClick()}
+        />
+      ) : null}
       <WebBotWidget slug={slug} />
     </div>
   )
@@ -289,9 +396,27 @@ function buildProductWhatsAppHref(config, producto, selectedModifiers, total) {
     lines.push('Opciones:')
     selectedModifiers.forEach((item) => {
       const lineTotal = Number(item.precio_delta || 0) * Number(item.cantidad || 0)
-      lines.push(`- ${item.nombre} x${item.cantidad}: ${lineTotal > 0 ? formatGs(lineTotal) : 'sin costo'}`)
+      const isRemovable = item.tipo_grupo === 'ingrediente_removible'
+      const label = isRemovable ? `Sin ${item.nombre}` : item.nombre
+      const quantityText = isRemovable && Number(item.cantidad || 0) === 1 ? '' : ` x${item.cantidad}`
+      lines.push(`- ${label}${quantityText}: ${lineTotal > 0 ? formatGs(lineTotal) : 'sin costo'}`)
     })
   }
   lines.push(`Total estimado: ${formatGs(total)}`)
   return `https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`
+}
+
+function getModifierRequirementMessage(grupos = [], selections = {}) {
+  const missingGroup = grupos.find((grupo) => {
+    const minimum = Math.max(Number(grupo.min_selecciones || 0), grupo.obligatorio ? 1 : 0)
+    if (minimum <= 0) return false
+    const selectedCount = (grupo.opciones || []).reduce((total, opcion) => (
+      total + Number(selections[opcion.id_opcion] || 0)
+    ), 0)
+    return selectedCount < minimum
+  })
+
+  if (!missingGroup) return ''
+  const minimum = Math.max(Number(missingGroup.min_selecciones || 0), missingGroup.obligatorio ? 1 : 0)
+  return `Elegí al menos ${minimum} opción${minimum === 1 ? '' : 'es'} en ${missingGroup.nombre}.`
 }

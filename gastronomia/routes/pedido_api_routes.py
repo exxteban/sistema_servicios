@@ -2,6 +2,7 @@
 from flask import Blueprint, jsonify, request, url_for
 from flask_login import current_user, login_required
 
+from app.models import SesionCaja
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.pedido_service import (
     actualizar_pedido_abierto,
@@ -125,6 +126,16 @@ def cobro_avanzado(pedido_id):
     pedido = obtener_pedido(cliente_id, pedido_id)
     if not pedido:
         return jsonify({'error': 'not_found'}), 404
+    sesion = SesionCaja.query.filter_by(
+        id_usuario=current_user.id_usuario,
+        estado='abierta',
+    ).first()
+    if not sesion:
+        return jsonify({
+            'error': 'caja_no_abierta',
+            'mensaje': 'Debe abrir una caja antes de cobrar el pedido.',
+            'redirect_url': url_for('caja.abrir'),
+        }), 400
     try:
         cola = crear_cola_cobro_central_desde_pedido(
             pedido,

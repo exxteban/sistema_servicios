@@ -1341,7 +1341,7 @@ class TestCajaReparacion(unittest.TestCase):
         self.assertIn('data-testid="metrica-pendientes" data-value="1"', html)
         self.assertIn('data-testid="metrica-tasa-cobro" data-value="50.0"', html)
 
-    def test_vendedor_sin_caja_puede_enviar_a_caja_en_modo_exclusivo(self):
+    def test_vendedor_sin_caja_no_crea_pendiente_y_debe_abrir_caja(self):
         from app.models import ColaCobro, Configuracion
 
         rol = self._crear_rol_con_permisos('Vendedor Registro Envio', ['crear_venta', 'enviar_caja_venta'])
@@ -1353,6 +1353,7 @@ class TestCajaReparacion(unittest.TestCase):
         Configuracion.establecer_bool('caja_flujo_enviado_desde_vendedor', True)
         Configuracion.establecer_bool('caja_exigir_cajero_para_cobro', True)
 
+        total_antes = ColaCobro.query.count()
         resp = client_vendedor.post(
             '/ventas/enviar-a-caja',
             json={
@@ -1366,13 +1367,11 @@ class TestCajaReparacion(unittest.TestCase):
             },
             headers={'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
         )
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 400)
         data = resp.get_json() or {}
-        self.assertTrue(data.get('success'))
-
-        pendiente = ColaCobro.query.filter_by(tipo_origen='venta').order_by(ColaCobro.id.desc()).first()
-        self.assertIsNotNone(pendiente)
-        self.assertEqual(int(pendiente.id_usuario_origen), int(vendedor.id_usuario))
+        self.assertFalse(data.get('success'))
+        self.assertEqual(data.get('redirect_url'), '/caja/abrir')
+        self.assertEqual(ColaCobro.query.count(), total_antes)
 
     def test_enviar_venta_a_caja_requiere_permiso_crear_venta(self):
         from app.models import Configuracion

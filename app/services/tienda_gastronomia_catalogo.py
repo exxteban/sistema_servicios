@@ -7,7 +7,7 @@ from app import db
 from app.models.tienda import TiendaConfig
 from app.services.tienda_context import resolver_cliente_gastronomia_tienda
 from app.utils.tienda_urls import build_category_public_path, build_product_public_path, slugify_tienda_text
-from gastronomia.models import GastronomiaCategoria, GastronomiaGrupoOpciones, GastronomiaProducto
+from gastronomia.models import GastronomiaCategoria, GastronomiaGrupoOpciones, GastronomiaOpcionProducto, GastronomiaProducto
 from app.services.tienda_presupuesto import mensaje_whatsapp_producto
 
 
@@ -166,6 +166,7 @@ def _serializar_producto_card(producto: GastronomiaProducto, config: TiendaConfi
         'disponible': bool(producto.disponible),
         'publicado_tienda': bool(producto.publicado_tienda),
         'imagenes': _imagenes_producto(producto)[:1],
+        'tiene_opciones': _producto_tiene_opciones(producto),
         'whatsapp_link': _build_whatsapp_link(producto, config),
         'vistas': 0,
         'es_destacado': False,
@@ -187,6 +188,21 @@ def _imagenes_producto(producto: GastronomiaProducto) -> list[dict]:
         'width': None,
         'height': None,
     }]
+
+
+def _producto_tiene_opciones(producto: GastronomiaProducto) -> bool:
+    return db.session.query(GastronomiaGrupoOpciones.id_grupo).join(
+        GastronomiaOpcionProducto,
+        GastronomiaOpcionProducto.grupo_id == GastronomiaGrupoOpciones.id_grupo,
+    ).filter(
+        GastronomiaGrupoOpciones.cliente_id == producto.cliente_id,
+        GastronomiaGrupoOpciones.producto_id == producto.id_producto,
+        GastronomiaGrupoOpciones.activo.is_(True),
+        GastronomiaGrupoOpciones.visible.is_(True),
+        GastronomiaOpcionProducto.activo.is_(True),
+        GastronomiaOpcionProducto.visible.is_(True),
+        GastronomiaOpcionProducto.disponible.is_(True),
+    ).first() is not None
 
 
 def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
