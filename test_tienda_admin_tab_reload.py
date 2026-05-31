@@ -87,9 +87,14 @@ def test_tienda_admin_partial_does_not_reinject_page_scripts():
     panel_source = (TIENDA_ADMIN_TEMPLATES / "panel.html").read_text(encoding="utf-8")
     runtime_source = PROMOCIONES_RUNTIME.read_text(encoding="utf-8")
     layout_source = Path("app/templates/layout_refactored.html").read_text(encoding="utf-8")
+    route_source = TIENDA_ADMIN_ROUTE.read_text(encoding="utf-8")
 
     assert "request.endpoint != 'tienda_admin.panel'" in base_source
+    assert "tienda-admin partial scripts suppressed" in base_source
     assert "not request.args.get('partial')" in panel_source
+    assert "tienda-admin-debug-version" in panel_source
     assert "abrirModalPromocion" in runtime_source
     assert "guardarPromocion" in runtime_source
+    assert "runtime instalado" in runtime_source
+    assert "X-Tienda-Admin-Debug-Version" in route_source
     assert "tienda_admin_promociones_runtime.html" in layout_source

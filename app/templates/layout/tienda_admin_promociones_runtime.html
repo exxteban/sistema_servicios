@@ -2,6 +2,8 @@
 (function() {
     if (window.__tiendaAdminPromocionesRuntimeInstalled) return;
     window.__tiendaAdminPromocionesRuntimeInstalled = true;
+    window.__tiendaAdminPromocionesRuntimeVersion = 'tienda-admin-promos-runtime-v4-2026-05-31';
+    console.info('[tienda-admin-promos-runtime-v4-2026-05-31] runtime instalado');
 
     const state = {
         productos: [],
@@ -210,8 +212,10 @@
     }
 
     window.abrirModalPromocion = async function(prefill = null) {
+        console.info('[tienda-admin-promos-runtime-v4-2026-05-31] abrirModalPromocion', { hasPrefill: Boolean(prefill) });
         const modal = document.getElementById('modalPromocion');
         const currentForm = form();
+        console.info('[tienda-admin-promos-runtime-v4-2026-05-31] modal/form', { modal: Boolean(modal), form: Boolean(currentForm) });
         if (!modal || !currentForm) return;
         resetForm();
         const productos = prefill?.productos || [];
@@ -291,6 +295,7 @@
             productos: state.productos.filter((product) => product.tipo_catalogo !== 'gastronomia').map((product) => product.id_producto),
             productos_gastronomia: state.productos.filter((product) => product.tipo_catalogo === 'gastronomia').map((product) => product.id_producto)
         };
+        console.info('[tienda-admin-promos-runtime-v4-2026-05-31] guardarPromocion payload', payload);
         const url = promotionId ? `/api/tienda/admin/promociones/${promotionId}` : '/api/tienda/admin/promociones';
         const res = await fetch(url, {
             method: promotionId ? 'PUT' : 'POST',
@@ -298,6 +303,7 @@
             body: JSON.stringify(payload)
         });
         const data = await res.json();
+        console.info('[tienda-admin-promos-runtime-v4-2026-05-31] guardarPromocion response', { status: res.status, data });
         if (!res.ok) {
             alert('No se pudo guardar la promoción: ' + (data.error || 'error'));
             return;

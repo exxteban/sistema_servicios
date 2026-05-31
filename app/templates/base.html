@@ -57,6 +57,8 @@
 <div id="partial-scripts">
     {% if request.endpoint != 'tienda_admin.panel' %}
     {% block extra_js %}{% endblock %}
+    {% else %}
+    <!-- tienda-admin partial scripts suppressed: tienda-admin-promos-runtime-v4-2026-05-31 -->
     {% endif %}
 </div>
 {% else %}

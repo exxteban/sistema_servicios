@@ -1,4 +1,4 @@
-from flask import Blueprint, make_response, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, current_app, make_response, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 
 from app import db
@@ -16,6 +16,7 @@ from app.services.web_bot.admin_service import (
 from gastronomia.services.modo_operacion import gastronomia_activa_para_cliente
 
 tienda_admin_bp = Blueprint('tienda_admin', __name__)
+TIENDA_ADMIN_DEBUG_VERSION = 'tienda-admin-promos-runtime-v4-2026-05-31'
 
 
 def _can_manage_store() -> bool:
@@ -31,6 +32,7 @@ def _no_store_response(content):
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
+    response.headers['X-Tienda-Admin-Debug-Version'] = TIENDA_ADMIN_DEBUG_VERSION
     return response
 
 
@@ -100,6 +102,14 @@ def panel():
     )
 
     if es_solicitud_parcial:
+        current_app.logger.warning(
+            '[%s] tienda-admin productos parcial q=%r cliente=%r gastro=%s items=%s',
+            TIENDA_ADMIN_DEBUG_VERSION,
+            q,
+            client_scope,
+            es_gastronomia_tienda,
+            len(productos.items),
+        )
         return _no_store_response(render_template(
             'tienda_admin/_panel_productos_gastronomia.html' if es_gastronomia_tienda else 'tienda_admin/_panel_productos.html',
             productos=productos,
@@ -114,6 +124,16 @@ def panel():
             serialize_admin_promotion(item)
             for item in list_admin_promotions(int(config.id_cliente))
         ]
+    current_app.logger.warning(
+        '[%s] tienda-admin panel partial=%r cliente=%r config=%r gastro=%s promociones=%s productos=%s',
+        TIENDA_ADMIN_DEBUG_VERSION,
+        request.args.get('partial'),
+        client_scope,
+        getattr(config, 'id_config', None),
+        es_gastronomia_tienda,
+        len(promociones),
+        len(productos.items),
+    )
     return _no_store_response(render_template(
         'tienda_admin/panel.html',
         productos=productos,
