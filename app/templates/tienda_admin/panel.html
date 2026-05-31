@@ -122,8 +122,10 @@
     </div>
 </div>
 
+{% if not request.args.get('partial') %}
 {% include "tienda_admin/_estadisticas_producto.html" %}
 {% include "tienda_admin/_estadisticas_tienda.html" %}
+{% endif %}
 
 <!-- Modal de Configuración de Tienda -->
 <div id="modalConfiguracion" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">

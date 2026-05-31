@@ -55,7 +55,9 @@
     {% block content %}{% endblock %}
 </div>
 <div id="partial-scripts">
+    {% if request.endpoint != 'tienda_admin.panel' %}
     {% block extra_js %}{% endblock %}
+    {% endif %}
 </div>
 {% else %}
 {% extends "layout_refactored.html" %}
