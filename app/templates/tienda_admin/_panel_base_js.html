@@ -1,6 +1,6 @@
-let tiendaAdminAutoBusquedaTimer = null;
-let tiendaAdminUltimaBusqueda = {{ q|tojson }};
-let tiendaAdminBusquedaController = null;
+var tiendaAdminAutoBusquedaTimer = null;
+var tiendaAdminUltimaBusqueda = {{ q|tojson }};
+var tiendaAdminBusquedaController = null;
 
 function tiendaAdminObtenerElementosBusqueda() {
     return {
@@ -201,28 +201,12 @@ function abrirConfiguracion() {
     }, 10);
 }
 
-function inicializarBotonesCabeceraTienda() {
-    const btnEstadisticas = document.getElementById('btnAbrirEstadisticasTienda');
-    const btnConfiguracion = document.getElementById('btnAbrirConfiguracionTienda');
-
-    if (btnEstadisticas && btnEstadisticas.dataset.bound !== '1') {
-        btnEstadisticas.dataset.bound = '1';
-        btnEstadisticas.addEventListener('click', abrirModalEstadisticasTienda);
-    }
-    if (btnConfiguracion && btnConfiguracion.dataset.bound !== '1') {
-        btnConfiguracion.dataset.bound = '1';
-        btnConfiguracion.addEventListener('click', abrirConfiguracion);
-    }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     tiendaAdminInicializarBusqueda();
     inicializarTogglesContacto();
-    inicializarBotonesCabeceraTienda();
 });
 
 tiendaAdminInicializarBusqueda();
-inicializarBotonesCabeceraTienda();
 
 function cerrarConfiguracion() {
     const modal = document.getElementById('modalConfiguracion');

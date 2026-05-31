@@ -1,5 +1,5 @@
-let promocionProductosSeleccionados = [];
-let promocionBusquedaTimer = null;
+var promocionProductosSeleccionados = [];
+var promocionBusquedaTimer = null;
 
 function promocionSlugActual() {
     return document.querySelector('#formPromocion [name="slug_actual"]')?.value || '{{ tienda_config.slug if tienda_config else "" }}';
