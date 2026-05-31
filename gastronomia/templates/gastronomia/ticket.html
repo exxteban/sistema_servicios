@@ -140,7 +140,7 @@
 
     <div class="screen-actions">
         <button type="button" onclick="window.print()">Imprimir ticket</button>
-        <a href="{{ url_for('gastronomia.caja') }}">Volver a caja</a>
+        <a href="{{ url_for('gastronomia.pos') }}">Cancelar y volver al POS</a>
     </div>
 
     <div class="ticket-preview-layout">
@@ -239,10 +239,19 @@ Seguimiento:
     <div style="height: 15mm;"></div>
     {% if request.args.get('preview') != '1' and request.args.get('embedded') != '1' %}
     <script>
+        function volverAlPos() {
+            const posUrl = {{ url_for('gastronomia.pos')|tojson }};
+            if (window.opener && !window.opener.closed) {
+                window.opener.location.href = posUrl;
+                window.close();
+                return;
+            }
+            window.location.href = posUrl;
+        }
         window.onload = function () {
             setTimeout(function () { window.print(); }, 500);
         };
-        window.onafterprint = function () { window.close(); };
+        window.onafterprint = volverAlPos;
     </script>
     {% endif %}
 </body>

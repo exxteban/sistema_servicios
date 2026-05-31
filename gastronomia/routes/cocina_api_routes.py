@@ -3,12 +3,12 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.cocina_presenter import serializar_eventos_cocina, serializar_pedidos_cocina
 from gastronomia.services.pedido_service import (
     cambiar_estado_pedido,
     listar_eventos_pedido,
     listar_pedidos_cocina,
     obtener_ultimo_evento_id,
-    serializar_pedidos,
 )
 from gastronomia.services.permisos import PERMISO_COCINA, requiere_permiso_gastronomia
 
@@ -33,7 +33,7 @@ def cocina_pedidos():
     pedidos = listar_pedidos_cocina(cliente_id)
     return jsonify({
         'ok': True,
-        'pedidos': serializar_pedidos(pedidos),
+        'pedidos': serializar_pedidos_cocina(pedidos),
         'ultimo_evento_id': obtener_ultimo_evento_id(cliente_id),
     })
 
@@ -49,7 +49,7 @@ def cocina_eventos():
     eventos = listar_eventos_pedido(cliente_id, despues_de=despues_de)
     return jsonify({
         'ok': True,
-        'eventos': [evento.to_dict() for evento in eventos],
+        'eventos': serializar_eventos_cocina(eventos),
         'ultimo_evento_id': obtener_ultimo_evento_id(cliente_id),
     })
 
@@ -65,7 +65,7 @@ def cocina_tomar(pedido_id):
         pedido = cambiar_estado_pedido(cliente_id, pedido_id, 'preparando')
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+    return jsonify({'ok': True, 'pedido': serializar_pedidos_cocina([pedido])[0]})
 
 
 @gastronomia_cocina_api_bp.route('/cocina/pedidos/<int:pedido_id>/listo', methods=['POST'])
@@ -79,7 +79,7 @@ def cocina_listo(pedido_id):
         pedido = cambiar_estado_pedido(cliente_id, pedido_id, 'listo')
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+    return jsonify({'ok': True, 'pedido': serializar_pedidos_cocina([pedido])[0]})
 
 
 @gastronomia_cocina_api_bp.route('/cocina/pedidos/<int:pedido_id>/entregar', methods=['POST'])
@@ -93,7 +93,7 @@ def cocina_entregar(pedido_id):
         pedido = cambiar_estado_pedido(cliente_id, pedido_id, 'entregado')
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+    return jsonify({'ok': True, 'pedido': serializar_pedidos_cocina([pedido])[0]})
 
 
 @gastronomia_cocina_api_bp.route('/cocina/pedidos/<int:pedido_id>/salir', methods=['POST'])
@@ -107,4 +107,4 @@ def cocina_salir(pedido_id):
         pedido = cambiar_estado_pedido(cliente_id, pedido_id, 'en_camino')
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+    return jsonify({'ok': True, 'pedido': serializar_pedidos_cocina([pedido])[0]})

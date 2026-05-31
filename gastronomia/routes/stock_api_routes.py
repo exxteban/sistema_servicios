@@ -3,7 +3,8 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
-from gastronomia.services.permisos import PERMISO_MENU, requiere_permiso_gastronomia
+from gastronomia.services.permisos import PERMISO_MENU, PERMISO_POS, requiere_permiso_gastronomia
+from gastronomia.services.stock_preview_service import previsualizar_stock_carrito
 from gastronomia.services.stock_service import (
     ajustar_stock,
     configurar_insumo,
@@ -30,6 +31,20 @@ def _cliente_o_error():
 
 def _payload():
     return request.get_json(silent=True) or {}
+
+
+@gastronomia_stock_api_bp.route('/stock/previsualizar-pedido', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_POS)
+def previsualizar_pedido():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    data = _payload()
+    items = data.get('items') or []
+    if not isinstance(items, list):
+        return jsonify({'error': 'validation_error', 'mensaje': 'Los items deben ser una lista.'}), 400
+    return jsonify({'ok': True, 'alertas': previsualizar_stock_carrito(cliente_id, items)})
 
 
 @gastronomia_stock_api_bp.route('/stock/insumos', methods=['GET'])

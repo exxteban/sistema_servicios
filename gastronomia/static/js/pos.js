@@ -40,6 +40,7 @@
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const showAlert = (message, ok) => {
+    delete alertBox.dataset.stockPreview;
     alertBox.textContent = message;
     alertBox.className = `mb-4 rounded-lg border px-4 py-3 text-sm font-semibold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
   };
@@ -350,6 +351,7 @@
       </article>
     `).join('') || '<div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">Sin items.</div>';
     cartTotal.textContent = money(cartTotalAmount());
+    window.GastronomiaStockAlerts?.refresh(cart);
   };
 
   const cartSubtotal = () => cart.reduce((sum, item) => sum + promotions.subtotal(item), 0);

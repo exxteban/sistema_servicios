@@ -95,7 +95,6 @@
       activeControllers.delete(controller);
     }
   };
-  const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const ageMinutes = (iso) => {
     const start = new Date(iso || Date.now()).getTime();
     return Math.max(0, Math.floor((Date.now() - start) / 60000));
@@ -257,9 +256,6 @@
       </div>
       <div class="mt-4 space-y-2">
         ${renderDetails(order)}
-      </div>
-      <div class="mt-3 flex items-center justify-end border-t border-slate-700/70 pt-3">
-        <span class="text-sm font-black text-slate-200">${money(order.total)}</span>
       </div>
       ${renderActions(order)}
     </article>

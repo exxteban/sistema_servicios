@@ -27,6 +27,21 @@ def _csrf(html: str) -> str:
     return match.group(1)
 
 
+def _assert_sin_importes(value):
+    claves_importe = {
+        'costo_envio', 'descuento_linea', 'descuento_monto', 'pago', 'precio',
+        'precio_delta', 'precio_original', 'precio_unitario', 'subtotal', 'total',
+        'total_cobrado',
+    }
+    if isinstance(value, list):
+        for item in value:
+            _assert_sin_importes(item)
+    elif isinstance(value, dict):
+        assert not claves_importe.intersection(value)
+        for item in value.values():
+            _assert_sin_importes(item)
+
+
 def _crear_producto(app, nombre_cliente: str, username: str):
     with app.app_context():
         cliente = Cliente(nombre=nombre_cliente, ruc_ci=username, tipo='minorista', activo=True)
@@ -104,6 +119,7 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
     assert [pedido['estado'] for pedido in pedidos] == ['enviado_cocina']
     assert pedidos[0]['codigo_entrega'] == f'#{pedido_id:03d}'
     assert pedidos[0]['referencia_entrega'] == 'Juan mostrador'
+    _assert_sin_importes(pedidos)
 
     tomar_resp = client.post(
         f'/api/gastronomia/cocina/pedidos/{pedido_id}/tomar',
@@ -112,6 +128,10 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
     )
     assert tomar_resp.status_code == 200
     assert tomar_resp.get_json()['pedido']['estado'] == 'preparando'
+    _assert_sin_importes(tomar_resp.get_json()['pedido'])
+    eventos_resp = client.get('/api/gastronomia/cocina/eventos?after=0')
+    assert eventos_resp.status_code == 200
+    _assert_sin_importes(eventos_resp.get_json()['eventos'])
     cocina_resp = client.get('/api/gastronomia/cocina/pedidos')
     assert cocina_resp.status_code == 200
     pedidos = cocina_resp.get_json()['pedidos']
