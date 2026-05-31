@@ -4,6 +4,8 @@ from pathlib import Path
 
 TIENDA_ADMIN_TEMPLATES = Path("app/templates/tienda_admin")
 TAB_RUNTIME_PART1 = Path("app/templates/layout/tab_runtime_js_part1.html")
+TAB_RUNTIME_PART2 = Path("app/templates/layout/tab_runtime_js_part2.html")
+TIENDA_ADMIN_ROUTE = Path("app/routes/tienda_admin.py")
 
 
 def test_tienda_admin_scripts_allow_tab_runtime_reload():
@@ -56,3 +58,13 @@ def test_tab_runtime_normalizes_stale_reloadable_state_declarations():
     assert "isRedeclarationError" in source
     assert "tiendaStatsState" in source
     assert "tiendaAdminAutoBusquedaTimer" in source
+
+
+def test_tienda_admin_tab_loads_without_cache():
+    runtime_source = TAB_RUNTIME_PART2.read_text(encoding="utf-8")
+    route_source = TIENDA_ADMIN_ROUTE.read_text(encoding="utf-8")
+    search_source = (TIENDA_ADMIN_TEMPLATES / "_panel_base_js.html").read_text(encoding="utf-8")
+
+    assert "cache: 'no-store'" in runtime_source
+    assert "cache: 'no-store'" in search_source
+    assert "no-store, no-cache, must-revalidate, max-age=0" in route_source

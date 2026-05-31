@@ -28,6 +28,7 @@
                         dlog('[TAB LOAD]', fetchUrl.toString());
                         const response = await fetch(fetchUrl.toString(), {
                             headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            cache: 'no-store',
                             signal: currentAbortController.signal
                         });
                         if (posPerfActive) {

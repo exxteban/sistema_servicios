@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, make_response, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 
 from app import db
@@ -24,6 +24,14 @@ def _can_manage_store() -> bool:
 
 def _current_client_scope() -> int | None:
     return resolver_cliente_tienda()
+
+
+def _no_store_response(content):
+    response = make_response(content)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @tienda_admin_bp.route('/tienda-admin')
@@ -92,12 +100,12 @@ def panel():
     )
 
     if es_solicitud_parcial:
-        return render_template(
+        return _no_store_response(render_template(
             'tienda_admin/_panel_productos_gastronomia.html' if es_gastronomia_tienda else 'tienda_admin/_panel_productos.html',
             productos=productos,
             q=q,
             tienda_config=config,
-        )
+        ))
 
     categorias = Categoria.query.order_by(Categoria.nombre.asc()).all()
     promociones = []
@@ -106,7 +114,7 @@ def panel():
             serialize_admin_promotion(item)
             for item in list_admin_promotions(int(config.id_cliente))
         ]
-    return render_template(
+    return _no_store_response(render_template(
         'tienda_admin/panel.html',
         productos=productos,
         tienda_config=config,
@@ -116,7 +124,7 @@ def panel():
         promociones=promociones,
         q=q,
         show_publicidad_ads_analytics=es_usuario_root(current_user),
-    )
+    ))
 
 
 @tienda_admin_bp.route('/tienda-admin/bot/conversaciones')

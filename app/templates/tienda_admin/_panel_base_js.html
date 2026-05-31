@@ -73,6 +73,7 @@ async function tiendaAdminCargarResultados(url, { restaurarFoco = false } = {}) 
     try {
         const response = await fetch(partialUrl.toString(), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            cache: 'no-store',
             signal: window.tiendaAdminBusquedaController.signal
         });
         if (!response.ok) {
