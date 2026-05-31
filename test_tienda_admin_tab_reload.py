@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 TIENDA_ADMIN_TEMPLATES = Path("app/templates/tienda_admin")
+TAB_RUNTIME_PART1 = Path("app/templates/layout/tab_runtime_js_part1.html")
 
 
 def test_tienda_admin_scripts_allow_tab_runtime_reload():
@@ -46,3 +47,12 @@ def test_tienda_admin_header_buttons_use_single_click_handler():
     assert 'onclick="abrirConfiguracion()"' in panel_source
     assert 'onclick="abrirModalEstadisticasTienda()"' in panel_source
     assert "inicializarBotonesCabeceraTienda" not in script_source
+
+
+def test_tab_runtime_normalizes_stale_reloadable_state_declarations():
+    source = TAB_RUNTIME_PART1.read_text(encoding="utf-8")
+
+    assert "normalizeReloadableInlineScript" in source
+    assert "isRedeclarationError" in source
+    assert "tiendaStatsState" in source
+    assert "tiendaAdminAutoBusquedaTimer" in source

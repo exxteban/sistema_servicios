@@ -664,6 +664,35 @@
                     if (loadingCover) loadingCover.remove();
                 }
 
+                const reloadableTabGlobals = [
+                    'tiendaAdminAutoBusquedaTimer',
+                    'tiendaAdminUltimaBusqueda',
+                    'tiendaAdminBusquedaController',
+                    'productoActualImagenes',
+                    'imagenProductoPendiente',
+                    'productoActualOferta',
+                    'estadoActualOferta',
+                    'promocionProductosSeleccionados',
+                    'promocionBusquedaTimer',
+                    'tiendaDashboardStatsState',
+                    'tiendaStatsState'
+                ];
+
+                function normalizeReloadableInlineScript(source) {
+                    let normalized = source || '';
+                    reloadableTabGlobals.forEach((name) => {
+                        normalized = normalized.replace(
+                            new RegExp(`\\b(?:var|let|const)\\s+${name}\\s*=`, 'g'),
+                            `window.${name} =`
+                        );
+                    });
+                    return normalized;
+                }
+
+                function isRedeclarationError(error) {
+                    return /Identifier '.+' has already been declared/.test(String(error?.message || error || ''));
+                }
+
                 async function applyPayload(payload) {
                     markPosPerf('apply_payload_start_perf');
                     removePanelContent();
@@ -702,9 +731,16 @@
                                         newScript.addEventListener('error', resolve, { once: true });
                                     }));
                                 } else {
-                                    newScript.appendChild(document.createTextNode(node.innerHTML));
+                                    newScript.appendChild(document.createTextNode(normalizeReloadableInlineScript(node.innerHTML)));
                                 }
-                                scriptsHost.appendChild(newScript);
+                                try {
+                                    scriptsHost.appendChild(newScript);
+                                } catch (error) {
+                                    if (!isRedeclarationError(error)) {
+                                        throw error;
+                                    }
+                                    console.warn('Script omitido por estado global ya declarado:', error);
+                                }
                                 return;
                             }
 
@@ -898,4 +934,3 @@
                         } catch { }
                     });
                 }
-
