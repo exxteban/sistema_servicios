@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { calculatePromotionSubtotal } from '../utils/promotions'
 
 const STORAGE_PREFIX = 'tienda-online:gastronomia-order:'
 
@@ -36,17 +37,20 @@ function normalizeCartItem(producto, quantity, options = {}) {
   if (!producto?.id || nextQuantity <= 0 || (!isCustomized && productRequiresCustomization(producto))) return null
 
   const precio = Number(options.unitPrice ?? producto.precio ?? 0)
+  const basePrice = Number(options.basePrice ?? producto.basePrice ?? producto.precio ?? precio)
+  const promotion = options.promotion ?? producto.promocion_activa ?? null
   const key = String(options.key || producto.key || producto.cartKey || (isCustomized ? buildCustomizedKey(producto, modifiers) : producto.id))
   return {
     key,
     id: producto.id,
     nombre: producto.nombre || 'Producto',
     precio,
-    basePrice: Number(options.basePrice ?? producto.basePrice ?? producto.precio ?? precio),
+    basePrice,
+    promotion,
     modifiers,
     customized: isCustomized,
     quantity: nextQuantity,
-    subtotal: precio * nextQuantity
+    subtotal: calculatePromotionSubtotal(precio, nextQuantity, promotion, basePrice)
   }
 }
 
@@ -58,6 +62,7 @@ function cartItemsAreEqual(currentItem, nextItem) {
   return currentItem?.key === nextItem?.key &&
     currentItem?.nombre === nextItem?.nombre &&
     Number(currentItem?.precio || 0) === Number(nextItem?.precio || 0) &&
+    Number(currentItem?.promotion?.id || 0) === Number(nextItem?.promotion?.id || 0) &&
     Number(currentItem?.quantity || 0) === Number(nextItem?.quantity || 0) &&
     Number(currentItem?.subtotal || 0) === Number(nextItem?.subtotal || 0)
 }
@@ -82,7 +87,8 @@ function readStoredCart(storageKey) {
         key: item?.key,
         modifiers: item?.modifiers,
         unitPrice: item?.precio,
-        basePrice: item?.basePrice
+        basePrice: item?.basePrice,
+        promotion: item?.promotion
       })
       if (normalizedItem) {
         acc[normalizedItem.key] = normalizedItem
@@ -121,12 +127,21 @@ export function useQuickOrderCart(slug, productosActuales = []) {
       let changed = false
       const nextMap = Object.values(current).reduce((acc, item) => {
         const latestProduct = latestProductsById[item.id]
-        if (!latestProduct || item.customized) {
+        if (!latestProduct) {
           acc[item.key] = item
           return acc
         }
 
-        const refreshedItem = normalizeCartItem(latestProduct, item.quantity)
+        const refreshedItem = item.customized
+          ? normalizeCartItem(item, item.quantity, {
+              allowCustomization: true,
+              key: item.key,
+              modifiers: item.modifiers,
+              unitPrice: item.precio,
+              basePrice: item.basePrice,
+              promotion: latestProduct.promocion_activa ?? null
+            })
+          : normalizeCartItem(latestProduct, item.quantity)
         if (!refreshedItem) {
           changed = true
           return acc

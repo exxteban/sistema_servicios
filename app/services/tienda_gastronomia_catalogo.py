@@ -5,6 +5,11 @@ from urllib.parse import quote
 
 from app import db
 from app.models.tienda import TiendaConfig
+from app.services.tienda_promociones import (
+    attach_gastronomia_promotion_to_product_data,
+    get_active_gastronomia_product_promotion,
+    get_active_gastronomia_product_promotion_map,
+)
 from app.services.tienda_context import resolver_cliente_gastronomia_tienda
 from app.utils.tienda_urls import build_category_public_path, build_product_public_path, slugify_tienda_text
 from gastronomia.models import GastronomiaCategoria, GastronomiaGrupoOpciones, GastronomiaOpcionProducto, GastronomiaProducto
@@ -72,7 +77,14 @@ def productos_gastronomia_payload(
         .limit(per_page)
         .all()
     )
-    cards = [_serializar_producto_card(producto, config) for producto in productos]
+    promotions = get_active_gastronomia_product_promotion_map(
+        resolver_cliente_gastronomia_tienda(config),
+        [producto.id_producto for producto in productos],
+    )
+    cards = [
+        _serializar_producto_card(producto, config, promotions.get(int(producto.id_producto)))
+        for producto in productos
+    ]
 
     return {
         'total': total,
@@ -116,9 +128,16 @@ def detalle_producto_gastronomia(config: TiendaConfig, producto_id: int) -> dict
         )
         relacionados.extend(faltantes)
 
+    related_promotions = get_active_gastronomia_product_promotion_map(
+        producto.cliente_id,
+        [item.id_producto for item in relacionados],
+    )
     return {
         **_serializar_producto(producto, config),
-        'relacionados': [_serializar_producto_card(item, config) for item in relacionados],
+        'relacionados': [
+            _serializar_producto_card(item, config, related_promotions.get(int(item.id_producto)))
+            for item in relacionados
+        ],
     }
 
 
@@ -142,15 +161,16 @@ def _query_productos_publicos(config: TiendaConfig):
 
 
 def _serializar_producto(producto: GastronomiaProducto, config: TiendaConfig) -> dict:
-    data = _serializar_producto_card(producto, config)
+    promotion = get_active_gastronomia_product_promotion(producto.cliente_id, producto.id_producto)
+    data = _serializar_producto_card(producto, config, promotion)
     data['descripcion'] = producto.descripcion or ''
     data['imagenes'] = _imagenes_producto(producto)
     data['grupos_opciones'] = _grupos_opciones_producto(producto)
     return data
 
 
-def _serializar_producto_card(producto: GastronomiaProducto, config: TiendaConfig) -> dict:
-    return {
+def _serializar_producto_card(producto: GastronomiaProducto, config: TiendaConfig, promotion=None) -> dict:
+    data = {
         'id': producto.id_producto,
         'slug_producto': slugify_tienda_text(producto.nombre, fallback=str(producto.id_producto)),
         'url_detalle': build_product_public_path(config.slug, producto.id_producto, producto.nombre),
@@ -174,6 +194,7 @@ def _serializar_producto_card(producto: GastronomiaProducto, config: TiendaConfi
         'promocion_activa': None,
         'tipo_catalogo': 'gastronomia',
     }
+    return attach_gastronomia_promotion_to_product_data(producto, data, promotion)
 
 
 def _imagenes_producto(producto: GastronomiaProducto) -> list[dict]:

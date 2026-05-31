@@ -32,7 +32,11 @@ from app.models.crm_nota_interna import CrmNotaInterna
 from app.models.crm_plantilla import CrmPlantilla
 from app.models.agenda_actividad import AgendaActividad
 from app.models.tienda import TiendaConfig, ProductoImagen, TiendaLead, TiendaVisitaEvento
-from app.models.tienda_promocion import TiendaPromocion, TiendaPromocionProducto
+from app.models.tienda_promocion import (
+    TiendaPromocion,
+    TiendaPromocionGastronomiaProducto,
+    TiendaPromocionProducto,
+)
 from app.models.web_bot import WebBotSesion, WebBotMensaje, WebBotHandoff
 from app.models.asistente_ia import AsistenteIABackofficeAudit
 from app.models.publicidad_ads import PublicidadAdsEvento
@@ -76,7 +80,7 @@ __all__ = [
     'CrmEtiqueta', 'CrmContacto', 'CrmNotaInterna', 'CrmPlantilla',
     'AgendaActividad',
     'TiendaConfig', 'ProductoImagen', 'TiendaLead', 'TiendaVisitaEvento',
-    'TiendaPromocion', 'TiendaPromocionProducto',
+    'TiendaPromocion', 'TiendaPromocionProducto', 'TiendaPromocionGastronomiaProducto',
     'WebBotSesion', 'WebBotMensaje', 'WebBotHandoff',
     'AsistenteIABackofficeAudit',
     'PublicidadAdsEvento',

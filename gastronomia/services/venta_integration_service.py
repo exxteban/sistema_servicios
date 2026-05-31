@@ -313,7 +313,11 @@ def _registrar_detalles(venta: Venta, pedido: GastronomiaPedido):
             id_servicio=servicio.id_servicio,
             cantidad=cantidad,
             precio_unitario=precio_unitario,
-            precio_original=precio_unitario,
+            precio_original=Decimal(str(item.precio_original or precio_unitario)),
+            descuento_linea=Decimal(str(item.descuento_linea or 0)),
+            id_promocion_aplicada=item.id_promocion_aplicada,
+            promocion_descripcion=item.promocion_descripcion,
+            cantidad_bonificada=int(item.cantidad_bonificada or 0),
             porcentaje_iva=int(servicio.porcentaje_iva or 0),
             monto_iva=monto_iva,
             subtotal=subtotal,
@@ -372,6 +376,7 @@ def _items_cola_desde_pedido(pedido: GastronomiaPedido) -> list[dict]:
 def _item_cola_desde_pedido_item(item: GastronomiaPedidoItem) -> dict:
     servicio = _servicio_para_item(item)
     precio = Decimal(str(item.precio_unitario or 0)).quantize(Decimal('0.01'))
+    cantidad = int(item.cantidad or 1)
     return {
         'tipo': 'servicio',
         'id': int(servicio.id_servicio),
@@ -380,7 +385,9 @@ def _item_cola_desde_pedido_item(item: GastronomiaPedidoItem) -> dict:
         'nombre': item.nombre_producto,
         'precio': float(precio),
         'precio_base': float(precio),
-        'cantidad': int(item.cantidad or 1),
+        'cantidad': cantidad,
+        'subtotal': float(Decimal(str(item.subtotal or 0)).quantize(Decimal('0.01'))),
+        'subtotal_cantidad': cantidad,
         'es_servicio': True,
         'stock': 0,
         'stock_minimo': 0,

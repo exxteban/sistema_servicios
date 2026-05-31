@@ -109,6 +109,14 @@ class DetalleVenta(db.Model):
     # Totales
     descuento_linea = db.Column(db.Numeric(15, 2), default=0)
     subtotal = db.Column(db.Numeric(15, 2), nullable=False)
+    id_promocion_aplicada = db.Column(
+        db.Integer,
+        db.ForeignKey('tienda_promociones.id_promocion'),
+        nullable=True,
+        index=True,
+    )
+    promocion_descripcion = db.Column(db.String(255))
+    cantidad_bonificada = db.Column(db.Integer, nullable=False, default=0)
     
     es_kit = db.Column(db.Boolean, default=False)
     

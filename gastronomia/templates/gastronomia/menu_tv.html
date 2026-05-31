@@ -172,6 +172,25 @@
             flex: 0 0 auto;
             text-align: left;
         }
+        .menu-tv-price-old {
+            display: block;
+            margin-top: 8px;
+            color: #fed7aa;
+            font-size: clamp(15px, 1.2vw, 22px);
+            font-weight: 800;
+            text-decoration: line-through;
+        }
+        .menu-tv-promo-badge {
+            display: inline-block;
+            margin-top: 10px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #16a34a 0%, #0d9488 100%);
+            color: #ffffff;
+            padding: 6px 14px;
+            font-size: 16px;
+            font-weight: 1000;
+            text-transform: uppercase;
+        }
         .menu-tv-soldout { opacity: 0.55; }
         .menu-tv-badge {
             display: inline-block;
@@ -275,6 +294,6 @@
         <section id="menu-tv-content" class="menu-tv-grid"></section>
         <div id="menu-tv-status" class="menu-tv-status" aria-live="polite"></div>
     </main>
-    <script src="{{ url_for('gastronomia.static', filename='js/menu_tv.js', v='20260529-2') }}"></script>
+    <script src="{{ url_for('gastronomia.static', filename='js/menu_tv.js', v='20260530-3') }}"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@ from .parte1 import *
 from .parte3 import _procesar_venta_payload
 from app.models import ClienteServicio
 from app.services.clientes_fidelizacion import revertir_fidelizacion_por_anulacion_venta
+from app.services.devoluciones_calculo import calculate_refund_subtotal
 from cobranzas.services.cuenta_service import anular_cuenta_por_cobrar
 
 
@@ -412,6 +413,7 @@ def crear_devolucion(id):
             db.session.query(
                 DetalleDevolucion.id_detalle_venta_original,
                 func.coalesce(func.sum(DetalleDevolucion.cantidad), 0),
+                func.coalesce(func.sum(DetalleDevolucion.subtotal), 0),
             )
             .join(Devolucion, DetalleDevolucion.id_devolucion == Devolucion.id_devolucion)
             .filter(
@@ -422,7 +424,11 @@ def crear_devolucion(id):
             .group_by(DetalleDevolucion.id_detalle_venta_original)
             .all()
         )
-        devueltos_por_detalle = {int(r[0]): int(r[1] or 0) for r in devueltos_rows if r and r[0] is not None}
+        devueltos_por_detalle = {
+            int(r[0]): {'cantidad': int(r[1] or 0), 'subtotal': Decimal(str(r[2] or 0))}
+            for r in devueltos_rows
+            if r and r[0] is not None
+        }
 
         monto_total = Decimal('0')
         items_auditoria = []
@@ -435,23 +441,30 @@ def crear_devolucion(id):
                 return jsonify({'error': f'Detalle de venta no encontrado: {id_detalle_venta}'}), 400
 
             cantidad_original = int(detalle_venta.cantidad)
-            cantidad_devuelta = int(devueltos_por_detalle.get(id_detalle_venta) or 0)
+            devuelto = devueltos_por_detalle.get(id_detalle_venta) or {}
+            cantidad_devuelta = int(devuelto.get('cantidad') or 0)
             disponible = cantidad_original - cantidad_devuelta
             if disponible <= 0:
                 return jsonify({'error': f'No hay cantidad disponible para devolver en detalle {id_detalle_venta}'}), 400
             if cantidad > disponible:
                 return jsonify({'error': f'Cantidad inválida para detalle {id_detalle_venta}. Disponible: {disponible}'}), 400
 
-            precio_unitario = Decimal(str(detalle_venta.precio_unitario))
-            subtotal = precio_unitario * Decimal(str(cantidad))
+            subtotal = calculate_refund_subtotal(
+                line_subtotal=detalle_venta.subtotal,
+                original_quantity=cantidad_original,
+                returned_quantity=cantidad_devuelta,
+                returned_subtotal=devuelto.get('subtotal') or 0,
+                quantity=cantidad,
+            )
+            precio_unitario = (subtotal / Decimal(str(cantidad))).quantize(Decimal('0.01'))
             monto_total += subtotal
-            items_normalizados.append((detalle_venta, cantidad, subtotal))
+            items_normalizados.append((detalle_venta, cantidad, precio_unitario, subtotal))
 
             items_auditoria.append({
                 'id_detalle_venta': id_detalle_venta,
                 'id_producto': detalle_venta.id_producto,
                 'cantidad': cantidad,
-                'precio_unitario': float(detalle_venta.precio_unitario or 0),
+                'precio_unitario': float(precio_unitario),
                 'subtotal': float(subtotal or 0),
             })
 
@@ -468,13 +481,13 @@ def crear_devolucion(id):
         db.session.add(devolucion)
         db.session.flush()
 
-        for detalle_venta, cantidad, subtotal in items_normalizados:
+        for detalle_venta, cantidad, precio_unitario, subtotal in items_normalizados:
             detalle_dev = DetalleDevolucion(
                 id_devolucion=devolucion.id_devolucion,
                 id_producto=detalle_venta.id_producto,
                 id_detalle_venta_original=detalle_venta.id_detalle_venta,
                 cantidad=cantidad,
-                precio_unitario=detalle_venta.precio_unitario,
+                precio_unitario=precio_unitario,
                 subtotal=subtotal
             )
             db.session.add(detalle_dev)

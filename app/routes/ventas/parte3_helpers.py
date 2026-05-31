@@ -1,6 +1,8 @@
 from .parte1 import *
 from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO
 from cobranzas.services.credito_service import calcular_compromiso_credito
+from app.services.promociones_calculo import calculate_promotion_totals
+from app.services.tienda_promociones import get_active_product_promotion_map_any_client
 
 
 def _normalizar_pagos_venta(pagos, id_autorizacion):
@@ -217,6 +219,7 @@ def _construir_detalles_venta(
     detalles = []
     productos_por_id = {}
     cantidades_por_producto = {}
+    promotions = get_active_product_promotion_map_any_client(productos_prefetch_por_id.keys())
 
     for item in items:
         tipo_item = (item.get('tipo') or 'producto').strip().lower()
@@ -311,7 +314,18 @@ def _construir_detalles_venta(
         elif cola_cobro is not None and precio <= 0:
             return None, ({'error': 'Precio invalido en el pendiente enviado a caja'}, 400)
 
-        item_subtotal = precio * cantidad
+        promotion = None
+        promotion_metrics = None
+        if (
+            precio_opcion_id in (None, '')
+            and not item.get('precio_manual')
+            and not usar_precio_mayorista
+        ):
+            promotion = promotions.get(int(producto.id_producto))
+            if promotion:
+                promotion_metrics = calculate_promotion_totals(precio_original, cantidad, promotion)
+                precio = promotion_metrics['precio_unitario_efectivo']
+        item_subtotal = promotion_metrics['subtotal_base'] if promotion_metrics else precio * cantidad
         if item_subtotal <= 0:
             return None, ({'error': f'Subtotal inválido para producto {id_producto_item}'}, 400)
         if not producto.es_servicio:
@@ -337,6 +351,10 @@ def _construir_detalles_venta(
             porcentaje_iva=producto.porcentaje_iva,
             monto_iva=item_iva,
             subtotal=item_subtotal,
+            descuento_linea=promotion_metrics['descuento_linea'] if promotion_metrics else 0,
+            id_promocion_aplicada=getattr(promotion, 'id_promocion', None),
+            promocion_descripcion=promotion_metrics['descripcion'] if promotion_metrics else None,
+            cantidad_bonificada=promotion_metrics['cantidad_bonificada'] if promotion_metrics else 0,
             es_kit=producto.es_kit
         )
         detalles.append((detalle, producto, cantidad, None))
@@ -389,6 +407,18 @@ def _construir_detalle_servicio(item, servicios_prefetch_por_id, servicio_opcion
             return None, ({'error': f'Precio inválido para servicio {id_servicio_item}'}, 400)
 
     item_subtotal = precio * cantidad
+    subtotal_cantidad = item.get('subtotal_cantidad')
+    if (
+        cola_cobro is not None
+        and cola_cobro.tipo_origen == 'gastronomia'
+        and item.get('subtotal') not in (None, '')
+        and subtotal_cantidad not in (None, '')
+    ):
+        try:
+            if int(subtotal_cantidad) == cantidad:
+                item_subtotal = Decimal(str(item.get('subtotal'))).quantize(Decimal('0.01'))
+        except Exception:
+            return None, ({'error': f'Subtotal invÃ¡lido para servicio {id_servicio_item}'}, 400)
     if item_subtotal <= 0:
         return None, ({'error': f'Subtotal inválido para servicio {id_servicio_item}'}, 400)
     if servicio.porcentaje_iva == 10:

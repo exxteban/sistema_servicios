@@ -85,6 +85,9 @@
                 id_servicio: it.id_servicio || null,
                 cantidad: it.cantidad,
                 precio: it.precio,
+                subtotal: it.subtotal_guardado ?? null,
+                subtotal_cantidad: it.subtotal_guardado_cantidad ?? null,
+                promocion_activa: it.promocion_activa || null,
                 precio_manual: it.precio_manual === true,
                 precio_opcion_id: it.precio_opcion_id || null,
                 nombre: it.nombre,
@@ -349,7 +352,7 @@
             const codigo = this.escapeHtml(it.codigo || '');
             const cant = parseInt(it.cantidad) || 0;
             const precio = parseFloat(it.precio) || 0;
-            const lineTotal = precio * cant;
+            const lineTotal = this.subtotalItemPromocion(it);
             return `
                             <tr>
                                 <td style="vertical-align: top;">

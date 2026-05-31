@@ -17,6 +17,9 @@
                         id_producto: item.id_producto,
                         cantidad: item.cantidad,
                         precio: item.precio,
+                        promocion_activa: item.promocion_activa || null,
+                        subtotal_guardado: item.subtotal_guardado ?? null,
+                        subtotal_guardado_cantidad: item.subtotal_guardado_cantidad ?? null,
                         precio_manual: item.precio_manual === true,
                         precio_opcion_id: item.precio_opcion_id || null
                     })),
@@ -186,6 +189,9 @@
                                 precio_mayorista: validacion.precio_mayorista,
                                 cantidad: itemGuardado.cantidad,
                                 iva: validacion.iva,
+                                promocion_activa: (!esMayorista && !precioManual)
+                                    ? (validacion.promocion_activa || null)
+                                    : null,
                                 precio_manual: precioManual,
                                 precio_opcion_id: precioOpcionId,
                                 stock_disponible: validacion.stock,
@@ -263,7 +269,7 @@
                 const empresa = POS_EMPRESA || {};
                 const items = Array.isArray(payload.items) ? payload.items : [];
                 const pagos = Array.isArray(payload.pagos) ? payload.pagos : [];
-                const subtotal = items.reduce((sum, it) => sum + ((parseFloat(it.precio) || 0) * (parseInt(it.cantidad) || 0)), 0);
+                const subtotal = items.reduce((sum, it) => sum + this.subtotalItemPromocion(it), 0);
                 const descuento = parseFloat(payload.descuento) || 0;
                 const total = Math.max(0, subtotal - descuento);
                 const totalPagado = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
@@ -276,7 +282,7 @@
                     const codigo = this.escapeHtml(it.codigo || '');
                     const cant = parseInt(it.cantidad) || 0;
                     const precio = parseFloat(it.precio) || 0;
-                    const lineTotal = precio * cant;
+                    const lineTotal = this.subtotalItemPromocion(it);
                     return `
                             <tr>
                                 <td style="vertical-align: top;">

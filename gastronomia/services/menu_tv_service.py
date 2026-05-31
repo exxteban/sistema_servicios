@@ -57,6 +57,8 @@ def obtener_payload_publico(slug: str) -> dict | None:
 
 
 def listar_categorias_menu_tv(config: GastronomiaClienteConfig) -> list[dict]:
+    from app.services.tienda_promociones import get_active_gastronomia_product_promotion_map
+
     categorias = (
         GastronomiaCategoria.query
         .filter_by(cliente_id=int(config.cliente_id), activo=True, visible=True)
@@ -64,9 +66,15 @@ def listar_categorias_menu_tv(config: GastronomiaClienteConfig) -> list[dict]:
     )
     categorias = ordenar_categorias(categorias)
     productos = _productos_visibles(config)
+    promotions = get_active_gastronomia_product_promotion_map(
+        config.cliente_id,
+        [producto.id_producto for producto in productos],
+    )
     productos_por_categoria: dict[int, list[dict]] = {}
     for producto in productos:
-        productos_por_categoria.setdefault(int(producto.categoria_id), []).append(_producto_tv(producto))
+        productos_por_categoria.setdefault(int(producto.categoria_id), []).append(
+            _producto_tv(producto, promotions.get(int(producto.id_producto)))
+        )
 
     return [
         {
@@ -143,8 +151,10 @@ def _productos_visibles(config: GastronomiaClienteConfig) -> list[GastronomiaPro
     return query.order_by(GastronomiaProducto.orden.asc(), GastronomiaProducto.nombre.asc()).all()
 
 
-def _producto_tv(producto: GastronomiaProducto) -> dict:
-    return {
+def _producto_tv(producto: GastronomiaProducto, promotion=None) -> dict:
+    from app.services.tienda_promociones import attach_gastronomia_promotion_to_product_data
+
+    data = {
         'id_producto': producto.id_producto,
         'nombre': producto.nombre,
         'descripcion': producto.descripcion,
@@ -153,6 +163,7 @@ def _producto_tv(producto: GastronomiaProducto) -> dict:
         'disponible': bool(producto.disponible),
         'orden': int(producto.orden or 0),
     }
+    return attach_gastronomia_promotion_to_product_data(producto, data, promotion)
 
 
 def _clean_text(value, limit: int) -> str | None:

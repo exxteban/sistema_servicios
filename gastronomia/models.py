@@ -65,7 +65,7 @@ class GastronomiaCategoria(db.Model):
     )
 
     def to_dict(self):
-        return {
+        data = {
             'id_categoria': self.id_categoria,
             'cliente_id': self.cliente_id,
             'nombre': self.nombre,
@@ -74,6 +74,7 @@ class GastronomiaCategoria(db.Model):
             'visible': bool(self.visible),
             'activo': bool(self.activo),
         }
+        return data
 
 
 class GastronomiaProducto(db.Model):
@@ -105,7 +106,7 @@ class GastronomiaProducto(db.Model):
     )
 
     def to_dict(self):
-        return {
+        data = {
             'id_producto': self.id_producto,
             'cliente_id': self.cliente_id,
             'categoria_id': self.categoria_id,
@@ -122,6 +123,12 @@ class GastronomiaProducto(db.Model):
             'activo': bool(self.activo),
             'orden': int(self.orden or 0),
         }
+        from app.services.tienda_promociones import (
+            attach_gastronomia_promotion_to_product_data,
+            get_active_gastronomia_product_promotion,
+        )
+        promotion = get_active_gastronomia_product_promotion(self.cliente_id, self.id_producto)
+        return attach_gastronomia_promotion_to_product_data(self, data, promotion)
 
 
 class GastronomiaGrupoOpciones(db.Model):
@@ -373,6 +380,16 @@ class GastronomiaPedidoItem(db.Model):
     nombre_producto = db.Column(db.String(160), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False, default=1)
     precio_unitario = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    precio_original = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    descuento_linea = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    id_promocion_aplicada = db.Column(
+        db.Integer,
+        db.ForeignKey('tienda_promociones.id_promocion'),
+        nullable=True,
+        index=True,
+    )
+    promocion_descripcion = db.Column(db.String(255))
+    cantidad_bonificada = db.Column(db.Integer, nullable=False, default=0)
     notas = db.Column(db.Text)
     subtotal = db.Column(db.Numeric(15, 2), nullable=False, default=0)
 
@@ -391,6 +408,11 @@ class GastronomiaPedidoItem(db.Model):
             'nombre_producto': self.nombre_producto,
             'cantidad': int(self.cantidad or 0),
             'precio_unitario': float(self.precio_unitario or 0),
+            'precio_original': float(self.precio_original or 0),
+            'descuento_linea': float(self.descuento_linea or 0),
+            'id_promocion_aplicada': self.id_promocion_aplicada,
+            'promocion_descripcion': self.promocion_descripcion,
+            'cantidad_bonificada': int(self.cantidad_bonificada or 0),
             'notas': self.notas,
             'subtotal': float(self.subtotal or 0),
             'modificadores': [

@@ -70,7 +70,13 @@
 
   const renderProduct = (product, config) => {
     const image = renderProductImage(product);
-    const price = config.mostrar_precios ? `<strong class="menu-tv-price">${money(product.precio)}</strong>` : '';
+    const previousPrice = product.precio_anterior
+      ? `<span class="menu-tv-price-old">${money(product.precio_anterior)}</span>`
+      : '';
+    const price = config.mostrar_precios ? `${previousPrice}<strong class="menu-tv-price">${money(product.precio)}</strong>` : '';
+    const promotionBadge = product.promocion_activa?.etiqueta
+      ? `<span class="menu-tv-promo-badge">${escapeHtml(product.promocion_activa.etiqueta)}</span>`
+      : '';
     return `
     <div class="menu-tv-product ${image ? 'menu-tv-product--with-image' : ''} ${product.disponible ? '' : 'menu-tv-soldout'}">
       ${image}
@@ -80,6 +86,7 @@
           ${price}
         </div>
         ${product.descripcion ? `<p>${escapeHtml(product.descripcion)}</p>` : ''}
+        ${promotionBadge}
         ${product.disponible ? '' : '<span class="menu-tv-badge">Agotado</span>'}
       </div>
     </div>

@@ -614,6 +614,8 @@ def initialize_database(app, db, config_name='default'):
         ensure_gastos_corrientes_schema()
         from gastronomia.schema import ensure_gastronomia_schema
         ensure_gastronomia_schema()
+        from app.bootstrap.promociones_schema import ensure_promociones_schema
+        ensure_promociones_schema()
 
         try:
             dialect = db.engine.dialect.name

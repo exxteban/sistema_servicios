@@ -2,8 +2,8 @@
     <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <p class="text-xs uppercase tracking-wide font-semibold text-rose-600 dark:text-rose-400">Promociones</p>
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Bot y tienda sincronizados con promos activas</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Cuando una promo vence deja de verse en la tienda y también sale del contexto del asistente.</p>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Promos sincronizadas en caja, gastronomía y tienda</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">La promo se aplica sola durante su vigencia en caja, menú, pantalla TV, tienda y asistente.</p>
         </div>
         <button
             type="button"
@@ -41,6 +41,8 @@
                         <p class="text-base font-semibold text-rose-600 dark:text-rose-400">
                             {% if promo.tipo == 'porcentaje' %}
                             {{ promo.valor|round(0)|int }}%
+                            {% elif promo.tipo == 'cantidad' %}
+                            {{ promo.cantidad_lleva }}x{{ promo.cantidad_paga }}
                             {% else %}
                             ₲ {{ "{:,.0f}".format(promo.valor).replace(",", ".") }}
                             {% endif %}
@@ -127,11 +129,22 @@
                                 <option value="porcentaje">Descuento %</option>
                                 <option value="monto_fijo">Monto fijo</option>
                                 <option value="precio_promocional">Precio promocional</option>
+                                <option value="cantidad">2x1 / cantidad</option>
                             </select>
                         </div>
-                        <div>
+                        <div id="promocionValorField">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Valor</label>
                             <input name="valor" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm" placeholder="Ej: 10 o 25000" required>
+                        </div>
+                        <div id="promocionCantidadFields" class="hidden md:col-span-2 grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cantidad que lleva</label>
+                                <input name="cantidad_lleva" type="number" min="2" step="1" value="2" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cantidad que paga</label>
+                                <input name="cantidad_paga" type="number" min="1" step="1" value="1" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm">
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Inicio</label>
@@ -152,7 +165,7 @@
                         <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                             <div>
                                 <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Productos incluidos</h4>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">Buscá productos por nombre, código, marca o modelo.</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Buscá productos de inventario o del menú gastronómico.</p>
                             </div>
                             <div class="w-full md:max-w-md">
                                 <input id="promocionProductoSearch" type="text" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm" placeholder="Buscar producto para agregar">

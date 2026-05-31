@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import case
 
 from app import db
+from app.services.promociones_calculo import calculate_promotion_totals, money
 from app.utils.public_url import build_public_url
 from gastronomia.models import (
     GastronomiaPedido,
@@ -124,6 +125,11 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
             'nombre_producto': item.nombre_producto,
             'cantidad': int(item.cantidad or 0),
             'precio_unitario': float(item.precio_unitario or 0),
+            'precio_original': float(item.precio_original or 0),
+            'descuento_linea': float(item.descuento_linea or 0),
+            'id_promocion_aplicada': item.id_promocion_aplicada,
+            'promocion_descripcion': item.promocion_descripcion,
+            'cantidad_bonificada': int(item.cantidad_bonificada or 0),
             'notas': item.notas,
             'subtotal': float(item.subtotal or 0),
             'modificadores': modificadores_por_item.get(int(item.id_item), []),
@@ -403,6 +409,8 @@ def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_d
 
 
 def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) -> GastronomiaPedidoItem:
+    from app.services.tienda_promociones import get_active_gastronomia_product_promotion
+
     producto_id = parse_int(item_data.get('producto_id') or item_data.get('id_producto'), 0)
     cantidad = max(1, parse_int(item_data.get('cantidad'), 1))
     opciones_ids = item_data.get('opciones') or []
@@ -412,8 +420,12 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
         raise ValueError(f'El producto "{producto.get("nombre")}" no esta disponible.')
     _consumir_stock_producto(cliente_id, producto['id_producto'], cantidad)
 
-    precio_unitario = Decimal(str(validado['total']))
-    subtotal = precio_unitario * Decimal(cantidad)
+    precio_base = money(producto.get('precio_base', producto['precio']))
+    modificadores = money(validado['total_modificadores'])
+    promotion = get_active_gastronomia_product_promotion(cliente_id, producto['id_producto'])
+    metrics = calculate_promotion_totals(precio_base, cantidad, promotion)
+    subtotal = money(metrics['subtotal_base'] + (modificadores * cantidad))
+    precio_unitario = money(subtotal / cantidad)
     item = GastronomiaPedidoItem(
         pedido_id=pedido_id,
         cliente_id=int(cliente_id),
@@ -421,6 +433,11 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
         nombre_producto=producto['nombre'],
         cantidad=cantidad,
         precio_unitario=precio_unitario,
+        precio_original=money(precio_base + modificadores),
+        descuento_linea=metrics['descuento_linea'],
+        id_promocion_aplicada=getattr(promotion, 'id_promocion', None),
+        promocion_descripcion=metrics['descripcion'],
+        cantidad_bonificada=metrics['cantidad_bonificada'],
         notas=(item_data.get('notas') or '').strip() or None,
         subtotal=subtotal,
     )

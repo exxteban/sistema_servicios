@@ -11,6 +11,7 @@ PROMOTION_TYPES = (
     'porcentaje',
     'monto_fijo',
     'precio_promocional',
+    'cantidad',
 )
 
 
@@ -28,6 +29,8 @@ class TiendaPromocion(db.Model):
     descripcion_corta = db.Column(db.Text, nullable=True)
     tipo = db.Column(db.String(30), nullable=False, default='porcentaje', server_default='porcentaje')
     valor = db.Column(db.Numeric(10, 2), nullable=False)
+    cantidad_lleva = db.Column(db.Integer, nullable=True)
+    cantidad_paga = db.Column(db.Integer, nullable=True)
     fecha_inicio = db.Column(db.DateTime, nullable=False, index=True)
     fecha_fin = db.Column(db.DateTime, nullable=False, index=True)
     activa = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
@@ -42,6 +45,12 @@ class TiendaPromocion(db.Model):
     cliente = db.relationship('Cliente', backref='promociones_tienda', lazy='select')
     productos_rel = db.relationship(
         'TiendaPromocionProducto',
+        backref='promocion',
+        lazy='selectin',
+        cascade='all, delete-orphan',
+    )
+    gastronomia_productos_rel = db.relationship(
+        'TiendaPromocionGastronomiaProducto',
         backref='promocion',
         lazy='selectin',
         cascade='all, delete-orphan',
@@ -86,3 +95,32 @@ class TiendaPromocionProducto(db.Model):
 
     def __repr__(self):
         return f'<TiendaPromocionProducto promo={self.id_promocion} producto={self.id_producto}>'
+
+
+class TiendaPromocionGastronomiaProducto(db.Model):
+    __tablename__ = 'tienda_promocion_gastronomia_productos'
+
+    id_relacion = db.Column(db.Integer, primary_key=True)
+    id_promocion = db.Column(
+        db.Integer,
+        db.ForeignKey('tienda_promociones.id_promocion', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    id_producto = db.Column(
+        db.Integer,
+        db.ForeignKey('gastronomia_productos.id_producto', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    producto = db.relationship('GastronomiaProducto', backref='promociones_tienda_rel', lazy='select')
+
+    __table_args__ = (
+        db.UniqueConstraint('id_promocion', 'id_producto', name='uq_tienda_promocion_gastronomia_producto'),
+        db.Index('ix_tienda_promocion_gastro_producto_promocion', 'id_producto', 'id_promocion'),
+    )
+
+    def __repr__(self):
+        return f'<TiendaPromocionGastronomiaProducto promo={self.id_promocion} producto={self.id_producto}>'

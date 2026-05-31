@@ -150,6 +150,12 @@ def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
     if not items:
         raise ValueError('No hay productos en la venta')
 
+    from app.services.ventas_promociones import (
+        calculate_queue_product_subtotal,
+        get_queue_product_promotions,
+    )
+    promociones_por_producto = get_queue_product_promotions(items)
+
     subtotal = Decimal('0')
     items_normalizados = []
 
@@ -243,7 +249,19 @@ def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
             except Exception:
                 precio = precio_original
 
-        item_subtotal = precio * cantidad
+        if producto:
+            item_subtotal, promocion_activa = calculate_queue_product_subtotal(
+                producto=producto,
+                precio=precio,
+                cantidad=cantidad,
+                precio_opcion_id=precio_opcion_id,
+                precio_manual=item.get('precio_manual'),
+                usar_precio_mayorista=usar_precio_mayorista,
+                promotions=promociones_por_producto,
+            )
+        else:
+            item_subtotal = precio * cantidad
+            promocion_activa = None
         subtotal += item_subtotal
 
         try:
@@ -262,6 +280,9 @@ def _normalizar_items_para_cola_cobro(items, usar_precio_mayorista=False):
             'precio_base': float(precio_original),
             'precio_mayorista': precio_mayorista,
             'cantidad': int(cantidad),
+            'subtotal': float(item_subtotal),
+            'subtotal_cantidad': int(cantidad),
+            'promocion_activa': promocion_activa,
             'es_servicio': bool(servicio or producto.es_servicio),
             'stock': int(producto.stock_actual or 0) if producto else 0,
             'stock_minimo': int(producto.stock_minimo or 0) if producto else 0,
@@ -333,6 +354,9 @@ def _build_pos_data_from_cola_cobro(item_cola):
             'precio_base': float(item.get('precio_base') or getattr(servicio or producto, 'precio', getattr(producto, 'precio_venta', 0)) or 0),
             'precio_mayorista': precio_mayorista,
             'cantidad': int(item.get('cantidad') or 0),
+            'subtotal': item.get('subtotal'),
+            'subtotal_cantidad': item.get('subtotal_cantidad'),
+            'promocion_activa': item.get('promocion_activa'),
             'es_servicio': es_servicio,
             'stock': stock_actual,
             'stock_minimo': stock_minimo,
@@ -383,6 +407,8 @@ def _build_venta_items_payload_from_pos_items(items_pos):
             'id_producto': id_item if tipo_item != 'servicio' else None,
             'id_servicio': id_item if tipo_item == 'servicio' else None,
             'cantidad': cantidad,
+            'subtotal': item_pos.get('subtotal'),
+            'subtotal_cantidad': item_pos.get('subtotal_cantidad'),
             'precio': float(item_pos.get('precio') or 0),
             'precio_base': item_pos.get('precio_base'),
             'precio_manual': bool(item_pos.get('precio_manual') is True),
@@ -706,6 +732,8 @@ def validar_carrito():
             .all()
         )
         productos_map = {int(producto.id_producto): producto for producto in productos}
+        from app.services.ventas_promociones import get_serialized_active_product_promotions
+        promociones_por_producto = get_serialized_active_product_promotions(ids_normalizados)
 
         opciones_por_producto = {}
         opciones = (
@@ -745,7 +773,8 @@ def validar_carrito():
                     'stock': producto.stock_actual,
                     'stock_minimo': producto.stock_minimo,
                     'es_servicio': producto.es_servicio,
-                    'iva': producto.porcentaje_iva
+                    'iva': producto.porcentaje_iva,
+                    'promocion_activa': promociones_por_producto.get(id_producto)
                 }
             else:
                 productos_validados[str(id_producto)] = {

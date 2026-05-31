@@ -27,6 +27,7 @@
   const tableNameInput = document.getElementById('table-name');
   const tablePickerSection = document.getElementById('table-picker-section');
   const tableGrid = document.getElementById('table-grid');
+  const promotions = window.GastronomiaPromociones;
 
   let products = [];
   let mesas = [];
@@ -104,6 +105,7 @@
         </span>
         <span class="mt-1.5 line-clamp-2 block min-h-8 text-xs text-gray-600 dark:text-gray-400">${escapeHtml(product.descripcion || 'Toca para configurar el item.')}</span>
         <span class="mt-3 block text-lg font-black text-orange-600 dark:text-orange-300">${money(product.precio)}</span>
+        ${product.promocion_activa?.etiqueta ? `<span class="mt-1 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-black text-emerald-700">${escapeHtml(product.promocion_activa.etiqueta)}</span>` : ''}
       </button>
     `).join('') || `
       <div class="rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-500 dark:border-gray-700 sm:col-span-2 2xl:col-span-3">
@@ -163,6 +165,9 @@
       nombre: item.nombre_producto,
       cantidad: Math.max(1, Number(item.cantidad || 1)),
       precio_unitario: Number(item.precio_unitario || 0),
+      precio_base: Number(item.precio_original || item.precio_unitario || 0),
+      promocion_activa: null,
+      subtotal_guardado: Number(item.subtotal || 0),
       opciones: modifiers.map((modifier) => Number(modifier.opcion_id)).filter(Boolean),
       selecciones: modifiers.map((modifier) => ({
         ...modifier,
@@ -289,6 +294,8 @@
       nombre: activeProduct.nombre,
       cantidad: Math.max(1, Number(modalQty.value || 1)),
       precio_unitario: validation.total,
+      precio_base: Number(activeProduct.precio_base ?? activeProduct.precio ?? 0),
+      promocion_activa: validation.producto?.promocion_activa || activeProduct.promocion_activa || null,
       opciones: selectedOptions,
       selecciones: validation.selecciones || [],
       notas: modalNote.value.trim(),
@@ -334,14 +341,14 @@
         </div>
         <div class="mt-1.5 flex justify-between text-sm">
           <span class="font-semibold text-gray-500">${money(item.precio_unitario)} c/u</span>
-          <strong class="font-black text-gray-900 dark:text-white">${money(item.precio_unitario * item.cantidad)}</strong>
+          <strong class="font-black text-gray-900 dark:text-white">${money(promotions.subtotal(item))}</strong>
         </div>
       </article>
     `).join('') || '<div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">Sin items.</div>';
     cartTotal.textContent = money(cartTotalAmount());
   };
 
-  const cartSubtotal = () => cart.reduce((sum, item) => sum + item.precio_unitario * item.cantidad, 0);
+  const cartSubtotal = () => cart.reduce((sum, item) => sum + promotions.subtotal(item), 0);
   const deliveryShippingCost = () => (
     (orderTypeInput?.value || '') === 'delivery'
       ? Math.max(0, Number(deliveryShippingInput?.value || 0))

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import ProductPriceBlock from './ProductPriceBlock'
+import { promotionBadge } from '../../utils/promotions'
 import StoreImage from './StoreImage'
 import { buildProductPath } from '../../utils/storeFormatting'
 
@@ -46,7 +47,7 @@ export default function ProductoCard({
         )}
         {producto.es_oferta && (
           <span className="product-badge absolute top-3 left-3 text-white text-xs font-bold px-2 py-1 rounded-full z-10">
-            {producto.descuento_porcentaje ? `-${producto.descuento_porcentaje}%` : 'OFERTA'}
+            {promotionBadge(producto)}
           </span>
         )}
       </Link>

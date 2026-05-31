@@ -224,7 +224,7 @@
         app.totalVentaPendiente = function totalVentaPendiente(venta) {
             const payload = (venta && venta.payload) || {};
             const items = Array.isArray(payload.items) ? payload.items : [];
-            const subtotal = items.reduce((sum, item) => sum + ((parseFloat(item.precio) || 0) * (parseInt(item.cantidad) || 0)), 0);
+            const subtotal = items.reduce((sum, item) => sum + app.subtotalItemPromocion.call(app, item), 0);
             return Math.max(0, subtotal - (parseFloat(payload.descuento) || 0));
         };
 

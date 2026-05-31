@@ -16,6 +16,7 @@ from app.services.tienda_promociones import (
 )
 from app.utils.permisos import requiere_permiso
 from app.routes.tienda_api import _config_por_slug, _resolver_id_cliente_actual
+from gastronomia.models import GastronomiaProducto
 
 
 tienda_promociones_api_bp = Blueprint('tienda_promociones_api', __name__)
@@ -149,15 +150,38 @@ def admin_search_promotion_products():
         )
 
     products = query.order_by(Producto.nombre.asc()).limit(limit).all()
+    gastro_query = GastronomiaProducto.query.filter(
+        GastronomiaProducto.cliente_id == int(client_id),
+        GastronomiaProducto.activo.is_(True),
+    )
+    if q:
+        like = f'%{q}%'
+        gastro_query = gastro_query.filter(
+            db.or_(
+                GastronomiaProducto.nombre.ilike(like),
+                GastronomiaProducto.descripcion.ilike(like),
+            )
+        )
+    gastro_products = gastro_query.order_by(GastronomiaProducto.nombre.asc()).limit(limit).all()
     return jsonify({
         'ok': True,
-        'productos': [
+        'productos': ([
             {
                 'id_producto': product.id_producto,
                 'codigo': product.codigo,
                 'nombre': product.nombre,
                 'precio_venta': float(product.precio_venta or 0),
+                'tipo_catalogo': 'producto',
             }
             for product in products
-        ],
+        ] + [
+            {
+                'id_producto': product.id_producto,
+                'codigo': 'GASTRO',
+                'nombre': product.nombre,
+                'precio_venta': float(product.precio or 0),
+                'tipo_catalogo': 'gastronomia',
+            }
+            for product in gastro_products
+        ])[:limit],
     })

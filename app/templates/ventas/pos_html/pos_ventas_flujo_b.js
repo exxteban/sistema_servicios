@@ -25,6 +25,7 @@
                         precio: precio,
                         precio_base: producto.precio,
                         precio_mayorista: producto.precio_mayorista,
+                        promocion_activa: producto.promocion_activa || null,
                         cantidad: 1,
                         iva: producto.iva,
                         precio_manual: true,
@@ -76,6 +77,7 @@
                         precio: precioAplicar,
                         precio_base: producto.precio,
                         precio_mayorista: producto.precio_mayorista,
+                        promocion_activa: producto.promocion_activa || null,
                         cantidad: 1,
                         iva: producto.iva,
                         stock_disponible: producto.stock,
@@ -136,9 +138,7 @@
 
             actualizarTotal() {
                 this.subtotal = this.carrito.reduce((sum, item) => {
-                    const precio = parseFloat(item.precio) || 0;
-                    const cantidad = parseInt(item.cantidad) || 0;
-                    return sum + (precio * cantidad);
+                    return sum + this.subtotalItemPromocion(item);
                 }, 0);
                 const descuento = parseFloat(this.descuento) || 0;
                 const descuentoBeneficio = (typeof this.beneficioFidelizacionDescuentoEstimado === 'function')
@@ -577,6 +577,7 @@
                     id_servicio: it.id_servicio || null,
                     cantidad: it.cantidad,
                     precio: it.precio,
+                    promocion_activa: it.promocion_activa || null,
                     precio_manual: it.precio_manual === true,
                     precio_opcion_id: it.precio_opcion_id || null,
                     nombre: it.nombre,

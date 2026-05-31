@@ -299,3 +299,4 @@
 
 {% include "ventas/pos_html/pos_state_runtime.js" %}
 {% include "ventas/pos_html/pos_state_storage.js" %}
+{% include "ventas/pos_html/pos_promociones.js" %}

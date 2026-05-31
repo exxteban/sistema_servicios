@@ -10,6 +10,19 @@ function promocionToDatetimeLocal(value) {
     return String(value).slice(0, 16);
 }
 
+function promocionProductoKey(product) {
+    return `${product.tipo_catalogo || 'producto'}:${product.id_producto}`;
+}
+
+function sincronizarCamposTipoPromocion() {
+    const form = document.getElementById('formPromocion');
+    if (!form) return;
+    const esCantidad = form.elements.tipo.value === 'cantidad';
+    document.getElementById('promocionValorField')?.classList.toggle('hidden', esCantidad);
+    document.getElementById('promocionCantidadFields')?.classList.toggle('hidden', !esCantidad);
+    form.elements.valor.required = !esCantidad;
+}
+
 function renderPromocionProductosSeleccionados() {
     const container = document.getElementById('promocionProductosSeleccionados');
     if (!container) return;
@@ -22,8 +35,9 @@ function renderPromocionProductosSeleccionados() {
     container.innerHTML = promocionProductosSeleccionados.map((product) => `
         <span class="inline-flex items-center gap-2 rounded-full bg-rose-100 dark:bg-rose-900/30 px-3 py-1.5 text-sm font-medium text-rose-700 dark:text-rose-300">
             ${product.codigo ? `<span class="font-mono text-xs">${product.codigo}</span>` : ''}
+            ${product.tipo_catalogo === 'gastronomia' ? '<span class="text-[10px] uppercase">Menú</span>' : ''}
             <span>${product.nombre}</span>
-            <button type="button" class="text-rose-600 dark:text-rose-300 hover:text-rose-800" onclick="quitarProductoPromocion(${product.id_producto})">
+            <button type="button" class="text-rose-600 dark:text-rose-300 hover:text-rose-800" onclick="quitarProductoPromocion('${promocionProductoKey(product)}')">
                 <i class="fas fa-times"></i>
             </button>
         </span>
@@ -40,7 +54,7 @@ function renderPromocionResultados(productos) {
     }
 
     container.innerHTML = productos.map((product) => {
-        const seleccionado = promocionProductosSeleccionados.some((item) => item.id_producto === product.id_producto);
+        const seleccionado = promocionProductosSeleccionados.some((item) => promocionProductoKey(item) === promocionProductoKey(product));
         return `
             <button
                 type="button"
@@ -61,15 +75,15 @@ function renderPromocionResultados(productos) {
 }
 
 function agregarProductoPromocion(product) {
-    if (promocionProductosSeleccionados.some((item) => item.id_producto === product.id_producto)) {
+    if (promocionProductosSeleccionados.some((item) => promocionProductoKey(item) === promocionProductoKey(product))) {
         return;
     }
     promocionProductosSeleccionados.push(product);
     renderPromocionProductosSeleccionados();
 }
 
-function quitarProductoPromocion(productId) {
-    promocionProductosSeleccionados = promocionProductosSeleccionados.filter((item) => item.id_producto !== productId);
+function quitarProductoPromocion(productKey) {
+    promocionProductosSeleccionados = promocionProductosSeleccionados.filter((item) => promocionProductoKey(item) !== productKey);
     renderPromocionProductosSeleccionados();
 }
 
@@ -100,6 +114,7 @@ function resetFormularioPromocion() {
     form.elements.promotion_id.value = '';
     form.elements.tipo.value = 'porcentaje';
     form.elements.activa.checked = true;
+    sincronizarCamposTipoPromocion();
     promocionProductosSeleccionados = [];
     renderPromocionProductosSeleccionados();
     renderPromocionResultados([]);
@@ -120,6 +135,7 @@ async function abrirModalPromocion(prefill = null) {
             codigo: product.codigo || '',
             nombre: product.nombre || '',
             precio_venta: product.precio_venta || 0,
+            tipo_catalogo: product.tipo_catalogo || 'producto',
         }));
         renderPromocionProductosSeleccionados();
     }
@@ -130,6 +146,8 @@ async function abrirModalPromocion(prefill = null) {
         form.elements.descripcion_corta.value = prefill.descripcion_corta || '';
         form.elements.tipo.value = prefill.tipo || 'porcentaje';
         form.elements.valor.value = prefill.valor ?? '';
+        form.elements.cantidad_lleva.value = prefill.cantidad_lleva ?? 2;
+        form.elements.cantidad_paga.value = prefill.cantidad_paga ?? 1;
         form.elements.fecha_inicio.value = promocionToDatetimeLocal(prefill.fecha_inicio);
         form.elements.fecha_fin.value = promocionToDatetimeLocal(prefill.fecha_fin);
         form.elements.activa.checked = Boolean(prefill.activa);
@@ -138,8 +156,10 @@ async function abrirModalPromocion(prefill = null) {
             codigo: product.codigo || '',
             nombre: product.nombre || '',
             precio_venta: product.precio_venta || 0,
+            tipo_catalogo: product.tipo_catalogo || 'producto',
         }));
         renderPromocionProductosSeleccionados();
+        sincronizarCamposTipoPromocion();
         const title = document.getElementById('modal-promocion-title');
         if (title) title.textContent = 'Editar promoción';
     }
@@ -164,7 +184,7 @@ function abrirModalPromocionDesdeJSON(rawPromotion) {
 
 function abrirModalPromocionParaProducto(productId, productName) {
     abrirModalPromocion({
-        productos: [{ id_producto: Number(productId), nombre: productName || '', codigo: '', precio_venta: 0 }],
+        productos: [{ id_producto: Number(productId), nombre: productName || '', codigo: '', precio_venta: 0, tipo_catalogo: 'producto' }],
     });
 }
 
@@ -187,10 +207,17 @@ async function guardarPromocion() {
         descripcion_corta: form.elements.descripcion_corta.value,
         tipo: form.elements.tipo.value,
         valor: form.elements.valor.value,
+        cantidad_lleva: form.elements.cantidad_lleva.value,
+        cantidad_paga: form.elements.cantidad_paga.value,
         fecha_inicio: form.elements.fecha_inicio.value,
         fecha_fin: form.elements.fecha_fin.value,
         activa: form.elements.activa.checked,
-        productos: promocionProductosSeleccionados.map((product) => product.id_producto),
+        productos: promocionProductosSeleccionados
+            .filter((product) => product.tipo_catalogo !== 'gastronomia')
+            .map((product) => product.id_producto),
+        productos_gastronomia: promocionProductosSeleccionados
+            .filter((product) => product.tipo_catalogo === 'gastronomia')
+            .map((product) => product.id_producto),
     };
 
     const url = promotionId
@@ -235,4 +262,6 @@ document.getElementById('promocionProductoSearch')?.addEventListener('input', (e
     }, 250);
 });
 
+document.querySelector('#formPromocion [name="tipo"]')?.addEventListener('change', sincronizarCamposTipoPromocion);
 renderPromocionProductosSeleccionados();
+sincronizarCamposTipoPromocion();

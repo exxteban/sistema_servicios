@@ -6,6 +6,10 @@ from flask_login import current_user, login_required
 from app import db
 from app.models import Categoria, Producto, ProductoPrecioOpcion, Servicio, ServicioPrecioOpcion
 from app.routes.ventas.parte1 import ventas_bp
+from app.services.tienda_promociones import (
+    attach_promotion_to_product_data,
+    get_active_product_promotion_map_any_client,
+)
 
 
 def _puede_buscar_catalogo():
@@ -64,12 +68,13 @@ def bootstrap_catalogo_pos():
 
     producto_opciones = _producto_opciones([p.id_producto for p in productos])
     servicio_opciones = _servicio_opciones([s.id_servicio for s in servicios])
+    promotions = get_active_product_promotion_map_any_client([p.id_producto for p in productos])
 
     return jsonify({
         'success': True,
         'generated_at': datetime.utcnow().isoformat(timespec='seconds') + 'Z',
         'items': (
-            [_producto_dict(p, producto_opciones.get(int(p.id_producto), [])) for p in productos]
+            [_producto_dict(p, producto_opciones.get(int(p.id_producto), []), promotions) for p in productos]
             + [_servicio_dict(s, servicio_opciones.get(int(s.id_servicio), [])) for s in servicios]
         ),
     })
@@ -93,7 +98,8 @@ def _buscar_productos(q):
         .all()
     )
     opciones = _producto_opciones([p.id_producto for p in productos])
-    return [_producto_dict(p, opciones.get(int(p.id_producto), [])) for p in productos]
+    promotions = get_active_product_promotion_map_any_client([p.id_producto for p in productos])
+    return [_producto_dict(p, opciones.get(int(p.id_producto), []), promotions) for p in productos]
 
 
 def _buscar_producto_exacto(q):
@@ -158,8 +164,8 @@ def _servicio_opciones(servicio_ids):
     return opciones
 
 
-def _producto_dict(producto, opciones):
-    return {
+def _producto_dict(producto, opciones, promotions=None):
+    data = {
         'tipo': 'producto',
         'id': int(producto.id_producto),
         'codigo': producto.codigo,
@@ -176,6 +182,9 @@ def _producto_dict(producto, opciones):
         'es_servicio': bool(producto.es_servicio),
         'iva': int(producto.porcentaje_iva or 0),
     }
+    promotions = promotions if promotions is not None else get_active_product_promotion_map_any_client([producto.id_producto])
+    promotion = promotions.get(int(producto.id_producto))
+    return attach_promotion_to_product_data(producto, data, promotion)
 
 
 def _servicio_dict(servicio, opciones):
