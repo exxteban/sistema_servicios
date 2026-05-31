@@ -75,6 +75,12 @@
                     <span data-category-drag-handle class="pos-category-drag-handle" aria-label="Mover {{ categoria.nombre }}"><i class="fas fa-grip-vertical"></i></span>
                 </button>
                 {% endfor %}
+                <button type="button" data-category="" data-price-channel="pedidosya" class="pos-category">
+                    <i class="fas fa-motorcycle"></i><span>PedidosYa</span>
+                </button>
+                <button type="button" data-category="" data-price-channel="monchis" class="pos-category">
+                    <i class="fas fa-shopping-bag"></i><span>Monchis</span>
+                </button>
             </div>
             <a href="{{ url_for('gastronomia.menu_config') }}" class="pos-category-admin mt-2">
                 <i class="fas fa-cog"></i><span>Administracion</span>

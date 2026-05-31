@@ -32,12 +32,12 @@
   let products = [];
   let mesas = [];
   let selectedCategory = '';
+  let selectedPriceChannel = '';
   let cart = [];
   let activeProduct = null;
   let editingItemKey = null;
   let activeOrderId = null;
   let lastOrderId = null;
-
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const showAlert = (message, ok) => {
     delete alertBox.dataset.stockPreview;
@@ -73,7 +73,7 @@
   };
 
   const loadProducts = async () => {
-    const data = await apiJson('/api/gastronomia/productos?publico=1&modificadores=1&agotados=1');
+    const data = await apiJson(`/api/gastronomia/productos?publico=1&modificadores=1&agotados=1&canal_precio=${encodeURIComponent(selectedPriceChannel)}`);
     products = data.productos || [];
     renderProducts();
   };
@@ -167,6 +167,7 @@
     return {
       key: item.id_item ? `pedido-item-${item.id_item}` : `${Date.now()}-${Math.random()}`,
       producto_id: item.producto_id,
+      canal_precio: item.canal_precio || null,
       nombre: item.nombre_producto,
       cantidad: Math.max(1, Number(item.cantidad || 1)),
       precio_unitario: Number(item.precio_unitario || 0),
@@ -291,11 +292,12 @@
     const selectedOptions = Array.from(modal.querySelectorAll('#modifier-groups input:checked')).map((input) => Number(input.value));
     const validation = await apiJson(`/api/gastronomia/productos/${activeProduct.id_producto}/validar-selecciones`, {
       method: 'POST',
-      body: JSON.stringify({opciones: selectedOptions}),
+      body: JSON.stringify({opciones: selectedOptions, canal_precio: activeProduct.canal_precio || null}),
     });
     const configuredItem = {
       key: editingItemKey || `${Date.now()}-${Math.random()}`,
       producto_id: activeProduct.id_producto,
+      canal_precio: activeProduct.canal_precio || null,
       nombre: activeProduct.nombre,
       cantidad: Math.max(1, Number(modalQty.value || 1)),
       precio_unitario: validation.total,
@@ -315,14 +317,15 @@
     renderCart();
   };
 
-  const editCartItem = (itemKey) => {
+  const editCartItem = async (itemKey) => {
     const item = cart.find((cartItem) => cartItem.key === itemKey);
-    const product = products.find((productItem) => String(productItem.id_producto) === String(item?.producto_id));
-    if (!item || !product) {
+    if (!item) {
       showAlert('No se pudo abrir el item para editar.', false);
       return;
     }
-    openProduct(product, item);
+    const canal = encodeURIComponent(item.canal_precio || '');
+    const data = await apiJson(`/api/gastronomia/productos/${item.producto_id}?modificadores=1&canal_precio=${canal}`);
+    openProduct(data.producto, item);
   };
 
   const renderCart = () => {
@@ -374,6 +377,7 @@
     notas: document.getElementById('order-notes').value.trim(),
     items: cart.map((item) => ({
       producto_id: item.producto_id,
+      canal_precio: item.canal_precio || null,
       cantidad: item.cantidad,
       opciones: item.opciones,
       notas: item.notas,
@@ -515,9 +519,10 @@
     const button = event.target.closest('[data-category]');
     if (!button) return;
     selectedCategory = button.dataset.category;
+    selectedPriceChannel = button.dataset.priceChannel || '';
     document.querySelectorAll('.pos-category').forEach((item) => item.classList.remove('active'));
     button.classList.add('active');
-    renderProducts();
+    loadProducts().catch((error) => showAlert(error.message, false));
   });
   productSearch?.addEventListener('input', () => {
     syncProductSearchClearButton();
@@ -550,7 +555,7 @@
   cartItems?.addEventListener('click', (event) => {
     const editButton = event.target.closest('[data-edit]');
     if (editButton) {
-      editCartItem(editButton.dataset.edit);
+      editCartItem(editButton.dataset.edit).catch((error) => showAlert(error.message, false));
       return;
     }
     const button = event.target.closest('[data-remove]');

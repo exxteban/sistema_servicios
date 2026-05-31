@@ -26,7 +26,7 @@
   };
   const allowedMainTabs = new Set(['menu', 'menu-cargado', 'stock']);
   const allowedEntryTabs = new Set(['categoria', 'producto']);
-  const allowedMenuTabs = new Set(['categorias', 'productos', 'promociones', 'tv']);
+  const allowedMenuTabs = new Set(['categorias', 'productos', 'pedidosya', 'monchis', 'promociones', 'tv']);
   const persistedAlertKey = 'gastro-menu-alert';
   let productoImageObjectUrl = '';
 

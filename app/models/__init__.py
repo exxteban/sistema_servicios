@@ -54,6 +54,7 @@ from gastronomia.models import (
     GastronomiaPedidoPago,
     GastronomiaProducto,
 )
+from gastronomia.channel_models import GastronomiaProductoPrecioCanal
 from gastronomia.stock_models import (
     GastronomiaOpcionInsumo,
     GastronomiaPedidoItemConsumo,
@@ -90,7 +91,7 @@ __all__ = [
     'WebBotSesion', 'WebBotMensaje', 'WebBotHandoff',
     'AsistenteIABackofficeAudit',
     'PublicidadAdsEvento',
-    'GastronomiaClienteConfig', 'GastronomiaCategoria', 'GastronomiaProducto',
+    'GastronomiaClienteConfig', 'GastronomiaCategoria', 'GastronomiaProducto', 'GastronomiaProductoPrecioCanal',
     'GastronomiaGrupoOpciones', 'GastronomiaOpcionProducto', 'GastronomiaMesa',
     'GastronomiaPedido', 'GastronomiaPedidoItem', 'GastronomiaPedidoItemModificador',
     'GastronomiaPedidoEvento', 'GastronomiaPedidoPago',

@@ -112,6 +112,7 @@ def run_migration() -> None:
     from app import create_app, db
     from app.models.producto_presentacion import ProductoPresentacionStock
     from gastronomia import models as gastronomia_models
+    from gastronomia.channel_models import GastronomiaProductoPrecioCanal
     from gastronomia import stock_models as gastronomia_stock_models
     from gastronomia.schema import ensure_gastronomia_schema
 
@@ -121,6 +122,7 @@ def run_migration() -> None:
         gastronomia_models.GastronomiaClienteConfig.__table__,
         gastronomia_models.GastronomiaCategoria.__table__,
         gastronomia_models.GastronomiaProducto.__table__,
+        GastronomiaProductoPrecioCanal.__table__,
         gastronomia_models.GastronomiaGrupoOpciones.__table__,
         gastronomia_models.GastronomiaOpcionProducto.__table__,
         gastronomia_models.GastronomiaMesa.__table__,

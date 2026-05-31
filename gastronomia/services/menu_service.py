@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app import db
 from gastronomia.models import GastronomiaCategoria, GastronomiaProducto
+from gastronomia.services.channel_price_service import asegurar_precios_producto
 
 
 COMIDA_KEYWORDS = {
@@ -156,6 +157,7 @@ def guardar_producto(cliente_id: int, data: dict, producto: GastronomiaProducto 
     producto.orden = parse_int(data.get('orden'), 0)
     db.session.add(producto)
     _commit_or_raise_duplicate('Ya existe un producto con ese nombre.')
+    asegurar_precios_producto(producto)
     return producto
 
 

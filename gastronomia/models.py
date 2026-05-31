@@ -380,6 +380,7 @@ class GastronomiaPedidoItem(db.Model):
     pedido_id = db.Column(db.Integer, db.ForeignKey('gastronomia_pedidos.id_pedido', ondelete='CASCADE'), nullable=False, index=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
     producto_id = db.Column(db.Integer, db.ForeignKey('gastronomia_productos.id_producto'), nullable=False, index=True)
+    canal_precio = db.Column(db.String(30))
     nombre_producto = db.Column(db.String(160), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False, default=1)
     precio_unitario = db.Column(db.Numeric(15, 2), nullable=False, default=0)
@@ -408,6 +409,7 @@ class GastronomiaPedidoItem(db.Model):
         return {
             'id_item': self.id_item,
             'producto_id': self.producto_id,
+            'canal_precio': self.canal_precio,
             'nombre_producto': self.nombre_producto,
             'cantidad': int(self.cantidad or 0),
             'precio_unitario': float(self.precio_unitario or 0),

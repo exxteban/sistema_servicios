@@ -1,6 +1,7 @@
 """Modulo aislado para el modo Gastronomia."""
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.routes.api_routes import gastronomia_api_bp
+from gastronomia.routes.channel_price_api_routes import gastronomia_channel_price_api_bp
 from gastronomia.routes.caja_api_routes import gastronomia_caja_api_bp
 from gastronomia.routes.cocina_api_routes import gastronomia_cocina_api_bp
 from gastronomia.routes.delivery_api_routes import gastronomia_delivery_api_bp
@@ -25,6 +26,7 @@ from gastronomia.routes import salon_routes as _salon_routes  # noqa: F401
 __all__ = [
     'gastronomia_bp',
     'gastronomia_api_bp',
+    'gastronomia_channel_price_api_bp',
     'gastronomia_caja_api_bp',
     'gastronomia_cocina_api_bp',
     'gastronomia_delivery_api_bp',

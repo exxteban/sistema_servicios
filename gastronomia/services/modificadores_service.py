@@ -238,11 +238,13 @@ def eliminar_opcion(cliente_id: int, opcion_id: int) -> bool:
     return True
 
 
-def producto_con_modificadores(cliente_id: int, producto_id: int) -> dict:
+def producto_con_modificadores(cliente_id: int, producto_id: int, *, canal_precio: str | None = None) -> dict:
+    from gastronomia.services.channel_price_service import aplicar_precio_canal
+
     producto = obtener_producto(cliente_id, producto_id)
     if not producto:
         raise ValueError('Producto no encontrado.')
-    data = producto.to_dict()
+    data = aplicar_precio_canal(producto, producto.to_dict(), canal_precio)
     data['grupos_opciones'] = [
         grupo.to_dict()
         for grupo in listar_grupos_producto(cliente_id, producto_id, incluir_ocultos=False)
@@ -251,7 +253,15 @@ def producto_con_modificadores(cliente_id: int, producto_id: int) -> dict:
     return data
 
 
-def validar_selecciones_producto(cliente_id: int, producto_id: int, opciones_ids: list[int]) -> dict:
+def validar_selecciones_producto(
+    cliente_id: int,
+    producto_id: int,
+    opciones_ids: list[int],
+    *,
+    canal_precio: str | None = None,
+) -> dict:
+    from gastronomia.services.channel_price_service import aplicar_precio_canal, obtener_precio_canal
+
     producto = obtener_producto(cliente_id, producto_id)
     if not producto:
         raise ValueError('Producto no encontrado.')
@@ -282,10 +292,10 @@ def validar_selecciones_producto(cliente_id: int, producto_id: int, opciones_ids
         if cantidad > int(grupo.max_selecciones or 0):
             raise ValueError(f'Solo puedes seleccionar {grupo.max_selecciones} en {grupo.nombre}.')
 
-    precio_base = Decimal(str(producto.precio or 0))
+    precio_base = obtener_precio_canal(producto, canal_precio)
     total = precio_base + total_modificadores
     return {
-        'producto': producto.to_dict(),
+        'producto': aplicar_precio_canal(producto, producto.to_dict(), canal_precio),
         'selecciones': [_opcion_con_grupo(opcion, grupos_por_id) for opcion in seleccionadas],
         'total_modificadores': float(total_modificadores),
         'total': float(total),

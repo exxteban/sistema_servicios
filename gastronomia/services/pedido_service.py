@@ -125,6 +125,7 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
         item_data = {
             'id_item': item.id_item,
             'producto_id': item.producto_id,
+            'canal_precio': item.canal_precio,
             'nombre_producto': item.nombre_producto,
             'cantidad': int(item.cantidad or 0),
             'precio_unitario': float(item.precio_unitario or 0),
@@ -414,17 +415,24 @@ def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_d
 
 def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) -> GastronomiaPedidoItem:
     from app.services.tienda_promociones import get_active_gastronomia_product_promotion
+    from gastronomia.services.channel_price_service import normalizar_canal_precio
 
     producto_id = parse_int(item_data.get('producto_id') or item_data.get('id_producto'), 0)
     cantidad = max(1, parse_int(item_data.get('cantidad'), 1))
+    canal_precio = normalizar_canal_precio(item_data.get('canal_precio'))
     opciones_ids = item_data.get('opciones') or []
-    validado = validar_selecciones_producto(cliente_id, producto_id, opciones_ids)
+    validado = validar_selecciones_producto(
+        cliente_id,
+        producto_id,
+        opciones_ids,
+        canal_precio=canal_precio,
+    )
     producto = validado['producto']
     if not producto.get('visible') or not producto.get('disponible'):
         raise ValueError(f'El producto "{producto.get("nombre")}" no esta disponible.')
     precio_base = money(producto.get('precio_base', producto['precio']))
     modificadores = money(validado['total_modificadores'])
-    promotion = get_active_gastronomia_product_promotion(cliente_id, producto['id_producto'])
+    promotion = None if canal_precio else get_active_gastronomia_product_promotion(cliente_id, producto['id_producto'])
     metrics = calculate_promotion_totals(precio_base, cantidad, promotion)
     subtotal = money(metrics['subtotal_base'] + (modificadores * cantidad))
     precio_unitario = money(subtotal / cantidad)
@@ -432,6 +440,7 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
         pedido_id=pedido_id,
         cliente_id=int(cliente_id),
         producto_id=int(producto['id_producto']),
+        canal_precio=canal_precio,
         nombre_producto=producto['nombre'],
         cantidad=cantidad,
         precio_unitario=precio_unitario,

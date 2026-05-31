@@ -29,6 +29,10 @@ PAYMENT_COLUMN_MIGRATIONS = (
     ('id_movimiento_caja', 'INTEGER'),
 )
 
+ORDER_ITEM_COLUMN_MIGRATIONS = (
+    ('canal_precio', 'VARCHAR(30)'),
+)
+
 CONFIG_COLUMN_MIGRATIONS = (
     ('menu_tv_publico_activo', 'BOOLEAN NOT NULL DEFAULT 1'),
     ('menu_tv_slug', 'VARCHAR(100)'),
@@ -58,11 +62,17 @@ CENTRAL_PRODUCT_COLUMN_MIGRATIONS = (
 
 
 def ensure_gastronomia_schema():
+    from gastronomia.channel_models import GastronomiaProductoPrecioCanal
+    from gastronomia.models import GastronomiaProducto
+    from gastronomia.services.channel_price_service import asegurar_precios_productos
+
+    GastronomiaProductoPrecioCanal.__table__.create(bind=db.engine, checkfirst=True)
     dialect = db.engine.dialect.name
     if dialect == 'sqlite':
         _ensure_sqlite_columns()
     elif dialect == 'mysql':
         _ensure_mysql_columns()
+    asegurar_precios_productos(GastronomiaProducto.query.filter_by(activo=True).all())
 
 
 def _ensure_sqlite_columns():
@@ -88,6 +98,14 @@ def _ensure_sqlite_columns():
         for column, column_type in PAYMENT_COLUMN_MIGRATIONS:
             if column not in payment_columns:
                 db.session.execute(text(f'ALTER TABLE gastronomia_pedido_pagos ADD COLUMN {column} {column_type}'))
+    if _sqlite_table_exists('gastronomia_pedido_items'):
+        item_columns = {
+            row[1]
+            for row in db.session.execute(text('PRAGMA table_info(gastronomia_pedido_items)')).fetchall()
+        }
+        for column, column_type in ORDER_ITEM_COLUMN_MIGRATIONS:
+            if column not in item_columns:
+                db.session.execute(text(f'ALTER TABLE gastronomia_pedido_items ADD COLUMN {column} {column_type}'))
     db.session.commit()
 
 
@@ -107,6 +125,10 @@ def _ensure_mysql_columns():
         for column, column_type in PAYMENT_COLUMN_MIGRATIONS:
             if not _mysql_column_exists('gastronomia_pedido_pagos', column):
                 db.session.execute(text(f'ALTER TABLE gastronomia_pedido_pagos ADD COLUMN {column} {column_type} NULL'))
+    if _mysql_table_exists('gastronomia_pedido_items'):
+        for column, column_type in ORDER_ITEM_COLUMN_MIGRATIONS:
+            if not _mysql_column_exists('gastronomia_pedido_items', column):
+                db.session.execute(text(f'ALTER TABLE gastronomia_pedido_items ADD COLUMN {column} {column_type} NULL'))
     db.session.commit()
 
 

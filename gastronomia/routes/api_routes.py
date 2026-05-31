@@ -5,6 +5,7 @@ from flask_login import current_user, login_required
 from app import db
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.dashboard_preferences import set_dashboard_card_order
+from gastronomia.services.channel_price_service import aplicar_precio_canal, normalizar_canal_precio
 from gastronomia.services.menu_image_service import (
     eliminar_imagen_producto_menu,
     extension_permitida as extension_imagen_permitida,
@@ -233,6 +234,10 @@ def productos():
     categoria_id = request.args.get('categoria_id', type=int)
     incluir_ocultos = request.args.get('publico') != '1'
     incluir_agotados = request.args.get('agotados') == '1'
+    try:
+        canal_precio = normalizar_canal_precio(request.args.get('canal_precio'))
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     items = listar_productos(
         cliente_id,
         categoria_id=categoria_id,
@@ -240,9 +245,12 @@ def productos():
         incluir_agotados=incluir_agotados,
     )
     if request.args.get('modificadores') == '1':
-        productos_data = [producto_con_modificadores(cliente_id, item.id_producto) for item in items]
+        productos_data = [
+            producto_con_modificadores(cliente_id, item.id_producto, canal_precio=canal_precio)
+            for item in items
+        ]
     else:
-        productos_data = [item.to_dict() for item in items]
+        productos_data = [aplicar_precio_canal(item, item.to_dict(), canal_precio) for item in items]
     return jsonify({'ok': True, 'productos': productos_data})
 
 
@@ -290,9 +298,16 @@ def producto_detalle(producto_id):
     if not producto:
         return jsonify({'error': 'not_found'}), 404
     incluir_modificadores = request.args.get('modificadores') == '1'
+    try:
+        canal_precio = normalizar_canal_precio(request.args.get('canal_precio'))
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     if incluir_modificadores:
-        return jsonify({'ok': True, 'producto': producto_con_modificadores(cliente_id, producto_id)})
-    return jsonify({'ok': True, 'producto': producto.to_dict()})
+        return jsonify({
+            'ok': True,
+            'producto': producto_con_modificadores(cliente_id, producto_id, canal_precio=canal_precio),
+        })
+    return jsonify({'ok': True, 'producto': aplicar_precio_canal(producto, producto.to_dict(), canal_precio)})
 
 
 @gastronomia_api_bp.route('/productos/<int:producto_id>', methods=['PUT'])
@@ -496,7 +511,12 @@ def validar_modificadores_producto(producto_id):
         return error
     data = _payload()
     try:
-        resultado = validar_selecciones_producto(cliente_id, producto_id, data.get('opciones') or [])
+        resultado = validar_selecciones_producto(
+            cliente_id,
+            producto_id,
+            data.get('opciones') or [],
+            canal_precio=data.get('canal_precio'),
+        )
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, **resultado})
