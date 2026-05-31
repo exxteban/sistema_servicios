@@ -134,9 +134,14 @@
           </div>
         `).join('')}
       </div>
-      <button type="button" data-select="${order.id_pedido}" class="mt-4 w-full rounded-xl border border-emerald-200 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
-        Seleccionar
-      </button>
+      <div class="mt-4 grid gap-2 sm:grid-cols-2">
+        <button type="button" data-select="${order.id_pedido}" class="rounded-xl border border-emerald-200 px-4 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
+          Seleccionar
+        </button>
+        <button type="button" data-cancel-order="${order.id_pedido}" class="rounded-xl border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50">
+          Anular pedido
+        </button>
+      </div>
     </article>
   `;
   const renderSelected = () => {
@@ -225,8 +230,22 @@
     }
     chargeButton.textContent = selectedOrderId ? 'Cobrar pedido' : 'Selecciona un pedido para cobrar';
   };
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm(`Anular el pedido #${orderId}? Se restaurara el stock descontado.`)) return;
+    const data = await apiJson(`/api/gastronomia/pedidos/${orderId}/estado`, {
+      method: 'POST',
+      body: JSON.stringify({estado: 'cancelado'}),
+    });
+    showAlert(`Pedido #${orderId} anulado.`, true);
+    applyOrderEvents([{payload: {pedido: data.pedido}}]);
+  };
 
   ordersEl?.addEventListener('click', (event) => {
+    const cancelButton = event.target.closest('[data-cancel-order]');
+    if (cancelButton) {
+      cancelOrder(Number(cancelButton.dataset.cancelOrder)).catch((error) => showAlert(error.message, false));
+      return;
+    }
     const button = event.target.closest('[data-select]');
     if (!button) return;
     selectedOrderId = Number(button.dataset.select);

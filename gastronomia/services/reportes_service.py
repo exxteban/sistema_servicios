@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 
 from app import db
+from app.models import SesionCaja, Venta
 from app.utils.helpers import parse_iso_date, today_local, utc_bounds_for_local_dates
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem, GastronomiaPedidoPago
 
@@ -29,6 +30,7 @@ def resumen_reportes(cliente_id: int, fecha_desde: str | None = None, fecha_hast
         'productos_mas_vendidos': productos_mas_vendidos(cliente_id, inicio, fin),
         'tiempo_promedio_preparacion_min': tiempo_promedio_preparacion(cliente_id, inicio, fin),
         'pedidos_cancelados': pedidos_cancelados(cliente_id, inicio, fin),
+        'ventas_anulables': ventas_anulables(cliente_id, inicio, fin),
     }
 
 
@@ -112,6 +114,43 @@ def pedidos_cancelados(cliente_id: int, inicio: datetime, fin: datetime) -> int:
         )
         .count()
     )
+
+
+def ventas_anulables(cliente_id: int, inicio: datetime, fin: datetime, limite: int = 50) -> list[dict]:
+    filas = (
+        db.session.query(GastronomiaPedidoPago, GastronomiaPedido, Venta)
+        .join(GastronomiaPedido, GastronomiaPedido.id_pedido == GastronomiaPedidoPago.pedido_id)
+        .join(Venta, Venta.id_venta == GastronomiaPedidoPago.id_venta)
+        .join(SesionCaja, SesionCaja.id_sesion == Venta.id_sesion_caja)
+        .filter(
+            GastronomiaPedidoPago.cliente_id == int(cliente_id),
+            GastronomiaPedido.cliente_id == int(cliente_id),
+            GastronomiaPedidoPago.fecha_pago >= inicio,
+            GastronomiaPedidoPago.fecha_pago < fin,
+            GastronomiaPedidoPago.id_venta.isnot(None),
+            Venta.estado != 'anulada',
+            SesionCaja.estado != 'cerrada',
+        )
+        .order_by(GastronomiaPedidoPago.fecha_pago.desc(), GastronomiaPedidoPago.id_pago.desc())
+        .limit(max(1, min(100, int(limite or 50))))
+        .all()
+    )
+    return [_venta_anulable_to_dict(pago, pedido, venta) for pago, pedido, venta in filas]
+
+
+def _venta_anulable_to_dict(pago: GastronomiaPedidoPago, pedido: GastronomiaPedido, venta: Venta) -> dict:
+    return {
+        'id_pedido': int(pedido.id_pedido),
+        'id_venta': int(venta.id_venta),
+        'codigo_entrega': pedido.codigo_entrega,
+        'tipo_pedido': pedido.tipo_pedido,
+        'mesa': pedido.mesa,
+        'referencia_entrega': pedido.referencia_entrega,
+        'estado_pedido': pedido.estado,
+        'metodo_pago': pago.metodo_pago,
+        'total_cobrado': float(pago.total_cobrado or 0),
+        'fecha_pago': pago.fecha_pago.isoformat() if pago.fecha_pago else None,
+    }
 
 
 def _pagos_periodo(cliente_id: int, inicio: datetime, fin: datetime):

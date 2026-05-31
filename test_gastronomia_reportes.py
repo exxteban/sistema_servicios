@@ -2,8 +2,8 @@ import re
 from datetime import date
 
 from app import create_app, db
-from app.models import Caja, Cliente, SesionCaja, Usuario
-from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaProducto
+from app.models import Caja, Cliente, MovimientoCaja, SesionCaja, Usuario, Venta
+from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaPedido, GastronomiaPedidoPago, GastronomiaProducto
 
 
 def _loguear(client, app, username: str):
@@ -172,3 +172,60 @@ def test_reportes_page_carga_para_cliente_gastronomico():
     html = response.get_data(as_text=True)
     assert 'Reportes' in html
     assert 'js/reportes.js' in html
+    assert 'Ventas cobradas para anular' in html
+
+
+def test_reportes_anula_venta_gastronomica_y_actualiza_stock_caja_metricas():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, pizza_id, _bebida_id = _crear_productos(app, 'Resto Reporte Anula', 'resto_reporte_anula')
+    _loguear(client, app, 'resto_reporte_anula')
+    _abrir_caja(app, 'resto_reporte_anula')
+    page = client.get('/gastronomia/reportes')
+    csrf = _csrf(page.get_data(as_text=True))
+
+    with app.app_context():
+        producto = GastronomiaProducto.query.get(pizza_id)
+        producto.control_stock_venta = True
+        producto.stock_disponible = 3
+        db.session.commit()
+
+    pedido_id = _pedido_cobrado(client, csrf, [{'producto_id': pizza_id, 'cantidad': 2}])
+    fecha = date.today().isoformat()
+    resumen_resp = client.get('/api/gastronomia/reportes/resumen', query_string={'desde': fecha, 'hasta': fecha})
+    assert resumen_resp.status_code == 200
+    venta_item = resumen_resp.get_json()['resumen']['ventas_anulables'][0]
+    assert venta_item['id_pedido'] == pedido_id
+    assert venta_item['total_cobrado'] == 80000
+
+    anular_resp = client.post(
+        f'/api/gastronomia/reportes/pedidos/{pedido_id}/anular-venta',
+        json={'motivo': 'Error de carga'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert anular_resp.status_code == 200
+    assert anular_resp.get_json()['pedido']['estado'] == 'cancelado'
+
+    with app.app_context():
+        pedido = GastronomiaPedido.query.get(pedido_id)
+        producto = GastronomiaProducto.query.get(pizza_id)
+        assert pedido.estado == 'cancelado'
+        assert GastronomiaPedidoPago.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).count() == 0
+        assert producto.stock_disponible == 3
+        venta = Venta.query.get(venta_item['id_venta'])
+        assert venta.estado == 'anulada'
+        assert 'Error de carga' in venta.observaciones
+        reverso = MovimientoCaja.query.filter_by(
+            referencia_tipo='anulacion_venta',
+            referencia_id=venta.id_venta,
+            tipo='egreso',
+        ).first()
+        assert reverso is not None
+        assert float(reverso.monto) == 80000
+
+    resumen_post = client.get('/api/gastronomia/reportes/resumen', query_string={'desde': fecha, 'hasta': fecha})
+    resumen = resumen_post.get_json()['resumen']
+    assert resumen['pedidos_cobrados'] == 0
+    assert resumen['ventas_total'] == 0
+    assert resumen['pedidos_cancelados'] == 1
+    assert resumen['ventas_anulables'] == []
