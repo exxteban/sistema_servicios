@@ -1,0 +1,42 @@
+<script>
+(function() {
+    if (window.__reloadableScriptGuardInstalled) return;
+    window.__reloadableScriptGuardInstalled = true;
+
+    const reloadableNames = [
+        'tiendaAdminAutoBusquedaTimer',
+        'tiendaAdminUltimaBusqueda',
+        'tiendaAdminBusquedaController',
+        'productoActualImagenes',
+        'imagenProductoPendiente',
+        'productoActualOferta',
+        'estadoActualOferta',
+        'promocionProductosSeleccionados',
+        'promocionBusquedaTimer',
+        'tiendaDashboardStatsState',
+        'tiendaStatsState'
+    ];
+
+    function normalizeReloadableState(source) {
+        let normalized = source || '';
+        reloadableNames.forEach((name) => {
+            normalized = normalized.replace(
+                new RegExp(`\\b(?:var|let|const)\\s+${name}\\s*=`, 'g'),
+                `window.${name} =`
+            );
+        });
+        return normalized;
+    }
+
+    const originalAppendChild = Node.prototype.appendChild;
+    Node.prototype.appendChild = function(child) {
+        if (child?.tagName === 'SCRIPT' && !child.src && child.textContent) {
+            const normalized = normalizeReloadableState(child.textContent);
+            if (normalized !== child.textContent) {
+                child.textContent = normalized;
+            }
+        }
+        return originalAppendChild.call(this, child);
+    };
+})();
+</script>

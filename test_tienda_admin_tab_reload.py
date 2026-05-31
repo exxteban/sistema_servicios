@@ -6,6 +6,7 @@ TIENDA_ADMIN_TEMPLATES = Path("app/templates/tienda_admin")
 TAB_RUNTIME_PART1 = Path("app/templates/layout/tab_runtime_js_part1.html")
 TAB_RUNTIME_PART2 = Path("app/templates/layout/tab_runtime_js_part2.html")
 TIENDA_ADMIN_ROUTE = Path("app/routes/tienda_admin.py")
+RELOADABLE_SCRIPT_GUARD = Path("app/templates/layout/reloadable_script_guard.html")
 
 
 def test_tienda_admin_scripts_allow_tab_runtime_reload():
@@ -68,3 +69,13 @@ def test_tienda_admin_tab_loads_without_cache():
     assert "cache: 'no-store'" in runtime_source
     assert "cache: 'no-store'" in search_source
     assert "no-store, no-cache, must-revalidate, max-age=0" in route_source
+
+
+def test_layout_installs_reloadable_script_guard_before_dynamic_tabs():
+    guard_source = RELOADABLE_SCRIPT_GUARD.read_text(encoding="utf-8")
+    layout_source = Path("app/templates/layout_refactored.html").read_text(encoding="utf-8")
+
+    assert "Node.prototype.appendChild" in guard_source
+    assert "tiendaStatsState" in guard_source
+    assert "tiendaAdminAutoBusquedaTimer" in guard_source
+    assert layout_source.index("reloadable_script_guard.html") < layout_source.index("tab_runtime_js_part1.html")
