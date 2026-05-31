@@ -353,6 +353,10 @@ def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
     items_data = data.get('items') or []
     if not isinstance(items_data, list) or not items_data:
         raise ValueError('El pedido debe tener al menos un item.')
+    if any(not isinstance(item, dict) for item in items_data):
+        raise ValueError('Cada item del pedido debe ser valido.')
+    from gastronomia.services.channel_price_service import validar_canal_items_pedido
+    validar_canal_items_pedido(items_data)
     return {
         'tipo_pedido': tipo,
         'mesa': mesa,

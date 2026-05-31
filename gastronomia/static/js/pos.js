@@ -28,7 +28,6 @@
   const tablePickerSection = document.getElementById('table-picker-section');
   const tableGrid = document.getElementById('table-grid');
   const promotions = window.GastronomiaPromociones;
-
   let products = [];
   let mesas = [];
   let selectedCategory = '';
@@ -71,10 +70,10 @@
     }
     return data;
   };
-
   const loadProducts = async () => {
-    const data = await apiJson(`/api/gastronomia/productos?publico=1&modificadores=1&agotados=1&canal_precio=${encodeURIComponent(selectedPriceChannel)}`);
-    products = data.productos || [];
+    const nextProducts = await window.GastronomiaChannelPrices.fetchProducts(apiJson, selectedPriceChannel);
+    if (!nextProducts) return;
+    products = nextProducts;
     renderProducts();
   };
   const loadMesas = async () => {
@@ -289,6 +288,7 @@
   };
 
   const addConfiguredProduct = async () => {
+    window.GastronomiaChannelPrices?.ensureCanAdd(cart, activeProduct);
     const selectedOptions = Array.from(modal.querySelectorAll('#modifier-groups input:checked')).map((input) => Number(input.value));
     const validation = await apiJson(`/api/gastronomia/productos/${activeProduct.id_producto}/validar-selecciones`, {
       method: 'POST',

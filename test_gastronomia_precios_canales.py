@@ -1,7 +1,11 @@
 import re
+import sqlite3
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from app import create_app, db
 from app.models import Cliente, Usuario
+from config import TestingConfig, config
 from gastronomia.channel_models import GastronomiaProductoPrecioCanal
 from gastronomia.models import (
     GastronomiaCategoria,
@@ -9,6 +13,7 @@ from gastronomia.models import (
     GastronomiaPedidoItem,
     GastronomiaProducto,
 )
+from sqlalchemy import text
 
 
 def _loguear(client, app, username: str):
@@ -184,3 +189,64 @@ def test_api_precio_canal_respeta_cliente_de_sesion():
     )
 
     assert response.status_code == 404
+
+
+def test_api_pedido_no_permite_mezclar_listas_de_precios():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id = _crear_restaurante(app, 'Resto Canales Mixtos', 'resto_canales_mixtos')
+    producto_uno_id = _crear_producto(app, cliente_id, 'Producto normal')
+    producto_dos_id = _crear_producto(app, cliente_id, 'Producto PedidosYa')
+    _loguear(client, app, 'resto_canales_mixtos')
+    csrf = _csrf(client.get('/gastronomia/menu').get_data(as_text=True))
+
+    response = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'mostrador',
+            'items': [
+                {'producto_id': producto_uno_id, 'cantidad': 1},
+                {'producto_id': producto_dos_id, 'cantidad': 1, 'canal_precio': 'pedidosya'},
+            ],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+
+    assert response.status_code == 400
+    assert 'no puede mezclar precios normales' in response.get_json()['mensaje']
+
+
+def test_schema_actualiza_sqlite_existente_con_precios_por_canal():
+    with TemporaryDirectory() as temp_dir:
+        db_path = Path(temp_dir) / 'legacy.sqlite3'
+        connection = sqlite3.connect(db_path)
+        try:
+            connection.execute('CREATE TABLE gastronomia_pedido_items (id_item INTEGER PRIMARY KEY)')
+            connection.commit()
+        finally:
+            connection.close()
+
+        class LegacyTestingConfig(TestingConfig):
+            SQLALCHEMY_DATABASE_URI = f'sqlite:///{db_path.as_posix()}'
+
+        config_name = 'testing_gastronomia_channel_legacy'
+        config[config_name] = LegacyTestingConfig
+        try:
+            app = create_app(config_name)
+            with app.app_context():
+                engine = db.engine
+                item_columns = {
+                    row[1]
+                    for row in db.session.execute(text('PRAGMA table_info(gastronomia_pedido_items)')).fetchall()
+                }
+                tables = {
+                    row[1]
+                    for row in db.session.execute(text('PRAGMA table_list')).fetchall()
+                }
+                db.session.remove()
+            engine.dispose()
+        finally:
+            config.pop(config_name, None)
+
+    assert 'canal_precio' in item_columns
+    assert 'gastronomia_producto_precios_canal' in tables

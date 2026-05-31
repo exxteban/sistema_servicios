@@ -22,6 +22,17 @@ def normalizar_canal_precio(canal: str | None, *, permitir_vacio: bool = True) -
     return value
 
 
+def validar_canal_items_pedido(items: list[dict]) -> str | None:
+    canales = {
+        normalizar_canal_precio(item.get('canal_precio'))
+        for item in items
+        if isinstance(item, dict)
+    }
+    if len(canales) > 1:
+        raise ValueError('Un pedido no puede mezclar precios normales, de PedidosYa y de Monchis.')
+    return next(iter(canales), None)
+
+
 def asegurar_precios_producto(producto, *, commit: bool = True) -> list[GastronomiaProductoPrecioCanal]:
     existentes = {
         item.canal: item
