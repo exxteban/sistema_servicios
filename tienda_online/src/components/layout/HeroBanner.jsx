@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { isTruthyFlag, normalizeText } from '../../utils/storeFormatting'
+import { formatGs, isTruthyFlag, normalizeText } from '../../utils/storeFormatting'
 import StoreImage from '../ui/StoreImage'
 
 export default function HeroBanner({ config, themeKey }) {
@@ -26,11 +26,16 @@ export default function HeroBanner({ config, themeKey }) {
   const activeHeroSlide = carouselEnabled ? heroCarouselItems[activeSlideIndex] || heroCarouselItems[0] : null
   const coverImageSource = carouselEnabled ? normalizeText(activeHeroSlide?.hero_image_url) : coverImage
   const coverFallbackSources = carouselEnabled ? [] : (config?.imagen_portada_fallback_urls || [])
+  const activeHeroPrice = Number(activeHeroSlide?.precio || 0)
+  const activeHeroPreviousPrice = Number(activeHeroSlide?.precio_anterior || 0)
+  const showActiveHeroPrice = carouselEnabled && activeHeroSlide && activeHeroPrice > 0
+  const hasPreviousHeroPrice = activeHeroPreviousPrice > activeHeroPrice
+  const heroImagePosition = carouselEnabled ? 'center 38%' : 'center center'
 
   const fallbackBackground = `linear-gradient(135deg, ${brandColor} 0%, #0f172a 100%)`
-  const heroMinHeight = beneficios.length > 0
-    ? 'clamp(290px, 34vw, 420px)'
-    : 'clamp(240px, 28vw, 360px)'
+  const heroMinHeight = carouselEnabled
+    ? (beneficios.length > 0 ? 'clamp(320px, 38vw, 470px)' : 'clamp(280px, 34vw, 420px)')
+    : (beneficios.length > 0 ? 'clamp(290px, 34vw, 420px)' : 'clamp(240px, 28vw, 360px)')
 
   useEffect(() => {
     setActiveSlideIndex(0)
@@ -73,6 +78,7 @@ export default function HeroBanner({ config, themeKey }) {
                   decoding="async"
                   sizes="100vw"
                   className="absolute inset-0 h-full w-full object-cover"
+                  style={{ objectPosition: heroImagePosition }}
                 />
               </div>
             ))}
@@ -94,8 +100,9 @@ export default function HeroBanner({ config, themeKey }) {
               className="absolute inset-0 h-full w-full object-cover transition-all duration-700 ease-out"
               style={{
                 opacity: index === activeSlideIndex ? 1 : 0,
+                objectPosition: heroImagePosition,
                 transform: heroCarouselAnimation === 'zoom'
-                  ? `scale(${index === activeSlideIndex ? 1 : 1.08})`
+                  ? `scale(${index === activeSlideIndex ? 1 : 1.03})`
                   : 'scale(1)'
               }}
             />
@@ -112,13 +119,16 @@ export default function HeroBanner({ config, themeKey }) {
           decoding="async"
           sizes="100vw"
           className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: heroImagePosition }}
         />
       ) : null}
       {coverImageSource ? (
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: 'linear-gradient(rgba(15, 23, 42, 0.52), rgba(15, 23, 42, 0.82))'
+            background: carouselEnabled
+              ? 'linear-gradient(rgba(15, 23, 42, 0.38), rgba(15, 23, 42, 0.68))'
+              : 'linear-gradient(rgba(15, 23, 42, 0.52), rgba(15, 23, 42, 0.82))'
           }}
         ></div>
       ) : null}
@@ -153,12 +163,28 @@ export default function HeroBanner({ config, themeKey }) {
           </button>
         ) : null}
         {carouselEnabled && activeHeroSlide ? (
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm">
+          <div className="mt-4 flex flex-col items-center gap-3 text-sm">
             <a
               href={activeHeroSlide.url_detalle}
-              className="rounded-full border border-white/30 bg-white/15 px-4 py-2 font-semibold text-white no-underline backdrop-blur-sm transition hover:bg-white/25"
+              className="max-w-xl rounded-3xl border border-white/25 bg-slate-950/35 px-5 py-4 text-white no-underline shadow-lg backdrop-blur-md transition hover:bg-slate-950/45"
             >
-              {activeHeroSlide.nombre}
+              <span className="block text-lg font-black tracking-tight md:text-2xl">{activeHeroSlide.nombre}</span>
+              {showActiveHeroPrice ? (
+                <span className="mt-2 flex items-center justify-center gap-2 text-sm md:text-base">
+                  <strong className="text-xl md:text-2xl">{formatGs(activeHeroPrice)}</strong>
+                  {hasPreviousHeroPrice ? (
+                    <span className="text-white/65 line-through">{formatGs(activeHeroPreviousPrice)}</span>
+                  ) : null}
+                  {activeHeroSlide?.descuento_porcentaje ? (
+                    <span className="rounded-full bg-amber-400 px-2 py-1 text-xs font-bold text-slate-950">
+                      -{activeHeroSlide.descuento_porcentaje}%
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
+              <span className="mt-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
+                {heroCarouselItems.length > 1 ? 'Carrusel destacado' : 'Producto destacado'}
+              </span>
             </a>
             {heroCarouselItems.length > 1 ? (
               <div className="flex items-center gap-2">
@@ -173,7 +199,11 @@ export default function HeroBanner({ config, themeKey }) {
                   />
                 ))}
               </div>
-            ) : null}
+            ) : (
+              <p className="m-0 text-xs font-medium uppercase tracking-[0.25em] text-white/75">
+                Producto unico destacado
+              </p>
+            )}
           </div>
         ) : null}
         {beneficios.length > 0 && (

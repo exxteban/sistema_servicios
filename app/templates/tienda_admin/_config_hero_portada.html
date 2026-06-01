@@ -51,7 +51,7 @@
             <input type="hidden" name="hero_carrusel_producto_ids" id="hero_carrusel_producto_ids" value="{{ tienda_config.hero_carrusel_producto_ids if tienda_config and tienda_config.hero_carrusel_producto_ids else '' }}">
             <div class="space-y-2">
                 <p class="block text-sm font-medium text-gray-700 dark:text-gray-300">Productos del carrusel</p>
-                <div id="hero_carrusel_producto_ids_list" class="max-h-56 overflow-y-auto rounded-lg border border-gray-300 bg-white p-2 dark:border-gray-600 dark:bg-gray-700/50">
+                <div id="hero_carrusel_producto_ids_list" class="max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-gray-300 bg-white p-2 pr-1 dark:border-gray-600 dark:bg-gray-700/50">
                     {% for producto in hero_carousel_product_options %}
                     <label class="flex items-start gap-3 rounded-md px-2 py-2 text-sm text-gray-700 transition hover:bg-blue-50 dark:text-gray-200 dark:hover:bg-gray-700">
                         <input
@@ -66,6 +66,7 @@
                     <p class="px-2 py-2 text-sm text-gray-500 dark:text-gray-400">No hay productos publicados disponibles.</p>
                     {% endfor %}
                 </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">La lista tiene scroll. Puedes bajar para ver más productos.</p>
             </div>
             <p id="hero_carrusel_producto_ids_help" class="text-xs text-gray-500 dark:text-gray-400">
                 Marca los productos que quieres mostrar en el carrusel. Seleccionados: {{ hero_seleccionados|length }}.

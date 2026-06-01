@@ -6,6 +6,12 @@ from app import db
 from app.models.producto import Producto
 from app.models.tienda import ProductoImagen, TiendaConfig
 from app.services.tienda_context import resolver_cliente_gastronomia_tienda
+from app.services.tienda_promociones import (
+    attach_gastronomia_promotion_to_product_data,
+    attach_promotion_to_product_data,
+    get_active_gastronomia_product_promotion_map,
+    get_active_product_promotion_map,
+)
 from app.services.tienda_scope import public_product_query
 from app.utils.tienda_urls import build_product_public_path, normalize_store_media_url, slugify_tienda_text
 from gastronomia.models import GastronomiaCategoria, GastronomiaProducto
@@ -152,6 +158,7 @@ def _build_store_hero_items(config: TiendaConfig, product_ids: list[int]) -> lis
         return []
 
     product_map = {int(producto.id_producto): producto for producto in productos}
+    promotion_map = get_active_product_promotion_map(int(config.id_cliente or 0), list(product_map.keys()))
     image_rows = (
         ProductoImagen.query
         .filter(
@@ -173,12 +180,29 @@ def _build_store_hero_items(config: TiendaConfig, product_ids: list[int]) -> lis
         image_url = normalize_store_media_url(image_map.get(int(product_id)))
         if not image_url:
             continue
-        items.append({
+        slide = {
             'id': int(producto.id_producto),
             'nombre': producto.nombre,
             'url_detalle': build_product_public_path(config.slug, producto.id_producto, producto.nombre),
             'hero_image_url': image_url,
-        })
+            'precio': float(producto.precio_venta or 0),
+            'precio_anterior': float(producto.precio_anterior_tienda) if producto.precio_anterior_tienda else None,
+            'ahorro': None,
+            'descuento_porcentaje': None,
+            'promocion_activa': None,
+        }
+        if slide['precio_anterior'] and slide['precio_anterior'] > slide['precio'] and slide['precio'] > 0:
+            slide['ahorro'] = round(slide['precio_anterior'] - slide['precio'], 2)
+            if config.mostrar_descuento_porcentaje:
+                slide['descuento_porcentaje'] = round(((slide['precio_anterior'] - slide['precio']) / slide['precio_anterior']) * 100)
+        items.append(
+            attach_promotion_to_product_data(
+                producto,
+                slide,
+                promotion_map.get(int(product_id)),
+                allow_discount_percentage=bool(config.mostrar_descuento_porcentaje),
+            )
+        )
     return items
 
 
@@ -190,17 +214,25 @@ def _build_gastronomia_hero_items(config: TiendaConfig, product_ids: list[int]) 
         return []
 
     product_map = {int(producto.id_producto): producto for producto in productos}
+    gastronomy_client_id = resolver_cliente_gastronomia_tienda(config)
+    promotion_map = get_active_gastronomia_product_promotion_map(int(gastronomy_client_id or 0), list(product_map.keys()))
     items = []
     for product_id in product_ids:
         producto = product_map.get(int(product_id))
         if not producto or not producto.imagen_url:
             continue
-        items.append({
+        slide = {
             'id': int(producto.id_producto),
             'nombre': producto.nombre,
             'url_detalle': build_product_public_path(config.slug, producto.id_producto, producto.nombre),
             'hero_image_url': normalize_store_media_url(producto.imagen_url),
-        })
+            'precio': float(producto.precio or 0),
+            'precio_anterior': None,
+            'ahorro': None,
+            'descuento_porcentaje': None,
+            'promocion_activa': None,
+        }
+        items.append(attach_gastronomia_promotion_to_product_data(producto, slide, promotion_map.get(int(product_id))))
     return items
 
 

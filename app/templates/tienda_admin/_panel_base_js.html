@@ -253,6 +253,23 @@ function syncHeroCarouselSelection(form) {
     }
 }
 
+function applyHeroCarouselSelection(form) {
+    if (!form) return;
+    const hiddenInput = form.elements.namedItem('hero_carrusel_producto_ids');
+    const checkboxes = Array.from(form.querySelectorAll('.hero-carrusel-product-checkbox'));
+    if (!hiddenInput || checkboxes.length === 0) return;
+    const selectedValues = new Set(
+        String(hiddenInput.value || '')
+            .split(',')
+            .map((value) => String(value || '').trim())
+            .filter((value) => value)
+    );
+    checkboxes.forEach((checkbox) => {
+        checkbox.checked = selectedValues.has(String(checkbox.value || '').trim());
+    });
+    syncHeroCarouselSelection(form);
+}
+
 function inicializarTogglesContacto(scope = document) {
     vincularToggleContacto('mostrar_email_contacto', 'email_contacto_wrap', scope);
     vincularToggleContacto('mostrar_sitio_web', 'sitio_web_wrap', scope);
@@ -267,6 +284,7 @@ function abrirConfiguracion(trigger = null) {
     if (!modal) return;
     limpiarTextoNoneEnFormulario(scope);
     inicializarTogglesContacto(scope);
+    applyHeroCarouselSelection(modal.querySelector('#formConfiguracion'));
     modal.classList.remove('hidden');
     const backdrop = modal.querySelector('.fixed.inset-0.bg-gray-500\\/75');
     const panel = modal.querySelector('.transform');
@@ -277,7 +295,7 @@ function abrirConfiguracion(trigger = null) {
 document.addEventListener('DOMContentLoaded', () => {
     tiendaAdminInicializarBusqueda();
     inicializarTogglesContacto();
-    syncHeroCarouselSelection(document.querySelector('#configForm'));
+    applyHeroCarouselSelection(document.querySelector('#formConfiguracion'));
     document.querySelector('#hero_carrusel_producto_ids_list')?.addEventListener('change', () => {
         syncHeroCarouselSelection(document.querySelector('#configForm'));
     });
