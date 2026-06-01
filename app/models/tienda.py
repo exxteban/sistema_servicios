@@ -50,6 +50,12 @@ class TiendaConfig(db.Model):
     titulo_recomendados = db.Column(db.String(150), nullable=True)
     mostrar_seccion_imperdibles = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
     titulo_imperdibles = db.Column(db.String(150), nullable=True)
+    titulo_panel_promociones_catalogo = db.Column(db.String(180), nullable=True)
+    titulo_panel_confianza_catalogo = db.Column(db.String(180), nullable=True)
+    kicker_panel_destacados_catalogo = db.Column(db.String(120), nullable=True)
+    titulo_panel_destacados_catalogo = db.Column(db.String(180), nullable=True)
+    kicker_cta_whatsapp_catalogo = db.Column(db.String(120), nullable=True)
+    titulo_cta_whatsapp_catalogo = db.Column(db.String(180), nullable=True)
     titulo_footer = db.Column(db.String(150), nullable=True)
     mostrar_titulo_footer = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     mostrar_footer_enlaces = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
@@ -202,6 +208,12 @@ class TiendaConfig(db.Model):
             'titulo_recomendados': self.titulo_recomendados,
             'mostrar_seccion_imperdibles': self.mostrar_seccion_imperdibles,
             'titulo_imperdibles': self.titulo_imperdibles,
+            'titulo_panel_promociones_catalogo': self.titulo_panel_promociones_catalogo,
+            'titulo_panel_confianza_catalogo': self.titulo_panel_confianza_catalogo,
+            'kicker_panel_destacados_catalogo': self.kicker_panel_destacados_catalogo,
+            'titulo_panel_destacados_catalogo': self.titulo_panel_destacados_catalogo,
+            'kicker_cta_whatsapp_catalogo': self.kicker_cta_whatsapp_catalogo,
+            'titulo_cta_whatsapp_catalogo': self.titulo_cta_whatsapp_catalogo,
             'titulo_footer': self.titulo_footer,
             'mostrar_titulo_footer': self.mostrar_titulo_footer,
             'mostrar_footer_enlaces': self.mostrar_footer_enlaces,

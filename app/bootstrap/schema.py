@@ -192,6 +192,12 @@ SCHEMA_COLUMN_MIGRATIONS = {
         ('titulo_recomendados', ("ALTER TABLE tienda_config ADD COLUMN titulo_recomendados VARCHAR(150)",), ("ALTER TABLE tienda_config ADD COLUMN titulo_recomendados VARCHAR(150) NULL",)),
         ('mostrar_seccion_imperdibles', ("ALTER TABLE tienda_config ADD COLUMN mostrar_seccion_imperdibles BOOLEAN NOT NULL DEFAULT 0",), ("ALTER TABLE tienda_config ADD COLUMN mostrar_seccion_imperdibles TINYINT(1) NOT NULL DEFAULT 0",)),
         ('titulo_imperdibles', ("ALTER TABLE tienda_config ADD COLUMN titulo_imperdibles VARCHAR(150)",), ("ALTER TABLE tienda_config ADD COLUMN titulo_imperdibles VARCHAR(150) NULL",)),
+        ('titulo_panel_promociones_catalogo', ("ALTER TABLE tienda_config ADD COLUMN titulo_panel_promociones_catalogo VARCHAR(180)",), ("ALTER TABLE tienda_config ADD COLUMN titulo_panel_promociones_catalogo VARCHAR(180) NULL",)),
+        ('titulo_panel_confianza_catalogo', ("ALTER TABLE tienda_config ADD COLUMN titulo_panel_confianza_catalogo VARCHAR(180)",), ("ALTER TABLE tienda_config ADD COLUMN titulo_panel_confianza_catalogo VARCHAR(180) NULL",)),
+        ('kicker_panel_destacados_catalogo', ("ALTER TABLE tienda_config ADD COLUMN kicker_panel_destacados_catalogo VARCHAR(120)",), ("ALTER TABLE tienda_config ADD COLUMN kicker_panel_destacados_catalogo VARCHAR(120) NULL",)),
+        ('titulo_panel_destacados_catalogo', ("ALTER TABLE tienda_config ADD COLUMN titulo_panel_destacados_catalogo VARCHAR(180)",), ("ALTER TABLE tienda_config ADD COLUMN titulo_panel_destacados_catalogo VARCHAR(180) NULL",)),
+        ('kicker_cta_whatsapp_catalogo', ("ALTER TABLE tienda_config ADD COLUMN kicker_cta_whatsapp_catalogo VARCHAR(120)",), ("ALTER TABLE tienda_config ADD COLUMN kicker_cta_whatsapp_catalogo VARCHAR(120) NULL",)),
+        ('titulo_cta_whatsapp_catalogo', ("ALTER TABLE tienda_config ADD COLUMN titulo_cta_whatsapp_catalogo VARCHAR(180)",), ("ALTER TABLE tienda_config ADD COLUMN titulo_cta_whatsapp_catalogo VARCHAR(180) NULL",)),
         ('mostrar_descuento_porcentaje', ("ALTER TABLE tienda_config ADD COLUMN mostrar_descuento_porcentaje BOOLEAN NOT NULL DEFAULT 1",), ("ALTER TABLE tienda_config ADD COLUMN mostrar_descuento_porcentaje TINYINT(1) NOT NULL DEFAULT 1",)),
     ],
     'compras': [

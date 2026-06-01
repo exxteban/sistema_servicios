@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import TrustSignals from '../ui/TrustSignals'
 import StoreImage from '../ui/StoreImage'
-import { formatGs, normalizeText } from '../../utils/storeFormatting'
+import { formatGs, isTruthyFlag, normalizeText } from '../../utils/storeFormatting'
 
 export default function CatalogDesktopShowcase({
   children,
@@ -18,6 +18,16 @@ export default function CatalogDesktopShowcase({
   const baseStorePath = `/tienda/${slug}`
   const whatsappUrl = buildWhatsAppUrl(config?.telefono_whatsapp, supportMessage)
   const trustItems = buildTrustItems(config, whatsappUrl)
+  const promoPanelTitle = normalizeText(config?.titulo_panel_promociones_catalogo) || 'Promos, accesos y recordatorios'
+  const trustPanelTitle = normalizeText(config?.titulo_panel_confianza_catalogo) || 'Comprá con respaldo'
+  const featuredPanelKicker = normalizeText(config?.kicker_panel_destacados_catalogo) || 'Top esta semana'
+  const featuredPanelTitle = normalizeText(config?.titulo_panel_destacados_catalogo) || 'Productos que más llaman la atención'
+  const supportCardKicker = normalizeText(config?.kicker_cta_whatsapp_catalogo) || 'Atención directa'
+  const supportCardTitle = normalizeText(config?.titulo_cta_whatsapp_catalogo) || 'Te asesoramos por WhatsApp'
+  const supportCardText = normalizeText(
+    (isTruthyFlag(config?.mostrar_texto_apoyo_whatsapp) && config?.texto_apoyo_whatsapp)
+      || (isTruthyFlag(config?.mostrar_recordatorio_whatsapp) && config?.texto_recordatorio_whatsapp)
+  )
   const offersHref = `${baseStorePath}#${offerCount > 0 ? 'ofertas' : 'catalogo-main'}`
   const stats = [
     { label: 'Productos visibles', value: totalProducts || 0, href: `${baseStorePath}#catalogo-main` },
@@ -30,7 +40,7 @@ export default function CatalogDesktopShowcase({
       <aside className="catalog-side-panel">
         <div className="catalog-panel-stack">
           <section className="catalog-panel-card catalog-panel-card-promo">
-            <h3 className="catalog-panel-title">Promos, accesos y recordatorios</h3>
+            <h3 className="catalog-panel-title">{promoPanelTitle}</h3>
             <div className="catalog-panel-stats">
               {stats.map((stat) => (
                 <a
@@ -69,15 +79,15 @@ export default function CatalogDesktopShowcase({
         <div className="catalog-panel-stack">
           {trustItems.length > 0 && (
             <section className="catalog-panel-card">
-              <h3 className="catalog-panel-title">Comprá con respaldo</h3>
+              <h3 className="catalog-panel-title">{trustPanelTitle}</h3>
               <TrustSignals items={trustItems} compact />
             </section>
           )}
 
           {featuredProducts.length > 0 && (
             <section className="catalog-panel-card">
-              <span className="catalog-panel-kicker">Top esta semana</span>
-              <h3 className="catalog-panel-title">Productos que más llaman la atención</h3>
+              <span className="catalog-panel-kicker">{featuredPanelKicker}</span>
+              <h3 className="catalog-panel-title">{featuredPanelTitle}</h3>
               <div className="catalog-mini-product-list">
                 {featuredProducts.map((producto) => (
                   <Link
@@ -116,8 +126,9 @@ export default function CatalogDesktopShowcase({
 
           {whatsappUrl && (
             <a href={whatsappUrl} target="_blank" rel="noreferrer" onClick={onWhatsAppClick} className="catalog-support-card">
-              <span className="catalog-panel-kicker">Atención directa</span>
-              <strong>Te asesoramos por WhatsApp</strong>
+              <span className="catalog-panel-kicker">{supportCardKicker}</span>
+              <strong>{supportCardTitle}</strong>
+              {supportCardText ? <span>{supportCardText}</span> : null}
             </a>
           )}
         </div>
@@ -139,6 +150,21 @@ function resolveProductBadge(producto) {
 }
 
 function buildTrustItems(config, whatsappUrl) {
+  const configTrustItems = Array.isArray(config?.senales_confianza)
+    ? config.senales_confianza
+      .map((item, index) => buildTrustItem(
+        normalizeText(item?.key) || ['whatsapp', 'envios', 'retiro', 'garantia'][index] || 'whatsapp',
+        normalizeText(item?.text),
+        whatsappUrl
+      ))
+      .filter((item) => item.text)
+      .slice(0, 4)
+    : []
+
+  if (configTrustItems.length > 0) {
+    return configTrustItems
+  }
+
   const customItems = Array.isArray(config?.beneficios_home_items)
     ? config.beneficios_home_items
       .map((item, index) => buildTrustItem(

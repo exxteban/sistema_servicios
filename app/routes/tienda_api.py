@@ -1186,6 +1186,18 @@ def admin_guardar_config():
         config.titulo_recomendados = clean_text('titulo_recomendados')
     if 'titulo_imperdibles' in data:
         config.titulo_imperdibles = clean_text('titulo_imperdibles')
+    if 'titulo_panel_promociones_catalogo' in data:
+        config.titulo_panel_promociones_catalogo = clean_text('titulo_panel_promociones_catalogo')
+    if 'titulo_panel_confianza_catalogo' in data:
+        config.titulo_panel_confianza_catalogo = clean_text('titulo_panel_confianza_catalogo')
+    if 'kicker_panel_destacados_catalogo' in data:
+        config.kicker_panel_destacados_catalogo = clean_text('kicker_panel_destacados_catalogo')
+    if 'titulo_panel_destacados_catalogo' in data:
+        config.titulo_panel_destacados_catalogo = clean_text('titulo_panel_destacados_catalogo')
+    if 'kicker_cta_whatsapp_catalogo' in data:
+        config.kicker_cta_whatsapp_catalogo = clean_text('kicker_cta_whatsapp_catalogo')
+    if 'titulo_cta_whatsapp_catalogo' in data:
+        config.titulo_cta_whatsapp_catalogo = clean_text('titulo_cta_whatsapp_catalogo')
     if 'titulo_footer' in data:
         config.titulo_footer = clean_text('titulo_footer')
     if 'texto_footer_descripcion' in data:
