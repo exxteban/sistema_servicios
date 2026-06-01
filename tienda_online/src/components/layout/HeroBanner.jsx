@@ -182,9 +182,6 @@ export default function HeroBanner({ config, themeKey }) {
                   ) : null}
                 </span>
               ) : null}
-              <span className="mt-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
-                {heroCarouselItems.length > 1 ? 'Carrusel destacado' : 'Producto destacado'}
-              </span>
             </a>
             {heroCarouselItems.length > 1 ? (
               <div className="flex items-center gap-2">
