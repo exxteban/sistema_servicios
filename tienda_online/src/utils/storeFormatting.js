@@ -5,7 +5,7 @@ export function formatGs(value) {
 export function normalizeText(value) {
   if (value === null || value === undefined) return ''
   const clean = String(value).trim()
-  if (!clean || clean.toLowerCase() === 'none') return ''
+  if (!clean || ['none', 'false', 'null', 'undefined'].includes(clean.toLowerCase())) return ''
   return clean
 }
 

@@ -1128,8 +1128,10 @@ def admin_guardar_config():
         value = data.get(key)
         if value is None:
             return None
+        if isinstance(value, bool):
+            return None if value is False else str(value).strip()
         clean = str(value).strip()
-        if not clean or clean.lower() == 'none':
+        if not clean or clean.lower() in {'none', 'false', 'null', 'undefined'}:
             return None
         return clean
 
