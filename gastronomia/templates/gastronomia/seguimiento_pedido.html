@@ -21,17 +21,7 @@
     </style>
 </head>
 <body>
-    {% set mensajes = {
-        'abierto': 'Recibimos tu pedido.',
-        'enviado_cocina': 'Tu pedido fue enviado a cocina.',
-        'preparando': 'Estamos preparando tu pedido.',
-        'listo': 'Tu pedido esta listo.',
-        'en_camino': 'Tu pedido ya salio con el delivery.',
-        'entregado': 'Tu pedido fue entregado.',
-        'cobrado': 'Tu pedido fue cobrado.',
-        'cancelado': 'Tu pedido fue cancelado.'
-    } %}
-    <main class="wrap">
+    <main class="wrap" data-tracking-root data-status-url="{{ url_for('gastronomia.seguimiento_pedido_estado_publico', codigo_publico=pedido.codigo_publico) }}">
         <section class="card">
             <span class="badge">Seguimiento</span>
             <h1>Pedido {{ pedido.codigo_entrega }}</h1>
@@ -39,19 +29,19 @@
 
             <div class="status">
                 <span class="muted">Estado actual</span>
-                <strong>{{ pedido.estado|replace('_', ' ') }}</strong>
-                <p>{{ mensajes.get(pedido.estado, 'Tu pedido fue actualizado.') }}</p>
+                <strong data-current-status>{{ pedido.estado|replace('_', ' ') }}</strong>
+                <p data-current-message>{{ mensajes.get(pedido.estado, 'Tu pedido fue actualizado.') }}</p>
             </div>
 
             <div class="meta">
                 {% if pedido.nombre_cliente or pedido.referencia_entrega %}<div><strong>Cliente</strong><br>{{ pedido.nombre_cliente or pedido.referencia_entrega }}</div>{% endif %}
                 {% if pedido.tipo_pedido %}<div><strong>Tipo</strong><br>{{ pedido.tipo_pedido|replace('_', ' ')|title }}</div>{% endif %}
                 {% if pedido.tiempo_estimado_minutos %}<div><strong>Tiempo estimado</strong><br>{{ pedido.tiempo_estimado_minutos }} minutos</div>{% endif %}
-                {% if pedido.fecha_modificacion %}<div><strong>Ultima actualizacion</strong><br>{{ pedido.fecha_modificacion|local_strftime('%d/%m/%Y %H:%M') }}</div>{% endif %}
+                {% if pedido.fecha_modificacion %}<div><strong>Ultima actualizacion</strong><br><span data-last-update>{{ pedido.fecha_modificacion|local_strftime('%d/%m/%Y %H:%M') }}</span></div>{% endif %}
             </div>
 
             <h2>Historial</h2>
-            <div class="timeline">
+            <div class="timeline" data-events-list>
                 {% for evento in eventos %}
                 <div class="event">
                     <strong>{{ evento.tipo|replace('pedido_', '')|replace('_', ' ')|title }}</strong>
@@ -63,5 +53,59 @@
             </div>
         </section>
     </main>
+    <script>
+        (function () {
+            var root = document.querySelector('[data-tracking-root]');
+            if (!root || !window.fetch) return;
+            var statusUrl = root.getAttribute('data-status-url');
+            var currentStatus = document.querySelector('[data-current-status]');
+            var currentMessage = document.querySelector('[data-current-message]');
+            var lastUpdate = document.querySelector('[data-last-update]');
+            var eventsList = document.querySelector('[data-events-list]');
+
+            function escapeHtml(value) {
+                return String(value || '').replace(/[&<>"']/g, function (char) {
+                    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[char];
+                });
+            }
+
+            function formatDate(value) {
+                if (!value) return '';
+                var date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '';
+                return new Intl.DateTimeFormat('es-PY', {
+                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                }).format(date);
+            }
+
+            function renderEvents(events) {
+                if (!eventsList || !Array.isArray(events)) return;
+                if (!events.length) {
+                    eventsList.innerHTML = '<p class="muted">Aun no hay movimientos registrados.</p>';
+                    return;
+                }
+                eventsList.innerHTML = events.map(function (event) {
+                    return '<div class="event"><strong>' + escapeHtml(event.label) + '</strong>' +
+                        '<div class="muted">' + escapeHtml(formatDate(event.fecha_evento)) + '</div></div>';
+                }).join('');
+            }
+
+            function refreshStatus() {
+                fetch(statusUrl, {cache: 'no-store'})
+                    .then(function (response) { return response.ok ? response.json() : null; })
+                    .then(function (data) {
+                        if (!data || !data.pedido) return;
+                        currentStatus.textContent = data.pedido.estado_label || data.pedido.estado || '';
+                        currentMessage.textContent = data.pedido.mensaje || 'Tu pedido fue actualizado.';
+                        if (lastUpdate) lastUpdate.textContent = formatDate(data.pedido.fecha_modificacion);
+                        renderEvents(data.eventos);
+                    })
+                    .catch(function () {});
+            }
+
+            window.setInterval(refreshStatus, 8000);
+            window.setTimeout(refreshStatus, 1000);
+        }());
+    </script>
 </body>
 </html>

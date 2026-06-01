@@ -249,6 +249,7 @@ export default function CatalogoPage() {
           retry={retryCategorias}
           selectedSlug={selectedCategory?.slug || ''}
           themeKey={theme.key}
+          brandColor={config?.color_primario}
         />
         {quickOrderEnabled ? (
           <GastronomiaOrderPanel

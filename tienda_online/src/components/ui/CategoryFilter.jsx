@@ -1,7 +1,16 @@
 import { Link } from 'react-router-dom'
-import { buildCategoryPath } from '../../utils/storeFormatting'
+import { buildCategoryPath, getReadableTextColor, normalizeText } from '../../utils/storeFormatting'
 
-export default function CategoryFilter({ slug, categorias, loading, error, retry, selectedSlug, themeKey }) {
+export default function CategoryFilter({ slug, categorias, loading, error, retry, selectedSlug, themeKey, brandColor }) {
+  const activeChipStyle = normalizeText(brandColor)
+    ? {
+        background: brandColor,
+        borderColor: brandColor,
+        color: getReadableTextColor(brandColor),
+        boxShadow: '0 10px 22px rgba(15, 23, 42, 0.14)'
+      }
+    : undefined
+
   if (loading) {
     return (
       <div className="flex gap-3 overflow-x-auto pb-4 mb-8 snap-x hide-scrollbar">
@@ -35,6 +44,7 @@ export default function CategoryFilter({ slug, categorias, loading, error, retry
         to={`/tienda/${slug}`}
         className={`category-chip ${!selectedSlug ? 'category-chip-active' : ''}`}
         aria-current={!selectedSlug ? 'page' : undefined}
+        style={!selectedSlug ? activeChipStyle : undefined}
       >
         Todas
       </Link>
@@ -44,6 +54,7 @@ export default function CategoryFilter({ slug, categorias, loading, error, retry
           key={cat.id}
           className={`category-chip ${selectedSlug === cat.slug ? 'category-chip-active' : ''}`}
           aria-current={selectedSlug === cat.slug ? 'page' : undefined}
+          style={selectedSlug === cat.slug ? activeChipStyle : undefined}
         >
           {cat.nombre}
         </Link>

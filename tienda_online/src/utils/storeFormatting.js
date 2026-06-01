@@ -2,6 +2,44 @@ export function formatGs(value) {
   return `₲ ${Number(value || 0).toLocaleString('es-PY')}`
 }
 
+function parseColorChannel(channel) {
+  const value = Number.parseFloat(channel)
+  if (Number.isNaN(value)) return null
+  return Math.max(0, Math.min(255, value))
+}
+
+function parseHexColor(color) {
+  const clean = normalizeText(color).replace('#', '')
+  if (![3, 6].includes(clean.length) || !/^[0-9a-f]+$/i.test(clean)) return null
+
+  const normalized = clean.length === 3
+    ? clean.split('').map((char) => `${char}${char}`).join('')
+    : clean
+
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16)
+  }
+}
+
+function parseRgbColor(color) {
+  const match = normalizeText(color).match(/^rgba?\(([^)]+)\)$/i)
+  if (!match) return null
+
+  const [r, g, b] = match[1].split(',').map((part) => parseColorChannel(part.trim()))
+  if ([r, g, b].some((channel) => channel === null)) return null
+
+  return { r, g, b }
+}
+
+function getRelativeLuminance(channel) {
+  const normalized = channel / 255
+  return normalized <= 0.03928
+    ? normalized / 12.92
+    : ((normalized + 0.055) / 1.055) ** 2.4
+}
+
 export function normalizeText(value) {
   if (value === null || value === undefined) return ''
   const clean = String(value).trim()
@@ -55,6 +93,19 @@ export function parseProductIdFromParam(value) {
 
 export function normalizeCategoryRef(value) {
   return slugifyForUrl(value, 'catalogo')
+}
+
+export function getReadableTextColor(backgroundColor, lightColor = '#ffffff', darkColor = '#0f172a') {
+  const parsedColor = parseHexColor(backgroundColor) || parseRgbColor(backgroundColor)
+  if (!parsedColor) return lightColor
+
+  const luminance = (
+    0.2126 * getRelativeLuminance(parsedColor.r) +
+    0.7152 * getRelativeLuminance(parsedColor.g) +
+    0.0722 * getRelativeLuminance(parsedColor.b)
+  )
+
+  return luminance > 0.45 ? darkColor : lightColor
 }
 
 export function getStoreHeaderTitle(config) {

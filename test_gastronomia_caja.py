@@ -342,9 +342,17 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     assert '0981123456' in ticket_html
     assert 'Av. Siempre Viva 742' in ticket_html
     assert 'Envio' in ticket_html
-    seguimiento_html = client.get(f'/gastronomia/pedido/{pedido["codigo_publico"]}').get_data(as_text=True)
+    seguimiento_resp = client.get(f'/gastronomia/pedido/{pedido["codigo_publico"]}')
+    assert seguimiento_resp.headers['Cache-Control'] == 'no-store, no-cache, must-revalidate, max-age=0'
+    seguimiento_html = seguimiento_resp.get_data(as_text=True)
     assert 'Tu pedido ya salio con el delivery.' in seguimiento_html
     assert '35 minutos' in seguimiento_html
+    seguimiento_estado_resp = client.get(f'/gastronomia/pedido/{pedido["codigo_publico"]}/estado')
+    assert seguimiento_estado_resp.status_code == 200
+    assert seguimiento_estado_resp.headers['Cache-Control'] == 'no-store, no-cache, must-revalidate, max-age=0'
+    seguimiento_estado = seguimiento_estado_resp.get_json()
+    assert seguimiento_estado['pedido']['estado'] == 'en_camino'
+    assert seguimiento_estado['pedido']['mensaje'] == 'Tu pedido ya salio con el delivery.'
 
 
 def test_caja_actualiza_costo_envio_delivery_antes_de_cobrar():
