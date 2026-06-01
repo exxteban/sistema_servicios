@@ -237,12 +237,20 @@ function vincularToggleContacto(checkboxId, wrapId, scope = document) {
 function syncHeroCarouselSelection(form) {
     if (!form) return;
     const hiddenInput = form.elements.namedItem('hero_carrusel_producto_ids');
-    const select = form.querySelector('#hero_carrusel_producto_ids_select');
-    if (!hiddenInput || !select) return;
-    hiddenInput.value = Array.from(select.selectedOptions)
-        .map((option) => option.value)
-        .filter((value) => value)
-        .join(',');
+    const helpText = form.querySelector('#hero_carrusel_producto_ids_help');
+    const checkboxes = Array.from(form.querySelectorAll('.hero-carrusel-product-checkbox'));
+    if (!hiddenInput || checkboxes.length === 0) {
+        if (hiddenInput) hiddenInput.value = '';
+        return;
+    }
+    const selectedValues = checkboxes
+        .filter((checkbox) => checkbox.checked)
+        .map((checkbox) => checkbox.value)
+        .filter((value) => value);
+    hiddenInput.value = selectedValues.join(',');
+    if (helpText) {
+        helpText.textContent = `Marca los productos que quieres mostrar en el carrusel. Seleccionados: ${selectedValues.length}.`;
+    }
 }
 
 function inicializarTogglesContacto(scope = document) {
@@ -269,6 +277,10 @@ function abrirConfiguracion(trigger = null) {
 document.addEventListener('DOMContentLoaded', () => {
     tiendaAdminInicializarBusqueda();
     inicializarTogglesContacto();
+    syncHeroCarouselSelection(document.querySelector('#configForm'));
+    document.querySelector('#hero_carrusel_producto_ids_list')?.addEventListener('change', () => {
+        syncHeroCarouselSelection(document.querySelector('#configForm'));
+    });
 });
 
 tiendaAdminInicializarBusqueda();
