@@ -115,10 +115,11 @@
             word-break: break-word;
             overflow-wrap: break-word;
             font-family: 'Lucida Console', 'Courier New', Courier, monospace;
-            font-size: {{ 10 if paper_width_value == 48 else 11 if paper_width_value == 58 else 12 }}px;
+            font-size: 10px;
             line-height: 1.25;
             font-weight: 700;
-            padding: 2mm {{ 4 if paper_width_value == 80 else 3 }}mm 3mm;
+            /* El padding lateral lo aporta el body; aqui solo el inferior para el avance del papel. */
+            padding: 2mm 0 3mm;
             text-rendering: geometricPrecision;
         }
 
