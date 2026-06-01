@@ -26,7 +26,7 @@
             <button
                 id="btnAbrirConfiguracionTienda"
                 type="button"
-                onclick="abrirConfiguracion()"
+                onclick="abrirConfiguracion(this)"
                 class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
                 <i class="fas fa-cog mr-2"></i> Configuración
             </button>
@@ -139,7 +139,7 @@
                     <h3 class="text-lg font-semibold leading-6 text-gray-900 dark:text-white" id="modal-title">
                         <i class="fas fa-cogs mr-2 text-blue-500"></i> Configuración de la Tienda
                     </h3>
-                    <button type="button" onclick="cerrarConfiguracion()" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <button type="button" onclick="cerrarConfiguracion(this)" class="text-gray-400 hover:text-gray-500 focus:outline-none">
                         <span class="sr-only">Cerrar</span>
                         <i class="fas fa-times text-xl"></i>
                     </button>
@@ -555,10 +555,10 @@
                 
                 <!-- Footer -->
                 <div class="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex flex-row-reverse gap-3 rounded-b-2xl border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="document.getElementById('formConfiguracion').requestSubmit()" class="inline-flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition-colors">
+                    <button type="button" onclick="this.closest('#modalConfiguracion')?.querySelector('#formConfiguracion')?.requestSubmit()" class="inline-flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition-colors">
                         Guardar Configuración
                     </button>
-                    <button type="button" onclick="cerrarConfiguracion()" class="inline-flex w-full justify-center rounded-lg bg-white dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-gray-200 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 sm:w-auto transition-colors">
+                    <button type="button" onclick="cerrarConfiguracion(this)" class="inline-flex w-full justify-center rounded-lg bg-white dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-gray-200 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 sm:w-auto transition-colors">
                         Cancelar
                     </button>
                 </div>

@@ -150,6 +150,16 @@ function tiendaAdminInicializarBusqueda() {
     });
 }
 
+function tiendaAdminPanelScope(trigger = null) {
+    const panel = trigger?.closest?.('[data-tab-panel]');
+    if (panel) return panel;
+    return document.querySelector('[data-tab-panel][aria-hidden="false"]:not([hidden])') || document;
+}
+
+function tiendaAdminElementById(id, scope = document) {
+    return scope.querySelector?.(`#${id}`) || document.getElementById(id);
+}
+
 document.getElementById('color_primario')?.addEventListener('input', function(e) {
     document.getElementById('color_hex').textContent = e.target.value;
 });
@@ -166,8 +176,8 @@ function actualizarNombreArchivo(input) {
     }
 }
 
-function limpiarTextoNoneEnFormulario() {
-    const form = document.getElementById('formConfiguracion');
+function limpiarTextoNoneEnFormulario(scope = document) {
+    const form = tiendaAdminElementById('formConfiguracion', scope);
     if (!form) return;
     const campos = form.querySelectorAll('input[type="text"], input[type="email"], input[type="url"], textarea');
     campos.forEach((campo) => {
@@ -177,9 +187,9 @@ function limpiarTextoNoneEnFormulario() {
     });
 }
 
-function vincularToggleContacto(checkboxId, wrapId) {
-    const check = document.getElementById(checkboxId);
-    const wrap = document.getElementById(wrapId);
+function vincularToggleContacto(checkboxId, wrapId, scope = document) {
+    const check = tiendaAdminElementById(checkboxId, scope);
+    const wrap = tiendaAdminElementById(wrapId, scope);
     if (!check || !wrap) return;
     const sync = () => wrap.classList.toggle('hidden', !check.checked);
     check.removeEventListener('change', sync);
@@ -187,19 +197,20 @@ function vincularToggleContacto(checkboxId, wrapId) {
     sync();
 }
 
-function inicializarTogglesContacto() {
-    vincularToggleContacto('mostrar_email_contacto', 'email_contacto_wrap');
-    vincularToggleContacto('mostrar_sitio_web', 'sitio_web_wrap');
-    vincularToggleContacto('mostrar_instagram', 'instagram_url_wrap');
-    vincularToggleContacto('mostrar_facebook', 'facebook_url_wrap');
-    vincularToggleContacto('mostrar_youtube', 'youtube_url_wrap');
+function inicializarTogglesContacto(scope = document) {
+    vincularToggleContacto('mostrar_email_contacto', 'email_contacto_wrap', scope);
+    vincularToggleContacto('mostrar_sitio_web', 'sitio_web_wrap', scope);
+    vincularToggleContacto('mostrar_instagram', 'instagram_url_wrap', scope);
+    vincularToggleContacto('mostrar_facebook', 'facebook_url_wrap', scope);
+    vincularToggleContacto('mostrar_youtube', 'youtube_url_wrap', scope);
 }
 
-function abrirConfiguracion() {
-    const modal = document.getElementById('modalConfiguracion');
+function abrirConfiguracion(trigger = null) {
+    const scope = tiendaAdminPanelScope(trigger);
+    const modal = tiendaAdminElementById('modalConfiguracion', scope);
     if (!modal) return;
-    limpiarTextoNoneEnFormulario();
-    inicializarTogglesContacto();
+    limpiarTextoNoneEnFormulario(scope);
+    inicializarTogglesContacto(scope);
     modal.classList.remove('hidden');
     const backdrop = modal.querySelector('.fixed.inset-0.bg-gray-500\\/75');
     const panel = modal.querySelector('.transform');
@@ -214,8 +225,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 tiendaAdminInicializarBusqueda();
 
-function cerrarConfiguracion() {
-    const modal = document.getElementById('modalConfiguracion');
+function cerrarConfiguracion(trigger = null) {
+    const modal = trigger?.closest?.('#modalConfiguracion')
+        || tiendaAdminElementById('modalConfiguracion', tiendaAdminPanelScope(trigger));
     if (!modal) return;
     modal.querySelector('.fixed.inset-0.bg-gray-500\\/75')?.classList.remove('opacity-100');
     modal.querySelector('.transform')?.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');

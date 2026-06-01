@@ -50,7 +50,7 @@ def test_tienda_admin_header_buttons_use_single_click_handler():
     panel_source = (TIENDA_ADMIN_TEMPLATES / "panel.html").read_text(encoding="utf-8")
     script_source = (TIENDA_ADMIN_TEMPLATES / "_panel_base_js.html").read_text(encoding="utf-8")
 
-    assert 'onclick="abrirConfiguracion()"' in panel_source
+    assert 'onclick="abrirConfiguracion(this)"' in panel_source
     assert 'onclick="abrirModalEstadisticasTienda()"' in panel_source
     assert "inicializarBotonesCabeceraTienda" not in script_source
 
