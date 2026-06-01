@@ -516,6 +516,14 @@ def find_overlapping_gastronomia_promotion(
     return query.order_by(TiendaPromocion.fecha_inicio.asc()).first()
 
 
+def sync_promotion_product_relations(items, product_ids: list[int], relation_model) -> None:
+    existing = {int(item.id_producto): item for item in items if item.id_producto is not None}
+    items[:] = [
+        existing.get(int(product_id)) or relation_model(id_producto=product_id)
+        for product_id in product_ids
+    ]
+
+
 def save_promotion(
     *,
     promotion: TiendaPromocion | None,
@@ -570,13 +578,15 @@ def save_promotion(
         db.session.add(promotion)
         db.session.flush()
 
-    promotion.productos_rel[:] = [
-        TiendaPromocionProducto(id_producto=product.id_producto)
-        for product in products
-    ]
-    promotion.gastronomia_productos_rel[:] = [
-        TiendaPromocionGastronomiaProducto(id_producto=product.id_producto)
-        for product in gastro_products
-    ]
+    sync_promotion_product_relations(
+        promotion.productos_rel,
+        [product.id_producto for product in products],
+        TiendaPromocionProducto,
+    )
+    sync_promotion_product_relations(
+        promotion.gastronomia_productos_rel,
+        [product.id_producto for product in gastro_products],
+        TiendaPromocionGastronomiaProducto,
+    )
     db.session.flush()
     return promotion, None

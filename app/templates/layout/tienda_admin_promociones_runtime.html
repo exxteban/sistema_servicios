@@ -235,7 +235,7 @@
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             cache: 'no-store'
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'No se pudo buscar productos');
         renderResultados(data.productos || []);
     }
@@ -331,7 +331,7 @@
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
             body: JSON.stringify(payload)
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
             alert('No se pudo guardar la promoción: ' + (data.error || 'error'));
             return;
@@ -353,7 +353,7 @@
             method: 'DELETE',
             headers: { 'X-CSRFToken': csrfToken() }
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
             alert('No se pudo eliminar la promoción: ' + (data.error || 'error'));
             return;

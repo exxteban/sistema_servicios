@@ -278,6 +278,22 @@ def test_menu_promociones_filtra_catalogo_gastronomico_y_respeta_cliente():
     assert promo_data['productos'][0]['nombre'] == 'Combo gastronomico'
     assert promo_data['productos'][0]['tipo_catalogo'] == 'gastronomia'
 
+    update_promotion = client.put(
+        f"/api/tienda/admin/promociones/{promo_data['id_promocion']}",
+        json={
+            'cliente_id_gastronomia': cliente_id,
+            'nombre': 'Promo combo editada',
+            'tipo': 'porcentaje',
+            'valor': 20,
+            'fecha_inicio': (datetime.now() - timedelta(hours=1)).isoformat(timespec='minutes'),
+            'fecha_fin': (datetime.now() + timedelta(hours=1)).isoformat(timespec='minutes'),
+            'productos_gastronomia': [producto_gastronomico_id],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert update_promotion.status_code == 200, update_promotion.get_data(as_text=True)
+    assert update_promotion.get_json()['promocion']['nombre'] == 'Promo combo editada'
+
     cross_tenant = client.get('/api/tienda/admin/promociones/productos', query_string={
         'cliente_id_gastronomia': otro_cliente_id,
         'tipo_catalogo': 'gastronomia',
