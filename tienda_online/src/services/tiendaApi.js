@@ -135,12 +135,21 @@ function resolveMediaCandidates(value) {
 function normalizeConfig(config) {
   if (!config) return config
 
+  const heroCarouselItems = Array.isArray(config.hero_carrusel_items)
+    ? config.hero_carrusel_items.map((item) => ({
+        ...item,
+        hero_image_url: resolveMediaUrl(item?.hero_image_url),
+        hero_image_fallback_urls: resolveMediaCandidates(item?.hero_image_url)
+      }))
+    : []
+
   return {
     ...config,
     logo_url: resolveMediaUrl(config.logo_url),
     logo_fallback_urls: resolveMediaCandidates(config.logo_url),
     imagen_portada: resolveMediaUrl(config.imagen_portada),
-    imagen_portada_fallback_urls: resolveMediaCandidates(config.imagen_portada)
+    imagen_portada_fallback_urls: resolveMediaCandidates(config.imagen_portada),
+    hero_carrusel_items: heroCarouselItems
   }
 }
 

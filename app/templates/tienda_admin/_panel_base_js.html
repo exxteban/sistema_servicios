@@ -234,6 +234,17 @@ function vincularToggleContacto(checkboxId, wrapId, scope = document) {
     sync();
 }
 
+function syncHeroCarouselSelection(form) {
+    if (!form) return;
+    const hiddenInput = form.elements.namedItem('hero_carrusel_producto_ids');
+    const select = form.querySelector('#hero_carrusel_producto_ids_select');
+    if (!hiddenInput || !select) return;
+    hiddenInput.value = Array.from(select.selectedOptions)
+        .map((option) => option.value)
+        .filter((value) => value)
+        .join(',');
+}
+
 function inicializarTogglesContacto(scope = document) {
     vincularToggleContacto('mostrar_email_contacto', 'email_contacto_wrap', scope);
     vincularToggleContacto('mostrar_sitio_web', 'sitio_web_wrap', scope);
@@ -314,8 +325,12 @@ function enviarFormularioConfiguracion(trigger = null) {
 async function guardarConfiguracion(e) {
     e.preventDefault();
     const form = e.target;
+    syncHeroCarouselSelection(form);
     const checkboxNames = [
         'mostrar_hero_tienda',
+        'mostrar_titulo_hero_tienda',
+        'mostrar_subtitulo_hero_tienda',
+        'mostrar_boton_hero_tienda',
         'mostrar_bloque_beneficios_home',
         'mostrar_destacados',
         'mostrar_ofertas',
@@ -377,6 +392,10 @@ async function guardarConfiguracion(e) {
             titulo_hero_tienda: form.titulo_hero_tienda.value,
             subtitulo_hero_tienda: form.subtitulo_hero_tienda.value,
             texto_boton_hero: form.texto_boton_hero.value,
+            hero_visual_tipo: form.hero_visual_tipo.value,
+            hero_carrusel_producto_ids: form.hero_carrusel_producto_ids.value,
+            hero_carrusel_velocidad_segundos: form.hero_carrusel_velocidad_segundos.value,
+            hero_carrusel_animacion: form.hero_carrusel_animacion.value,
             beneficio_home_1_texto: form.beneficio_home_1_texto.value,
             beneficio_home_2_texto: form.beneficio_home_2_texto.value,
             beneficio_home_3_texto: form.beneficio_home_3_texto.value,
@@ -415,6 +434,9 @@ async function guardarConfiguracion(e) {
             beneficio_producto_3: form.beneficio_producto_3.value,
             titulo_relacionados: form.titulo_relacionados.value,
             mostrar_hero_tienda: checkboxValue('mostrar_hero_tienda', true),
+            mostrar_titulo_hero_tienda: checkboxValue('mostrar_titulo_hero_tienda', true),
+            mostrar_subtitulo_hero_tienda: checkboxValue('mostrar_subtitulo_hero_tienda', true),
+            mostrar_boton_hero_tienda: checkboxValue('mostrar_boton_hero_tienda', true),
             mostrar_bloque_beneficios_home: checkboxValue('mostrar_bloque_beneficios_home'),
             mostrar_destacados: checkboxValue('mostrar_destacados', true),
             mostrar_ofertas: checkboxValue('mostrar_ofertas', true),

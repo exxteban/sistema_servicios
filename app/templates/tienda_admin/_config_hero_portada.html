@@ -1,0 +1,120 @@
+<div class="mt-4 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+    <label for="texto_portada" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Subtítulo / Texto de Portada</label>
+    <textarea name="texto_portada" id="texto_portada" rows="2"
+        class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.texto_portada if tienda_config and tienda_config.texto_portada else '' }}</textarea>
+</div>
+<div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm space-y-3">
+        <div>
+            <p class="text-xs uppercase tracking-wide font-semibold text-blue-600 dark:text-blue-400 mb-1">Hero y portada</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Personaliza el bloque principal de bienvenida de la home.</p>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input type="checkbox" name="mostrar_hero_tienda" {% if not tienda_config or tienda_config.mostrar_hero_tienda %}checked{% endif %}
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+            Mostrar hero principal
+        </label>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Tipo visual del hero
+            <select name="hero_visual_tipo" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                <option value="imagen" {% if not tienda_config or tienda_config.hero_visual_tipo != 'carrusel' %}selected{% endif %}>Imagen de portada</option>
+                <option value="carrusel" {% if tienda_config and tienda_config.hero_visual_tipo == 'carrusel' %}selected{% endif %}>Carrusel de productos</option>
+            </select>
+        </label>
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input type="checkbox" name="mostrar_titulo_hero_tienda" {% if not tienda_config or tienda_config.mostrar_titulo_hero_tienda %}checked{% endif %}
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+            Mostrar titulo principal
+        </label>
+        <input type="text" name="titulo_hero_tienda" value="{{ tienda_config.titulo_hero_tienda if tienda_config and tienda_config.titulo_hero_tienda else '' }}" placeholder="Título principal del hero"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input type="checkbox" name="mostrar_subtitulo_hero_tienda" {% if not tienda_config or tienda_config.mostrar_subtitulo_hero_tienda %}checked{% endif %}
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+            Mostrar subtitulo
+        </label>
+        <textarea name="subtitulo_hero_tienda" rows="3" placeholder="Mensaje comercial corto para la portada"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.subtitulo_hero_tienda if tienda_config and tienda_config.subtitulo_hero_tienda else '' }}</textarea>
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input type="checkbox" name="mostrar_boton_hero_tienda" {% if not tienda_config or tienda_config.mostrar_boton_hero_tienda %}checked{% endif %}
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+            Mostrar boton del hero
+        </label>
+        <input type="text" name="texto_boton_hero" value="{{ tienda_config.texto_boton_hero if tienda_config and tienda_config.texto_boton_hero else 'Explorar catálogo' }}" placeholder="Texto del botón principal"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+        <div class="rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/70 dark:bg-blue-950/20 p-3 space-y-3">
+            <div>
+                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Carrusel de productos</p>
+                <p class="text-xs text-gray-600 dark:text-gray-300">Si eliges carrusel, se usarán estos productos en lugar de la imagen fija de portada.</p>
+            </div>
+            <input type="hidden" name="hero_carrusel_producto_ids" id="hero_carrusel_producto_ids" value="{{ tienda_config.hero_carrusel_producto_ids if tienda_config and tienda_config.hero_carrusel_producto_ids else '' }}">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Productos del carrusel
+                <select id="hero_carrusel_producto_ids_select" multiple size="8" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    {% set hero_seleccionados = tienda_config.hero_carrusel_producto_ids_items if tienda_config and tienda_config.hero_carrusel_producto_ids_items else [] %}
+                    {% for producto in hero_carousel_product_options %}
+                    <option value="{{ producto.id }}" {% if producto.id in hero_seleccionados %}selected{% endif %}>{{ producto.label }}</option>
+                    {% else %}
+                    <option value="" disabled>No hay productos publicados disponibles</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Velocidad del carrusel
+                <input type="number" name="hero_carrusel_velocidad_segundos" min="2" max="15" step="1" value="{{ tienda_config.hero_carrusel_velocidad_segundos if tienda_config and tienda_config.hero_carrusel_velocidad_segundos else 5 }}"
+                    class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+            </label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Animación del carrusel
+                <select name="hero_carrusel_animacion" class="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    <option value="fade" {% if not tienda_config or not tienda_config.hero_carrusel_animacion or tienda_config.hero_carrusel_animacion == 'fade' %}selected{% endif %}>Fundido suave</option>
+                    <option value="slide" {% if tienda_config and tienda_config.hero_carrusel_animacion == 'slide' %}selected{% endif %}>Deslizamiento horizontal</option>
+                    <option value="zoom" {% if tienda_config and tienda_config.hero_carrusel_animacion == 'zoom' %}selected{% endif %}>Zoom premium</option>
+                </select>
+            </label>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Ingresa de 2 a 15 segundos entre cada cambio automático.</p>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input type="checkbox" name="mostrar_bloque_beneficios_home" {% if tienda_config and tienda_config.mostrar_bloque_beneficios_home %}checked{% endif %}
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+            Mostrar beneficios cortos en home
+        </label>
+        <input type="text" name="beneficio_home_1_texto" value="{{ tienda_config.beneficio_home_1_texto if tienda_config and tienda_config.beneficio_home_1_texto else '' }}" placeholder="Beneficio home 1"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+        <input type="text" name="beneficio_home_2_texto" value="{{ tienda_config.beneficio_home_2_texto if tienda_config and tienda_config.beneficio_home_2_texto else '' }}" placeholder="Beneficio home 2"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+        <input type="text" name="beneficio_home_3_texto" value="{{ tienda_config.beneficio_home_3_texto if tienda_config and tienda_config.beneficio_home_3_texto else '' }}" placeholder="Beneficio home 3"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+    </div>
+    <div class="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm space-y-3">
+        <div>
+            <p class="text-xs uppercase tracking-wide font-semibold text-blue-600 dark:text-blue-400 mb-1">Footer e institucional</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Configura texto institucional, enlaces rápidos y políticas.</p>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input type="checkbox" name="mostrar_footer_enlaces" {% if not tienda_config or tienda_config.mostrar_footer_enlaces %}checked{% endif %}
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+            Mostrar enlaces rápidos en footer
+        </label>
+        <textarea name="texto_footer_descripcion" rows="3" placeholder="Descripción comercial o institucional del pie"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">{{ tienda_config.texto_footer_descripcion if tienda_config and tienda_config.texto_footer_descripcion else '' }}</textarea>
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input type="checkbox" name="mostrar_politicas_envio" {% if tienda_config and tienda_config.mostrar_politicas_envio %}checked{% endif %}
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+            Mostrar políticas de envío
+        </label>
+        <input type="text" name="texto_politicas_envio" value="{{ tienda_config.texto_politicas_envio if tienda_config and tienda_config.texto_politicas_envio else '' }}" placeholder="Texto visible de políticas de envío"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+        <input type="url" name="link_politicas_envio" value="{{ tienda_config.link_politicas_envio if tienda_config and tienda_config.link_politicas_envio else '' }}" placeholder="URL opcional de políticas de envío"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input type="checkbox" name="mostrar_politicas_cambios" {% if tienda_config and tienda_config.mostrar_politicas_cambios %}checked{% endif %}
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+            Mostrar cambios o devoluciones
+        </label>
+        <input type="text" name="texto_politicas_cambios" value="{{ tienda_config.texto_politicas_cambios if tienda_config and tienda_config.texto_politicas_cambios else '' }}" placeholder="Texto visible de cambios o devoluciones"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+        <input type="url" name="link_politicas_cambios" value="{{ tienda_config.link_politicas_cambios if tienda_config and tienda_config.link_politicas_cambios else '' }}" placeholder="URL opcional de cambios o devoluciones"
+            class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+    </div>
+</div>

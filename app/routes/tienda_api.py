@@ -45,6 +45,13 @@ from app.services.tienda_gastronomia_catalogo import (
     productos_gastronomia_payload,
 )
 from app.services.tienda_presupuesto import config_publica_tienda, mensaje_whatsapp_producto, tienda_es_gastronomia
+from app.services.tienda_hero import (
+    build_hero_carousel_items,
+    normalize_hero_carousel_animation,
+    normalize_hero_carousel_speed,
+    normalize_hero_visual_type,
+    serialize_hero_product_ids,
+)
 from app.utils.helpers import today_local, parse_iso_date, utc_bounds_for_local_dates
 from app.utils.permisos import requiere_permiso
 from app.utils.tienda_urls import build_category_public_path, build_product_public_path, normalize_store_media_url, slugify_tienda_text
@@ -698,7 +705,9 @@ def get_config(slug: str):
     config = _config_por_slug(slug)
     if not config:
         return jsonify({'error': 'tienda_no_encontrada'}), 404
-    return jsonify(config_publica_tienda(config))
+    payload = config_publica_tienda(config)
+    payload['hero_carrusel_items'] = build_hero_carousel_items(config)
+    return jsonify(payload)
 
 
 @tienda_api_bp.route('/<slug>/categorias', methods=['GET'])
@@ -838,8 +847,11 @@ def get_bootstrap(slug: str):
     if not config:
         return jsonify({'error': 'tienda_no_encontrada'}), 404
 
+    config_payload = config_publica_tienda(config)
+    config_payload['hero_carrusel_items'] = build_hero_carousel_items(config)
+
     return jsonify({
-        'config': config_publica_tienda(config),
+        'config': config_payload,
         'categorias': _categorias_publicas(config),
         'catalogo': _build_productos_payload(config, page=1, per_page=12),
     })
@@ -1148,6 +1160,14 @@ def admin_guardar_config():
         config.subtitulo_hero_tienda = clean_text('subtitulo_hero_tienda')
     if 'texto_boton_hero' in data:
         config.texto_boton_hero = clean_text('texto_boton_hero') or 'Explorar catálogo'
+    if 'hero_visual_tipo' in data:
+        config.hero_visual_tipo = normalize_hero_visual_type(clean_text('hero_visual_tipo'))
+    if 'hero_carrusel_producto_ids' in data:
+        config.hero_carrusel_producto_ids = serialize_hero_product_ids(data.get('hero_carrusel_producto_ids'))
+    if 'hero_carrusel_velocidad_segundos' in data:
+        config.hero_carrusel_velocidad_segundos = normalize_hero_carousel_speed(data.get('hero_carrusel_velocidad_segundos'))
+    if 'hero_carrusel_animacion' in data:
+        config.hero_carrusel_animacion = normalize_hero_carousel_animation(data.get('hero_carrusel_animacion'))
     if 'beneficio_home_1_texto' in data:
         config.beneficio_home_1_texto = clean_text('beneficio_home_1_texto')
     if 'beneficio_home_2_texto' in data:
@@ -1219,6 +1239,9 @@ def admin_guardar_config():
     if 'titulo_relacionados' in data:
         config.titulo_relacionados = clean_text('titulo_relacionados') or 'Productos relacionados'
     config.mostrar_hero_tienda = parse_bool('mostrar_hero_tienda', True)
+    config.mostrar_titulo_hero_tienda = parse_bool('mostrar_titulo_hero_tienda', True)
+    config.mostrar_subtitulo_hero_tienda = parse_bool('mostrar_subtitulo_hero_tienda', True)
+    config.mostrar_boton_hero_tienda = parse_bool('mostrar_boton_hero_tienda', True)
     config.mostrar_bloque_beneficios_home = parse_bool('mostrar_bloque_beneficios_home', False)
     config.mostrar_destacados = parse_bool('mostrar_destacados', True)
     config.mostrar_ofertas = parse_bool('mostrar_ofertas', True)

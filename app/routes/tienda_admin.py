@@ -5,6 +5,7 @@ from app import db
 from app.models import Categoria, Producto, WebBotSesion
 from app.services.ia_backoffice.security import es_usuario_root
 from app.services.tienda_context import buscar_config_tienda_admin, resolver_cliente_gastronomia_tienda, resolver_cliente_tienda
+from app.services.tienda_hero import build_hero_carousel_admin_options
 from app.services.tienda_presupuesto import tienda_es_gastronomia
 from app.services.tienda_promociones import list_admin_promotions, serialize_admin_promotion
 from app.services.web_bot.admin_service import (
@@ -118,6 +119,7 @@ def panel():
         ))
 
     categorias = Categoria.query.order_by(Categoria.nombre.asc()).all()
+    hero_carousel_product_options = build_hero_carousel_admin_options(config, client_scope, es_gastronomia_tienda)
     promociones = []
     if config and config.id_cliente:
         promociones = [
@@ -139,6 +141,7 @@ def panel():
         productos=productos,
         tienda_config=config,
         es_gastronomia_tienda=es_gastronomia_tienda,
+        hero_carousel_product_options=hero_carousel_product_options,
         productos_template='tienda_admin/_panel_productos_gastronomia.html' if es_gastronomia_tienda else 'tienda_admin/_panel_productos.html',
         categorias=categorias,
         promociones=promociones,

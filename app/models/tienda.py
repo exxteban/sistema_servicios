@@ -26,9 +26,16 @@ class TiendaConfig(db.Model):
     telefono_whatsapp = db.Column(db.String(30), nullable=True)
     mensaje_whatsapp = db.Column(db.String(500), nullable=True)
     mostrar_hero_tienda = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
+    mostrar_titulo_hero_tienda = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     titulo_hero_tienda = db.Column(db.String(180), nullable=True)
+    mostrar_subtitulo_hero_tienda = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     subtitulo_hero_tienda = db.Column(db.Text, nullable=True)
+    mostrar_boton_hero_tienda = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     texto_boton_hero = db.Column(db.String(120), nullable=False, default='Explorar catálogo', server_default='Explorar catálogo')
+    hero_visual_tipo = db.Column(db.String(20), nullable=False, default='imagen', server_default='imagen')
+    hero_carrusel_producto_ids = db.Column(db.Text, nullable=True)
+    hero_carrusel_velocidad_segundos = db.Column(db.Integer, nullable=False, default=5, server_default='5')
+    hero_carrusel_animacion = db.Column(db.String(20), nullable=False, default='fade', server_default='fade')
     mostrar_bloque_beneficios_home = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
     beneficio_home_1_texto = db.Column(db.String(255), nullable=True)
     beneficio_home_2_texto = db.Column(db.String(255), nullable=True)
@@ -142,6 +149,20 @@ class TiendaConfig(db.Model):
             if texto
         ]
 
+    def _hero_carousel_product_ids(self):
+        ids = []
+        seen = set()
+        for raw_item in str(self.hero_carrusel_producto_ids or '').replace(';', ',').split(','):
+            try:
+                product_id = int(raw_item.strip())
+            except (TypeError, ValueError):
+                continue
+            if product_id <= 0 or product_id in seen:
+                continue
+            ids.append(product_id)
+            seen.add(product_id)
+        return ids
+
     def to_public_dict(self):
         """Serialización segura para la API pública."""
         return {
@@ -154,9 +175,17 @@ class TiendaConfig(db.Model):
             'mensaje_whatsapp': self.mensaje_whatsapp,
             'mensaje_whatsapp_general': self.mensaje_whatsapp,
             'mostrar_hero_tienda': self.mostrar_hero_tienda,
+            'mostrar_titulo_hero_tienda': self.mostrar_titulo_hero_tienda,
             'titulo_hero_tienda': self.titulo_hero_tienda,
+            'mostrar_subtitulo_hero_tienda': self.mostrar_subtitulo_hero_tienda,
             'subtitulo_hero_tienda': self.subtitulo_hero_tienda,
+            'mostrar_boton_hero_tienda': self.mostrar_boton_hero_tienda,
             'texto_boton_hero': self.texto_boton_hero or 'Explorar catálogo',
+            'hero_visual_tipo': self.hero_visual_tipo or 'imagen',
+            'hero_carrusel_producto_ids': self.hero_carrusel_producto_ids,
+            'hero_carrusel_producto_ids_items': self._hero_carousel_product_ids(),
+            'hero_carrusel_velocidad_segundos': int(self.hero_carrusel_velocidad_segundos or 5),
+            'hero_carrusel_animacion': self.hero_carrusel_animacion or 'fade',
             'mostrar_bloque_beneficios_home': self.mostrar_bloque_beneficios_home,
             'beneficio_home_1_texto': self.beneficio_home_1_texto,
             'beneficio_home_2_texto': self.beneficio_home_2_texto,
