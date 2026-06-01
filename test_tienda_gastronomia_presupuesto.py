@@ -280,6 +280,99 @@ def test_tienda_gastronomia_expone_modificadores_con_foto_y_precio():
             Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
 
 
+def test_tienda_gastronomia_hereda_imagenes_de_menu_para_modificadores_sin_foto():
+    app = create_app('testing')
+    client = app.test_client()
+
+    with app.app_context():
+        Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_GASTRONOMIA)
+        tienda, producto = _crear_tienda_gastronomia(slug='gastro-extras-fallback-test')
+        db.session.add_all([
+            GastronomiaProducto(
+                cliente_id=tienda.id_cliente,
+                categoria_id=producto.categoria_id,
+                nombre='Lechuga repollada',
+                descripcion='Ingrediente base con foto propia.',
+                precio=4000,
+                imagen_url='https://cdn.example.com/lechuga-repollada.webp',
+                disponible=True,
+                visible=True,
+                publicado_tienda=True,
+                activo=True,
+            ),
+            GastronomiaProducto(
+                cliente_id=tienda.id_cliente,
+                categoria_id=producto.categoria_id,
+                nombre='Medallon carne',
+                descripcion='Extra del menu con foto propia.',
+                precio=10000,
+                imagen_url='https://cdn.example.com/medallon-carne.webp',
+                disponible=True,
+                visible=True,
+                publicado_tienda=True,
+                activo=True,
+            ),
+        ])
+        db.session.flush()
+        grupo_removibles = GastronomiaGrupoOpciones(
+            cliente_id=tienda.id_cliente,
+            producto_id=producto.id_producto,
+            nombre='Ingredientes removibles',
+            tipo='ingrediente_removible',
+            max_selecciones=4,
+            visible=True,
+            activo=True,
+        )
+        grupo_adicionales = GastronomiaGrupoOpciones(
+            cliente_id=tienda.id_cliente,
+            producto_id=producto.id_producto,
+            nombre='Adicionales',
+            tipo='extra',
+            max_selecciones=3,
+            visible=True,
+            activo=True,
+        )
+        db.session.add_all([grupo_removibles, grupo_adicionales])
+        db.session.flush()
+        db.session.add_all([
+            GastronomiaOpcionProducto(
+                cliente_id=tienda.id_cliente,
+                grupo_id=grupo_removibles.id_grupo,
+                nombre='Lechuga repollada',
+                precio_delta=0,
+                imagen_url=None,
+                disponible=True,
+                visible=True,
+                activo=True,
+            ),
+            GastronomiaOpcionProducto(
+                cliente_id=tienda.id_cliente,
+                grupo_id=grupo_adicionales.id_grupo,
+                nombre='Medallon carne extra',
+                precio_delta=10000,
+                imagen_url=None,
+                disponible=True,
+                visible=True,
+                activo=True,
+            ),
+        ])
+        db.session.commit()
+        slug = tienda.slug
+        producto_id = producto.id_producto
+
+    try:
+        response = client.get(f'/api/tienda/{slug}/producto/{producto_id}')
+        assert response.status_code == 200
+        data = response.get_json()
+        grupo_removibles = next(grupo for grupo in data['grupos_opciones'] if grupo['tipo'] == 'ingrediente_removible')
+        grupo_adicionales = next(grupo for grupo in data['grupos_opciones'] if grupo['nombre'] == 'Adicionales')
+        assert grupo_removibles['opciones'][0]['imagen_url'] == 'https://cdn.example.com/lechuga-repollada.webp'
+        assert grupo_adicionales['opciones'][0]['imagen_url'] == 'https://cdn.example.com/medallon-carne.webp'
+    finally:
+        with app.app_context():
+            Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
+
+
 def test_panel_tienda_gastronomia_muestra_menu_y_permite_guardar_config():
     app = create_app('testing')
     app.config['WTF_CSRF_ENABLED'] = False

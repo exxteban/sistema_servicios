@@ -253,6 +253,7 @@ def _producto_tiene_opciones(producto: GastronomiaProducto) -> bool:
 
 
 def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
+    imagenes_menu = _imagenes_publicas_menu_por_nombre(producto.cliente_id)
     grupos = (
         producto.grupos_opciones
         .filter_by(activo=True, visible=True)
@@ -261,7 +262,7 @@ def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
     resultado = []
     for grupo in grupos.all():
         opciones = [
-            _normalizar_opcion(opcion.to_dict())
+            _normalizar_opcion(opcion.to_dict(), imagenes_menu)
             for opcion in grupo.opciones_ordenadas()
             if opcion.visible and opcion.disponible
         ]
@@ -273,10 +274,85 @@ def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
     return resultado
 
 
-def _normalizar_opcion(opcion: dict) -> dict:
-    if 'imagen_url' in opcion:
-        opcion['imagen_url'] = normalize_store_media_url(opcion.get('imagen_url'))
+def _normalizar_opcion(opcion: dict, imagenes_menu: dict[str, str] | None = None) -> dict:
+    imagen_normalizada = normalize_store_media_url(opcion.get('imagen_url')) if 'imagen_url' in opcion else ''
+    if imagen_normalizada:
+        opcion['imagen_url'] = imagen_normalizada
+        return opcion
+    opcion['imagen_url'] = _resolver_imagen_opcion_desde_menu(opcion.get('nombre'), imagenes_menu or {})
     return opcion
+
+
+def _imagenes_publicas_menu_por_nombre(cliente_id: int) -> dict[str, str]:
+    productos = (
+        GastronomiaProducto.query
+        .filter(
+            GastronomiaProducto.cliente_id == int(cliente_id),
+            GastronomiaProducto.activo.is_(True),
+            GastronomiaProducto.visible.is_(True),
+            GastronomiaProducto.publicado_tienda.is_(True),
+            GastronomiaProducto.disponible.is_(True),
+        )
+        .all()
+    )
+    imagenes = {}
+    for item in productos:
+        clave = _normalizar_nombre_modificador(item.nombre)
+        imagen = normalize_store_media_url(item.imagen_url)
+        if clave and imagen and clave not in imagenes:
+            imagenes[clave] = imagen
+    return imagenes
+
+
+def _resolver_imagen_opcion_desde_menu(nombre_opcion: str | None, imagenes_menu: dict[str, str]) -> str:
+    if not imagenes_menu:
+        return ''
+
+    for clave in _claves_busqueda_modificador(nombre_opcion):
+        imagen = imagenes_menu.get(clave)
+        if imagen:
+            return imagen
+
+    for clave in _claves_busqueda_modificador(nombre_opcion):
+        coincidencias = {
+            imagen
+            for nombre_producto, imagen in imagenes_menu.items()
+            if nombre_producto.startswith(f'{clave}-') or clave.startswith(f'{nombre_producto}-')
+        }
+        if len(coincidencias) == 1:
+            return coincidencias.pop()
+    return ''
+
+
+def _claves_busqueda_modificador(nombre: str | None) -> list[str]:
+    clave = _normalizar_nombre_modificador(nombre)
+    if not clave:
+        return []
+
+    claves = [clave]
+    tokens = [token for token in clave.split('-') if token]
+    tokens_filtrados = [token for token in tokens if token not in {
+        'sin',
+        'extra',
+        'extras',
+        'adicional',
+        'adicionales',
+        'agregado',
+        'agregados',
+        'removible',
+        'removibles',
+    }]
+    if tokens_filtrados:
+        claves.append('-'.join(tokens_filtrados))
+    if len(tokens) > 1 and tokens[0] == 'sin':
+        claves.append('-'.join(tokens[1:]))
+    if len(tokens) > 1 and tokens[-1] in {'extra', 'extras', 'adicional', 'adicionales'}:
+        claves.append('-'.join(tokens[:-1]))
+    return [item for index, item in enumerate(claves) if item and item not in claves[:index]]
+
+
+def _normalizar_nombre_modificador(nombre: str | None) -> str:
+    return slugify_tienda_text(nombre, fallback='')
 
 
 def _build_whatsapp_link(producto: GastronomiaProducto, config: TiendaConfig) -> str | None:
