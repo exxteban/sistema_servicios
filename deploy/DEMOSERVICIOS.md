@@ -1,5 +1,5 @@
 # Deploy Demo Servicios
-
+git clone -b lionsburguer --single-branch https://github.com/exxteban/sistema_servicios.git lionsburguer
 Datos fijos del demo:
 
 - Dominio: `demoservicios.pysystems.online`

@@ -70,13 +70,9 @@ def _render_pos_interface(sesion=None, solo_registro_vendedor=False):
         }]
         vendedor_default_id = int(current_user.id_usuario)
 
-    efectivo = next(
-        (
-            m for m in metodos_pago
-            if (m.nombre or '').strip().lower() == 'efectivo'
-        ),
-        None
-    )
+    from app.services.caja_metodos import obtener_metodo_efectivo
+
+    efectivo = obtener_metodo_efectivo(metodos_pago, solo_activos=True)
     fallback_metodo = metodos_pago[0] if metodos_pago else None
     efectivo_id = int(getattr((efectivo or fallback_metodo), 'id_metodo_pago', 1) or 1)
     efectivo_nombre = str(getattr((efectivo or fallback_metodo), 'nombre', 'Efectivo') or 'Efectivo')

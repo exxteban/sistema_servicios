@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from app import create_app, db
 from app.models import Cliente, Configuracion, MetodoPago, SesionCaja, Usuario
+from app.services.caja_metodos import CLAVE_METODO_EFECTIVO_ID
 from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO, CLAVE_VENTAS_CREDITO_METODO_PAGO_ID
 from cobranzas.services.cuotas_service import estimar_resumen_plan_credito
 
@@ -188,9 +189,13 @@ const trasExceso = app.pagos.map(pago => ({ nombre: pago.nombre, monto: pago.mon
 app.pagos[1].monto = 0;
 app.manejarInputMontoPago(1);
 const trasBorrar = app.pagos.map(pago => ({ nombre: pago.nombre, monto: pago.monto, auto: pago.auto === true }));
+app.pagos[0].monto = 100;
+app.manejarInputMontoPago(0);
+const trasVueltoEfectivo = app.pagos.map(pago => ({ nombre: pago.nombre, monto: pago.monto, auto: pago.auto === true }));
 process.stdout.write(JSON.stringify({
   trasExceso,
   trasBorrar,
+  trasVueltoEfectivo,
   totalPagado: app.totalPagado,
   saldoPendiente: app.saldoPendiente,
   vuelto: app.vuelto,
@@ -387,10 +392,41 @@ def test_pos_limita_monto_en_pago_mixto_y_conserva_filas_al_borrar():
     assert pagos_borrar['Efectivo'] == 65.0
     assert len(resultado['trasBorrar']) == 2
 
-    assert round(float(resultado['totalPagado']), 2) == 65.0
+    pagos_vuelto = {pago['nombre']: round(float(pago['monto']), 2) for pago in resultado['trasVueltoEfectivo']}
+    assert pagos_vuelto['Efectivo'] == 100.0
+    assert pagos_vuelto['Tarjeta de Crédito'] == 0.0
+
+    assert round(float(resultado['totalPagado']), 2) == 100.0
     assert round(float(resultado['saldoPendiente']), 2) == 0.0
-    assert round(float(resultado['vuelto']), 2) == 0.0
+    assert round(float(resultado['vuelto']), 2) == 35.0
     assert any('supera lo pendiente' in (item['mensaje'] or '').lower() for item in resultado['notificaciones'])
+
+
+def test_pos_usa_metodo_efectivo_configurado_aunque_nombre_no_sea_exacto():
+    app = create_app('testing')
+    client = app.test_client()
+    _loguear_admin(client, app)
+
+    with app.app_context():
+        _abrir_caja_admin()
+        metodo = MetodoPago(
+            nombre='Caja Principal',
+            requiere_referencia=False,
+            activo=True,
+            orden_display=99,
+        )
+        db.session.add(metodo)
+        db.session.flush()
+        metodo_id = int(metodo.id_metodo_pago)
+        Configuracion.establecer(CLAVE_METODO_EFECTIVO_ID, str(metodo_id))
+        db.session.commit()
+
+    response = client.get('/ventas/pos')
+
+    assert response.status_code == 200
+    script_pos = _extraer_script_pos(response.get_data(as_text=True))
+    assert f'const efectivoId = {metodo_id};' in script_pos
+    assert f'id_metodo_pago: {metodo_id},' in script_pos
 
 
 def test_pos_mantiene_credito_si_metodo_fue_renombrado_pero_sigue_configurado_por_id():

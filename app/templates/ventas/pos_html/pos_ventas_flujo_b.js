@@ -221,6 +221,11 @@
                 if (!Array.isArray(this.pagos) || !this.pagos[index] || this.pagos[index].es_credito) {
                     return total;
                 }
+                const efectivoId = {{ (efectivo_id if efectivo_id is defined else 1) }};
+                const pagoActual = this.pagos[index] || {};
+                if (parseInt(pagoActual.id_metodo_pago) === efectivoId) {
+                    return Number.POSITIVE_INFINITY;
+                }
                 let totalManualOtros = 0;
                 for (let i = 0; i < this.pagos.length; i++) {
                     if (i === index) continue;
@@ -236,7 +241,7 @@
                 const ultimo = Number(this.ultimoAvisoExcesoPagoMixtoAt || 0);
                 if (ahora - ultimo < 900) return;
                 this.ultimoAvisoExcesoPagoMixtoAt = ahora;
-                mostrarNotificacion('Ese monto supera lo pendiente. En pagos mixtos solo puedes completar el total exacto.', 'warning');
+                mostrarNotificacion('Ese monto supera lo pendiente. Solo el efectivo puede superar el total para calcular vuelto.', 'warning');
             },
 
             manejarInputMontoPago(index) {
@@ -489,28 +494,11 @@
     }, 0);
             },
 
-    _totalNoEfectivoPagado() {
-        const efectivoId = {{ (efectivo_id if efectivo_id is defined else 1) }};
-        return this.pagos.reduce((sum, pago) => {
-            try {
-                if (parseInt(pago.id_metodo_pago) !== efectivoId) {
-                    return sum + (parseFloat(pago.monto) || 0);
-                }
-            } catch (e) { }
-            return sum;
-        }, 0);
-    },
-
     _validarVueltoAntesDeProcesar() {
         const tolerancia = 0.0001;
         const vuelto = parseFloat(this.vuelto) || 0;
         if (vuelto <= tolerancia) return true;
         const efectivoPagado = this._efectivoPagado();
-        const totalNoEfectivo = this._totalNoEfectivoPagado();
-        if (totalNoEfectivo > tolerancia) {
-            mostrarNotificacion('Con pagos mixtos no se admite vuelto. Ajusta los montos para que coincidan con el total.', 'warning');
-            return false;
-        }
         if (efectivoPagado <= tolerancia) {
             mostrarNotificacion('El vuelto solo es válido con pago en efectivo.', 'warning');
             return false;

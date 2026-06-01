@@ -749,8 +749,8 @@ class TestVentasContadoRegresion(unittest.TestCase):
         self.assertAlmostEqual(float(movimientos[1].monto or 0), 25000.0)
         self.assertAlmostEqual(float(self.sesion.calcular_total_efectivo() or 0), 575000.0)
 
-    def test_venta_contado_rechaza_vuelto_con_pago_mixto(self):
-        from app.models import MovimientoCaja, Venta
+    def test_venta_contado_admite_vuelto_mixto_si_exceso_es_efectivo(self):
+        from app.models import MovimientoCaja, PagoVenta
 
         producto = self._crear_producto_simple('TEST-CONTADO-VUELTO-MIXTO-001', 120000)
         resp = self._procesar_venta(
@@ -768,14 +768,46 @@ class TestVentasContadoRegresion(unittest.TestCase):
             'venta-contado-vuelto-mixto-001',
         )
 
+        self.assertEqual(resp.status_code, 200, resp.get_json())
+        data = resp.get_json() or {}
+        self.assertTrue(data.get('success'))
+        self.assertAlmostEqual(float(data.get('vuelto') or 0), 15000.0)
+        venta_id = int(data['id_venta'])
+
+        pagos = PagoVenta.query.filter_by(id_venta=venta_id).order_by(PagoVenta.id_pago.asc()).all()
+        self.assertEqual(len(pagos), 2)
+        self.assertAlmostEqual(sum(float(p.monto or 0) for p in pagos), 135000.0)
+
+        movimientos = (
+            MovimientoCaja.query
+            .filter_by(id_sesion_caja=self.sesion.id_sesion, referencia_id=venta_id)
+            .order_by(MovimientoCaja.id_movimiento_caja.asc())
+            .all()
+        )
+        self.assertEqual([mov.tipo for mov in movimientos], ['ingreso', 'egreso'])
+        self.assertEqual([mov.referencia_tipo for mov in movimientos], ['venta', 'vuelto'])
+        self.assertAlmostEqual(float(movimientos[0].monto or 0), 120000.0)
+        self.assertAlmostEqual(float(movimientos[1].monto or 0), 15000.0)
+        self.assertAlmostEqual(float(self.sesion.calcular_total_efectivo() or 0), 605000.0)
+
+    def test_venta_contado_rechaza_vuelto_sin_efectivo(self):
+        from app.models import MovimientoCaja, Venta
+
+        producto = self._crear_producto_simple('TEST-CONTADO-VUELTO-NO-EFECTIVO-001', 120000)
+        resp = self._procesar_venta(
+            producto,
+            [{
+                'id_metodo_pago': int(self.metodo_no_efectivo.id_metodo_pago),
+                'monto': 135000,
+            }],
+            'venta-contado-vuelto-no-efectivo-001',
+        )
+
         self.assertEqual(resp.status_code, 400)
         data = resp.get_json() or {}
-        self.assertIn('pagos mixtos', (data.get('error') or '').lower())
-        self.assertIsNone(Venta.query.filter_by(client_request_id='venta-contado-vuelto-mixto-001').first())
-        self.assertEqual(
-            MovimientoCaja.query.filter_by(id_sesion_caja=self.sesion.id_sesion).count(),
-            0,
-        )
+        self.assertIn('efectivo', (data.get('error') or '').lower())
+        self.assertIsNone(Venta.query.filter_by(client_request_id='venta-contado-vuelto-no-efectivo-001').first())
+        self.assertEqual(MovimientoCaja.query.filter_by(id_sesion_caja=self.sesion.id_sesion).count(), 0)
 
     def test_venta_contado_no_efectivo_no_genera_movimiento_caja(self):
         from app.models import MovimientoCaja, PagoVenta

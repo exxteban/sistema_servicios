@@ -491,17 +491,12 @@ def _registrar_pagos_y_movimientos_venta(venta, sesion, pagos, pagos_normalizado
         vuelto = Decimal('0')
     if vuelto > 0:
         efectivo_pagado = Decimal('0')
-        no_efectivo_pagado = Decimal('0')
         for pago in pagos_normalizados:
             try:
                 if int(pago['id_metodo_pago']) in ids_metodo_efectivo:
                     efectivo_pagado += pago['monto']
-                else:
-                    no_efectivo_pagado += pago['monto']
             except Exception:
                 continue
-        if no_efectivo_pagado > precision_tolerancia:
-            return None, ({'error': 'Con pagos mixtos no se admite vuelto. Ajuste los montos para que coincidan con el total'}, 400)
         if efectivo_pagado <= precision_tolerancia:
             return None, ({'error': 'El vuelto solo es v?lido con pago en efectivo'}, 400)
         if efectivo_pagado + precision_tolerancia < vuelto:

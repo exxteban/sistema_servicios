@@ -455,8 +455,8 @@ class TestCajaReparacion(unittest.TestCase):
         self.assertEqual(int(venta.id_reparacion), reparacion.id_reparacion)
         self.assertAlmostEqual(float(venta.total or 0), 75000.0)
 
-    def test_procesar_reparacion_directa_rechaza_vuelto_en_pago_mixto(self):
-        from app.models import DetalleReparacion, MetodoPago
+    def test_procesar_reparacion_directa_admite_vuelto_mixto_si_exceso_es_efectivo(self):
+        from app.models import DetalleReparacion, MetodoPago, MovimientoCaja
 
         reparacion = self._crear_reparacion(costo_final=0, abono=0)
         producto = self._crear_producto_simple(codigo='TEST-REP-VUELTO', precio=20000)
@@ -505,9 +505,21 @@ class TestCajaReparacion(unittest.TestCase):
         }
 
         resp = self.client.post('/ventas/procesar', json=payload)
-        self.assertEqual(resp.status_code, 400, resp.get_json())
+        self.assertEqual(resp.status_code, 200, resp.get_json())
         data = resp.get_json() or {}
-        self.assertIn('pagos mixtos', (data.get('error') or '').lower())
+        self.assertTrue(data.get('success'))
+        self.assertAlmostEqual(float(data.get('vuelto') or 0), 5000.0)
+
+        movimientos = (
+            MovimientoCaja.query
+            .filter_by(referencia_id=int(data['id_venta']))
+            .order_by(MovimientoCaja.id_movimiento_caja.asc())
+            .all()
+        )
+        self.assertEqual([mov.tipo for mov in movimientos], ['ingreso', 'egreso'])
+        self.assertEqual([mov.referencia_tipo for mov in movimientos], ['venta', 'vuelto'])
+        self.assertAlmostEqual(float(movimientos[0].monto or 0), 10000.0)
+        self.assertAlmostEqual(float(movimientos[1].monto or 0), 5000.0)
 
     def test_cobrar_pendiente_venta_desde_pos_usa_snapshot_guardado(self):
         from app.models import ColaCobro, DetalleVenta, Venta
