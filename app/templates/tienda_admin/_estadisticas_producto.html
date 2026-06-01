@@ -196,7 +196,15 @@ function manejarCambioFechasEstadisticasProducto() {
 function construirQueryEstadisticasProducto() {
     const { from, to } = obtenerControlesEstadisticasProducto();
     const params = new URLSearchParams();
+    const configForm = document.getElementById('formConfiguracion');
+    const idConfig = configForm?.elements?.id_config?.value || '';
+    const slugActual = configForm?.elements?.slug_actual?.value || '';
     params.set('range', window.tiendaStatsState.range);
+    if (idConfig) {
+        params.set('id_config', idConfig);
+    } else if (slugActual) {
+        params.set('slug_actual', slugActual);
+    }
 
     if (window.tiendaStatsState.range === 'day') {
         params.set('fecha', from.value || to.value);

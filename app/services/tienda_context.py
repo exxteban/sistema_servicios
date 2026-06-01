@@ -44,6 +44,15 @@ def resolver_cliente_tienda(data: dict | None = None, *, crear_si_falta: bool = 
     return None
 
 
+def resolver_cliente_tienda_explicito(data: dict | None = None) -> int | None:
+    usuario_cliente_id = _id_cliente_usuario()
+    if usuario_cliente_id:
+        return usuario_cliente_id
+
+    config = _config_desde_data(data or {})
+    return int(config.id_cliente) if config else None
+
+
 def buscar_config_tienda_admin(data: dict | None = None, id_cliente: int | None = None) -> TiendaConfig | None:
     config = _config_desde_data(data or {})
     if config:

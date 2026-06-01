@@ -332,7 +332,7 @@ def test_sprint8_consumo_diario_se_renderiza_en_chat_y_panel_admin_es_root_only(
     html = response.get_data(as_text=True)
     assert 'ia-chat-usage' in html
     assert 'Consumo diario IA' in html
-    assert 'caja y fidelizacion' in html
+    assert 'caja y fidelización' in html
     assert 'ia-consumo-panel' not in html
     assert 'admin.js' not in html
     assert 'Panel IA' not in html
@@ -354,7 +354,7 @@ def test_sprint8_consumo_diario_se_renderiza_en_chat_y_panel_admin_es_root_only(
     html = response.get_data(as_text=True)
     assert 'ia-chat-usage' in html
     assert 'Consumo diario IA' in html
-    assert 'caja y fidelizacion' in html
+    assert 'caja y fidelización' in html
     assert 'ia-consumo-panel' not in html
     assert 'admin.js' not in html
     assert 'Panel IA' in html

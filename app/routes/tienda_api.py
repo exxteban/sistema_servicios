@@ -36,7 +36,7 @@ from app.services.tienda_promociones import (
     get_active_product_promotion_map,
     get_active_promotions_for_store,
 )
-from app.services.tienda_context import buscar_config_tienda_admin, resolver_cliente_tienda
+from app.services.tienda_context import buscar_config_tienda_admin, resolver_cliente_tienda, resolver_cliente_tienda_explicito
 from app.services.tienda_scope import public_category_query, public_product_query, store_product_scope_filter
 from app.services.tienda_estadisticas import obtener_resumen_estadisticas_tienda
 from app.services.tienda_gastronomia_catalogo import (
@@ -212,7 +212,9 @@ def _obtener_relacionados_inteligentes(p: Producto, config: TiendaConfig, limit:
     return relacionados + fallback
 
 
-def _resolver_id_cliente_actual(data: dict | None = None) -> int | None:
+def _resolver_id_cliente_actual(data: dict | None = None, *, exigir_explicito: bool = False) -> int | None:
+    if exigir_explicito:
+        return resolver_cliente_tienda_explicito(data)
     return resolver_cliente_tienda(data)
 
 
@@ -1032,7 +1034,7 @@ def admin_toggle_publicar(id_producto: int):
 @requiere_permiso('ver_reportes')
 def admin_producto_estadisticas(id_producto: int):
     producto = Producto.query.get_or_404(id_producto)
-    id_cliente = _resolver_id_cliente_actual()
+    id_cliente = _resolver_id_cliente_actual(request.args, exigir_explicito=True)
     if not id_cliente:
         return jsonify({'error': 'cliente_no_encontrado'}), 404
 
@@ -1046,7 +1048,7 @@ def admin_producto_estadisticas(id_producto: int):
 @requiere_permiso('ver_reportes')
 def admin_producto_estadisticas_export(id_producto: int):
     producto = Producto.query.get_or_404(id_producto)
-    id_cliente = _resolver_id_cliente_actual()
+    id_cliente = _resolver_id_cliente_actual(request.args, exigir_explicito=True)
     if not id_cliente:
         return jsonify({'error': 'cliente_no_encontrado'}), 404
 
@@ -1063,7 +1065,7 @@ def admin_producto_estadisticas_export(id_producto: int):
 @login_required
 @requiere_permiso('ver_reportes')
 def admin_estadisticas_productos_mas_vistos():
-    id_cliente = _resolver_id_cliente_actual()
+    id_cliente = _resolver_id_cliente_actual(request.args, exigir_explicito=True)
     if not id_cliente:
         return jsonify({'error': 'cliente_no_encontrado'}), 404
 

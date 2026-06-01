@@ -52,7 +52,7 @@
              data-limit="{{ consumo_diario.limite }}"
              data-remaining="{{ consumo_diario.restante if consumo_diario.restante is not none else '' }}">
             <i class="fas fa-gauge-high ia-usage-strip-icon" aria-hidden="true"></i>
-            <span class="ia-usage-strip-label">Consumo diario</span>
+            <span class="ia-usage-strip-label">Consumo diario IA</span>
             <div class="ia-usage-strip-track" aria-hidden="true">
                 <div id="ia-chat-usage-bar"
                      class="ia-usage-strip-fill {% if consumo_diario.porcentaje >= 90 %}ia-usage-strip-fill--danger{% elif consumo_diario.porcentaje >= 70 %}ia-usage-strip-fill--warn{% endif %}"

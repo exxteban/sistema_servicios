@@ -78,7 +78,7 @@ class TestDashboardAgendaResumen(unittest.TestCase):
         db.session.commit()
         return actividad
 
-    def test_resumen_agenda_consolida_metricas_en_dos_selects(self):
+    def test_resumen_agenda_consolida_metricas_y_turnero_en_tres_selects(self):
         start_utc, end_utc = utc_bounds_for_local_dates(self.today, self.today)
         vencida = self._crear_actividad('Vencida', start_utc - timedelta(hours=2))
         hoy_primera = self._crear_actividad('Hoy 1', start_utc + timedelta(hours=1))
@@ -102,7 +102,7 @@ class TestDashboardAgendaResumen(unittest.TestCase):
             statement for statement in statements
             if 'agenda_actividades' in (statement or '').lower()
         ]
-        self.assertEqual(len(agenda_statements), 2)
+        self.assertEqual(len(agenda_statements), 3)
         self.assertTrue(any('sum(case' in statement.lower() for statement in agenda_statements))
         self.assertTrue(any('order by' in statement.lower() for statement in agenda_statements))
         self.assertNotIn(

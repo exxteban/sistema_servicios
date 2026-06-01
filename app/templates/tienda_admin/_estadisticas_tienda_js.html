@@ -83,11 +83,19 @@ function actualizarFechasEstadisticasTienda(range) {
 function construirQueryEstadisticasTienda() {
     const { from, to, category } = obtenerControlesEstadisticasTienda();
     const params = new URLSearchParams();
+    const configForm = document.getElementById('formConfiguracion');
+    const idConfig = configForm?.elements?.id_config?.value || '';
+    const slugActual = configForm?.elements?.slug_actual?.value || '';
     params.set('range', tiendaDashboardStatsState.range);
     params.set('desde', from.value);
     params.set('hasta', to.value);
     params.set('page', String(tiendaDashboardStatsState.page));
     params.set('per_page', String(tiendaDashboardStatsState.perPage));
+    if (idConfig) {
+        params.set('id_config', idConfig);
+    } else if (slugActual) {
+        params.set('slug_actual', slugActual);
+    }
     if (category.value) {
         params.set('categoria_id', category.value);
     }
