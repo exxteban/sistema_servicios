@@ -8,7 +8,7 @@ from flask import Blueprint, current_app, make_response, request, send_from_dire
 from app.models.producto import Categoria, Producto
 from app.models.tienda import TiendaConfig
 from app.services.tienda_scope import find_public_category_by_slug, public_category_query, public_product_query
-from app.utils.tienda_urls import build_category_public_path, build_product_public_path
+from app.utils.tienda_urls import build_category_public_path, build_product_public_path, normalize_store_media_url
 
 tienda_public_bp = Blueprint('tienda_public', __name__)
 
@@ -106,7 +106,7 @@ def _base_store_path(slug: str) -> str:
 
 
 def _absolute_url(value: str | None) -> str:
-    raw_value = (value or '').strip()
+    raw_value = normalize_store_media_url(value)
     if not raw_value:
         return ''
     if re.match(r'^https?://', raw_value, re.IGNORECASE):

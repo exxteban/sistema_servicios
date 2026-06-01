@@ -14,8 +14,8 @@ function uniqueValues(values) {
 }
 
 function getAssetOrigin() {
-  if (configuredBaseURL) {
-    return new URL(configuredBaseURL, window.location.origin).origin
+  if (baseURL) {
+    return new URL(baseURL, window.location.origin).origin
   }
 
   if (import.meta.env.DEV) {
@@ -25,10 +25,40 @@ function getAssetOrigin() {
   return window.location.origin
 }
 
+function localMediaPath(value) {
+  const normalizedValue = typeof value === 'string' ? value.trim().replace(/\\/g, '/') : ''
+  if (!normalizedValue) return ''
+
+  const lowerNormalized = normalizedValue.toLowerCase()
+  const mediaSegment = '/api/tienda/media/'
+  const mediaIndex = lowerNormalized.indexOf(mediaSegment)
+  if (mediaIndex >= 0) {
+    return `/api/tienda/media/${normalizedValue.slice(mediaIndex + mediaSegment.length).replace(/^\/+/, '')}`
+  }
+
+  const staticUploadSegment = 'static/tienda_uploads/'
+  const staticUploadIndex = lowerNormalized.indexOf(staticUploadSegment)
+  if (staticUploadIndex >= 0) {
+    return `/api/tienda/media/${normalizedValue.slice(staticUploadIndex + staticUploadSegment.length).replace(/^\/+/, '')}`
+  }
+
+  const uploadSegment = 'tienda_uploads/'
+  const uploadIndex = lowerNormalized.indexOf(uploadSegment)
+  if (uploadIndex >= 0) {
+    return `/api/tienda/media/${normalizedValue.slice(uploadIndex + uploadSegment.length).replace(/^\/+/, '')}`
+  }
+
+  return ''
+}
+
 function resolveMediaUrl(value) {
   const rawValue = typeof value === 'string' ? value.trim() : ''
   if (!rawValue) return rawValue
   const normalizedValue = rawValue.replace(/\\/g, '/')
+  const localPath = localMediaPath(normalizedValue)
+  if (localPath) {
+    return import.meta.env.DEV ? new URL(localPath, `${getAssetOrigin()}/`).toString() : localPath
+  }
   if (/^(?:[a-z]+:)?\/\//i.test(normalizedValue) || /^(data:|blob:|mailto:|tel:)/i.test(normalizedValue)) {
     return normalizedValue
   }
@@ -54,6 +84,14 @@ function resolveMediaCandidates(value) {
   const candidates = []
   const pushCandidate = (candidate) => {
     if (!candidate) return
+    const localPath = localMediaPath(candidate)
+    if (localPath) {
+      candidates.push(import.meta.env.DEV ? new URL(localPath, `${getAssetOrigin()}/`).toString() : localPath)
+      if (!import.meta.env.DEV) {
+        candidates.push(new URL(localPath, `${getAssetOrigin()}/`).toString())
+      }
+      return
+    }
     if (/^(?:[a-z]+:)?\/\//i.test(candidate) || /^(data:|blob:|mailto:|tel:)/i.test(candidate)) {
       candidates.push(candidate)
       return

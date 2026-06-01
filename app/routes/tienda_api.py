@@ -47,7 +47,7 @@ from app.services.tienda_gastronomia_catalogo import (
 from app.services.tienda_presupuesto import config_publica_tienda, mensaje_whatsapp_producto, tienda_es_gastronomia
 from app.utils.helpers import today_local, parse_iso_date, utc_bounds_for_local_dates
 from app.utils.permisos import requiere_permiso
-from app.utils.tienda_urls import build_category_public_path, build_product_public_path, slugify_tienda_text
+from app.utils.tienda_urls import build_category_public_path, build_product_public_path, normalize_store_media_url, slugify_tienda_text
 
 try:
     from openpyxl import Workbook
@@ -505,27 +505,7 @@ def _render_whatsapp_message(template: str | None, producto: Producto) -> str:
 
 
 def _normalizar_url_media_tienda(url: str | None) -> str:
-    valor = (url or '').strip()
-    if not valor:
-        return ''
-    valor = valor.replace('\\', '/')
-    if re.match(r'^(?:[a-z]+:)?//', valor, flags=re.IGNORECASE) or valor.startswith(('data:', 'blob:')):
-        return valor
-    match_static = re.search(r'(?:^|/)(static/.*)$', valor, flags=re.IGNORECASE)
-    if match_static:
-        static_rel_path = match_static.group(1).lstrip('/')
-        static_rel_path_l = static_rel_path.lower()
-        marker_static = 'static/tienda_uploads/'
-        if marker_static in static_rel_path_l:
-            idx = static_rel_path_l.index(marker_static) + len(marker_static)
-            return f"/api/tienda/media/{static_rel_path[idx:].lstrip('/')}"
-        return f"/{static_rel_path}"
-    lower_valor = valor.lower()
-    marker = 'tienda_uploads/'
-    if marker in lower_valor:
-        idx = lower_valor.index(marker) + len(marker)
-        return f"/api/tienda/media/{valor[idx:].lstrip('/')}"
-    return valor if valor.startswith('/') else f'/{valor}'
+    return normalize_store_media_url(url)
 
 
 def _resolver_ruta_media_tienda(url: str | None) -> str | None:

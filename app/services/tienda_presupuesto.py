@@ -2,6 +2,7 @@
 
 from app.models.tienda import TiendaConfig
 from app.models.producto import Producto
+from app.utils.tienda_urls import normalize_store_media_url
 from gastronomia.services.modo_operacion import gastronomia_activa_para_cliente
 
 
@@ -27,6 +28,8 @@ def tienda_es_gastronomia(config: TiendaConfig | None) -> bool:
 
 def config_publica_tienda(config: TiendaConfig) -> dict:
     data = config.to_public_dict()
+    data['logo_url'] = normalize_store_media_url(data.get('logo_url'))
+    data['imagen_portada'] = normalize_store_media_url(data.get('imagen_portada'))
     es_gastronomia = tienda_es_gastronomia(config)
     data['es_gastronomia'] = es_gastronomia
 

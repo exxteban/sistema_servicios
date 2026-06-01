@@ -12,7 +12,7 @@ from app.services.tienda_promociones import (
     get_active_gastronomia_product_promotion_map,
 )
 from app.services.tienda_context import resolver_cliente_gastronomia_tienda
-from app.utils.tienda_urls import build_category_public_path, build_product_public_path, slugify_tienda_text
+from app.utils.tienda_urls import build_category_public_path, build_product_public_path, normalize_store_media_url, slugify_tienda_text
 from gastronomia.models import GastronomiaCategoria, GastronomiaGrupoOpciones, GastronomiaOpcionProducto, GastronomiaProducto
 from app.services.tienda_presupuesto import mensaje_whatsapp_producto
 
@@ -225,11 +225,12 @@ def _serializar_producto_card(producto: GastronomiaProducto, config: TiendaConfi
 def _imagenes_producto(producto: GastronomiaProducto) -> list[dict]:
     if not producto.imagen_url:
         return []
+    image_url = normalize_store_media_url(producto.imagen_url)
     return [{
         'id_imagen': None,
-        'url': producto.imagen_url,
-        'card_url': producto.imagen_url,
-        'thumbnail_url': producto.imagen_url,
+        'url': image_url,
+        'card_url': image_url,
+        'thumbnail_url': image_url,
         'orden': 0,
         'width': None,
         'height': None,
@@ -260,7 +261,7 @@ def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
     resultado = []
     for grupo in grupos.all():
         opciones = [
-            opcion.to_dict()
+            _normalizar_opcion(opcion.to_dict())
             for opcion in grupo.opciones_ordenadas()
             if opcion.visible and opcion.disponible
         ]
@@ -270,6 +271,12 @@ def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
         data['opciones'] = opciones
         resultado.append(data)
     return resultado
+
+
+def _normalizar_opcion(opcion: dict) -> dict:
+    if 'imagen_url' in opcion:
+        opcion['imagen_url'] = normalize_store_media_url(opcion.get('imagen_url'))
+    return opcion
 
 
 def _build_whatsapp_link(producto: GastronomiaProducto, config: TiendaConfig) -> str | None:
