@@ -164,11 +164,48 @@ document.getElementById('color_primario')?.addEventListener('input', function(e)
     document.getElementById('color_hex').textContent = e.target.value;
 });
 
+const TIENDA_IMAGENES_EXT_PERMITIDAS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+const TIENDA_IMAGENES_MIME_PERMITIDOS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+function obtenerExtensionArchivo(nombre = '') {
+    const partes = String(nombre).split('.');
+    if (partes.length < 2) return '';
+    return partes.pop().trim().toLowerCase();
+}
+
+function validarArchivoImagenTienda(file) {
+    if (!file) {
+        return { ok: true };
+    }
+
+    const extension = obtenerExtensionArchivo(file.name);
+    const extensionValida = TIENDA_IMAGENES_EXT_PERMITIDAS.includes(extension);
+    const mimeVacio = !file.type;
+    const mimeValido = mimeVacio || TIENDA_IMAGENES_MIME_PERMITIDOS.includes(file.type);
+
+    if (!extensionValida || !mimeValido) {
+        return {
+            ok: false,
+            error: 'Solo se permiten imágenes PNG, JPG, JPEG, WEBP o GIF.'
+        };
+    }
+
+    return { ok: true };
+}
+
 function actualizarNombreArchivo(input) {
     const targetId = input.dataset.target || 'nombre_archivo_portada';
     const p = document.getElementById(targetId);
     if (!p) return;
     if (input.files && input.files[0]) {
+        const validacion = validarArchivoImagenTienda(input.files[0]);
+        if (!validacion.ok) {
+            alert(validacion.error);
+            input.value = '';
+            p.textContent = '';
+            p.classList.add('hidden');
+            return;
+        }
         p.textContent = 'Archivo seleccionado: ' + input.files[0].name;
         p.classList.remove('hidden');
     } else {
@@ -253,6 +290,27 @@ async function copiarLinkTienda(inputId, trigger) {
     }
 }
 
+function enviarFormularioConfiguracion(trigger = null) {
+    const modal = trigger?.closest?.('#modalConfiguracion')
+        || tiendaAdminElementById('modalConfiguracion', tiendaAdminPanelScope(trigger));
+    const form = modal?.querySelector?.('#formConfiguracion') || document.getElementById('formConfiguracion');
+    if (!form) return;
+
+    if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+        return;
+    }
+
+    if (typeof form.reportValidity === 'function' && !form.reportValidity()) {
+        return;
+    }
+
+    guardarConfiguracion({
+        preventDefault() {},
+        target: form
+    });
+}
+
 async function guardarConfiguracion(e) {
     e.preventDefault();
     const form = e.target;
@@ -294,6 +352,14 @@ async function guardarConfiguracion(e) {
         method: 'POST'
     };
     if (hasFile) {
+        const archivosAValidar = [portadaFileInput?.files?.[0], logoFileInput?.files?.[0]].filter(Boolean);
+        for (const archivo of archivosAValidar) {
+            const validacion = validarArchivoImagenTienda(archivo);
+            if (!validacion.ok) {
+                alert(validacion.error);
+                return;
+            }
+        }
         const formData = new FormData(form);
         checkboxNames.forEach((name) => {
             formData.set(name, checkboxValue(name) ? '1' : '0');
@@ -305,6 +371,7 @@ async function guardarConfiguracion(e) {
             slug_actual: form.slug_actual.value,
             slug: form.slug.value,
             nombre_tienda: form.nombre_tienda.value,
+            titulo_header_tienda: form.titulo_header_tienda.value,
             logo_url: form.logo_url.value,
             texto_portada: form.texto_portada.value,
             titulo_hero_tienda: form.titulo_hero_tienda.value,

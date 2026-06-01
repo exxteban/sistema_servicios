@@ -21,7 +21,7 @@ import { trackMetaPixelContact } from '../services/metaPixel'
 import { resolveStoreTheme } from '../themes/storeTheme'
 import { getStoreWhatsAppMessage } from '../utils/gastronomiaBudget'
 import { buildGastronomiaOrderHref, buildGastronomiaOrderMessage } from '../utils/gastronomiaOrder'
-import { buildCategoryPath, isTruthyFlag, normalizeCategoryRef } from '../utils/storeFormatting'
+import { buildCategoryPath, getStoreHeaderTitle, isTruthyFlag, normalizeCategoryRef } from '../utils/storeFormatting'
 
 export default function CatalogoPage() {
   const { slug, categoryRef } = useParams()
@@ -132,7 +132,7 @@ export default function CatalogoPage() {
   useMetaPixelPageView(metaPixelId)
 
   useEffect(() => {
-    const storeName = config?.nombre_tienda || 'Tienda Online'
+    const storeName = getStoreHeaderTitle(config)
     const title = selectedCategory
       ? `${selectedCategory.nombre} | ${storeName}`
       : config?.nombre_tienda

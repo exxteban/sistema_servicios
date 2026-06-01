@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import io
 from urllib.parse import parse_qs, unquote, urlparse
 
 from app import create_app, db
@@ -310,6 +311,36 @@ def test_panel_tienda_gastronomia_muestra_menu_y_permite_guardar_config():
         })
         assert save_response.status_code == 200
         assert save_response.get_json()['ok'] is True
+    finally:
+        with app.app_context():
+            Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
+
+
+def test_panel_tienda_gastronomia_rechaza_extension_no_permitida_en_portada():
+    app = create_app('testing')
+    app.config['WTF_CSRF_ENABLED'] = False
+    client = app.test_client()
+
+    with app.app_context():
+        Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_GASTRONOMIA)
+        tienda, _producto = _crear_tienda_gastronomia(slug='gastro-portada-extension-test')
+        cliente_id = tienda.id_cliente
+        config_id = tienda.id_config
+        slug = tienda.slug
+
+    _loguear_admin(client, app, cliente_id=cliente_id)
+
+    try:
+        response = client.post('/api/tienda/admin/config', data={
+            'id_config': str(config_id),
+            'slug_actual': slug,
+            'slug': slug,
+            'nombre_tienda': 'Gastro Admin Test',
+            'telefono_whatsapp': '595981000000',
+            'imagen_portada_file': (io.BytesIO(b'contenido-no-valido'), 'portada.heic'),
+        })
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'extension_portada_no_permitida'
     finally:
         with app.app_context():
             Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)

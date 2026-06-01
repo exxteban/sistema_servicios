@@ -56,3 +56,7 @@ export function parseProductIdFromParam(value) {
 export function normalizeCategoryRef(value) {
   return slugifyForUrl(value, 'catalogo')
 }
+
+export function getStoreHeaderTitle(config) {
+  return normalizeText(config?.titulo_header_tienda) || normalizeText(config?.nombre_tienda) || 'Tienda Online'
+}

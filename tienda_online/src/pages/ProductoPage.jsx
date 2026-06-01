@@ -15,7 +15,7 @@ import { useMetaPixelPageView, useMetaPixelProductView } from '../hooks/useMetaP
 import { trackMetaPixelContact } from '../services/metaPixel'
 import { resolveStoreTheme } from '../themes/storeTheme'
 import { getStoreWhatsAppMessage } from '../utils/gastronomiaBudget'
-import { buildProductPath, formatGs, isTruthyFlag, normalizeText, parseProductIdFromParam } from '../utils/storeFormatting'
+import { buildProductPath, formatGs, getStoreHeaderTitle, isTruthyFlag, normalizeText, parseProductIdFromParam } from '../utils/storeFormatting'
 import WebBotWidget from '../features/web-bot/components/WebBotWidget'
 
 export default function ProductoPage() {
@@ -66,9 +66,8 @@ export default function ProductoPage() {
 
   useEffect(() => {
     if (!producto) return
-    const title = config?.nombre_tienda
-      ? `${producto.nombre} | ${config.nombre_tienda}`
-      : `${producto.nombre} | Tienda Online`
+    const storeName = getStoreHeaderTitle(config)
+    const title = `${producto.nombre} | ${storeName}`
     const tipo = producto.es_servicio ? 'servicio' : 'producto'
     const description = producto.descripcion || config?.texto_portada || `Detalle de ${tipo} disponible para consulta por WhatsApp.`
     applyPageMeta(title, description)
@@ -119,7 +118,7 @@ export default function ProductoPage() {
         <header className="glass-header">
           <div className="container" style={{ padding: '16px 0' }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
-              {config?.nombre_tienda || 'Tienda Online'}
+              {getStoreHeaderTitle(config)}
             </h1>
           </div>
         </header>
@@ -151,7 +150,7 @@ export default function ProductoPage() {
       <header className="glass-header">
         <div className="container" style={{ padding: '16px 0' }}>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
-            {config?.nombre_tienda || 'Tienda Online'}
+            {getStoreHeaderTitle(config)}
           </h1>
         </div>
       </header>

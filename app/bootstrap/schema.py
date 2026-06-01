@@ -118,6 +118,7 @@ SCHEMA_COLUMN_MIGRATIONS = {
     ],
     'tienda_config': [
         ('mensaje_whatsapp', ("ALTER TABLE tienda_config ADD COLUMN mensaje_whatsapp VARCHAR(500)",), ("ALTER TABLE tienda_config ADD COLUMN mensaje_whatsapp VARCHAR(500) NULL",)),
+        ('titulo_header_tienda', ("ALTER TABLE tienda_config ADD COLUMN titulo_header_tienda VARCHAR(200)",), ("ALTER TABLE tienda_config ADD COLUMN titulo_header_tienda VARCHAR(200) NULL",)),
         ('mostrar_hero_tienda', ("ALTER TABLE tienda_config ADD COLUMN mostrar_hero_tienda BOOLEAN NOT NULL DEFAULT 1",), ("ALTER TABLE tienda_config ADD COLUMN mostrar_hero_tienda TINYINT(1) NOT NULL DEFAULT 1",)),
         ('titulo_hero_tienda', ("ALTER TABLE tienda_config ADD COLUMN titulo_hero_tienda VARCHAR(180)",), ("ALTER TABLE tienda_config ADD COLUMN titulo_hero_tienda VARCHAR(180) NULL",)),
         ('subtitulo_hero_tienda', ("ALTER TABLE tienda_config ADD COLUMN subtitulo_hero_tienda TEXT",), ("ALTER TABLE tienda_config ADD COLUMN subtitulo_hero_tienda TEXT NULL",)),

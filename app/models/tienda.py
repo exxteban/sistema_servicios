@@ -20,6 +20,7 @@ class TiendaConfig(db.Model):
     )
     slug = db.Column(db.String(80), nullable=False, unique=True, index=True)
     nombre_tienda = db.Column(db.String(200), nullable=True)
+    titulo_header_tienda = db.Column(db.String(200), nullable=True)
     logo_url = db.Column(db.String(500), nullable=True)
     color_primario = db.Column(db.String(20), nullable=False, default='#6366f1')
     telefono_whatsapp = db.Column(db.String(30), nullable=True)
@@ -146,6 +147,7 @@ class TiendaConfig(db.Model):
         return {
             'slug': self.slug,
             'nombre_tienda': self.nombre_tienda,
+            'titulo_header_tienda': self.titulo_header_tienda,
             'logo_url': self.logo_url,
             'color_primario': self.color_primario,
             'telefono_whatsapp': self.telefono_whatsapp,

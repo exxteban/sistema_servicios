@@ -211,6 +211,12 @@
                                             class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                                     </div>
                                     <div>
+                                        <label for="titulo_header_tienda" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Texto del encabezado superior</label>
+                                        <input type="text" name="titulo_header_tienda" id="titulo_header_tienda" value="{{ tienda_config.titulo_header_tienda if tienda_config and tienda_config.titulo_header_tienda else '' }}" placeholder="Ej: Tienda Online, Lions Burguer, Catálogo"
+                                            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <p class="mt-1 text-xs text-gray-500">Este texto aparece arriba junto al logo. Si queda vacío, se usa el nombre de la tienda.</p>
+                                    </div>
+                                    <div>
                                         <label for="titulo_footer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Título sección principal del pie</label>
                                         <input type="text" name="titulo_footer" id="titulo_footer" value="{{ tienda_config.titulo_footer if tienda_config and tienda_config.titulo_footer else '' }}" placeholder="Ej: Nuestra Tienda"
                                             class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
@@ -339,7 +345,7 @@
                                                 <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">Haz clic para subir el logo</span> o arrastra y suelta</p>
                                                 <p class="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, JPEG o WEBP (MAX. 5MB)</p>
                                             </div>
-                                            <input id="logo_file" name="logo_file" type="file" class="hidden" accept="image/*" onchange="actualizarNombreArchivo(this)" data-target="nombre_archivo_logo" />
+                                            <input id="logo_file" name="logo_file" type="file" class="hidden" accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onchange="actualizarNombreArchivo(this)" data-target="nombre_archivo_logo" />
                                         </label>
                                     </div>
                                     <p id="nombre_archivo_logo" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hidden"></p>
@@ -368,7 +374,7 @@
                                                 <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">Haz clic para subir</span> o arrastra y suelta</p>
                                                 <p class="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, JPEG o WEBP (MAX. 5MB)</p>
                                             </div>
-                                            <input id="imagen_portada_file" name="imagen_portada_file" type="file" class="hidden" accept="image/*" onchange="actualizarNombreArchivo(this)" data-target="nombre_archivo_portada" />
+                                            <input id="imagen_portada_file" name="imagen_portada_file" type="file" class="hidden" accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onchange="actualizarNombreArchivo(this)" data-target="nombre_archivo_portada" />
                                         </label>
                                     </div>
                                     <p id="nombre_archivo_portada" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hidden"></p>
@@ -555,7 +561,7 @@
                 
                 <!-- Footer -->
                 <div class="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex flex-row-reverse gap-3 rounded-b-2xl border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" onclick="this.closest('#modalConfiguracion')?.querySelector('#formConfiguracion')?.requestSubmit()" class="inline-flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition-colors">
+                    <button type="button" onclick="enviarFormularioConfiguracion(this)" class="inline-flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:w-auto transition-colors">
                         Guardar Configuración
                     </button>
                     <button type="button" onclick="cerrarConfiguracion(this)" class="inline-flex w-full justify-center rounded-lg bg-white dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-gray-200 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 sm:w-auto transition-colors">

@@ -1,8 +1,9 @@
 import SearchBar from '../ui/SearchBar'
+import { getStoreHeaderTitle } from '../../utils/storeFormatting'
 
 export default function Header({ config, query, onChange, themeKey }) {
   const logoUrl = typeof config?.logo_url === 'string' ? config.logo_url.trim() : ''
-  const storeName = config?.nombre_tienda || 'Tienda Online'
+  const storeName = getStoreHeaderTitle(config)
 
   return (
     <header className={`store-header store-header-${themeKey}`}>

@@ -1130,6 +1130,8 @@ def admin_guardar_config():
 
     if 'nombre_tienda' in data:
         config.nombre_tienda = clean_text('nombre_tienda')
+    if 'titulo_header_tienda' in data:
+        config.titulo_header_tienda = clean_text('titulo_header_tienda')
     if 'logo_url' in data:
         config.logo_url = clean_text('logo_url')
     if 'color_primario' in data:
@@ -1248,7 +1250,12 @@ def admin_guardar_config():
 
     if 'logo_file' in request.files:
         archivo_logo = request.files['logo_file']
-        if archivo_logo and archivo_logo.filename and _ext_permitida(archivo_logo.filename):
+        if archivo_logo and archivo_logo.filename:
+            if not _ext_permitida(archivo_logo.filename):
+                return jsonify({
+                    'error': 'extension_logo_no_permitida',
+                    'detalle': 'El logo debe estar en formato PNG, JPG, JPEG, WEBP o GIF.',
+                }), 400
             upload_folder = os.path.join(current_app.static_folder, 'tienda_uploads', 'logos')
             try:
                 nombre_final = procesar_y_guardar_imagen(
@@ -1278,7 +1285,12 @@ def admin_guardar_config():
     # Procesar archivo de portada si viene en la request
     if 'imagen_portada_file' in request.files:
         archivo = request.files['imagen_portada_file']
-        if archivo and archivo.filename and _ext_permitida(archivo.filename):
+        if archivo and archivo.filename:
+            if not _ext_permitida(archivo.filename):
+                return jsonify({
+                    'error': 'extension_portada_no_permitida',
+                    'detalle': 'La portada debe estar en formato PNG, JPG, JPEG, WEBP o GIF.',
+                }), 400
             upload_folder = os.path.join(current_app.static_folder, 'tienda_uploads', 'portadas')
             try:
                 nombre_final = procesar_y_guardar_imagen(archivo, upload_folder, prefijo=f"portada_{id_cliente}")
