@@ -17,11 +17,16 @@ def test_previsualizacion_receta_alerta_antes_de_guardar_sin_mutar_stock():
     pos_html = client.get('/gastronomia/pos').get_data(as_text=True)
     csrf = _csrf(pos_html)
     assert 'js/pos_stock_alerts.js' in pos_html
+    assert 'js/pos_channel_prices.js' in pos_html
+    assert pos_html.index('js/pos_channel_prices.js') < pos_html.index('js/pos.js')
     assert 'css/pos.css' in pos_html
     assert client.get('/gastronomia/static/css/pos.css').status_code == 200
     stock_script = client.get('/gastronomia/static/js/pos_stock_alerts.js')
+    channel_prices_script = client.get('/gastronomia/static/js/pos_channel_prices.js')
     assert stock_script.status_code == 200
+    assert channel_prices_script.status_code == 200
     assert '/api/gastronomia/stock/previsualizar-pedido' in stock_script.get_data(as_text=True)
+    assert 'fetchProducts' in channel_prices_script.get_data(as_text=True)
     pos_script = client.get('/gastronomia/static/js/pos.js')
     assert 'window.GastronomiaStockAlerts?.refresh(cart);' in pos_script.get_data(as_text=True)
 
