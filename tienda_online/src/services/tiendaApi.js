@@ -138,7 +138,9 @@ function normalizeConfig(config) {
   return {
     ...config,
     logo_url: resolveMediaUrl(config.logo_url),
-    imagen_portada: resolveMediaUrl(config.imagen_portada)
+    logo_fallback_urls: resolveMediaCandidates(config.logo_url),
+    imagen_portada: resolveMediaUrl(config.imagen_portada),
+    imagen_portada_fallback_urls: resolveMediaCandidates(config.imagen_portada)
   }
 }
 

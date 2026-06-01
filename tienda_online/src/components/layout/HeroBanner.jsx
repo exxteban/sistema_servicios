@@ -1,9 +1,11 @@
 import React from 'react'
 import { normalizeText } from '../../utils/storeFormatting'
+import StoreImage from '../ui/StoreImage'
 
 export default function HeroBanner({ config, themeKey }) {
   const brandColor = config?.color_primario || '#2563eb'
   const coverImage = config?.imagen_portada
+  const coverFallbackSources = config?.imagen_portada_fallback_urls || []
   const tituloHero = normalizeText(config?.titulo_hero_tienda) || normalizeText(config?.nombre_tienda) || 'Bienvenido a nuestra tienda'
   const subtituloHero = normalizeText(config?.subtitulo_hero_tienda) || normalizeText(config?.texto_portada) || 'Descubre nuestros productos destacados. Calidad y precio en un solo lugar.'
   const textoBotonHero = normalizeText(config?.texto_boton_hero) || 'Explorar catálogo'
@@ -25,8 +27,9 @@ export default function HeroBanner({ config, themeKey }) {
       }}
     >
       {coverImage ? (
-        <img
+        <StoreImage
           src={coverImage}
+          fallbackSources={coverFallbackSources}
           alt=""
           loading="eager"
           fetchPriority="high"
