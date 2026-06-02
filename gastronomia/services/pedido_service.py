@@ -289,6 +289,11 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
     estado_anterior = pedido.estado
     if pedido.estado == 'cobrado' and estado != 'cobrado':
         raise ValueError('No se puede modificar un pedido cobrado.')
+    if estado == 'cancelado' and estado_anterior != 'cancelado' and pedido.pago:
+        raise ValueError(
+            'No se puede cancelar un pedido ya cobrado. '
+            'Anula la venta desde reportes para revertir el cobro y restaurar el stock.'
+        )
     if estado == 'en_camino' and pedido.estado not in {'listo', 'en_camino'}:
         raise ValueError('Solo se pueden despachar pedidos listos.')
     if estado == 'entregado' and pedido.estado not in {'listo', 'en_camino', 'entregado'}:

@@ -2,6 +2,7 @@ import re
 
 from app import create_app, db
 from app.models import Caja, Cliente, ColaCobro, DetalleVenta, MetodoPago, MovimientoCaja, PagoVenta, SesionCaja, Usuario, Venta
+from app.models.inventario import MovimientoStock
 from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
@@ -185,6 +186,36 @@ def test_caja_lista_y_cobra_pedido_con_descuento():
         assert evento is not None
 
     assert client.get('/api/gastronomia/caja/pedidos').get_json()['pedidos'] == []
+
+
+def test_caja_muestra_ventas_cobradas_anulables_del_dia():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Caja Anulables', 'resto_caja_anulables')
+    _loguear(client, app, 'resto_caja_anulables')
+    _abrir_caja(app, 'resto_caja_anulables')
+
+    page = client.get('/gastronomia/caja')
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert 'Ventas cobradas para anular' in html
+    assert 'caja-voidable-sales' in html
+    csrf = _csrf(html)
+    pedido_id = _crear_pedido_listo(client, csrf, producto_id)
+
+    cobrar_resp = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'metodo_pago': 'efectivo'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cobrar_resp.status_code == 200
+
+    anulables_resp = client.get('/api/gastronomia/caja/ventas-anulables')
+    assert anulables_resp.status_code == 200
+    ventas = anulables_resp.get_json()['ventas']
+    assert [venta['id_pedido'] for venta in ventas] == [pedido_id]
+    assert ventas[0]['id_venta'] is not None
+    assert ventas[0]['total_cobrado'] == 30000
 
 
 def test_cobro_directo_cierra_cola_gastronomia_activa():
@@ -683,3 +714,47 @@ def test_cobro_avanzado_usa_checkout_central_y_envia_a_cocina():
         assert cola.get_metadata()['gastronomia_pago_registrado'] is True
         assert Venta.query.get(venta_json['id_venta']) is not None
         assert GastronomiaPedidoPago.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).count() == 1
+
+
+def test_pedido_cobrado_no_se_cancela_por_via_operativa_y_conserva_caja_y_stock():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto(app, 'Resto Cobro Bloqueo', 'resto_cobro_bloqueo')
+    _loguear(client, app, 'resto_cobro_bloqueo')
+    _abrir_caja(app, 'resto_cobro_bloqueo')
+
+    with app.app_context():
+        producto = GastronomiaProducto.query.get(producto_id)
+        producto.control_stock_venta = True
+        producto.stock_disponible = 5
+        db.session.commit()
+
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+    pedido_id = _crear_pedido_listo(client, csrf, producto_id)
+    cobrar_resp = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'metodo_pago': 'efectivo'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cobrar_resp.status_code == 200
+
+    cancelar_resp = client.post(
+        f'/api/gastronomia/pedidos/{pedido_id}/estado',
+        json={'estado': 'cancelado'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cancelar_resp.status_code == 400
+    assert 'cobrado' in cancelar_resp.get_json()['mensaje'].lower()
+
+    with app.app_context():
+        pedido = GastronomiaPedido.query.get(pedido_id)
+        producto = GastronomiaProducto.query.get(producto_id)
+        # El pedido sigue cobrado: ni el stock ni la caja se descuadran.
+        assert pedido.estado != 'cancelado'
+        assert pedido.pago is not None
+        assert producto.stock_disponible == 4
+        assert Venta.query.get(pedido.pago.id_venta).estado != 'anulada'
+        assert MovimientoStock.query.filter_by(
+            id_producto=producto_id,
+            referencia_tipo='gastronomia_restaura',
+        ).count() == 0
