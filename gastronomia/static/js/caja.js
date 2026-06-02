@@ -2,7 +2,6 @@
   const pageRoot = document.querySelector('[data-gastro-caja]');
   const csrf = document.getElementById('csrf-token')?.value || '';
   const ordersEl = document.getElementById('caja-orders');
-  const voidableSalesEl = document.getElementById('caja-voidable-sales');
   const alertBox = document.getElementById('caja-alert');
   const selectedSummary = document.getElementById('selected-summary');
   const discountInput = document.getElementById('discount-amount');
@@ -46,18 +45,6 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
   const deliveryCode = (order) => escapeHtml(order.codigo_entrega || `#${String(order.id_pedido || 0).padStart(3, '0')}`);
-  const saleLabel = (sale) => {
-    const parts = [sale.tipo_pedido || 'mostrador'];
-    if (sale.mesa) parts.push(`Mesa ${sale.mesa}`);
-    if (sale.referencia_entrega) parts.push(sale.referencia_entrega);
-    return parts.join(' - ');
-  };
-  const formatDateTime = (value) => {
-    if (!value) return 'Sin fecha';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString('es-PY', {dateStyle: 'short', timeStyle: 'short'});
-  };
   const selectPaymentMethod = (button) => {
     if (!button || !paymentMethodInput) return;
     paymentMethodInput.value = button.dataset.paymentMethod || 'efectivo';
@@ -76,11 +63,6 @@
     }
     renderOrders();
     renderSelected();
-  };
-  const loadVoidableSales = async () => {
-    if (!voidableSalesEl) return;
-    const data = await apiJson('/api/gastronomia/caja/ventas-anulables');
-    renderVoidableSales(data.ventas || []);
   };
   const pollEvents = async () => {
     try {
@@ -162,29 +144,6 @@
       </div>
     </article>
   `;
-  const renderVoidableSales = (sales) => {
-    if (!voidableSalesEl) return;
-    voidableSalesEl.innerHTML = sales.map((sale) => `
-      <div class="grid gap-3 rounded-lg border border-rose-100 bg-white p-3 dark:border-rose-500/20 dark:bg-gray-900/70 sm:grid-cols-[1fr_auto] sm:items-center">
-        <div>
-          <div class="flex flex-wrap items-center gap-2">
-            <strong class="text-gray-900 dark:text-white">${escapeHtml(sale.codigo_entrega || `#${sale.id_pedido}`)}</strong>
-            <span class="rounded-full bg-gray-100 px-2 py-1 text-xs font-black uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">Venta #${escapeHtml(sale.id_venta)}</span>
-            <span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">${escapeHtml(sale.metodo_pago)}</span>
-          </div>
-          <p class="mt-1 text-sm font-semibold text-gray-600 dark:text-gray-300">${escapeHtml(saleLabel(sale))}</p>
-          <p class="mt-1 text-xs font-semibold text-gray-500">${escapeHtml(formatDateTime(sale.fecha_pago))} - Estado ${escapeHtml(sale.estado_pedido)}</p>
-        </div>
-        <div class="flex flex-col gap-2 sm:items-end">
-          <strong class="text-lg text-gray-900 dark:text-white">${money(sale.total_cobrado)}</strong>
-          <button type="button" data-void-sale="${sale.id_pedido}" data-venta-id="${sale.id_venta}" class="rounded-lg bg-rose-600 px-3 py-2 text-sm font-black text-white hover:bg-rose-700" data-permiso="anular_venta">
-            Anular venta
-          </button>
-        </div>
-      </div>
-    `).join('') || '<div class="rounded-lg border border-dashed border-rose-200 bg-white/70 p-5 text-center text-sm font-semibold text-gray-500 dark:border-rose-500/20 dark:bg-gray-900/60 dark:text-gray-300">No hay ventas cobradas anulables hoy.</div>';
-    if (window.aplicarPermisosUI) window.aplicarPermisosUI();
-  };
   const renderSelected = () => {
     const order = orders.find((item) => Number(item.id_pedido) === Number(selectedOrderId));
     if (!order) {
@@ -249,7 +208,6 @@
     document.getElementById('payment-note').value = '';
     selectPaymentMethod(document.querySelector('[data-payment-method="efectivo"]'));
     applyOrderEvents([{payload: {pedido: data.pedido}}]);
-    loadVoidableSales().catch((error) => showAlert(error.message, false));
     setChargeBusy(false);
   };
   const setChargeBusy = (busy) => {
@@ -281,25 +239,6 @@
     showAlert(`Pedido #${orderId} anulado.`, true);
     applyOrderEvents([{payload: {pedido: data.pedido}}]);
   };
-  const voidSale = async (pedidoId, ventaId) => {
-    if (!window.confirm(`Anular la venta #${ventaId}? Se restaurara stock y se reversara caja.`)) return;
-    const runAuthorized = window.ejecutarConAutorizacion || ((_permiso, _accion, callback) => callback(null));
-    await runAuthorized(
-      'anular_venta',
-      `Anular venta gastronomia #${ventaId}`,
-      async (idAutorizacion) => {
-        await apiJson(`/api/gastronomia/reportes/pedidos/${pedidoId}/anular-venta`, {
-          method: 'POST',
-          body: JSON.stringify({id_autorizacion: idAutorizacion || null}),
-        });
-        showAlert(`Venta #${ventaId} anulada correctamente.`, true);
-        await loadVoidableSales();
-      },
-      'venta',
-      ventaId
-    );
-  };
-
   ordersEl?.addEventListener('click', (event) => {
     const cancelButton = event.target.closest('[data-cancel-order]');
     if (cancelButton) {
@@ -313,12 +252,6 @@
     if (shippingInput) shippingInput.value = Number(order?.costo_envio || 0);
     renderOrders();
     renderSelected();
-  });
-  voidableSalesEl?.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-void-sale]');
-    if (!button) return;
-    voidSale(Number(button.dataset.voidSale), Number(button.dataset.ventaId))
-      .catch((error) => showAlert(error.message, false));
   });
   discountInput?.addEventListener('input', renderSelected);
   shippingInput?.addEventListener('input', renderSelected);
@@ -342,7 +275,6 @@
   loadOrders()
     .catch((error) => showAlert(error.message, false))
     .finally(() => { pollTimer = setInterval(pollEvents, 2500); });
-  loadVoidableSales().catch((error) => showAlert(error.message, false));
   updateChargeButton();
   if (!hasOpenCashSession) {
     showAlert('Abri una caja central antes de cobrar pedidos desde esta pantalla.', false);

@@ -188,21 +188,15 @@ def test_caja_lista_y_cobra_pedido_con_descuento():
     assert client.get('/api/gastronomia/caja/pedidos').get_json()['pedidos'] == []
 
 
-def test_caja_muestra_ventas_cobradas_anulables_del_dia():
+def test_caja_actual_permite_anular_venta_desde_modal_de_movimiento():
     app = create_app('testing')
     client = app.test_client()
-    _cliente_id, producto_id = _crear_producto(app, 'Resto Caja Anulables', 'resto_caja_anulables')
-    _loguear(client, app, 'resto_caja_anulables')
-    _abrir_caja(app, 'resto_caja_anulables')
+    cliente_id, producto_id = _crear_producto(app, 'Resto Caja Actual Anula', 'resto_caja_actual_anula')
+    _loguear(client, app, 'resto_caja_actual_anula')
+    _abrir_caja(app, 'resto_caja_actual_anula')
 
-    page = client.get('/gastronomia/caja')
-    assert page.status_code == 200
-    html = page.get_data(as_text=True)
-    assert 'Ventas cobradas para anular' in html
-    assert 'caja-voidable-sales' in html
-    csrf = _csrf(html)
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
     pedido_id = _crear_pedido_listo(client, csrf, producto_id)
-
     cobrar_resp = client.post(
         f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
         json={'metodo_pago': 'efectivo'},
@@ -210,12 +204,22 @@ def test_caja_muestra_ventas_cobradas_anulables_del_dia():
     )
     assert cobrar_resp.status_code == 200
 
-    anulables_resp = client.get('/api/gastronomia/caja/ventas-anulables')
-    assert anulables_resp.status_code == 200
-    ventas = anulables_resp.get_json()['ventas']
-    assert [venta['id_pedido'] for venta in ventas] == [pedido_id]
-    assert ventas[0]['id_venta'] is not None
-    assert ventas[0]['total_cobrado'] == 30000
+    with app.app_context():
+        pago = GastronomiaPedidoPago.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).one()
+        venta_id = pago.id_venta
+
+    caja_actual = client.get('/caja/')
+    assert caja_actual.status_code == 200
+    html = caja_actual.get_data(as_text=True)
+    assert 'Ventas cobradas para anular' not in client.get('/gastronomia/caja').get_data(as_text=True)
+    assert f'data-venta-id="{venta_id}"' in html
+    assert 'data-venta-anulable="1"' in html
+    assert 'Anular venta' in html
+
+    resumen = client.get('/caja/api/estado/resumen')
+    assert resumen.status_code == 200
+    movimiento = next(item for item in resumen.get_json()['movimientos'] if item.get('venta_id') == venta_id)
+    assert movimiento['venta_anulable'] is True
 
 
 def test_cobro_directo_cierra_cola_gastronomia_activa():

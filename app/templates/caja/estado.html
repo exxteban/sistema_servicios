@@ -12,7 +12,8 @@
         "colaFiltros": cola_filtros,
         "idUsuarioActual": current_user.id_usuario,
         "esAdmin": current_user.es_admin(),
-        "puedeTomarColaCobro": current_user.tiene_permiso("tomar_cola_cobro")
+        "puedeTomarColaCobro": current_user.tiene_permiso("tomar_cola_cobro"),
+        "puedeAnularVenta": current_user.es_admin() or current_user.tiene_permiso("anular_venta")
     }|tojson }})'>
     <!-- Header -->
     <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
@@ -166,7 +167,9 @@
                     data-tipo="{{ mov.tipo }}"
                     data-monto="{{ '{:,.0f}'.format(mov.monto).replace(',', '.') }}"
                     data-motivo="{{ mov.motivo_detallado or mov.motivo }}"
-                    data-usuario="{{ mov.usuario.username if mov.usuario else 'Sistema' }}">
+                    data-usuario="{{ mov.usuario.username if mov.usuario else 'Sistema' }}"
+                    data-venta-id="{{ mov.venta_id_anulable or '' }}"
+                    data-venta-anulable="{{ 1 if mov.venta_anulable else 0 }}">
                     <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">{{ mov.fecha_movimiento|local_strftime('%d/%m/%Y %H:%M') }}</td>
                     <td class="px-4 py-3">
                         <span
@@ -257,15 +260,28 @@
                                     <span class="block text-gray-500 dark:text-gray-400 mb-1">Motivo:</span>
                                     <p class="text-gray-900 dark:text-gray-200 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg text-sm" x-text="modalData.motivo"></p>
                                 </div>
+                                <div x-show="modalData.ventaAnulable" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100">
+                                    Este movimiento corresponde a la venta #<span class="font-bold" x-text="modalData.ventaId"></span>.
+                                    Puedes anularla desde esta misma caja si fue cargada por error.
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="bg-gray-50 dark:bg-gray-700/30 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-gray-50 dark:bg-gray-700/30 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse sm:gap-2">
                     <button type="button" 
                             class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" 
                             @click="showModal = false">
                         Cerrar
+                    </button>
+                    <button type="button"
+                            x-show="modalData.ventaAnulable"
+                            data-permiso="anular_venta"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-rose-600 text-base font-medium text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 sm:mt-0 sm:w-auto sm:text-sm"
+                            :class="anulandoVenta ? 'opacity-60 cursor-wait' : ''"
+                            :disabled="anulandoVenta"
+                            @click="anularVentaMovimiento()">
+                        <span x-text="anulandoVenta ? 'Anulando...' : 'Anular venta'"></span>
                     </button>
                 </div>
             </div>
@@ -608,7 +624,9 @@ function cajaEstadoData(config) {
             tipo: '',
             monto: '',
             motivo: '',
-            usuario: ''
+            usuario: '',
+            ventaId: '',
+            ventaAnulable: false
         },
         showPagosModal: false,
         pagosDetalle: [],
@@ -617,9 +635,11 @@ function cajaEstadoData(config) {
         ventaModalOpen: false,
         venta: null,
         isLoadingVenta: false,
+        anulandoVenta: false,
         csrfToken: (config && config.csrfToken) ? String(config.csrfToken) : '',
         idUsuarioActual: Number((config && config.idUsuarioActual) || 0),
         esAdmin: !!(config && config.esAdmin),
+        puedeAnularVenta: !!(config && config.puedeAnularVenta),
         puedeTomarColaCobro: !!(config && config.puedeTomarColaCobro),
         colaRealtimeActiva: !!(config && config.colaRealtimeActiva),
         colaForceActiva: !!(config && config.colaForceActiva),
@@ -769,6 +789,8 @@ function cajaEstadoData(config) {
                 const tipoTexto = tipo === 'ingreso' ? 'INGRESO' : 'EGRESO';
                 const motivo = this._escapeHtml((mov && mov.motivo) || '');
                 const usuario = this._escapeHtml((mov && mov.usuario) || 'Sistema');
+                const ventaId = Number((mov && mov.venta_id) || 0);
+                const ventaAnulable = ventaId && !!(mov && mov.venta_anulable);
                 const monto = this._textoMonto(Number((mov && mov.monto) || 0));
                 const montoPlano = monto.replace('₲ ', '');
                 return `
@@ -778,7 +800,9 @@ function cajaEstadoData(config) {
                         data-tipo="${this._escapeHtml(tipo)}"
                         data-monto="${this._escapeHtml(montoPlano)}"
                         data-motivo="${motivo}"
-                        data-usuario="${usuario}">
+                        data-usuario="${usuario}"
+                        data-venta-id="${ventaId || ''}"
+                        data-venta-anulable="${ventaAnulable ? '1' : '0'}">
                         <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">${fecha}</td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-1 rounded-full text-xs ${this._badgeTipoMovimiento(tipo)}">${tipoTexto}</span>
@@ -1123,9 +1147,48 @@ function cajaEstadoData(config) {
                 tipo: dataset.tipo,
                 monto: dataset.monto,
                 motivo: dataset.motivo,
-                usuario: dataset.usuario
+                usuario: dataset.usuario,
+                ventaId: dataset.ventaId || '',
+                ventaAnulable: dataset.ventaAnulable === '1' && this.puedeAnularVenta
             };
             this.showModal = true;
+        },
+        async anularVentaMovimiento() {
+            const ventaId = Number(this.modalData.ventaId || 0);
+            if (!ventaId || this.anulandoVenta) return;
+            if (!window.confirm(`Anular la venta #${ventaId}? Se reversara caja y se restaurara stock cuando corresponda.`)) return;
+            const runAuthorized = window.ejecutarConAutorizacion || ((_permiso, _accion, callback) => callback(null));
+            await runAuthorized(
+                'anular_venta',
+                `Anular venta #${ventaId} desde Caja Actual`,
+                async (idAutorizacion) => {
+                    this.anulandoVenta = true;
+                    try {
+                        const fd = new FormData();
+                        fd.append('csrf_token', this.csrfToken);
+                        if (idAutorizacion) fd.append('id_autorizacion', idAutorizacion);
+                        const response = await fetch(`/ventas/${ventaId}/anular`, {
+                            method: 'POST',
+                            body: fd,
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        if (!response.ok) throw new Error('No se pudo anular la venta.');
+                        this.showModal = false;
+                        await this.refrescarResumenCaja(false);
+                        if (window.mostrarNotificacion) {
+                            window.mostrarNotificacion(`Venta #${ventaId} anulada`, 'success');
+                        }
+                    } catch (error) {
+                        if (window.mostrarNotificacion) {
+                            window.mostrarNotificacion(error.message || 'No se pudo anular la venta', 'error');
+                        }
+                    } finally {
+                        this.anulandoVenta = false;
+                    }
+                },
+                'venta',
+                ventaId
+            );
         },
         async verDetallesPagos(idMetodo, nombreMetodo) {
             this.pagosMetodoTitulo = nombreMetodo;

@@ -174,6 +174,7 @@ def _construir_estado_caja_payload(sesion):
 
     movimientos = sesion.movimientos.order_by(MovimientoCaja.fecha_movimiento.desc()).all()
     _enriquecer_motivos_movimientos(movimientos)
+    _anotar_ventas_anulables_en_movimientos(movimientos, Venta)
 
     return {
         'total_efectivo': total_efectivo,
@@ -194,10 +195,29 @@ def _construir_estado_caja_payload(sesion):
                 'monto': float(mov.monto or 0),
                 'motivo': str((mov.motivo_detallado or mov.motivo or '').strip()),
                 'usuario': str((mov.usuario.username if mov.usuario else 'Sistema') or 'Sistema'),
+                'venta_id': getattr(mov, 'venta_id_anulable', None),
+                'venta_anulable': bool(getattr(mov, 'venta_anulable', False)),
             }
             for mov in movimientos
         ],
     }
+
+
+def _anotar_ventas_anulables_en_movimientos(movimientos, venta_model):
+    venta_ids = {
+        int(mov.referencia_id)
+        for mov in movimientos
+        if (mov.referencia_tipo or '').strip().lower() == 'venta' and mov.referencia_id
+    }
+    if not venta_ids:
+        return
+    ventas = venta_model.query.filter(venta_model.id_venta.in_(venta_ids)).all()
+    estados_por_id = {int(venta.id_venta): (venta.estado or '').strip().lower() for venta in ventas}
+    for mov in movimientos:
+        venta_id = int(mov.referencia_id or 0) if (mov.referencia_tipo or '').strip().lower() == 'venta' else 0
+        estado = estados_por_id.get(venta_id)
+        mov.venta_id_anulable = venta_id or None
+        mov.venta_anulable = bool(venta_id and estado == 'completada')
 
 
 @caja_bp.route('/')

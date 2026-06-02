@@ -2,12 +2,10 @@
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from app.utils.helpers import today_local, utc_bounds_for_local_dates
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.caja_service import cobrar_pedido, listar_pedidos_caja
 from gastronomia.services.pedido_service import listar_eventos_pedido, obtener_ultimo_evento_id, serializar_pedidos
 from gastronomia.services.permisos import PERMISO_CAJA, requiere_permiso_gastronomia
-from gastronomia.services.reportes_service import ventas_anulables
 
 
 gastronomia_caja_api_bp = Blueprint('gastronomia_caja_api', __name__)
@@ -54,21 +52,6 @@ def caja_eventos():
         'ok': True,
         'eventos': [evento.to_dict() for evento in eventos],
         'ultimo_evento_id': obtener_ultimo_evento_id(cliente_id),
-    })
-
-
-@gastronomia_caja_api_bp.route('/caja/ventas-anulables', methods=['GET'])
-@login_required
-@requiere_permiso_gastronomia(PERMISO_CAJA)
-def caja_ventas_anulables():
-    cliente_id, error = _cliente_o_error()
-    if error:
-        return error
-    hoy = today_local()
-    inicio, fin = utc_bounds_for_local_dates(hoy, hoy)
-    return jsonify({
-        'ok': True,
-        'ventas': ventas_anulables(cliente_id, inicio, fin, limite=request.args.get('limite', 20, type=int) or 20),
     })
 
 
