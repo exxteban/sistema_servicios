@@ -9,6 +9,8 @@
   let orders = [];
   let lastEventId = 0;
   let pollTimer = null;
+  let tickTimer = null;
+  let lastPaintedMinutes = new Map();
   let destroyed = false;
   const activeControllers = new Set();
   const pendingOrders = new Set();
@@ -100,6 +102,7 @@
     return Math.max(0, Math.floor((Date.now() - start) / 60000));
   };
   const elapsed = (iso) => `${ageMinutes(iso)} min`;
+  const orderMinutes = (order) => ageMinutes(order.fecha_envio_cocina || order.fecha_creacion);
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
@@ -201,6 +204,14 @@
         </div>
       `;
     }
+    lastPaintedMinutes = new Map(orders.map((order) => [Number(order.id_pedido), orderMinutes(order)]));
+  };
+  // Repinta el tablero cuando el contador de minutos de algun pedido cambia,
+  // independientemente del polling de eventos (que no re-renderiza si no hay cambios).
+  const minutesHaveChanged = () => orders.some((order) => orderMinutes(order) !== lastPaintedMinutes.get(Number(order.id_pedido)));
+  const tickIfNeeded = () => {
+    if (destroyed) return;
+    if (minutesHaveChanged()) render(orders);
   };
   const renderColumn = (column, orders) => `
     <section class="kds-column">
@@ -393,6 +404,7 @@
   const cleanup = () => {
     destroyed = true;
     clearInterval(pollTimer);
+    clearInterval(tickTimer);
     board.removeEventListener('click', handleBoardClick);
     activeControllers.forEach((controller) => controller.abort());
     activeControllers.clear();
@@ -407,7 +419,10 @@
       showAlert(error.message, false);
     })
     .finally(() => {
-      if (!destroyed) pollTimer = setInterval(pollEvents, 2000);
+      if (!destroyed) {
+        pollTimer = setInterval(pollEvents, 2000);
+        tickTimer = setInterval(tickIfNeeded, 15000);
+      }
     });
   window.addEventListener('beforeunload', cleanup, {once: true});
 }());
