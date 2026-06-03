@@ -206,3 +206,31 @@ def test_delivery_ruta_operativa_muestra_pedidos_sin_repartidor_vinculado():
     )
     assert salir_resp.status_code == 200
     assert salir_resp.get_json()['pedido']['estado'] == 'en_camino'
+
+
+def test_delivery_repartidor_admite_usuario_global_activo():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, _producto_id, _delivery_user_id = _crear_contexto(app, '_global')
+    with app.app_context():
+        global_user = Usuario(
+            id_cliente=None,
+            username='delivery_global_admin',
+            nombre_completo='Delivery Global Admin',
+            id_rol=1,
+            activo=True,
+        )
+        global_user.set_password('clave123')
+        db.session.add(global_user)
+        db.session.commit()
+        global_user_id = global_user.id_usuario
+    _loguear(client, app, 'admin_delivery_ruta_global')
+
+    csrf = _csrf(client.get('/gastronomia/delivery').get_data(as_text=True))
+    repartidor_resp = client.post(
+        '/api/gastronomia/delivery/repartidores',
+        json={'nombre': 'Moto Global', 'usuario_id': global_user_id},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert repartidor_resp.status_code == 201
+    assert repartidor_resp.get_json()['repartidor']['usuario_id'] == global_user_id

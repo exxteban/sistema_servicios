@@ -208,7 +208,14 @@ def _aplicar_datos_repartidor(repartidor: GastronomiaRepartidor, data: dict) -> 
 
     usuario_id = _parse_optional_int(data.get('usuario_id'))
     if usuario_id:
-        usuario = Usuario.query.filter_by(id_usuario=usuario_id, id_cliente=int(repartidor.cliente_id), activo=True).first()
+        usuario = Usuario.query.filter(
+            Usuario.id_usuario == usuario_id,
+            Usuario.activo.is_(True),
+            db.or_(
+                Usuario.id_cliente == int(repartidor.cliente_id),
+                Usuario.id_cliente.is_(None),
+            ),
+        ).first()
         if not usuario:
             raise ValueError('Usuario de delivery invalido.')
         existente = GastronomiaRepartidor.query.filter(
