@@ -85,6 +85,7 @@
           ${order.celular_cliente ? `<p><strong>Cel:</strong> ${escapeHtml(order.celular_cliente)}</p>` : ''}
           <p><strong>Direccion:</strong> ${escapeHtml(order.direccion_entrega || 'Sin direccion')}</p>
           ${order.notas ? `<p><strong>Notas:</strong> ${escapeHtml(order.notas)}</p>` : ''}
+          ${renderGpsInfo(order)}
         </div>
         <div class="mt-4 flex flex-wrap gap-2">
           ${(order.items || []).map((item) => `<span class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200">${item.cantidad} x ${escapeHtml(item.nombre_producto)}</span>`).join('')}
@@ -105,6 +106,12 @@
     const url = destinationUrl(order);
     if (!url) return '';
     return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="rounded-lg bg-sky-600 px-3 py-2 text-center text-sm font-black text-white hover:bg-sky-700">Ir al destino</a>`;
+  };
+  const renderGpsInfo = (order) => {
+    const gps = order.ultima_ubicacion_delivery;
+    if (!gps?.latitud || !gps?.longitud) return '';
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${gps.latitud},${gps.longitud}`)}`;
+    return `<p class="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800"><strong>GPS:</strong> ultima ubicacion recibida ${escapeHtml(formatDate(gps.fecha_registro))}. <a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="underline">Ver punto</a></p>`;
   };
   const renderDestinationEditor = (order) => {
     const orderId = String(order.id_pedido || '');
@@ -148,8 +155,17 @@
     const lng = coordinateValue(order.destino_longitud);
     return lat !== null && lng !== null ? `${lat},${lng}` : '';
   };
+  const formatDate = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('es-PY', {hour: '2-digit', minute: '2-digit'}).format(date);
+  };
   const renderGpsButton = (order) => {
     if (!gpsTrackingEnabled || order.estado !== 'en_camino') return '';
+    if (routeMode !== 'repartidor') {
+      return '<span class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm font-black text-slate-500">GPS solo repartidor</span>';
+    }
     const orderId = Number(order.id_pedido || 0);
     const status = gpsStatusByOrder[orderId] || (Number(gpsOrderId || 0) === orderId ? 'active' : 'idle');
     const requesting = status === 'requesting';
@@ -172,8 +188,16 @@
   };
   const startGpsTracking = (orderId) => {
     if (!gpsTrackingEnabled) return;
+    if (routeMode !== 'repartidor') {
+      showAlert('El GPS solo puede activarlo el usuario repartidor asignado desde su celular.', false);
+      return;
+    }
     if (!navigator.geolocation) {
       showAlert('Este telefono/navegador no permite GPS desde la web.', false);
+      return;
+    }
+    if (window.isSecureContext === false) {
+      showAlert('GPS requiere HTTPS o localhost. En HTTP el navegador no pide permiso de ubicacion.', false);
       return;
     }
     const numericOrderId = Number(orderId || 0);

@@ -176,7 +176,13 @@ def actualizar_destino_pedido_delivery(cliente_id: int, pedido_id: int, data: di
 def usuarios_disponibles_delivery(cliente_id: int) -> list[Usuario]:
     return (
         Usuario.query
-        .filter(Usuario.id_cliente == int(cliente_id), Usuario.activo.is_(True))
+        .filter(
+            Usuario.activo.is_(True),
+            db.or_(
+                Usuario.id_cliente == int(cliente_id),
+                Usuario.id_cliente.is_(None),
+            ),
+        )
         .order_by(Usuario.nombre_completo.asc(), Usuario.username.asc())
         .all()
     )

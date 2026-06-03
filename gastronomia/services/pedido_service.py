@@ -10,6 +10,7 @@ from app import db
 from app.services.promociones_calculo import calculate_promotion_totals, money
 from app.utils.public_url import build_public_url
 from gastronomia.models import (
+    GastronomiaDeliveryUbicacion,
     GastronomiaPedido,
     GastronomiaPedidoEvento,
     GastronomiaPedidoItem,
@@ -142,17 +143,37 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
         }
         items_por_pedido.setdefault(int(item.pedido_id), []).append(item_data)
 
+    ubicaciones_delivery = (
+        GastronomiaDeliveryUbicacion.query
+        .filter(
+            GastronomiaDeliveryUbicacion.cliente_id.in_(cliente_ids),
+            GastronomiaDeliveryUbicacion.pedido_id.in_(pedido_ids),
+        )
+        .order_by(GastronomiaDeliveryUbicacion.fecha_registro.desc(), GastronomiaDeliveryUbicacion.id_ubicacion.desc())
+        .all()
+    )
+    ubicacion_por_pedido = {}
+    for ubicacion in ubicaciones_delivery:
+        ubicacion_por_pedido.setdefault(int(ubicacion.pedido_id), ubicacion)
+
     return [
         _pedido_to_dict_prearmado(
             pedido,
             pago=pagos_por_pedido.get(int(pedido.id_pedido)),
             items=items_por_pedido.get(int(pedido.id_pedido), []),
+            ubicacion_delivery=ubicacion_por_pedido.get(int(pedido.id_pedido)),
         )
         for pedido in pedidos
     ]
 
 
-def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPedidoPago | None, items: list[dict]) -> dict:
+def _pedido_to_dict_prearmado(
+    pedido: GastronomiaPedido,
+    *,
+    pago: GastronomiaPedidoPago | None,
+    items: list[dict],
+    ubicacion_delivery: GastronomiaDeliveryUbicacion | None = None,
+) -> dict:
     pago_data = pago.to_dict() if pago else None
     url_seguimiento = f'/gastronomia/pedido/{pedido.codigo_publico}' if pedido.codigo_publico else None
     return {
@@ -190,6 +211,7 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
         'estado_pago': 'pagado' if pago else 'pendiente',
         'pago': pago_data,
         'items': items,
+        'ultima_ubicacion_delivery': ubicacion_delivery.to_dict() if ubicacion_delivery else None,
         'alertas_stock': alertas_stock_pedido(pedido.id_pedido),
     }
 

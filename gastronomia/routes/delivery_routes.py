@@ -2,6 +2,7 @@
 from flask import flash, redirect, render_template, url_for
 from flask_login import login_required
 
+from app import db
 from app.models import Usuario
 
 from gastronomia.routes.dashboard_routes import gastronomia_bp
@@ -27,7 +28,13 @@ def delivery():
         return redirect(url_for('main.dashboard'))
     usuarios_delivery = (
         Usuario.query
-        .filter(Usuario.id_cliente == int(cliente_id), Usuario.activo.is_(True))
+        .filter(
+            Usuario.activo.is_(True),
+            db.or_(
+                Usuario.id_cliente == int(cliente_id),
+                Usuario.id_cliente.is_(None),
+            ),
+        )
         .order_by(Usuario.nombre_completo.asc(), Usuario.username.asc())
         .all()
     )
