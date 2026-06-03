@@ -208,6 +208,7 @@
     if (deliveryReferenceInput) deliveryReferenceInput.value = '';
     if (deliveryPhoneInput) deliveryPhoneInput.value = '';
     if (deliveryAddressInput) deliveryAddressInput.value = '';
+    window.GastronomiaDeliveryLocation?.reset();
     if (deliveryEstimateInput) deliveryEstimateInput.value = '';
     if (deliveryShippingInput) deliveryShippingInput.value = 0;
     if (tableNameInput) tableNameInput.value = '';
@@ -223,6 +224,7 @@
     if (deliveryReferenceInput) deliveryReferenceInput.value = order.referencia_entrega || '';
     if (deliveryPhoneInput) deliveryPhoneInput.value = order.celular_cliente || '';
     if (deliveryAddressInput) deliveryAddressInput.value = order.direccion_entrega || '';
+    window.GastronomiaDeliveryLocation?.hydrate(order);
     if (deliveryEstimateInput) deliveryEstimateInput.value = order.tiempo_estimado_minutos || '';
     if (deliveryShippingInput) deliveryShippingInput.value = order.costo_envio || 0;
     if (tableNameInput) tableNameInput.value = order.mesa || '';
@@ -240,7 +242,6 @@
     if (order.pagado) throw new Error('No se puede editar un pedido que ya fue cobrado.');
     hydrateOrder(order);
   };
-
   const openProduct = (product, item = null) => {
     activeProduct = product;
     editingItemKey = item?.key || null;
@@ -260,7 +261,6 @@
     modal.classList.remove('hidden');
     modal.classList.add('flex');
   };
-
   const renderGroup = (group, selectedOptions = []) => {
     const isRemovable = group.tipo === 'ingrediente_removible';
     const inputType = isRemovable ? 'checkbox' : (group.max_selecciones === 1 ? 'radio' : 'checkbox');
@@ -286,7 +286,6 @@
       </section>
     `;
   };
-
   const addConfiguredProduct = async () => {
     window.GastronomiaChannelPrices?.ensureCanAdd(cart, activeProduct);
     const selectedOptions = Array.from(modal.querySelectorAll('#modifier-groups input:checked')).map((input) => Number(input.value));
@@ -372,6 +371,7 @@
     nombre_cliente: deliveryReferenceInput?.value.trim() || '',
     celular_cliente: deliveryPhoneInput?.value.trim() || '',
     direccion_entrega: deliveryAddressInput?.value.trim() || '',
+    ...(window.GastronomiaDeliveryLocation?.payload() || {}),
     tiempo_estimado_minutos: deliveryEstimateInput?.value || null,
     costo_envio: deliveryShippingCost(),
     notas: document.getElementById('order-notes').value.trim(),

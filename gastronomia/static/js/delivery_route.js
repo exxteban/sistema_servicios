@@ -87,6 +87,7 @@
           ${(order.items || []).map((item) => `<span class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200">${item.cantidad} x ${escapeHtml(item.nombre_producto)}</span>`).join('')}
         </div>
         <div class="mt-4 grid gap-2 sm:grid-cols-4">
+          ${renderDestinationButton(order)}
           ${trackingUrl ? `<button type="button" data-copy-tracking="${order.id_pedido}" class="rounded-lg border border-sky-200 px-3 py-2 text-center text-sm font-black text-sky-700 hover:bg-sky-50"><i class="fas fa-link"></i> Copiar</button>` : ''}
           ${whatsappUrl ? `<a href="${escapeHtml(whatsappUrl)}" target="${whatsappTarget}" class="rounded-lg border border-green-200 px-3 py-2 text-center text-sm font-black text-green-700 hover:bg-green-50">WhatsApp</a>` : ''}
           ${order.estado === 'listo' ? `<button type="button" data-action="salir" data-order-id="${order.id_pedido}" class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-black text-white hover:bg-orange-700">Salgo ahora</button>` : ''}
@@ -95,6 +96,23 @@
         </div>
       </article>
     `;
+  };
+  const renderDestinationButton = (order) => {
+    const url = destinationUrl(order);
+    if (!url) return '';
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="rounded-lg bg-sky-600 px-3 py-2 text-center text-sm font-black text-white hover:bg-sky-700">Ir al destino</a>`;
+  };
+  const destinationUrl = (order) => {
+    const lat = Number(order.destino_latitud);
+    const lng = Number(order.destino_longitud);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}`;
+    }
+    const locationUrl = String(order.ubicacion_entrega_url || '').trim();
+    if (/^https?:\/\//i.test(locationUrl)) return locationUrl;
+    const address = String(order.direccion_entrega || '').trim();
+    if (!address) return '';
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
   };
   const renderGpsButton = (order) => {
     if (!gpsTrackingEnabled || order.estado !== 'en_camino') return '';

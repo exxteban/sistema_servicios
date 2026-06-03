@@ -260,6 +260,9 @@ class GastronomiaPedido(db.Model):
     nombre_cliente = db.Column(db.String(120))
     celular_cliente = db.Column(db.String(40))
     direccion_entrega = db.Column(db.String(240))
+    ubicacion_entrega_url = db.Column(db.String(500))
+    destino_latitud = db.Column(db.Float)
+    destino_longitud = db.Column(db.Float)
     tiempo_estimado_minutos = db.Column(db.Integer)
     repartidor_id = db.Column(db.Integer, db.ForeignKey('gastronomia_repartidores.id_repartidor'), nullable=True, index=True)
     estado = db.Column(db.String(30), nullable=False, default='abierto', index=True)
@@ -302,6 +305,9 @@ class GastronomiaPedido(db.Model):
             'nombre_cliente': self.nombre_cliente,
             'celular_cliente': self.celular_cliente,
             'direccion_entrega': self.direccion_entrega,
+            'ubicacion_entrega_url': self.ubicacion_entrega_url,
+            'destino_latitud': self.destino_latitud,
+            'destino_longitud': self.destino_longitud,
             'tiempo_estimado_minutos': self.tiempo_estimado_minutos,
             'repartidor_id': self.repartidor_id,
             'repartidor': self.repartidor.to_dict() if self.repartidor else None,

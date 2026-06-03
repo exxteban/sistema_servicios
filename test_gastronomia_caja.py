@@ -326,6 +326,8 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     pos_html = client.get('/gastronomia/pos?tipo=delivery').get_data(as_text=True)
     csrf = _csrf(pos_html)
     assert 'delivery-shipping-cost' in pos_html
+    assert 'delivery-location-url' in pos_html
+    assert 'delivery-open-location-map' in pos_html
 
     pedido_resp = client.post(
         '/api/gastronomia/pedidos',
@@ -334,6 +336,7 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
             'referencia_entrega': 'Carla',
             'celular_cliente': '0981123456',
             'direccion_entrega': 'Av. Siempre Viva 742',
+            'ubicacion_entrega_url': 'https://www.google.com/maps/place/test/@-25.3001,-57.6359,17z',
             'tiempo_estimado_minutos': 35,
             'costo_envio': 7000,
             'items': [{'producto_id': producto_id, 'cantidad': 1}],
@@ -345,6 +348,9 @@ def test_delivery_guarda_contacto_ticket_y_seguimiento_publico():
     assert pedido['tipo_pedido'] == 'delivery'
     assert pedido['celular_cliente'] == '0981123456'
     assert pedido['direccion_entrega'] == 'Av. Siempre Viva 742'
+    assert pedido['ubicacion_entrega_url'].startswith('https://www.google.com/maps')
+    assert pedido['destino_latitud'] == -25.3001
+    assert pedido['destino_longitud'] == -57.6359
     assert pedido['tiempo_estimado_minutos'] == 35
     assert pedido['costo_envio'] == 7000
     assert pedido['subtotal'] == 30000

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+import re
+from urllib.parse import parse_qs, unquote, urlparse
 
 from app import db
 from app.services.promociones_calculo import calculate_promotion_totals, money
@@ -167,6 +169,9 @@ def _pedido_to_dict_prearmado(pedido: GastronomiaPedido, *, pago: GastronomiaPed
         'nombre_cliente': pedido.nombre_cliente,
         'celular_cliente': pedido.celular_cliente,
         'direccion_entrega': pedido.direccion_entrega,
+        'ubicacion_entrega_url': pedido.ubicacion_entrega_url,
+        'destino_latitud': pedido.destino_latitud,
+        'destino_longitud': pedido.destino_longitud,
         'tiempo_estimado_minutos': pedido.tiempo_estimado_minutos,
         'repartidor_id': pedido.repartidor_id,
         'repartidor': pedido.repartidor.to_dict() if pedido.repartidor else None,
@@ -218,6 +223,9 @@ def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPed
         nombre_cliente=pedido_data['nombre_cliente'],
         celular_cliente=pedido_data['celular_cliente'],
         direccion_entrega=pedido_data['direccion_entrega'],
+        ubicacion_entrega_url=pedido_data['ubicacion_entrega_url'],
+        destino_latitud=pedido_data['destino_latitud'],
+        destino_longitud=pedido_data['destino_longitud'],
         tiempo_estimado_minutos=pedido_data['tiempo_estimado_minutos'],
         costo_envio=pedido_data['costo_envio'],
         notas=pedido_data['notas'],
@@ -253,6 +261,9 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
     pedido.nombre_cliente = pedido_data['nombre_cliente']
     pedido.celular_cliente = pedido_data['celular_cliente']
     pedido.direccion_entrega = pedido_data['direccion_entrega']
+    pedido.ubicacion_entrega_url = pedido_data['ubicacion_entrega_url']
+    pedido.destino_latitud = pedido_data['destino_latitud']
+    pedido.destino_longitud = pedido_data['destino_longitud']
     pedido.tiempo_estimado_minutos = pedido_data['tiempo_estimado_minutos']
     pedido.costo_envio = pedido_data['costo_envio']
     pedido.notas = pedido_data['notas']
@@ -351,6 +362,13 @@ def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
     nombre_cliente = (data.get('nombre_cliente') or data.get('referencia_entrega') or '').strip()[:120] or None
     celular_cliente = (data.get('celular_cliente') or '').strip()[:40] or None
     direccion_entrega = (data.get('direccion_entrega') or '').strip()[:240] or None
+    ubicacion_entrega_url = (data.get('ubicacion_entrega_url') or '').strip()[:500] or None
+    destino_latitud = _parse_optional_coordinate(data.get('destino_latitud'), -90, 90)
+    destino_longitud = _parse_optional_coordinate(data.get('destino_longitud'), -180, 180)
+    if ubicacion_entrega_url and (destino_latitud is None or destino_longitud is None):
+        parsed_lat, parsed_lng = _coords_from_location_text(ubicacion_entrega_url)
+        destino_latitud = destino_latitud if destino_latitud is not None else parsed_lat
+        destino_longitud = destino_longitud if destino_longitud is not None else parsed_lng
     if tipo == 'delivery' and not celular_cliente:
         raise ValueError('El celular es obligatorio para pedidos delivery.')
     if tipo == 'delivery' and not direccion_entrega:
@@ -369,6 +387,9 @@ def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
         'nombre_cliente': nombre_cliente,
         'celular_cliente': celular_cliente,
         'direccion_entrega': direccion_entrega,
+        'ubicacion_entrega_url': ubicacion_entrega_url if tipo == 'delivery' else None,
+        'destino_latitud': destino_latitud if tipo == 'delivery' else None,
+        'destino_longitud': destino_longitud if tipo == 'delivery' else None,
         'tiempo_estimado_minutos': _parse_estimated_minutes(data.get('tiempo_estimado_minutos')),
         'costo_envio': _parse_nonnegative_money(data.get('costo_envio')) if tipo == 'delivery' else Decimal('0.00'),
         'notas': (data.get('notas') or '').strip() or None,
@@ -404,6 +425,47 @@ def _parse_nonnegative_money(value) -> Decimal:
     if amount < 0:
         raise ValueError('El costo de envio no puede ser negativo.')
     return amount
+
+
+def _parse_optional_coordinate(value, minimum: float, maximum: float) -> float | None:
+    if value in (None, ''):
+        return None
+    try:
+        parsed = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return parsed if minimum <= parsed <= maximum else None
+
+
+def _coords_from_location_text(value: str) -> tuple[float | None, float | None]:
+    text_value = unquote(str(value or '').strip())
+    for pattern in (r'@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)', r'!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)'):
+        match = re.search(pattern, text_value)
+        if match:
+            return _validated_coords(match.group(1), match.group(2))
+    parsed = urlparse(text_value)
+    params = parse_qs(parsed.query)
+    for key in ('q', 'query', 'll', 'destination'):
+        if params.get(key):
+            coords = _coords_from_plain_text(params[key][0])
+            if coords != (None, None):
+                return coords
+    return _coords_from_plain_text(text_value)
+
+
+def _coords_from_plain_text(value: str) -> tuple[float | None, float | None]:
+    match = re.search(r'(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)', str(value or ''))
+    if not match:
+        return None, None
+    return _validated_coords(match.group(1), match.group(2))
+
+
+def _validated_coords(lat_value, lng_value) -> tuple[float | None, float | None]:
+    lat = _parse_optional_coordinate(lat_value, -90, 90)
+    lng = _parse_optional_coordinate(lng_value, -180, 180)
+    if lat is None or lng is None:
+        return None, None
+    return lat, lng
 
 
 def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_data: list[dict]) -> None:
