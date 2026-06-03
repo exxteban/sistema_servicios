@@ -97,10 +97,15 @@
       activeControllers.delete(controller);
     }
   };
-  const ageMinutes = (iso) => {
-    const start = new Date(iso || Date.now()).getTime();
-    return Math.max(0, Math.floor((Date.now() - start) / 60000));
+  const parseTimestamp = (iso) => {
+    if (!iso) return Date.now();
+    const value = String(iso);
+    const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+    const normalized = /^\d{4}-\d{2}-\d{2}T/.test(value) && !hasTimezone ? `${value}Z` : value;
+    const timestamp = new Date(normalized).getTime();
+    return Number.isNaN(timestamp) ? Date.now() : timestamp;
   };
+  const ageMinutes = (iso) => Math.max(0, Math.floor((Date.now() - parseTimestamp(iso)) / 60000));
   const elapsed = (iso) => `${ageMinutes(iso)} min`;
   const orderMinutes = (order) => ageMinutes(order.fecha_envio_cocina || order.fecha_creacion);
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -180,8 +185,8 @@
   };
   const sortOrders = () => {
     orders.sort((a, b) => {
-      const dateDiff = new Date(a.fecha_envio_cocina || a.fecha_creacion || 0).getTime()
-        - new Date(b.fecha_envio_cocina || b.fecha_creacion || 0).getTime();
+      const dateDiff = parseTimestamp(a.fecha_envio_cocina || a.fecha_creacion)
+        - parseTimestamp(b.fecha_envio_cocina || b.fecha_creacion);
       return dateDiff || Number(a.id_pedido || 0) - Number(b.id_pedido || 0);
     });
   };
