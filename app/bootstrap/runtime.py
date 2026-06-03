@@ -17,6 +17,20 @@ def _is_truthy_env(name: str, default: str = '0') -> bool:
     return (raw or '').strip().lower() in {'1', 'true', 'yes', 'y', 'on', 'si', 'sí'}
 
 
+def _permissions_policy_value() -> str:
+    """Permissions-Policy del sitio.
+
+    La geolocalizacion debe permitirse en el propio origen para que el GPS del
+    delivery funcione (sin allowlist el navegador bloquea la API y nunca pide
+    permiso al usuario). Se puede sobreescribir con la variable de entorno
+    PERMISSIONS_POLICY si una instancia necesita un valor distinto.
+    """
+    override = (os.environ.get('PERMISSIONS_POLICY') or '').strip()
+    if override:
+        return override
+    return 'geolocation=(self), microphone=(), camera=()'
+
+
 def register_runtime_features(app, db):
     from app.utils.helpers import now_local, local_strftime, normalize_for_thermal_printer, get_app_timezone_name
     from app.services.brand_logos import resolve_electronics_brand_logo
@@ -235,7 +249,7 @@ def register_runtime_features(app, db):
             response.headers.setdefault('X-Content-Type-Options', 'nosniff')
             response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
             response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
-            response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+            response.headers.setdefault('Permissions-Policy', _permissions_policy_value())
         if _is_truthy_env('HSTS_ENABLED', '0') and request.is_secure:
             max_age_raw = (os.environ.get('HSTS_MAX_AGE') or '31536000').strip()
             try:

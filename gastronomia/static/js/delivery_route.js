@@ -14,6 +14,11 @@
   let gpsWatchId = null;
   let gpsOrderId = null;
   let lastGpsSentAt = 0;
+  let lastGpsFixAt = 0;
+  let gpsWatchdogTimer = null;
+  let gpsWatchRetries = 0;
+  const GPS_MAX_WATCH_RETRIES = 5;
+  const GPS_STALE_MS = 45000;
   let destinationDrafts = {};
   let destinationFeedbacks = {};
   let gpsStatusByOrder = {};
@@ -203,9 +208,11 @@
     const numericOrderId = Number(orderId || 0);
     if (!numericOrderId) return;
     if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchRetries = 0;
     gpsStatusByOrder[numericOrderId] = 'requesting';
     showAlert('Solicitando permiso de ubicacion del telefono...', 'warning');
     render();
+    warnIfPermissionBlocked();
     navigator.geolocation.getCurrentPosition(
       (position) => activateGpsTracking(numericOrderId, position).catch((error) => {
         gpsStatusByOrder[numericOrderId] = 'error';
@@ -217,39 +224,89 @@
         showAlert(gpsErrorMessage(error), false);
         render();
       },
-      {enableHighAccuracy: true, maximumAge: 0, timeout: 15000},
+      {enableHighAccuracy: true, maximumAge: 0, timeout: 20000},
     );
+  };
+  const warnIfPermissionBlocked = () => {
+    if (!navigator.permissions?.query) return;
+    navigator.permissions.query({name: 'geolocation'}).then((status) => {
+      if (status.state === 'denied') {
+        showAlert('El permiso de ubicacion esta bloqueado para esta pagina. Activalo en el candado/ajustes del navegador y volve a intentar.', false);
+      }
+    }).catch(() => {});
+  };
+  const startGpsWatch = () => {
+    if (!gpsOrderId) return;
+    if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = navigator.geolocation.watchPosition(
+      (position) => {
+        gpsWatchRetries = 0;
+        sendGpsPosition(gpsOrderId, position).catch(() => {});
+      },
+      (error) => handleWatchError(error),
+      {enableHighAccuracy: true, maximumAge: 10000, timeout: 20000},
+    );
+  };
+  const handleWatchError = (error) => {
+    if (error?.code === 1) {
+      showAlert(gpsErrorMessage(error), false);
+      stopGpsTracking(gpsOrderId);
+      render();
+      return;
+    }
+    if (gpsWatchRetries >= GPS_MAX_WATCH_RETRIES) {
+      showAlert('El GPS dejo de actualizar. Revisa el permiso de ubicacion y la senal del telefono.', false);
+      return;
+    }
+    gpsWatchRetries += 1;
+    showAlert(`Reintentando GPS (${gpsWatchRetries}/${GPS_MAX_WATCH_RETRIES})...`, 'warning');
+    startGpsWatch();
   };
   const activateGpsTracking = async (orderId, firstPosition) => {
     gpsOrderId = Number(orderId || 0);
     lastGpsSentAt = 0;
+    lastGpsFixAt = Date.now();
     await sendGpsPosition(gpsOrderId, firstPosition, {force: true});
-    gpsWatchId = navigator.geolocation.watchPosition(
-      (position) => sendGpsPosition(gpsOrderId, position).catch(() => {}),
-      () => showAlert('El GPS dejo de actualizar. Revisa el permiso de ubicacion del telefono.', false),
-      {enableHighAccuracy: true, maximumAge: 10000, timeout: 15000},
-    );
+    startGpsWatch();
+    startGpsWatchdog();
     gpsStatusByOrder[gpsOrderId] = 'active';
-    showAlert('GPS activo: primera ubicacion guardada correctamente.', true);
+    showAlert('GPS activo: primera ubicacion guardada correctamente. Manten esta pantalla abierta.', true);
     render();
   };
+  const startGpsWatchdog = () => {
+    if (gpsWatchdogTimer) window.clearInterval(gpsWatchdogTimer);
+    gpsWatchdogTimer = window.setInterval(() => {
+      if (gpsWatchId === null || !lastGpsFixAt) return;
+      if (Date.now() - lastGpsFixAt > GPS_STALE_MS) {
+        showAlert('Hace rato que no llega tu ubicacion GPS. Verifica la senal y que el permiso siga activo.', 'warning');
+      }
+    }, 15000);
+  };
   const gpsErrorMessage = (error) => {
-    if (error?.code === 1) return 'Permiso de ubicacion denegado. Activalo en el navegador para usar GPS delivery.';
-    if (error?.code === 2) return 'No se pudo obtener la ubicacion del telefono.';
-    if (error?.code === 3) return 'El telefono tardo demasiado en entregar la ubicacion GPS.';
-    return 'No se pudo activar GPS. Revisa permisos, HTTPS y ubicacion del telefono.';
+    if (error?.code === 1) return 'Permiso de ubicacion denegado. Activalo en el candado/ajustes del navegador para usar GPS delivery.';
+    if (error?.code === 2) return 'No se pudo obtener la ubicacion del telefono. Activa el GPS/ubicacion del dispositivo.';
+    if (error?.code === 3) return 'El telefono tardo demasiado en entregar la ubicacion GPS. Reintenta en una zona con mejor senal.';
+    return 'No se pudo activar GPS. Revisa permisos, HTTPS y que la ubicacion del telefono este encendida.';
   };
   const stopGpsTracking = (orderId) => {
-    if (gpsWatchId === null) return;
-    if (orderId && Number(orderId) !== Number(gpsOrderId)) return;
+    if (orderId && gpsOrderId && Number(orderId) !== Number(gpsOrderId)) return;
+    if (gpsWatchdogTimer) {
+      window.clearInterval(gpsWatchdogTimer);
+      gpsWatchdogTimer = null;
+    }
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
     if (gpsOrderId) delete gpsStatusByOrder[gpsOrderId];
-    navigator.geolocation.clearWatch(gpsWatchId);
-    gpsWatchId = null;
     gpsOrderId = null;
     lastGpsSentAt = 0;
+    lastGpsFixAt = 0;
+    gpsWatchRetries = 0;
   };
   const sendGpsPosition = async (orderId, position, options = {}) => {
     if (!orderId || !position?.coords) return;
+    lastGpsFixAt = Date.now();
     const now = Date.now();
     if (!options.force && now - lastGpsSentAt < 15000) return;
     lastGpsSentAt = now;

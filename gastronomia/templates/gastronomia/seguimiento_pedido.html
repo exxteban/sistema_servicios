@@ -149,9 +149,18 @@
                 }
                 if (points.length > 1) map.fitBounds(points, {padding: [36, 36], maxZoom: 16});
                 else map.setView(points[0], 15);
-                if (mapStatus && hasDelivery) mapStatus.textContent = 'Ultima ubicacion del delivery: ' + formatDate(tracking.delivery.fecha_registro);
+                if (mapStatus && hasDelivery) mapStatus.textContent = 'Ultima ubicacion del delivery: ' + formatDate(tracking.delivery.fecha_registro) + staleSuffix(tracking.delivery.fecha_registro);
                 if (mapStatus && !hasDelivery && hasDestination) mapStatus.textContent = 'Destino cargado. Esperando ubicacion GPS del delivery.';
                 setTimeout(function () { map.invalidateSize(); }, 50);
+            }
+
+            function staleSuffix(value) {
+                if (!value) return '';
+                var date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '';
+                var diffMs = Date.now() - date.getTime();
+                if (diffMs > 120000) return ' (sin actualizar hace mas de 2 minutos)';
+                return '';
             }
 
             function refreshStatus() {
@@ -165,7 +174,11 @@
                         renderTracking(data.tracking);
                         renderEvents(data.eventos);
                     })
-                    .catch(function () {});
+                    .catch(function () {
+                        if (mapStatus && mapCard && mapCard.classList.contains('visible')) {
+                            mapStatus.textContent = 'Sin conexion para actualizar la ubicacion. Reintentando...';
+                        }
+                    });
             }
 
             renderTracking(initialTracking);
