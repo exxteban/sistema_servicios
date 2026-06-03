@@ -93,7 +93,8 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
         headers={'X-CSRFToken': csrf},
     )
     assert pedido_resp.status_code == 201
-    pedido_id = pedido_resp.get_json()['pedido']['id_pedido']
+    pedido_data = pedido_resp.get_json()['pedido']
+    pedido_id = pedido_data['id_pedido']
     assert client.post(f'/api/gastronomia/pedidos/{pedido_id}/enviar-cocina', json={}, headers={'X-CSRFToken': csrf}).status_code == 200
     assert client.post(f'/api/gastronomia/cocina/pedidos/{pedido_id}/listo', json={}, headers={'X-CSRFToken': csrf}).status_code == 200
 
@@ -134,6 +135,13 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
     )
     assert ubicacion_resp.status_code == 200
     assert ubicacion_resp.get_json()['ubicacion']['pedido_id'] == pedido_id
+
+    seguimiento_resp = client.get(f'/gastronomia/pedido/{pedido_data["codigo_publico"]}/estado')
+    assert seguimiento_resp.status_code == 200
+    seguimiento = seguimiento_resp.get_json()
+    assert seguimiento['tracking']['visible'] is True
+    assert seguimiento['tracking']['delivery']['latitud'] == -25.3001
+    assert seguimiento['tracking']['destino']['latitud'] == -25.3001
 
     entregar_resp = client.post(
         f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/entregar',

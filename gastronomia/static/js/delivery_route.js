@@ -14,6 +14,7 @@
   let gpsWatchId = null;
   let gpsOrderId = null;
   let lastGpsSentAt = 0;
+  let destinationDrafts = {};
   const gpsTrackingEnabled = root.dataset.gpsTracking === '1';
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -104,15 +105,19 @@
     return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="rounded-lg bg-sky-600 px-3 py-2 text-center text-sm font-black text-white hover:bg-sky-700">Ir al destino</a>`;
   };
   const renderDestinationEditor = (order) => {
-    const currentValue = order.ubicacion_entrega_url || formatCoords(order) || '';
+    const orderId = String(order.id_pedido || '');
+    const currentValue = Object.prototype.hasOwnProperty.call(destinationDrafts, orderId)
+      ? destinationDrafts[orderId]
+      : order.ubicacion_entrega_url || formatCoords(order) || '';
     return `
       <div class="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3 dark:border-sky-500/30 dark:bg-sky-500/10">
         <label class="block text-xs font-black uppercase tracking-wide text-sky-800 dark:text-sky-200">
           Ubicacion exacta del destino
           <span class="mt-1 block text-[11px] normal-case font-semibold text-sky-700 dark:text-sky-300">Pega un link de Google Maps/WhatsApp o coordenadas. Se usa para el boton Ir al destino.</span>
-          <span class="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <span class="mt-2 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
             <input data-destination-input="${order.id_pedido}" value="${escapeHtml(currentValue)}" placeholder="Link de ubicacion o -25.3001,-57.6359" class="w-full rounded-lg border border-sky-200 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-sky-500/30 dark:bg-gray-900 dark:text-gray-100">
-            <button type="button" data-save-destination="${order.id_pedido}" class="rounded-lg bg-sky-700 px-3 py-2 text-sm font-black text-white hover:bg-sky-800">Guardar destino</button>
+            <button type="button" data-save-destination="${order.id_pedido}" style="background:#0369a1;color:#fff" class="rounded-lg px-3 py-2 text-sm font-black hover:opacity-90">Guardar destino</button>
+            <button type="button" data-clear-destination="${order.id_pedido}" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-black text-red-700 hover:bg-red-50">Borrar</button>
           </span>
         </label>
       </div>
@@ -210,9 +215,21 @@
       method: 'POST',
       body: JSON.stringify({ubicacion_entrega_url: input?.value || ''}),
     });
+    delete destinationDrafts[String(orderId)];
     showAlert('Destino actualizado.', true);
     await load({keepAlert: true});
   };
+  const clearDestination = async (orderId) => {
+    const input = document.querySelector(`[data-destination-input="${orderId}"]`);
+    if (input) input.value = '';
+    destinationDrafts[String(orderId)] = '';
+    await saveDestination(orderId);
+  };
+  ordersBox.addEventListener('input', (event) => {
+    const input = event.target.closest('[data-destination-input]');
+    if (!input) return;
+    destinationDrafts[String(input.dataset.destinationInput)] = input.value;
+  });
   ordersBox.addEventListener('click', (event) => {
     const copyButton = event.target.closest('[data-copy-tracking]');
     if (copyButton) {
@@ -222,6 +239,11 @@
     const destinationButton = event.target.closest('[data-save-destination]');
     if (destinationButton) {
       saveDestination(destinationButton.dataset.saveDestination).catch((error) => showAlert(error.message, false));
+      return;
+    }
+    const clearDestinationButton = event.target.closest('[data-clear-destination]');
+    if (clearDestinationButton) {
+      clearDestination(clearDestinationButton.dataset.clearDestination).catch((error) => showAlert(error.message, false));
       return;
     }
     const gpsButton = event.target.closest('[data-start-gps]');

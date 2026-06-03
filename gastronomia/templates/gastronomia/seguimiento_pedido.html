@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Seguimiento pedido {{ pedido.codigo_entrega }}</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         body { margin: 0; background: #fff7ed; color: #111827; font-family: Arial, Helvetica, sans-serif; }
         .wrap { max-width: 720px; margin: 0 auto; padding: 28px 16px; }
@@ -16,6 +17,9 @@
         .meta div { border-radius: 12px; background: #f9fafb; padding: 12px; font-size: 14px; }
         .timeline { display: grid; gap: 10px; margin-top: 18px; }
         .event { border-left: 4px solid #fb923c; background: #fff7ed; padding: 10px 12px; }
+        .map-card { display: none; margin: 18px 0; border-radius: 16px; border: 1px solid #bae6fd; background: #f0f9ff; padding: 14px; }
+        .map-card.visible { display: block; }
+        #delivery-map { height: 320px; border-radius: 14px; overflow: hidden; border: 1px solid #bae6fd; }
         .muted { color: #6b7280; font-size: 13px; }
         @media (min-width: 640px) { .meta { grid-template-columns: repeat(2, 1fr); } }
     </style>
@@ -40,6 +44,12 @@
                 {% if pedido.fecha_modificacion %}<div><strong>Ultima actualizacion</strong><br><span data-last-update>{{ pedido.fecha_modificacion|local_strftime('%d/%m/%Y %H:%M') }}</span></div>{% endif %}
             </div>
 
+            <section class="map-card{% if tracking.visible %} visible{% endif %}" data-delivery-map-card>
+                <h2 style="margin: 0 0 8px;">Ubicacion del delivery</h2>
+                <p class="muted" data-delivery-map-status>Ultima ubicacion registrada del repartidor.</p>
+                <div id="delivery-map"></div>
+            </section>
+
             <h2>Historial</h2>
             <div class="timeline" data-events-list>
                 {% for evento in eventos %}
@@ -53,15 +63,22 @@
             </div>
         </section>
     </main>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         (function () {
             var root = document.querySelector('[data-tracking-root]');
             if (!root || !window.fetch) return;
+            var initialTracking = {{ tracking|tojson }};
             var statusUrl = root.getAttribute('data-status-url');
             var currentStatus = document.querySelector('[data-current-status]');
             var currentMessage = document.querySelector('[data-current-message]');
             var lastUpdate = document.querySelector('[data-last-update]');
             var eventsList = document.querySelector('[data-events-list]');
+            var mapCard = document.querySelector('[data-delivery-map-card]');
+            var mapStatus = document.querySelector('[data-delivery-map-status]');
+            var map = null;
+            var deliveryMarker = null;
+            var destinationMarker = null;
 
             function escapeHtml(value) {
                 return String(value || '').replace(/[&<>"']/g, function (char) {
@@ -90,6 +107,42 @@
                 }).join('');
             }
 
+            function renderTracking(tracking) {
+                if (!mapCard || !tracking || !tracking.visible || !tracking.delivery || !window.L) {
+                    if (mapCard) mapCard.classList.remove('visible');
+                    return;
+                }
+                mapCard.classList.add('visible');
+                var lat = Number(tracking.delivery.latitud);
+                var lng = Number(tracking.delivery.longitud);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+                if (!map) {
+                    map = window.L.map('delivery-map').setView([lat, lng], 15);
+                    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '&copy; OpenStreetMap'
+                    }).addTo(map);
+                }
+                if (!deliveryMarker) deliveryMarker = window.L.marker([lat, lng]).addTo(map);
+                else deliveryMarker.setLatLng([lat, lng]);
+                deliveryMarker.bindPopup('Delivery').openPopup();
+                var bounds = [[lat, lng]];
+                if (tracking.destino) {
+                    var destLat = Number(tracking.destino.latitud);
+                    var destLng = Number(tracking.destino.longitud);
+                    if (Number.isFinite(destLat) && Number.isFinite(destLng)) {
+                        if (!destinationMarker) destinationMarker = window.L.marker([destLat, destLng]).addTo(map);
+                        else destinationMarker.setLatLng([destLat, destLng]);
+                        destinationMarker.bindPopup('Destino');
+                        bounds.push([destLat, destLng]);
+                    }
+                }
+                if (bounds.length > 1) map.fitBounds(bounds, {padding: [36, 36], maxZoom: 16});
+                else map.setView([lat, lng], 15);
+                if (mapStatus) mapStatus.textContent = 'Ultima ubicacion: ' + formatDate(tracking.delivery.fecha_registro);
+                setTimeout(function () { map.invalidateSize(); }, 50);
+            }
+
             function refreshStatus() {
                 fetch(statusUrl, {cache: 'no-store'})
                     .then(function (response) { return response.ok ? response.json() : null; })
@@ -98,11 +151,13 @@
                         currentStatus.textContent = data.pedido.estado_label || data.pedido.estado || '';
                         currentMessage.textContent = data.pedido.mensaje || 'Tu pedido fue actualizado.';
                         if (lastUpdate) lastUpdate.textContent = formatDate(data.pedido.fecha_modificacion);
+                        renderTracking(data.tracking);
                         renderEvents(data.eventos);
                     })
                     .catch(function () {});
             }
 
+            renderTracking(initialTracking);
             window.setInterval(refreshStatus, 8000);
             window.setTimeout(refreshStatus, 1000);
         }());

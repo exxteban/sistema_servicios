@@ -1,7 +1,7 @@
 """Seguimiento publico de pedidos gastronomicos."""
 from flask import abort, jsonify, make_response, render_template
 
-from gastronomia.models import GastronomiaPedido, GastronomiaPedidoEvento
+from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaPedidoEvento
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 
 
@@ -21,12 +21,14 @@ MENSAJES_SEGUIMIENTO = {
 def seguimiento_pedido_publico(codigo_publico):
     pedido = _obtener_pedido_publico(codigo_publico)
     eventos = _eventos_pedido(pedido)
+    tracking = _tracking_delivery(pedido)
     response = make_response(
         render_template(
             'gastronomia/seguimiento_pedido.html',
             pedido=pedido,
             eventos=eventos,
             mensajes=MENSAJES_SEGUIMIENTO,
+            tracking=tracking,
         )
     )
     return _sin_cache(response)
@@ -43,6 +45,7 @@ def seguimiento_pedido_estado_publico(codigo_publico):
             'mensaje': MENSAJES_SEGUIMIENTO.get(pedido.estado, 'Tu pedido fue actualizado.'),
             'fecha_modificacion': pedido.fecha_modificacion.isoformat() if pedido.fecha_modificacion else None,
         },
+        'tracking': _tracking_delivery(pedido),
         'eventos': [_evento_dict(evento) for evento in _eventos_pedido(pedido)],
     })
     return _sin_cache(response)
@@ -72,6 +75,27 @@ def _evento_dict(evento):
         'tipo': evento.tipo,
         'label': _estado_label((evento.tipo or '').replace('pedido_', '')),
         'fecha_evento': evento.fecha_evento.isoformat() if evento.fecha_evento else None,
+    }
+
+
+def _tracking_delivery(pedido):
+    if pedido.tipo_pedido != 'delivery' or pedido.estado != 'en_camino':
+        return {'visible': False}
+    ubicacion = (
+        GastronomiaDeliveryUbicacion.query
+        .filter_by(cliente_id=pedido.cliente_id, pedido_id=pedido.id_pedido)
+        .order_by(GastronomiaDeliveryUbicacion.fecha_registro.desc(), GastronomiaDeliveryUbicacion.id_ubicacion.desc())
+        .first()
+    )
+    if not ubicacion:
+        return {'visible': False}
+    destino = None
+    if pedido.destino_latitud is not None and pedido.destino_longitud is not None:
+        destino = {'latitud': pedido.destino_latitud, 'longitud': pedido.destino_longitud}
+    return {
+        'visible': True,
+        'delivery': ubicacion.to_dict(),
+        'destino': destino,
     }
 
 
