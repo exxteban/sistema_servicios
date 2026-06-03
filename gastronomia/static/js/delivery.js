@@ -142,7 +142,7 @@
             ${drivers.filter((driver) => driver.activo || driver.id_repartidor === order.repartidor_id).map((driver) => `<option value="${driver.id_repartidor}" ${Number(order.repartidor_id || 0) === Number(driver.id_repartidor) ? 'selected' : ''}>${escapeHtml(driver.nombre)}</option>`).join('')}
           </select>
           <div class="grid gap-2" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 2.5rem 2.5rem;">
-            <a href="/gastronomia/cocina" class="rounded-lg border border-orange-200 px-2 py-2 text-center text-xs font-black text-orange-800 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-200 dark:hover:bg-orange-500/10">Cocina</a>
+            ${renderKitchenControl(order)}
             <a href="/gastronomia/pedidos/${order.id_pedido}/ticket?preview=1" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Ticket</a>
             <a href="${escapeHtml(order.url_seguimiento_publica || order.url_seguimiento || '#')}" target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-2 py-2 text-center text-xs font-black text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-200">Estado</a>
             ${trackingUrl ? `<button type="button" data-copy-tracking="${order.id_pedido}" title="Copiar link de estado" aria-label="Copiar link de estado" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-sky-200 text-lg text-sky-700 hover:bg-sky-50"><i class="fas fa-link"></i></button>` : '<span title="Sin link de estado" aria-label="Sin link de estado" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fas fa-link"></i></span>'}
@@ -155,6 +155,13 @@
         </div>
       </article>
     `;
+  };
+  const renderKitchenControl = (order) => {
+    const classes = 'rounded-lg border border-orange-200 px-2 py-2 text-center text-xs font-black text-orange-800 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-200 dark:hover:bg-orange-500/10';
+    if (order.estado === 'abierto') {
+      return `<button type="button" data-send-kitchen="${order.id_pedido}" class="${classes}">Enviar cocina</button>`;
+    }
+    return `<a href="/gastronomia/cocina" class="${classes}">Cocina</a>`;
   };
   const elapsed = (iso) => {
     const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso || Date.now()).getTime()) / 60000));
@@ -229,6 +236,11 @@
     });
     await load();
   };
+  const sendKitchen = async (orderId) => {
+    await apiJson(`/api/gastronomia/pedidos/${orderId}/enviar-cocina`, {method: 'POST', body: '{}'});
+    showAlert('Pedido enviado a cocina.', true);
+    await load();
+  };
   const copyTrackingLink = async (orderId) => {
     const order = orders.find((item) => Number(item.id_pedido) === Number(orderId));
     if (!order) throw new Error('Pedido no encontrado.');
@@ -253,6 +265,11 @@
     assignDriver(select.dataset.driverSelect, select.value).catch((error) => showAlert(error.message, false));
   });
   board.addEventListener('click', (event) => {
+    const kitchenButton = event.target.closest('[data-send-kitchen]');
+    if (kitchenButton) {
+      sendKitchen(kitchenButton.dataset.sendKitchen).catch((error) => showAlert(error.message, false));
+      return;
+    }
     const copyButton = event.target.closest('[data-copy-tracking]');
     if (copyButton) {
       copyTrackingLink(copyButton.dataset.copyTracking).catch((error) => showAlert(error.message, false));

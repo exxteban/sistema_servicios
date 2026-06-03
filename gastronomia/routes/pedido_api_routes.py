@@ -99,7 +99,7 @@ def actualizar(pedido_id):
 
 @gastronomia_pedidos_api_bp.route('/pedidos/<int:pedido_id>/enviar-cocina', methods=['POST'])
 @login_required
-@requiere_permiso_gastronomia(PERMISO_POS)
+@requiere_permiso_gastronomia(PERMISO_POS, PERMISO_CAJA, PERMISO_COCINA)
 def enviar_cocina(pedido_id):
     cliente_id, error = _cliente_o_error()
     if error:
