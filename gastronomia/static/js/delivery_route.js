@@ -100,8 +100,8 @@
     const blockersHtml = blockers.length
       ? `<ul class="mt-2 list-disc space-y-1 pl-5 text-xs font-semibold text-red-700 dark:text-red-300">${blockers.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
       : '';
-    const hintHtml = ready && !enCamino.length
-      ? '<p class="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">Para enviar tu ubicacion al cliente necesitas un pedido en estado "En camino". Marca "Salgo ahora" en un pedido listo.</p>'
+    const hintHtml = ready && !enCamino.length && !orders.some((order) => order.estado === 'listo')
+      ? '<p class="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">Cuando tengas un pedido asignado podras activar tu GPS. El cliente vera tu ubicacion cuando marques "Salgo ahora".</p>'
       : '';
     const buttonHtml = (ready && permissionState !== 'granted')
       ? '<button type="button" id="route-test-gps" class="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-black text-white hover:bg-sky-700"><i class="fas fa-location-crosshairs"></i> Probar / activar permiso de ubicacion</button>'
@@ -214,7 +214,7 @@
     return new Intl.DateTimeFormat('es-PY', {hour: '2-digit', minute: '2-digit'}).format(date);
   };
   const renderGpsButton = (order) => {
-    if (!gpsTrackingEnabled || order.estado !== 'en_camino') return '';
+    if (!gpsTrackingEnabled || (order.estado !== 'en_camino' && order.estado !== 'listo')) return '';
     if (routeMode !== 'repartidor') {
       return '<span class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm font-black text-slate-500">GPS solo repartidor</span>';
     }
@@ -303,12 +303,12 @@
     navigator.geolocation.getCurrentPosition(
       () => {
         permissionState = 'granted';
-        const enCamino = orders.find((order) => order.estado === 'en_camino');
-        if (enCamino) {
-          showAlert('Permiso concedido. Activando GPS del pedido en camino...', true);
-          startGpsTracking(enCamino.id_pedido);
+        const target = orders.find((order) => order.estado === 'en_camino') || orders.find((order) => order.estado === 'listo');
+        if (target) {
+          showAlert('Permiso concedido. Activando GPS del pedido...', true);
+          startGpsTracking(target.id_pedido);
         } else {
-          showAlert('Permiso de ubicacion concedido. Marca "Salgo ahora" en un pedido para empezar a compartir tu posicion.', true);
+          showAlert('Permiso de ubicacion concedido. Cuando tengas un pedido asignado podras compartir tu posicion.', true);
         }
         renderGpsPanel();
       },

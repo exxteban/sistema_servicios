@@ -21,7 +21,6 @@ from gastronomia.services.permisos import (
     PERMISO_CAJA,
     PERMISO_COCINA,
     PERMISO_DELIVERY,
-    PERMISO_DELIVERY_GPS,
     PERMISO_POS,
     requiere_permiso_gastronomia,
     tiene_permiso_gastronomia,
@@ -149,13 +148,11 @@ def ruta_entregar(pedido_id):
 
 @gastronomia_delivery_api_bp.route('/delivery/ruta/pedidos/<int:pedido_id>/ubicacion', methods=['POST'])
 @login_required
-@requiere_permiso_gastronomia(PERMISO_DELIVERY, PERMISO_DELIVERY_GPS)
+@requiere_permiso_gastronomia(PERMISO_DELIVERY)
 def ruta_ubicacion(pedido_id):
     cliente_id, error = _cliente_o_error()
     if error:
         return error
-    if not tiene_permiso_gastronomia(PERMISO_DELIVERY) or not tiene_permiso_gastronomia(PERMISO_DELIVERY_GPS):
-        return jsonify({'error': 'Sin permisos', 'mensaje': 'GPS delivery no esta activo para este usuario.'}), 403
     try:
         ubicacion = registrar_ubicacion_repartidor(cliente_id, current_user.id_usuario, pedido_id, _payload())
     except ValueError as exc:
