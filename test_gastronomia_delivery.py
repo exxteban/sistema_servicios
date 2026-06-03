@@ -128,6 +128,13 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
     assert destino_resp.status_code == 200
     assert destino_resp.get_json()['pedido']['destino_latitud'] == -25.3001
 
+    seguimiento_destino_resp = client.get(f'/gastronomia/pedido/{pedido_data["codigo_publico"]}/estado')
+    assert seguimiento_destino_resp.status_code == 200
+    seguimiento_destino = seguimiento_destino_resp.get_json()
+    assert seguimiento_destino['tracking']['visible'] is True
+    assert seguimiento_destino['tracking']['delivery'] is None
+    assert seguimiento_destino['tracking']['destino']['latitud'] == -25.3001
+
     ubicacion_resp = client.post(
         f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/ubicacion',
         json={'latitud': -25.3001, 'longitud': -57.6359, 'precision_metros': 12},

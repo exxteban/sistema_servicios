@@ -15,6 +15,8 @@
   let gpsOrderId = null;
   let lastGpsSentAt = 0;
   let destinationDrafts = {};
+  let destinationFeedbacks = {};
+  let gpsStatusByOrder = {};
   const gpsTrackingEnabled = root.dataset.gpsTracking === '1';
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -119,6 +121,7 @@
             <button type="button" data-save-destination="${order.id_pedido}" style="background:#0369a1;color:#fff" class="rounded-lg px-3 py-2 text-sm font-black hover:opacity-90">Guardar destino</button>
             <button type="button" data-clear-destination="${order.id_pedido}" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-black text-red-700 hover:bg-red-50">Borrar</button>
           </span>
+          <span data-destination-status="${order.id_pedido}" class="mt-2 block text-[11px] normal-case font-black ${destinationFeedbacks[orderId]?.ok === false ? 'text-red-700' : 'text-emerald-700'}">${escapeHtml(destinationFeedbacks[orderId]?.message || '')}</span>
         </label>
       </div>
     `;
@@ -147,8 +150,12 @@
   };
   const renderGpsButton = (order) => {
     if (!gpsTrackingEnabled || order.estado !== 'en_camino') return '';
-    const active = Number(gpsOrderId || 0) === Number(order.id_pedido || 0);
-    return `<button type="button" data-start-gps="${order.id_pedido}" class="rounded-lg border border-sky-200 px-3 py-2 text-sm font-black ${active ? 'bg-sky-600 text-white' : 'text-sky-700 hover:bg-sky-50'}">${active ? 'GPS activo' : 'Activar GPS'}</button>`;
+    const orderId = Number(order.id_pedido || 0);
+    const status = gpsStatusByOrder[orderId] || (Number(gpsOrderId || 0) === orderId ? 'active' : 'idle');
+    const requesting = status === 'requesting';
+    const active = status === 'active';
+    const label = requesting ? 'Solicitando GPS...' : active ? 'GPS activo' : status === 'error' ? 'Reintentar GPS' : 'Activar GPS';
+    return `<button type="button" data-start-gps="${order.id_pedido}" ${requesting ? 'disabled' : ''} class="rounded-lg border border-sky-200 px-3 py-2 text-sm font-black ${active ? 'bg-sky-600 text-white' : requesting ? 'bg-sky-50 text-sky-700 opacity-70' : 'text-sky-700 hover:bg-sky-50'}">${label}</button>`;
   };
   const emptyRoute = () => {
     const message = routeMode === 'sin_repartidor'
@@ -169,29 +176,58 @@
       showAlert('Este telefono/navegador no permite GPS desde la web.', false);
       return;
     }
+    const numericOrderId = Number(orderId || 0);
+    if (!numericOrderId) return;
     if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
+    gpsStatusByOrder[numericOrderId] = 'requesting';
+    showAlert('Solicitando permiso de ubicacion del telefono...', 'warning');
+    render();
+    navigator.geolocation.getCurrentPosition(
+      (position) => activateGpsTracking(numericOrderId, position).catch((error) => {
+        gpsStatusByOrder[numericOrderId] = 'error';
+        showAlert(`No se pudo guardar la ubicacion GPS: ${error.message}`, false);
+        render();
+      }),
+      (error) => {
+        gpsStatusByOrder[numericOrderId] = 'error';
+        showAlert(gpsErrorMessage(error), false);
+        render();
+      },
+      {enableHighAccuracy: true, maximumAge: 0, timeout: 15000},
+    );
+  };
+  const activateGpsTracking = async (orderId, firstPosition) => {
     gpsOrderId = Number(orderId || 0);
     lastGpsSentAt = 0;
+    await sendGpsPosition(gpsOrderId, firstPosition, {force: true});
     gpsWatchId = navigator.geolocation.watchPosition(
       (position) => sendGpsPosition(gpsOrderId, position).catch(() => {}),
-      () => showAlert('No se pudo activar GPS. Revisa el permiso de ubicacion del telefono.', false),
+      () => showAlert('El GPS dejo de actualizar. Revisa el permiso de ubicacion del telefono.', false),
       {enableHighAccuracy: true, maximumAge: 10000, timeout: 15000},
     );
-    showAlert('GPS activo para esta entrega mientras la hoja de ruta siga abierta.', true);
+    gpsStatusByOrder[gpsOrderId] = 'active';
+    showAlert('GPS activo: primera ubicacion guardada correctamente.', true);
     render();
+  };
+  const gpsErrorMessage = (error) => {
+    if (error?.code === 1) return 'Permiso de ubicacion denegado. Activalo en el navegador para usar GPS delivery.';
+    if (error?.code === 2) return 'No se pudo obtener la ubicacion del telefono.';
+    if (error?.code === 3) return 'El telefono tardo demasiado en entregar la ubicacion GPS.';
+    return 'No se pudo activar GPS. Revisa permisos, HTTPS y ubicacion del telefono.';
   };
   const stopGpsTracking = (orderId) => {
     if (gpsWatchId === null) return;
     if (orderId && Number(orderId) !== Number(gpsOrderId)) return;
+    if (gpsOrderId) delete gpsStatusByOrder[gpsOrderId];
     navigator.geolocation.clearWatch(gpsWatchId);
     gpsWatchId = null;
     gpsOrderId = null;
     lastGpsSentAt = 0;
   };
-  const sendGpsPosition = async (orderId, position) => {
+  const sendGpsPosition = async (orderId, position, options = {}) => {
     if (!orderId || !position?.coords) return;
     const now = Date.now();
-    if (now - lastGpsSentAt < 15000) return;
+    if (!options.force && now - lastGpsSentAt < 15000) return;
     lastGpsSentAt = now;
     await apiJson(`/api/gastronomia/delivery/ruta/pedidos/${orderId}/ubicacion`, {
       method: 'POST',
@@ -211,13 +247,23 @@
   };
   const saveDestination = async (orderId) => {
     const input = document.querySelector(`[data-destination-input="${orderId}"]`);
-    await apiJson(`/api/gastronomia/delivery/ruta/pedidos/${orderId}/destino`, {
-      method: 'POST',
-      body: JSON.stringify({ubicacion_entrega_url: input?.value || ''}),
-    });
-    delete destinationDrafts[String(orderId)];
-    showAlert('Destino actualizado.', true);
-    await load({keepAlert: true});
+    const key = String(orderId);
+    destinationFeedbacks[key] = {message: 'Guardando destino...', ok: true};
+    render();
+    try {
+      await apiJson(`/api/gastronomia/delivery/ruta/pedidos/${orderId}/destino`, {
+        method: 'POST',
+        body: JSON.stringify({ubicacion_entrega_url: input?.value || ''}),
+      });
+      delete destinationDrafts[key];
+      destinationFeedbacks[key] = {message: input?.value ? 'Destino guardado correctamente.' : 'Destino borrado correctamente.', ok: true};
+      showAlert(input?.value ? 'Destino guardado correctamente.' : 'Destino borrado correctamente.', true);
+      await load({keepAlert: true});
+    } catch (error) {
+      destinationFeedbacks[key] = {message: `No se pudo guardar: ${error.message}`, ok: false};
+      render();
+      throw error;
+    }
   };
   const clearDestination = async (orderId) => {
     const input = document.querySelector(`[data-destination-input="${orderId}"]`);

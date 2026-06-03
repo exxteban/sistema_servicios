@@ -81,20 +81,18 @@ def _evento_dict(evento):
 def _tracking_delivery(pedido):
     if pedido.tipo_pedido != 'delivery' or pedido.estado != 'en_camino':
         return {'visible': False}
+    destino = None
+    if pedido.destino_latitud is not None and pedido.destino_longitud is not None:
+        destino = {'latitud': pedido.destino_latitud, 'longitud': pedido.destino_longitud}
     ubicacion = (
         GastronomiaDeliveryUbicacion.query
         .filter_by(cliente_id=pedido.cliente_id, pedido_id=pedido.id_pedido)
         .order_by(GastronomiaDeliveryUbicacion.fecha_registro.desc(), GastronomiaDeliveryUbicacion.id_ubicacion.desc())
         .first()
     )
-    if not ubicacion:
-        return {'visible': False}
-    destino = None
-    if pedido.destino_latitud is not None and pedido.destino_longitud is not None:
-        destino = {'latitud': pedido.destino_latitud, 'longitud': pedido.destino_longitud}
     return {
         'visible': True,
-        'delivery': ubicacion.to_dict(),
+        'delivery': ubicacion.to_dict() if ubicacion else None,
         'destino': destino,
     }
 
