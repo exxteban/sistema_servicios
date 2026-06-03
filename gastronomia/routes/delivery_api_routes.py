@@ -5,6 +5,7 @@ from flask_login import current_user, login_required
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.delivery_service import (
     actualizar_repartidor,
+    actualizar_destino_pedido_delivery,
     asignar_repartidor_pedido,
     crear_repartidor,
     listar_repartidores,
@@ -160,6 +161,30 @@ def ruta_ubicacion(pedido_id):
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'ubicacion': ubicacion.to_dict()})
+
+
+@gastronomia_delivery_api_bp.route('/delivery/ruta/pedidos/<int:pedido_id>/destino', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_DELIVERY)
+def ruta_destino(pedido_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        repartidor = obtener_repartidor_usuario(cliente_id, current_user.id_usuario)
+        if repartidor:
+            pedido_actual = next(
+                (pedido for pedido in listar_ruta_repartidor(cliente_id, current_user.id_usuario)[1] if int(pedido.id_pedido) == int(pedido_id)),
+                None,
+            )
+            if not pedido_actual:
+                raise ValueError('El pedido no esta asignado a este repartidor.')
+        elif not _puede_ver_ruta_operativa():
+            raise ValueError('Este usuario no esta vinculado a un repartidor activo.')
+        pedido = actualizar_destino_pedido_delivery(cliente_id, pedido_id, _payload())
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
 
 
 def _marcar_ruta(pedido_id: int, estado: str):

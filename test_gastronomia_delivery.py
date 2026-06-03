@@ -119,6 +119,14 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
     assert salir_resp.status_code == 200
     assert salir_resp.get_json()['pedido']['estado'] == 'en_camino'
 
+    destino_resp = client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/destino',
+        json={'ubicacion_entrega_url': 'https://www.google.com/maps/place/test/@-25.3001,-57.6359,17z'},
+        headers={'X-CSRFToken': csrf_ruta},
+    )
+    assert destino_resp.status_code == 200
+    assert destino_resp.get_json()['pedido']['destino_latitud'] == -25.3001
+
     ubicacion_resp = client.post(
         f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/ubicacion',
         json={'latitud': -25.3001, 'longitud': -57.6359, 'precision_metros': 12},

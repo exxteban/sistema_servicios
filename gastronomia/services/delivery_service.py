@@ -6,7 +6,12 @@ from datetime import datetime
 from app import db
 from app.models import Usuario
 from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaRepartidor
-from gastronomia.services.pedido_service import cambiar_estado_pedido, registrar_evento_pedido
+from gastronomia.services.pedido_service import (
+    _coords_from_location_text,
+    _parse_optional_coordinate,
+    cambiar_estado_pedido,
+    registrar_evento_pedido,
+)
 
 
 ESTADOS_RUTA = {'listo', 'en_camino'}
@@ -145,6 +150,27 @@ def registrar_ubicacion_repartidor(cliente_id: int, usuario_id: int, pedido_id: 
     db.session.add(ubicacion)
     db.session.commit()
     return ubicacion
+
+
+def actualizar_destino_pedido_delivery(cliente_id: int, pedido_id: int, data: dict) -> GastronomiaPedido:
+    pedido = _obtener_pedido_delivery(cliente_id, pedido_id)
+    if pedido.estado not in {'abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino'}:
+        raise ValueError('Solo se puede actualizar destino de pedidos delivery activos.')
+
+    ubicacion_url = (data.get('ubicacion_entrega_url') or data.get('destino') or '').strip()[:500] or None
+    latitud = _parse_optional_coordinate(data.get('destino_latitud'), -90, 90)
+    longitud = _parse_optional_coordinate(data.get('destino_longitud'), -180, 180)
+    if ubicacion_url and (latitud is None or longitud is None):
+        parsed_lat, parsed_lng = _coords_from_location_text(ubicacion_url)
+        latitud = latitud if latitud is not None else parsed_lat
+        longitud = longitud if longitud is not None else parsed_lng
+
+    pedido.ubicacion_entrega_url = ubicacion_url
+    pedido.destino_latitud = latitud
+    pedido.destino_longitud = longitud
+    db.session.commit()
+    registrar_evento_pedido(pedido, 'pedido_destino_delivery_actualizado')
+    return pedido
 
 
 def usuarios_disponibles_delivery(cliente_id: int) -> list[Usuario]:

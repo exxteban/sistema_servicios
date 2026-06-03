@@ -86,6 +86,7 @@
         <div class="mt-4 flex flex-wrap gap-2">
           ${(order.items || []).map((item) => `<span class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200">${item.cantidad} x ${escapeHtml(item.nombre_producto)}</span>`).join('')}
         </div>
+        ${renderDestinationEditor(order)}
         <div class="mt-4 grid gap-2 sm:grid-cols-4">
           ${renderDestinationButton(order)}
           ${trackingUrl ? `<button type="button" data-copy-tracking="${order.id_pedido}" class="rounded-lg border border-sky-200 px-3 py-2 text-center text-sm font-black text-sky-700 hover:bg-sky-50"><i class="fas fa-link"></i> Copiar</button>` : ''}
@@ -102,10 +103,25 @@
     if (!url) return '';
     return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="rounded-lg bg-sky-600 px-3 py-2 text-center text-sm font-black text-white hover:bg-sky-700">Ir al destino</a>`;
   };
+  const renderDestinationEditor = (order) => {
+    const currentValue = order.ubicacion_entrega_url || formatCoords(order) || '';
+    return `
+      <div class="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3 dark:border-sky-500/30 dark:bg-sky-500/10">
+        <label class="block text-xs font-black uppercase tracking-wide text-sky-800 dark:text-sky-200">
+          Ubicacion exacta del destino
+          <span class="mt-1 block text-[11px] normal-case font-semibold text-sky-700 dark:text-sky-300">Pega un link de Google Maps/WhatsApp o coordenadas. Se usa para el boton Ir al destino.</span>
+          <span class="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <input data-destination-input="${order.id_pedido}" value="${escapeHtml(currentValue)}" placeholder="Link de ubicacion o -25.3001,-57.6359" class="w-full rounded-lg border border-sky-200 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-sky-500/30 dark:bg-gray-900 dark:text-gray-100">
+            <button type="button" data-save-destination="${order.id_pedido}" class="rounded-lg bg-sky-700 px-3 py-2 text-sm font-black text-white hover:bg-sky-800">Guardar destino</button>
+          </span>
+        </label>
+      </div>
+    `;
+  };
   const destinationUrl = (order) => {
-    const lat = Number(order.destino_latitud);
-    const lng = Number(order.destino_longitud);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    const lat = coordinateValue(order.destino_latitud);
+    const lng = coordinateValue(order.destino_longitud);
+    if (lat !== null && lng !== null) {
       return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}`;
     }
     const locationUrl = String(order.ubicacion_entrega_url || '').trim();
@@ -113,6 +129,16 @@
     const address = String(order.direccion_entrega || '').trim();
     if (!address) return '';
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  };
+  const coordinateValue = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  };
+  const formatCoords = (order) => {
+    const lat = coordinateValue(order.destino_latitud);
+    const lng = coordinateValue(order.destino_longitud);
+    return lat !== null && lng !== null ? `${lat},${lng}` : '';
   };
   const renderGpsButton = (order) => {
     if (!gpsTrackingEnabled || order.estado !== 'en_camino') return '';
@@ -178,10 +204,24 @@
     if (!copied) throw new Error('No se pudo copiar el link.');
     showAlert('Link de estado copiado.', true);
   };
+  const saveDestination = async (orderId) => {
+    const input = document.querySelector(`[data-destination-input="${orderId}"]`);
+    await apiJson(`/api/gastronomia/delivery/ruta/pedidos/${orderId}/destino`, {
+      method: 'POST',
+      body: JSON.stringify({ubicacion_entrega_url: input?.value || ''}),
+    });
+    showAlert('Destino actualizado.', true);
+    await load({keepAlert: true});
+  };
   ordersBox.addEventListener('click', (event) => {
     const copyButton = event.target.closest('[data-copy-tracking]');
     if (copyButton) {
       copyTrackingLink(copyButton.dataset.copyTracking).catch((error) => showAlert(error.message, false));
+      return;
+    }
+    const destinationButton = event.target.closest('[data-save-destination]');
+    if (destinationButton) {
+      saveDestination(destinationButton.dataset.saveDestination).catch((error) => showAlert(error.message, false));
       return;
     }
     const gpsButton = event.target.closest('[data-start-gps]');
