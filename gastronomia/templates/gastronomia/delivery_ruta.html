@@ -22,6 +22,7 @@
     </div>
 
     <div id="route-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
+    <section id="route-gps-panel" class="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm dark:border-sky-500/30 dark:bg-sky-500/10"></section>
     <section id="route-summary" class="grid gap-3 sm:grid-cols-2"></section>
     <section id="route-orders" class="grid gap-4"></section>
 </div>
@@ -29,5 +30,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/whatsapp_order.js', v='20260529-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/delivery_route.js', v='20260603-10') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/delivery_route.js', v='20260603-11') }}"></script>
 {% endblock %}

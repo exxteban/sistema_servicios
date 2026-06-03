@@ -4,6 +4,7 @@
   const ordersBox = document.getElementById('route-orders');
   const summary = document.getElementById('route-summary');
   const alertBox = document.getElementById('route-alert');
+  const gpsPanel = document.getElementById('route-gps-panel');
   const driverName = document.getElementById('route-driver-name');
   const refreshButton = document.getElementById('route-refresh');
   if (!root || !ordersBox || !summary || !alertBox) return;
@@ -22,6 +23,7 @@
   let destinationDrafts = {};
   let destinationFeedbacks = {};
   let gpsStatusByOrder = {};
+  let permissionState = 'unknown';
   const gpsTrackingEnabled = root.dataset.gpsTracking === '1';
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -61,6 +63,7 @@
     render();
   };
   const render = () => {
+    renderGpsPanel();
     summary.innerHTML = [
       {title: 'Listos para salir', count: orders.filter((order) => order.estado === 'listo').length},
       {title: 'En camino', count: orders.filter((order) => order.estado === 'en_camino').length},
@@ -71,6 +74,50 @@
       </article>
     `).join('');
     ordersBox.innerHTML = orders.length ? orders.map(renderOrder).join('') : emptyRoute();
+  };
+  const gpsBlockers = () => {
+    const blockers = [];
+    if (!gpsTrackingEnabled) blockers.push('Tu usuario no tiene el permiso "Gastronomia - GPS Delivery". Pedile al administrador que lo active.');
+    if (routeMode !== 'repartidor') blockers.push('Tu usuario no esta vinculado a un repartidor activo. Vinculalo desde Delivery > Repartidores.');
+    if (typeof navigator === 'undefined' || !navigator.geolocation) blockers.push('Este navegador no soporta GPS web.');
+    if (window.isSecureContext === false) blockers.push('Estas entrando por HTTP. El GPS solo funciona con HTTPS o localhost; sin eso el navegador nunca pide permiso.');
+    if (permissionState === 'denied') blockers.push('El permiso de ubicacion esta bloqueado para esta pagina. Activalo en el candado/ajustes del navegador.');
+    return blockers;
+  };
+  const renderGpsPanel = () => {
+    if (!gpsPanel) return;
+    const blockers = gpsBlockers();
+    const enCamino = orders.filter((order) => order.estado === 'en_camino');
+    const trackingActive = gpsWatchId !== null && gpsOrderId;
+    const ready = blockers.length === 0;
+    const statusLine = !ready
+      ? '<span class="font-black text-red-700 dark:text-red-300">GPS no disponible todavia</span>'
+      : trackingActive
+        ? '<span class="font-black text-emerald-700 dark:text-emerald-300">GPS activo, compartiendo tu ubicacion</span>'
+        : permissionState === 'granted'
+          ? '<span class="font-black text-emerald-700 dark:text-emerald-300">Permiso concedido. Toca "Salgo ahora" o "Activar GPS" en un pedido en camino.</span>'
+          : '<span class="font-black text-sky-700 dark:text-sky-300">Listo para activar. Proba el permiso de ubicacion abajo.</span>';
+    const blockersHtml = blockers.length
+      ? `<ul class="mt-2 list-disc space-y-1 pl-5 text-xs font-semibold text-red-700 dark:text-red-300">${blockers.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+      : '';
+    const hintHtml = ready && !enCamino.length
+      ? '<p class="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">Para enviar tu ubicacion al cliente necesitas un pedido en estado "En camino". Marca "Salgo ahora" en un pedido listo.</p>'
+      : '';
+    const buttonHtml = (ready && permissionState !== 'granted')
+      ? '<button type="button" id="route-test-gps" class="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-black text-white hover:bg-sky-700"><i class="fas fa-location-crosshairs"></i> Probar / activar permiso de ubicacion</button>'
+      : '';
+    gpsPanel.innerHTML = `
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-xs font-black uppercase tracking-wide text-sky-700 dark:text-sky-300">Ubicacion GPS</p>
+          <p class="mt-1 text-sm">${statusLine}</p>
+        </div>
+        <i class="fas ${ready ? (trackingActive ? 'fa-satellite-dish text-emerald-600' : 'fa-location-dot text-sky-600') : 'fa-triangle-exclamation text-red-600'} text-2xl"></i>
+      </div>
+      ${blockersHtml}
+      ${hintHtml}
+      ${buttonHtml}
+    `;
   };
   const renderOrder = (order) => {
     const whatsappUrl = window.GastroWhatsApp?.buildOrderWhatsAppUrl(order, order.celular_cliente) || '';
@@ -235,6 +282,44 @@
       }
     }).catch(() => {});
   };
+  const trackPermissionState = () => {
+    if (!navigator.permissions?.query) return;
+    navigator.permissions.query({name: 'geolocation'}).then((status) => {
+      permissionState = status.state;
+      renderGpsPanel();
+      status.onchange = () => {
+        permissionState = status.state;
+        renderGpsPanel();
+      };
+    }).catch(() => {});
+  };
+  const testGpsPermission = () => {
+    const blockers = gpsBlockers();
+    if (blockers.length) {
+      showAlert(blockers[0], false);
+      return;
+    }
+    showAlert('Solicitando permiso de ubicacion al navegador...', 'warning');
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        permissionState = 'granted';
+        const enCamino = orders.find((order) => order.estado === 'en_camino');
+        if (enCamino) {
+          showAlert('Permiso concedido. Activando GPS del pedido en camino...', true);
+          startGpsTracking(enCamino.id_pedido);
+        } else {
+          showAlert('Permiso de ubicacion concedido. Marca "Salgo ahora" en un pedido para empezar a compartir tu posicion.', true);
+        }
+        renderGpsPanel();
+      },
+      (error) => {
+        if (error?.code === 1) permissionState = 'denied';
+        showAlert(gpsErrorMessage(error), false);
+        renderGpsPanel();
+      },
+      {enableHighAccuracy: true, maximumAge: 0, timeout: 20000},
+    );
+  };
   const startGpsWatch = () => {
     if (!gpsOrderId) return;
     if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
@@ -266,6 +351,7 @@
     gpsOrderId = Number(orderId || 0);
     lastGpsSentAt = 0;
     lastGpsFixAt = Date.now();
+    permissionState = 'granted';
     await sendGpsPosition(gpsOrderId, firstPosition, {force: true});
     startGpsWatch();
     startGpsWatchdog();
@@ -382,7 +468,12 @@
     if (!button) return;
     changeState(button.dataset.orderId, button.dataset.action).catch((error) => showAlert(error.message, false));
   });
+  gpsPanel?.addEventListener('click', (event) => {
+    if (event.target.closest('#route-test-gps')) testGpsPermission();
+  });
   refreshButton?.addEventListener('click', () => load().catch((error) => showAlert(error.message, false)));
+  trackPermissionState();
+  renderGpsPanel();
   load().catch((error) => showAlert(error.message, false));
   refreshTimer = window.setInterval(() => load({keepAlert: true}).catch(() => {}), 10000);
   window.addEventListener('beforeunload', () => {
