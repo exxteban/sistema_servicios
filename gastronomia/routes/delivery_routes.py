@@ -10,6 +10,7 @@ from gastronomia.services.permisos import (
     PERMISO_CAJA,
     PERMISO_COCINA,
     PERMISO_DELIVERY,
+    PERMISO_DELIVERY_GPS,
     PERMISO_POS,
     requiere_permiso_gastronomia,
     tiene_permiso_gastronomia,
@@ -44,4 +45,7 @@ def delivery_ruta():
     if not cliente_id_actual_gastronomia():
         flash(mensaje_contexto_gastronomia(), 'warning')
         return redirect(url_for('main.dashboard'))
-    return render_template('gastronomia/delivery_ruta.html')
+    return render_template(
+        'gastronomia/delivery_ruta.html',
+        gps_delivery_activo=tiene_permiso_gastronomia(PERMISO_DELIVERY_GPS),
+    )

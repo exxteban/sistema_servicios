@@ -63,10 +63,11 @@ CENTRAL_PRODUCT_COLUMN_MIGRATIONS = (
 
 def ensure_gastronomia_schema():
     from gastronomia.channel_models import GastronomiaProductoPrecioCanal
-    from gastronomia.models import GastronomiaProducto
+    from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaProducto
     from gastronomia.services.channel_price_service import asegurar_precios_productos
 
     GastronomiaProductoPrecioCanal.__table__.create(bind=db.engine, checkfirst=True)
+    GastronomiaDeliveryUbicacion.__table__.create(bind=db.engine, checkfirst=True)
     dialect = db.engine.dialect.name
     if dialect == 'sqlite':
         _ensure_sqlite_columns()

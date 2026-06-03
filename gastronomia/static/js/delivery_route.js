@@ -10,6 +10,11 @@
 
   let orders = [];
   let routeMode = 'repartidor';
+  let refreshTimer = null;
+  let gpsWatchId = null;
+  let gpsOrderId = null;
+  let lastGpsSentAt = 0;
+  const gpsTrackingEnabled = root.dataset.gpsTracking === '1';
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
@@ -32,8 +37,8 @@
     if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
     return data;
   };
-  const load = async () => {
-    hideAlert();
+  const load = async ({keepAlert = false} = {}) => {
+    if (!keepAlert) hideAlert();
     const data = await apiJson('/api/gastronomia/delivery/ruta');
     routeMode = data.modo || 'repartidor';
     orders = data.pedidos || [];
@@ -85,10 +90,16 @@
           ${trackingUrl ? `<button type="button" data-copy-tracking="${order.id_pedido}" class="rounded-lg border border-sky-200 px-3 py-2 text-center text-sm font-black text-sky-700 hover:bg-sky-50"><i class="fas fa-link"></i> Copiar</button>` : ''}
           ${whatsappUrl ? `<a href="${escapeHtml(whatsappUrl)}" target="${whatsappTarget}" class="rounded-lg border border-green-200 px-3 py-2 text-center text-sm font-black text-green-700 hover:bg-green-50">WhatsApp</a>` : ''}
           ${order.estado === 'listo' ? `<button type="button" data-action="salir" data-order-id="${order.id_pedido}" class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-black text-white hover:bg-orange-700">Salgo ahora</button>` : ''}
+          ${renderGpsButton(order)}
           <button type="button" data-action="entregar" data-order-id="${order.id_pedido}" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-black text-white hover:bg-emerald-700">Entregado</button>
         </div>
       </article>
     `;
+  };
+  const renderGpsButton = (order) => {
+    if (!gpsTrackingEnabled || order.estado !== 'en_camino') return '';
+    const active = Number(gpsOrderId || 0) === Number(order.id_pedido || 0);
+    return `<button type="button" data-start-gps="${order.id_pedido}" class="rounded-lg border border-sky-200 px-3 py-2 text-sm font-black ${active ? 'bg-sky-600 text-white' : 'text-sky-700 hover:bg-sky-50'}">${active ? 'GPS activo' : 'Activar GPS'}</button>`;
   };
   const emptyRoute = () => {
     const message = routeMode === 'sin_repartidor'
@@ -99,7 +110,48 @@
   const changeState = async (orderId, action) => {
     await apiJson(`/api/gastronomia/delivery/ruta/pedidos/${orderId}/${action}`, {method: 'POST', body: '{}'});
     showAlert(action === 'entregar' ? 'Pedido marcado como entregado.' : 'Pedido marcado en camino.', true);
-    await load();
+    await load({keepAlert: true});
+    if (action === 'salir') startGpsTracking(orderId);
+    if (action === 'entregar') stopGpsTracking(orderId);
+  };
+  const startGpsTracking = (orderId) => {
+    if (!gpsTrackingEnabled) return;
+    if (!navigator.geolocation) {
+      showAlert('Este telefono/navegador no permite GPS desde la web.', false);
+      return;
+    }
+    if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
+    gpsOrderId = Number(orderId || 0);
+    lastGpsSentAt = 0;
+    gpsWatchId = navigator.geolocation.watchPosition(
+      (position) => sendGpsPosition(gpsOrderId, position).catch(() => {}),
+      () => showAlert('No se pudo activar GPS. Revisa el permiso de ubicacion del telefono.', false),
+      {enableHighAccuracy: true, maximumAge: 10000, timeout: 15000},
+    );
+    showAlert('GPS activo para esta entrega mientras la hoja de ruta siga abierta.', true);
+    render();
+  };
+  const stopGpsTracking = (orderId) => {
+    if (gpsWatchId === null) return;
+    if (orderId && Number(orderId) !== Number(gpsOrderId)) return;
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+    gpsOrderId = null;
+    lastGpsSentAt = 0;
+  };
+  const sendGpsPosition = async (orderId, position) => {
+    if (!orderId || !position?.coords) return;
+    const now = Date.now();
+    if (now - lastGpsSentAt < 15000) return;
+    lastGpsSentAt = now;
+    await apiJson(`/api/gastronomia/delivery/ruta/pedidos/${orderId}/ubicacion`, {
+      method: 'POST',
+      body: JSON.stringify({
+        latitud: position.coords.latitude,
+        longitud: position.coords.longitude,
+        precision_metros: position.coords.accuracy,
+      }),
+    });
   };
   const copyTrackingLink = async (orderId) => {
     const order = orders.find((item) => Number(item.id_pedido) === Number(orderId));
@@ -114,10 +166,20 @@
       copyTrackingLink(copyButton.dataset.copyTracking).catch((error) => showAlert(error.message, false));
       return;
     }
+    const gpsButton = event.target.closest('[data-start-gps]');
+    if (gpsButton) {
+      startGpsTracking(gpsButton.dataset.startGps);
+      return;
+    }
     const button = event.target.closest('[data-action]');
     if (!button) return;
     changeState(button.dataset.orderId, button.dataset.action).catch((error) => showAlert(error.message, false));
   });
   refreshButton?.addEventListener('click', () => load().catch((error) => showAlert(error.message, false)));
   load().catch((error) => showAlert(error.message, false));
+  refreshTimer = window.setInterval(() => load({keepAlert: true}).catch(() => {}), 10000);
+  window.addEventListener('beforeunload', () => {
+    if (refreshTimer) window.clearInterval(refreshTimer);
+    stopGpsTracking();
+  });
 }());

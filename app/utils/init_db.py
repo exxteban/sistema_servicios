@@ -176,6 +176,7 @@ def inicializar_datos_base(config_name=None):
         {'codigo': 'gastronomia_caja', 'nombre': 'Gastronomia - Caja', 'descripcion': 'Permite cobrar pedidos gastronomicos', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
         {'codigo': 'gastronomia_salon', 'nombre': 'Gastronomia - Salon', 'descripcion': 'Permite gestionar mesas y mover pedidos entre mesas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
         {'codigo': 'gastronomia_delivery', 'nombre': 'Gastronomia - Delivery', 'descripcion': 'Permite usar la hoja de ruta del repartidor y marcar entregas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
+        {'codigo': 'gastronomia_delivery_gps', 'nombre': 'Gastronomia - GPS Delivery', 'descripcion': 'Permite registrar ubicacion GPS desde la hoja de ruta del repartidor', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
         {'codigo': 'gastronomia_reportes', 'nombre': 'Gastronomia - Reportes', 'descripcion': 'Permite ver reportes y metricas gastronomicas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
     ]
     for p in permisos:

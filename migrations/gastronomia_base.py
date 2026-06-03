@@ -128,6 +128,7 @@ def run_migration() -> None:
         gastronomia_models.GastronomiaMesa.__table__,
         gastronomia_models.GastronomiaRepartidor.__table__,
         gastronomia_models.GastronomiaPedido.__table__,
+        gastronomia_models.GastronomiaDeliveryUbicacion.__table__,
         gastronomia_models.GastronomiaPedidoItem.__table__,
         gastronomia_models.GastronomiaPedidoItemModificador.__table__,
         gastronomia_models.GastronomiaPedidoEvento.__table__,

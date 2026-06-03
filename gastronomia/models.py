@@ -373,6 +373,37 @@ class GastronomiaRepartidor(db.Model):
         }
 
 
+class GastronomiaDeliveryUbicacion(db.Model):
+    __tablename__ = 'gastronomia_delivery_ubicaciones'
+
+    id_ubicacion = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    pedido_id = db.Column(db.Integer, db.ForeignKey('gastronomia_pedidos.id_pedido', ondelete='CASCADE'), nullable=False, index=True)
+    repartidor_id = db.Column(db.Integer, db.ForeignKey('gastronomia_repartidores.id_repartidor'), nullable=False, index=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False, index=True)
+    latitud = db.Column(db.Float, nullable=False)
+    longitud = db.Column(db.Float, nullable=False)
+    precision_metros = db.Column(db.Float)
+    origen = db.Column(db.String(30), nullable=False, default='hoja_ruta', server_default='hoja_ruta')
+    fecha_registro = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    cliente = db.relationship('Cliente')
+    pedido = db.relationship('GastronomiaPedido')
+    repartidor = db.relationship('GastronomiaRepartidor')
+    usuario = db.relationship('Usuario')
+
+    def to_dict(self):
+        return {
+            'id_ubicacion': self.id_ubicacion,
+            'pedido_id': self.pedido_id,
+            'repartidor_id': self.repartidor_id,
+            'latitud': self.latitud,
+            'longitud': self.longitud,
+            'precision_metros': self.precision_metros,
+            'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None,
+        }
+
+
 class GastronomiaPedidoItem(db.Model):
     __tablename__ = 'gastronomia_pedido_items'
 

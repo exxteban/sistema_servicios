@@ -2,7 +2,13 @@ import re
 
 from app import create_app, db
 from app.models import Cliente, Usuario
-from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaPedidoEvento, GastronomiaProducto
+from gastronomia.models import (
+    GastronomiaCategoria,
+    GastronomiaClienteConfig,
+    GastronomiaDeliveryUbicacion,
+    GastronomiaPedidoEvento,
+    GastronomiaProducto,
+)
 
 
 def _loguear(client, app, username: str):
@@ -113,6 +119,14 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
     assert salir_resp.status_code == 200
     assert salir_resp.get_json()['pedido']['estado'] == 'en_camino'
 
+    ubicacion_resp = client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/ubicacion',
+        json={'latitud': -25.3001, 'longitud': -57.6359, 'precision_metros': 12},
+        headers={'X-CSRFToken': csrf_ruta},
+    )
+    assert ubicacion_resp.status_code == 200
+    assert ubicacion_resp.get_json()['ubicacion']['pedido_id'] == pedido_id
+
     entregar_resp = client.post(
         f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/entregar',
         json={},
@@ -128,6 +142,8 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
         ).all()
         assert 'pedido_repartidor_asignado' in [evento.tipo for evento in eventos]
         assert eventos[-1].tipo == 'pedido_entregado'
+        ubicacion = GastronomiaDeliveryUbicacion.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).one()
+        assert ubicacion.latitud == -25.3001
 
 
 def test_delivery_ruta_operativa_muestra_pedidos_sin_repartidor_vinculado():

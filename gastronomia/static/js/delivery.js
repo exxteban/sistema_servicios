@@ -30,6 +30,7 @@
   };
   let orders = [];
   let drivers = [];
+  let refreshTimer = null;
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -59,8 +60,8 @@
     });
     panels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.deliveryPanel !== key));
   };
-  const load = async () => {
-    hideAlert();
+  const load = async ({keepAlert = false} = {}) => {
+    if (!keepAlert) hideAlert();
     const params = new URLSearchParams({tipo_pedido: 'delivery', estados: activeStates.join(',')});
     const [data, driverData] = await Promise.all([
       apiJson(`/api/gastronomia/pedidos?${params.toString()}`),
@@ -148,10 +149,9 @@
             ${trackingUrl ? `<button type="button" data-copy-tracking="${order.id_pedido}" title="Copiar link de estado" aria-label="Copiar link de estado" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-sky-200 text-lg text-sky-700 hover:bg-sky-50"><i class="fas fa-link"></i></button>` : '<span title="Sin link de estado" aria-label="Sin link de estado" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fas fa-link"></i></span>'}
             ${whatsappUrl ? `<a href="${escapeHtml(whatsappUrl)}" target="${whatsappTarget}" title="Compartir seguimiento por WhatsApp" aria-label="Compartir seguimiento por WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-green-200 text-lg text-green-700 hover:bg-green-50"><i class="fab fa-whatsapp"></i></a>` : '<span title="Sin celular" aria-label="Sin celular para WhatsApp" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-400"><i class="fab fa-whatsapp"></i></span>'}
           </div>
-          <div class="grid gap-2 sm:grid-cols-2">
-            ${order.estado === 'listo' ? `<button type="button" data-state="en_camino" data-order-action="${order.id_pedido}" class="rounded-lg bg-orange-600 px-3 py-2 text-xs font-black text-white hover:bg-orange-700">Sale a entrega</button>` : ''}
-            ${['listo', 'en_camino'].includes(order.estado) ? `<button type="button" data-state="entregado" data-order-action="${order.id_pedido}" class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white hover:bg-emerald-700">Marcar entregado</button>` : ''}
-          </div>
+          <p class="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+            Estado actualizado desde Cocina.
+          </p>
         </div>
       </article>
     `;
@@ -220,7 +220,7 @@
     });
     resetDriverForm();
     showAlert('Repartidor guardado.', true);
-    await load();
+    await load({keepAlert: true});
   };
   const assignDriver = async (orderId, repartidorId) => {
     await apiJson(`/api/gastronomia/delivery/pedidos/${orderId}/repartidor`, {
@@ -229,17 +229,10 @@
     });
     await load();
   };
-  const changeOrderState = async (orderId, estado) => {
-    await apiJson(`/api/gastronomia/pedidos/${orderId}/estado`, {
-      method: 'POST',
-      body: JSON.stringify({estado}),
-    });
-    await load();
-  };
   const sendKitchen = async (orderId) => {
     await apiJson(`/api/gastronomia/pedidos/${orderId}/enviar-cocina`, {method: 'POST', body: '{}'});
+    await load({keepAlert: true});
     showAlert('Pedido enviado a cocina.', true);
-    await load();
   };
   const copyTrackingLink = async (orderId) => {
     const order = orders.find((item) => Number(item.id_pedido) === Number(orderId));
@@ -275,10 +268,11 @@
       copyTrackingLink(copyButton.dataset.copyTracking).catch((error) => showAlert(error.message, false));
       return;
     }
-    const button = event.target.closest('[data-order-action]');
-    if (!button) return;
-    changeOrderState(button.dataset.orderAction, button.dataset.state).catch((error) => showAlert(error.message, false));
   });
   setActiveTab('states');
   load().catch((error) => showAlert(error.message, false));
+  refreshTimer = window.setInterval(() => load({keepAlert: true}).catch(() => {}), 10000);
+  window.addEventListener('beforeunload', () => {
+    if (refreshTimer) window.clearInterval(refreshTimer);
+  });
 }());

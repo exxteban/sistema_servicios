@@ -14,6 +14,7 @@ PERMISO_COCINA = 'gastronomia_cocina'
 PERMISO_CAJA = 'gastronomia_caja'
 PERMISO_SALON = 'gastronomia_salon'
 PERMISO_DELIVERY = 'gastronomia_delivery'
+PERMISO_DELIVERY_GPS = 'gastronomia_delivery_gps'
 PERMISO_REPORTES = 'gastronomia_reportes'
 PERMISOS_GASTRONOMIA_FULL = (
     PERMISO_ACCESO,
@@ -23,6 +24,7 @@ PERMISOS_GASTRONOMIA_FULL = (
     PERMISO_CAJA,
     PERMISO_SALON,
     PERMISO_DELIVERY,
+    PERMISO_DELIVERY_GPS,
     PERMISO_REPORTES,
 )
 

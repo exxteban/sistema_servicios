@@ -5,7 +5,7 @@ from datetime import datetime
 
 from app import db
 from app.models import Usuario
-from gastronomia.models import GastronomiaPedido, GastronomiaRepartidor
+from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaRepartidor
 from gastronomia.services.pedido_service import cambiar_estado_pedido, registrar_evento_pedido
 
 
@@ -120,6 +120,33 @@ def marcar_pedido_ruta_operativa(cliente_id: int, pedido_id: int, estado: str) -
     return cambiar_estado_pedido(cliente_id, pedido_id, estado)
 
 
+def registrar_ubicacion_repartidor(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) -> GastronomiaDeliveryUbicacion:
+    repartidor = obtener_repartidor_usuario(cliente_id, usuario_id)
+    if not repartidor:
+        raise ValueError('Este usuario no esta vinculado a un repartidor activo.')
+    pedido = _obtener_pedido_delivery(cliente_id, pedido_id)
+    if int(pedido.repartidor_id or 0) != int(repartidor.id_repartidor):
+        raise ValueError('El pedido no esta asignado a este repartidor.')
+    if pedido.estado not in {'listo', 'en_camino'}:
+        raise ValueError('Solo se registra GPS en pedidos listos o en camino.')
+
+    latitud = _parse_coordinate(data.get('latitud'), -90, 90, 'Latitud invalida.')
+    longitud = _parse_coordinate(data.get('longitud'), -180, 180, 'Longitud invalida.')
+    precision = _parse_optional_float(data.get('precision_metros'))
+    ubicacion = GastronomiaDeliveryUbicacion(
+        cliente_id=int(cliente_id),
+        pedido_id=int(pedido.id_pedido),
+        repartidor_id=int(repartidor.id_repartidor),
+        usuario_id=int(usuario_id),
+        latitud=latitud,
+        longitud=longitud,
+        precision_metros=precision,
+    )
+    db.session.add(ubicacion)
+    db.session.commit()
+    return ubicacion
+
+
 def usuarios_disponibles_delivery(cliente_id: int) -> list[Usuario]:
     return (
         Usuario.query
@@ -187,3 +214,23 @@ def _parse_optional_int(value) -> int | None:
     except (TypeError, ValueError):
         return None
     return parsed if parsed > 0 else None
+
+
+def _parse_coordinate(value, minimum: float, maximum: float, message: str) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(message) from exc
+    if parsed < minimum or parsed > maximum:
+        raise ValueError(message)
+    return parsed
+
+
+def _parse_optional_float(value) -> float | None:
+    if value in (None, ''):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
