@@ -47,6 +47,8 @@ def buscar_entregas(cliente_id: int, filtros: dict) -> dict:
     estado = (filtros.get('estado') or '').strip().lower()
     if estado in ESTADOS_PEDIDO:
         query = query.filter(GastronomiaPedido.estado == estado)
+    else:
+        query = query.filter(GastronomiaPedido.estado != 'cancelado')
 
     tipo_pedido = (filtros.get('tipo_pedido') or '').strip().lower()
     if tipo_pedido in TIPOS_PEDIDO:
@@ -59,19 +61,33 @@ def buscar_entregas(cliente_id: int, filtros: dict) -> dict:
         query = query.filter(GastronomiaPedidoPago.id_pago.is_(None))
 
     query = _apply_search(query, filtros.get('q'))
-    total = query.count()
+    total = query.with_entities(GastronomiaPedido.id_pedido).distinct().count()
     por_pagina = min(_parse_positive_int(filtros.get('per_page'), PEDIDOS_POR_PAGINA), 50)
     paginas = max(1, ceil(total / por_pagina)) if total else 1
     pagina = min(_parse_positive_int(filtros.get('page'), 1), paginas)
     fecha_operativa = db.func.coalesce(GastronomiaPedido.fecha_entrega, GastronomiaPedidoPago.fecha_pago)
-    pedidos = (
+    pagina_rows = (
         query
-        .order_by(fecha_operativa.desc(), GastronomiaPedido.id_pedido.desc())
+        .with_entities(
+            GastronomiaPedido.id_pedido,
+            db.func.max(fecha_operativa).label('fecha_operativa'),
+        )
+        .group_by(GastronomiaPedido.id_pedido)
+        .order_by(db.func.max(fecha_operativa).desc(), GastronomiaPedido.id_pedido.desc())
         .offset((pagina - 1) * por_pagina)
         .limit(por_pagina)
         .all()
     )
-    pedidos_data = serializar_pedidos(pedidos)
+    pedido_ids = [int(row.id_pedido) for row in pagina_rows]
+    pedidos_por_id = {
+        int(pedido.id_pedido): pedido
+        for pedido in GastronomiaPedido.query.filter(
+            GastronomiaPedido.cliente_id == int(cliente_id),
+            GastronomiaPedido.id_pedido.in_(pedido_ids),
+        ).all()
+    }
+    pedidos = [pedidos_por_id[pedido_id] for pedido_id in pedido_ids if pedido_id in pedidos_por_id]
+    pedidos_data = _serializar_pedidos_entregas(pedidos)
     return {
         'fecha': fecha.isoformat(),
         'resumen': _resumen(query),
@@ -165,18 +181,48 @@ def _apply_search(query, value):
 
 def _resumen(query) -> dict:
     rows = query.with_entities(
+        GastronomiaPedido.id_pedido,
+        GastronomiaPedido.estado,
         GastronomiaPedido.total,
         GastronomiaPedidoPago.id_pago,
         GastronomiaPedidoPago.total_cobrado,
     ).all()
-    total_vendido = sum(float(total or 0) for total, _id_pago, _total_cobrado in rows)
-    pagados = [(id_pago, total_cobrado) for _total, id_pago, total_cobrado in rows if id_pago]
-    pendiente_pago = len(rows) - len(pagados)
-    total_pagado = sum(float(total_cobrado or 0) for _id_pago, total_cobrado in pagados)
+    pedidos = {}
+    for pedido_id, estado, total, id_pago, total_cobrado in rows:
+        data = pedidos.setdefault(int(pedido_id), {
+            'estado': estado,
+            'total': float(total or 0),
+            'pagado': False,
+            'total_pagado': 0,
+        })
+        if id_pago:
+            data['pagado'] = True
+            data['total_pagado'] += float(total_cobrado or 0)
+    total_vendido = sum(data['total'] for data in pedidos.values())
+    pagados = [data for data in pedidos.values() if data['pagado']]
+    pendiente_pago = len(pedidos) - len(pagados)
+    total_pagado = sum(data['total_pagado'] for data in pagados)
     return {
-        'cantidad_entregada': len(rows),
+        'cantidad_historial': len(pedidos),
+        'cantidad_entregada': sum(1 for data in pedidos.values() if data['estado'] == 'entregado'),
         'total_vendido': total_vendido,
         'cantidad_pagada': len(pagados),
         'cantidad_pendiente_pago': pendiente_pago,
         'total_pagado': total_pagado,
     }
+
+
+def _serializar_pedidos_entregas(pedidos: list[GastronomiaPedido]) -> list[dict]:
+    pedidos_data = serializar_pedidos(pedidos)
+    for pedido, data in zip(pedidos, pedidos_data):
+        data['fecha_entrega'] = _local_iso(pedido.fecha_entrega)
+        if data.get('pago') and pedido.pago:
+            data['pago']['fecha_pago'] = _local_iso(pedido.pago.fecha_pago)
+    return pedidos_data
+
+
+def _local_iso(value) -> str | None:
+    local = utc_naive_to_local(value)
+    if not local:
+        return None
+    return local.replace(tzinfo=None).isoformat(timespec='seconds')

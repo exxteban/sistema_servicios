@@ -16,6 +16,8 @@
   }[char]));
   const time = (iso) => {
     if (!iso) return '--:--';
+    const match = String(iso).match(/T(\d{2}):(\d{2})/);
+    if (match) return `${match[1]}:${match[2]}`;
     return new Date(iso).toLocaleTimeString('es-PY', {hour: '2-digit', minute: '2-digit'});
   };
   const showAlert = (message, ok) => {
@@ -51,8 +53,8 @@
   };
   const renderSummary = (summary) => {
     const cards = [
-      ['Entregados', summary.cantidad_entregada || 0, 'Pedidos con fecha de entrega'],
-      ['Total vendido', money(summary.total_vendido), 'Suma de pedidos entregados'],
+      ['En historial', summary.cantidad_historial ?? summary.cantidad_entregada ?? 0, 'Pedidos finalizados para la fecha'],
+      ['Total vendido', money(summary.total_vendido), 'Suma de pedidos del historial'],
       ['Pagados', summary.cantidad_pagada || 0, money(summary.total_pagado)],
       ['Pendientes', summary.cantidad_pendiente_pago || 0, 'Aun sin pago registrado'],
     ];

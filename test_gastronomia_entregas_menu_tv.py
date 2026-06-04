@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from app import create_app, db
 from app.models import Cliente, TiendaPromocion, TiendaPromocionGastronomiaProducto, Usuario
-from app.utils.helpers import today_local, utc_bounds_for_local_dates
+from app.utils.helpers import today_local, utc_bounds_for_local_dates, utc_naive_to_local
 from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
@@ -155,6 +155,39 @@ def test_entregas_filtra_por_fecha_entrega_busqueda_y_cliente():
     _entregar(client_dos, csrf_dos, pedido_dos)
     listado_dos = client_dos.get('/api/gastronomia/entregas?fecha=hoy')
     assert [pedido['id_pedido'] for pedido in listado_dos.get_json()['pedidos']] == [pedido_dos]
+
+
+def test_entregas_muestra_hora_local_y_excluye_cancelados_por_defecto():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id, _agotado_id = _crear_base(app, 'Resto Hora Entregas', 'entregas_hora', 'entregas-hora')
+
+    _loguear(client, app, 'entregas_hora')
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    pedido_local_id = _crear_pedido(client, csrf, producto_id, 'Hora local')
+    _entregar(client, csrf, pedido_local_id)
+    pedido_cancelado_id = _crear_pedido(client, csrf, producto_id, 'Cancelado')
+    _entregar(client, csrf, pedido_cancelado_id)
+
+    with app.app_context():
+        inicio_hoy, _fin_hoy = utc_bounds_for_local_dates(today_local(), today_local())
+        fecha_entrega_utc = inicio_hoy + timedelta(hours=3, minutes=15)
+        GastronomiaPedido.query.get(pedido_local_id).fecha_entrega = fecha_entrega_utc
+        cancelado = GastronomiaPedido.query.get(pedido_cancelado_id)
+        cancelado.fecha_entrega = fecha_entrega_utc
+        cancelado.estado = 'cancelado'
+        db.session.commit()
+        fecha_entrega_local = utc_naive_to_local(fecha_entrega_utc).replace(tzinfo=None).isoformat(timespec='seconds')
+
+    response = client.get('/api/gastronomia/entregas?fecha=hoy')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert [pedido['id_pedido'] for pedido in data['pedidos']] == [pedido_local_id]
+    assert data['pedidos'][0]['fecha_entrega'] == fecha_entrega_local
+    assert data['resumen']['cantidad_historial'] == 1
+
+    cancelados = client.get('/api/gastronomia/entregas?fecha=hoy&estado=cancelado').get_json()
+    assert [pedido['id_pedido'] for pedido in cancelados['pedidos']] == [pedido_cancelado_id]
 
 
 def test_entregas_view_requiere_login():
