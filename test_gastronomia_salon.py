@@ -219,12 +219,20 @@ def test_pos_puede_listar_mesas_sin_permiso_de_administrar_salon():
     _loguear(client, app, 'resto_pos_mesas')
     pos_page = client.get('/gastronomia/pos')
     assert pos_page.status_code == 200
-    csrf = _csrf(pos_page.get_data(as_text=True))
+    pos_html = pos_page.get_data(as_text=True)
+    csrf = _csrf(pos_html)
+    assert 'pos_table_warnings.js' in pos_html
 
     mesas_resp = client.get('/api/gastronomia/salon/mesas')
     assert mesas_resp.status_code == 200
     mesas = mesas_resp.get_json()['mesas']
     assert [mesa['nombre'] for mesa in mesas] == ['P1']
+
+    estado_resp = client.get('/api/gastronomia/salon/estado')
+    assert estado_resp.status_code == 200
+    estado_mesas = estado_resp.get_json()['mesas']
+    assert estado_mesas[0]['nombre'] == 'P1'
+    assert estado_mesas[0]['estado_salon'] == 'libre'
 
     crear_resp = client.post(
         '/api/gastronomia/salon/mesas',

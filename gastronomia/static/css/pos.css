@@ -344,9 +344,27 @@
         color: rgb(146 64 14);
     }
     .mesa-selector-btn {
+        flex-direction: column;
         min-height: 52px;
         background: rgb(240 253 244);
         color: rgb(22 101 52);
+    }
+    .mesa-selector-btn small {
+        font-size: 0.62rem;
+        font-weight: 900;
+        opacity: 0.78;
+    }
+    .mesa-selector-btn--ocupada,
+    .mesa-selector-btn--esperando_cocina,
+    .mesa-selector-btn--listo {
+        background: rgb(255 251 235);
+        border-color: rgb(245 158 11);
+        color: rgb(146 64 14);
+    }
+    .mesa-selector-btn--pagada {
+        background: rgb(238 242 255);
+        border-color: rgb(129 140 248);
+        color: rgb(67 56 202);
     }
     .mesa-selector-btn.activa {
         background: rgb(254 226 226);
@@ -379,6 +397,18 @@
     .dark .mesa-selector-btn {
         background: rgb(20 83 45 / 0.35);
         color: rgb(187 247 208);
+    }
+    .dark .mesa-selector-btn--ocupada,
+    .dark .mesa-selector-btn--esperando_cocina,
+    .dark .mesa-selector-btn--listo {
+        background: rgb(120 53 15 / 0.45);
+        border-color: rgb(251 191 36);
+        color: rgb(253 230 138);
+    }
+    .dark .mesa-selector-btn--pagada {
+        background: rgb(49 46 129 / 0.55);
+        border-color: rgb(129 140 248);
+        color: rgb(199 210 254);
     }
     .dark .mesa-selector-btn.activa {
         background: rgb(127 29 29 / 0.45);

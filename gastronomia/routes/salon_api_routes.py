@@ -33,7 +33,7 @@ def _payload():
 
 @gastronomia_salon_api_bp.route('/salon/estado', methods=['GET'])
 @login_required
-@requiere_permiso_gastronomia(PERMISO_SALON)
+@requiere_permiso_gastronomia(PERMISO_SALON, PERMISO_POS)
 def salon_estado():
     cliente_id, error = _cliente_o_error()
     if error:

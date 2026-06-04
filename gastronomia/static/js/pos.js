@@ -77,8 +77,9 @@
     renderProducts();
   };
   const loadMesas = async () => {
-    const data = await apiJson('/api/gastronomia/salon/mesas');
+    const data = await apiJson('/api/gastronomia/salon/estado');
     mesas = data.mesas || [];
+    if (tableNameInput?.value && !activeOrderId && window.GastronomiaTableWarnings?.confirmSelection(mesas, tableNameInput.value) === false) tableNameInput.value = '';
     renderMesas();
   };
   const syncProductSearchClearButton = () => {
@@ -119,15 +120,8 @@
   };
   const renderMesas = () => {
     if (!tableGrid) return;
-    tableGrid.innerHTML = mesas.map((mesa) => `
-      <button
-        type="button"
-        data-table-name="${escapeHtml(mesa.nombre)}"
-        class="mesa-selector-btn ${tableNameInput?.value === mesa.nombre ? 'activa' : ''}"
-      >
-        ${escapeHtml(mesa.nombre)}
-      </button>
-    `).join('') || '<div class="col-span-4 rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-700">Sin mesas cargadas.</div>';
+    tableGrid.innerHTML = window.GastronomiaTableWarnings.render(mesas, tableNameInput?.value, escapeHtml)
+      || '<div class="col-span-4 rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500 dark:border-gray-700">Sin mesas cargadas.</div>';
   };
   const syncOrderTypeUi = () => {
     const currentType = orderTypeInput?.value || 'mostrador';
@@ -153,6 +147,7 @@
   };
   const setMesa = (mesaNombre) => {
     if (!tableNameInput) return;
+    if (window.GastronomiaTableWarnings?.confirmSelection(mesas, mesaNombre) === false) return;
     tableNameInput.value = mesaNombre;
     renderMesas();
   };
