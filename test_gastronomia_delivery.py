@@ -150,6 +150,19 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
     )
     assert ubicacion_imprecisa_resp.status_code == 400
 
+    with app.app_context():
+        ubicacion_vieja_imprecisa = GastronomiaDeliveryUbicacion(
+            cliente_id=cliente_id,
+            pedido_id=pedido_id,
+            repartidor_id=repartidor_id,
+            usuario_id=delivery_user_id,
+            latitud=-25.2900,
+            longitud=-57.6200,
+            precision_metros=2000,
+        )
+        db.session.add(ubicacion_vieja_imprecisa)
+        db.session.commit()
+
     seguimiento_resp = client.get(f'/gastronomia/pedido/{pedido_data["codigo_publico"]}/estado')
     assert seguimiento_resp.status_code == 200
     seguimiento = seguimiento_resp.get_json()
@@ -172,7 +185,11 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
         ).all()
         assert 'pedido_repartidor_asignado' in [evento.tipo for evento in eventos]
         assert eventos[-1].tipo == 'pedido_entregado'
-        ubicacion = GastronomiaDeliveryUbicacion.query.filter_by(cliente_id=cliente_id, pedido_id=pedido_id).one()
+        ubicacion = GastronomiaDeliveryUbicacion.query.filter_by(
+            cliente_id=cliente_id,
+            pedido_id=pedido_id,
+            precision_metros=12,
+        ).one()
         assert ubicacion.latitud == -25.3001
 
 

@@ -6,6 +6,7 @@ from datetime import datetime
 from app import db
 from app.models import Usuario
 from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaRepartidor
+from gastronomia.services.delivery_gps import GPS_PRECISION_MAXIMA_PUBLICABLE_M
 from gastronomia.services.pedido_service import (
     _coords_from_location_text,
     _parse_optional_coordinate,
@@ -15,7 +16,6 @@ from gastronomia.services.pedido_service import (
 
 
 ESTADOS_RUTA = {'listo', 'en_camino'}
-GPS_PRECISION_MAXIMA_PUBLICABLE_M = 500
 
 
 def listar_repartidores(cliente_id: int, *, incluir_inactivos: bool = False) -> list[GastronomiaRepartidor]:

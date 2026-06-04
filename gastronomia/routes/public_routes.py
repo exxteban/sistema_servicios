@@ -3,6 +3,7 @@ from flask import abort, jsonify, make_response, render_template
 
 from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaPedidoEvento
 from gastronomia.routes.dashboard_routes import gastronomia_bp
+from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
 
 
 MENSAJES_SEGUIMIENTO = {
@@ -87,6 +88,7 @@ def _tracking_delivery(pedido):
     ubicacion = (
         GastronomiaDeliveryUbicacion.query
         .filter_by(cliente_id=pedido.cliente_id, pedido_id=pedido.id_pedido)
+        .filter(ubicacion_delivery_publicable_filter())
         .order_by(GastronomiaDeliveryUbicacion.fecha_registro.desc(), GastronomiaDeliveryUbicacion.id_ubicacion.desc())
         .first()
     )

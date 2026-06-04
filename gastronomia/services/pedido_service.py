@@ -19,6 +19,7 @@ from gastronomia.models import (
     GastronomiaProducto,
     generar_codigo_publico_pedido,
 )
+from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
@@ -151,6 +152,7 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
         .filter(
             GastronomiaDeliveryUbicacion.cliente_id.in_(cliente_ids),
             GastronomiaDeliveryUbicacion.pedido_id.in_(pedido_ids),
+            ubicacion_delivery_publicable_filter(),
         )
         .order_by(GastronomiaDeliveryUbicacion.fecha_registro.desc(), GastronomiaDeliveryUbicacion.id_ubicacion.desc())
         .all()
