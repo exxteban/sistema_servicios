@@ -35,6 +35,7 @@
   // enableHighAccuracy fuerza el chip GPS real; maximumAge 0 evita posiciones cacheadas viejas.
   const GPS_POSITION_OPTIONS = {enableHighAccuracy: true, maximumAge: 0, timeout: 20000};
   const GPS_WATCH_OPTIONS = {enableHighAccuracy: true, maximumAge: 0, timeout: 30000};
+  const deliveryLocationVisible = root.dataset.deliveryLocation === '1';
   const gpsTrackingEnabled = root.dataset.gpsTracking === '1';
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -97,6 +98,12 @@
   };
   const renderGpsPanel = () => {
     if (!gpsPanel) return;
+    if (!deliveryLocationVisible) {
+      gpsPanel.classList.add('hidden');
+      gpsPanel.innerHTML = '';
+      return;
+    }
+    gpsPanel.classList.remove('hidden');
     const blockers = gpsBlockers();
     const enCamino = orders.filter((order) => order.estado === 'en_camino');
     const trackingActive = gpsWatchId !== null && gpsOrderId;
@@ -148,18 +155,18 @@
           ${order.celular_cliente ? `<p><strong>Cel:</strong> ${escapeHtml(order.celular_cliente)}</p>` : ''}
           <p><strong>Direccion:</strong> ${escapeHtml(order.direccion_entrega || 'Sin direccion')}</p>
           ${order.notas ? `<p><strong>Notas:</strong> ${escapeHtml(order.notas)}</p>` : ''}
-          ${renderGpsInfo(order)}
+          ${deliveryLocationVisible ? renderGpsInfo(order) : ''}
         </div>
         <div class="mt-4 flex flex-wrap gap-2">
           ${(order.items || []).map((item) => `<span class="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200">${item.cantidad} x ${escapeHtml(item.nombre_producto)}</span>`).join('')}
         </div>
-        ${renderDestinationEditor(order)}
+        ${deliveryLocationVisible ? renderDestinationEditor(order) : ''}
         <div class="mt-4 grid gap-2 sm:grid-cols-4">
-          ${renderDestinationButton(order)}
+          ${deliveryLocationVisible ? renderDestinationButton(order) : ''}
           ${trackingUrl ? `<button type="button" data-copy-tracking="${order.id_pedido}" class="rounded-lg border border-sky-200 px-3 py-2 text-center text-sm font-black text-sky-700 hover:bg-sky-50"><i class="fas fa-link"></i> Copiar</button>` : ''}
           ${whatsappUrl ? `<a href="${escapeHtml(whatsappUrl)}" target="${whatsappTarget}" class="rounded-lg border border-green-200 px-3 py-2 text-center text-sm font-black text-green-700 hover:bg-green-50">WhatsApp</a>` : ''}
           ${order.estado === 'listo' ? `<button type="button" data-action="salir" data-order-id="${order.id_pedido}" class="rounded-lg bg-orange-600 px-3 py-2 text-sm font-black text-white hover:bg-orange-700">Salgo ahora</button>` : ''}
-          ${renderGpsButton(order)}
+          ${deliveryLocationVisible ? renderGpsButton(order) : ''}
           <button type="button" data-action="entregar" data-order-id="${order.id_pedido}" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-black text-white hover:bg-emerald-700">Entregado</button>
         </div>
       </article>
@@ -225,6 +232,7 @@
     return new Intl.DateTimeFormat('es-PY', {hour: '2-digit', minute: '2-digit'}).format(date);
   };
   const renderGpsButton = (order) => {
+    if (!deliveryLocationVisible) return '';
     if (!gpsTrackingEnabled || (order.estado !== 'en_camino' && order.estado !== 'listo')) return '';
     if (routeMode !== 'repartidor') {
       return '<span class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm font-black text-slate-500">GPS solo repartidor</span>';
@@ -250,6 +258,7 @@
     if (action === 'entregar') stopGpsTracking(orderId);
   };
   const startGpsTracking = (orderId) => {
+    if (!deliveryLocationVisible) return;
     if (!gpsTrackingEnabled) return;
     if (routeMode !== 'repartidor') {
       showAlert('El GPS solo puede activarlo el usuario repartidor asignado desde su celular.', false);
@@ -477,11 +486,16 @@
     await saveDestination(orderId);
   };
   ordersBox.addEventListener('input', (event) => {
+    if (!deliveryLocationVisible) return;
     const input = event.target.closest('[data-destination-input]');
     if (!input) return;
     destinationDrafts[String(input.dataset.destinationInput)] = input.value;
   });
   ordersBox.addEventListener('click', (event) => {
+    if (!deliveryLocationVisible) {
+      const locationButton = event.target.closest('[data-save-destination], [data-clear-destination], [data-start-gps]');
+      if (locationButton) return;
+    }
     const copyButton = event.target.closest('[data-copy-tracking]');
     if (copyButton) {
       copyTrackingLink(copyButton.dataset.copyTracking).catch((error) => showAlert(error.message, false));

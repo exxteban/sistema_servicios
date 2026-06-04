@@ -3,7 +3,10 @@
 {% block title %}Mi Ruta Delivery{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-4xl space-y-5" data-gastro-delivery-route data-gps-tracking="{{ '1' if gps_delivery_activo else '0' }}">
+<div class="mx-auto max-w-4xl space-y-5"
+     data-gastro-delivery-route
+     data-delivery-location="{{ '1' if delivery_localizacion_visible else '0' }}"
+     data-gps-tracking="{{ '1' if delivery_localizacion_visible else '0' }}">
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -30,5 +33,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/whatsapp_order.js', v='20260529-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/delivery_route.js', v='20260604-02') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/delivery_route.js', v='20260604-03') }}"></script>
 {% endblock %}

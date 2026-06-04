@@ -4,6 +4,7 @@ from flask_login import current_user, login_required
 
 from app.models import SesionCaja
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.delivery_privacy import ocultar_localizacion_pedido, ocultar_localizacion_pedidos
 from gastronomia.services.pedido_service import (
     actualizar_pedido_abierto,
     cambiar_estado_pedido,
@@ -51,7 +52,7 @@ def pedidos():
         estados = [estado.strip() for estado in request.args.get('estados').split(',') if estado.strip()]
     tipo_pedido = request.args.get('tipo_pedido') or request.args.get('tipo')
     items = listar_pedidos(cliente_id, estados=estados, tipo_pedido=tipo_pedido)
-    return jsonify({'ok': True, 'pedidos': serializar_pedidos(items)})
+    return jsonify({'ok': True, 'pedidos': ocultar_localizacion_pedidos(serializar_pedidos(items), current_user)})
 
 
 @gastronomia_pedidos_api_bp.route('/pedidos', methods=['POST'])
@@ -65,7 +66,7 @@ def crear():
         pedido = crear_pedido(cliente_id, current_user.id_usuario, _payload())
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()}), 201
+    return jsonify({'ok': True, 'pedido': _pedido_data(pedido)}), 201
 
 
 @gastronomia_pedidos_api_bp.route('/pedidos/<int:pedido_id>', methods=['GET'])
@@ -78,7 +79,7 @@ def detalle(pedido_id):
     pedido = obtener_pedido(cliente_id, pedido_id)
     if not pedido:
         return jsonify({'error': 'not_found'}), 404
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': _pedido_data(pedido)})
 
 
 @gastronomia_pedidos_api_bp.route('/pedidos/<int:pedido_id>', methods=['PUT'])
@@ -94,7 +95,7 @@ def actualizar(pedido_id):
         if str(exc) == 'Pedido no encontrado.':
             return jsonify({'error': 'not_found'}), 404
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': _pedido_data(pedido)})
 
 
 @gastronomia_pedidos_api_bp.route('/pedidos/<int:pedido_id>/enviar-cocina', methods=['POST'])
@@ -108,7 +109,7 @@ def enviar_cocina(pedido_id):
         pedido = enviar_pedido_cocina(cliente_id, pedido_id)
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': _pedido_data(pedido)})
 
 
 @gastronomia_pedidos_api_bp.route('/pedidos/<int:pedido_id>/cobro-avanzado', methods=['POST'])
@@ -162,4 +163,8 @@ def estado(pedido_id):
         pedido = cambiar_estado_pedido(cliente_id, pedido_id, _payload().get('estado'))
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': _pedido_data(pedido)})
+
+
+def _pedido_data(pedido):
+    return ocultar_localizacion_pedido(pedido.to_dict(), current_user)

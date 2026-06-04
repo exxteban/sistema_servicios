@@ -1,9 +1,11 @@
 """Seguimiento publico de pedidos gastronomicos."""
 from flask import abort, jsonify, make_response, render_template
+from flask_login import current_user
 
 from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaPedidoEvento
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
+from gastronomia.services.delivery_privacy import puede_ver_localizacion_delivery
 
 
 MENSAJES_SEGUIMIENTO = {
@@ -81,6 +83,8 @@ def _evento_dict(evento):
 
 def _tracking_delivery(pedido):
     if pedido.tipo_pedido != 'delivery' or pedido.estado != 'en_camino':
+        return {'visible': False}
+    if not puede_ver_localizacion_delivery(current_user):
         return {'visible': False}
     destino = None
     if pedido.destino_latitud is not None and pedido.destino_longitud is not None:

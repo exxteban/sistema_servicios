@@ -1,8 +1,9 @@
 """API de mesas y salon para Gastronomia."""
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.delivery_privacy import ocultar_localizacion_objeto, ocultar_localizacion_pedido
 from gastronomia.services.salon_service import (
     eliminar_mesa,
     guardar_mesa,
@@ -38,7 +39,7 @@ def salon_estado():
     cliente_id, error = _cliente_o_error()
     if error:
         return error
-    return jsonify({'ok': True, 'mesas': listar_salon(cliente_id)})
+    return jsonify({'ok': True, 'mesas': ocultar_localizacion_objeto(listar_salon(cliente_id), current_user)})
 
 
 @gastronomia_salon_api_bp.route('/salon/mesas', methods=['GET'])
@@ -109,7 +110,7 @@ def mover_pedido(pedido_id):
         if str(exc) == 'Pedido no encontrado.':
             return jsonify({'error': 'not_found'}), 404
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': ocultar_localizacion_pedido(pedido.to_dict(), current_user)})
 
 
 @gastronomia_salon_api_bp.route('/salon/pedidos/<int:pedido_id>/liberar-mesa', methods=['POST'])
@@ -125,4 +126,4 @@ def liberar_mesa(pedido_id):
         if str(exc) == 'Pedido no encontrado.':
             return jsonify({'error': 'not_found'}), 404
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': ocultar_localizacion_pedido(pedido.to_dict(), current_user)})

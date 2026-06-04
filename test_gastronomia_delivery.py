@@ -1,7 +1,9 @@
 import re
 
 from app import create_app, db
-from app.models import Cliente, Usuario
+from app.models import Cliente, Configuracion, Usuario
+from app.services.ia_backoffice.settings import CLAVE_SYSTEM_ROOT_USER_ID
+from gastronomia.services.delivery_privacy import CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT
 from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
@@ -231,6 +233,99 @@ def test_delivery_ruta_operativa_muestra_pedidos_sin_repartidor_vinculado():
     )
     assert salir_resp.status_code == 200
     assert salir_resp.get_json()['pedido']['estado'] == 'en_camino'
+
+
+def test_delivery_localizacion_solo_root_oculta_y_bloquea_no_root():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id, delivery_user_id = _crear_contexto(app, '_privacidad')
+    with app.app_context():
+        Configuracion.establecer_bool(CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT, True)
+
+    _loguear(client, app, 'admin_delivery_ruta_privacidad')
+    csrf = _csrf(client.get('/gastronomia/delivery').get_data(as_text=True))
+    repartidor_resp = client.post(
+        '/api/gastronomia/delivery/repartidores',
+        json={'nombre': 'Moto Privada', 'usuario_id': delivery_user_id},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert repartidor_resp.status_code == 201
+    repartidor_id = repartidor_resp.get_json()['repartidor']['id_repartidor']
+
+    pedido_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'delivery',
+            'referencia_entrega': 'Laura',
+            'celular_cliente': '0981123456',
+            'direccion_entrega': 'Calle 1',
+            'ubicacion_entrega_url': 'https://www.google.com/maps/place/test/@-25.3001,-57.6359,17z',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert pedido_resp.status_code == 201
+    pedido_data = pedido_resp.get_json()['pedido']
+    pedido_id = pedido_data['id_pedido']
+    assert client.post(f'/api/gastronomia/pedidos/{pedido_id}/enviar-cocina', json={}, headers={'X-CSRFToken': csrf}).status_code == 200
+    assert client.post(f'/api/gastronomia/cocina/pedidos/{pedido_id}/listo', json={}, headers={'X-CSRFToken': csrf}).status_code == 200
+    assert client.post(
+        f'/api/gastronomia/delivery/pedidos/{pedido_id}/repartidor',
+        json={'repartidor_id': repartidor_id},
+        headers={'X-CSRFToken': csrf},
+    ).status_code == 200
+
+    _loguear(client, app, 'repartidor_delivery_ruta_privacidad')
+    ruta_html = client.get('/gastronomia/delivery/ruta').get_data(as_text=True)
+    assert 'data-delivery-location="0"' in ruta_html
+    csrf_ruta = _csrf(ruta_html)
+    ruta_resp = client.get('/api/gastronomia/delivery/ruta')
+    assert ruta_resp.status_code == 200
+    pedido_repartidor = ruta_resp.get_json()['pedidos'][0]
+    assert 'ubicacion_entrega_url' not in pedido_repartidor
+    assert 'destino_latitud' not in pedido_repartidor
+    assert 'ultima_ubicacion_delivery' not in pedido_repartidor
+    pedidos_generales_resp = client.get('/api/gastronomia/pedidos?tipo=delivery')
+    assert pedidos_generales_resp.status_code == 200
+    pedido_general = pedidos_generales_resp.get_json()['pedidos'][0]
+    assert 'ubicacion_entrega_url' not in pedido_general
+    assert 'destino_latitud' not in pedido_general
+
+    salir_resp = client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/salir',
+        json={},
+        headers={'X-CSRFToken': csrf_ruta},
+    )
+    assert salir_resp.status_code == 200
+    assert client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/destino',
+        json={'ubicacion_entrega_url': 'https://maps.example/test'},
+        headers={'X-CSRFToken': csrf_ruta},
+    ).status_code == 403
+    assert client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/ubicacion',
+        json={'latitud': -25.3001, 'longitud': -57.6359, 'precision_metros': 12},
+        headers={'X-CSRFToken': csrf_ruta},
+    ).status_code == 403
+
+    seguimiento_resp = client.get(f'/gastronomia/pedido/{pedido_data["codigo_publico"]}/estado')
+    assert seguimiento_resp.status_code == 200
+    assert seguimiento_resp.get_json()['tracking']['visible'] is False
+
+    with app.app_context():
+        admin = Usuario.query.filter_by(username='admin_delivery_ruta_privacidad').first()
+        Configuracion.establecer(CLAVE_SYSTEM_ROOT_USER_ID, str(admin.id_usuario))
+
+    _loguear(client, app, 'admin_delivery_ruta_privacidad')
+    root_html = client.get('/gastronomia/delivery/ruta').get_data(as_text=True)
+    assert 'data-delivery-location="1"' in root_html
+    root_ruta_resp = client.get('/api/gastronomia/delivery/ruta')
+    assert root_ruta_resp.status_code == 200
+    pedido_root = root_ruta_resp.get_json()['pedidos'][0]
+    assert pedido_root['ubicacion_entrega_url']
+    assert pedido_root['destino_latitud'] == -25.3001
+    pedido_general_root = client.get('/api/gastronomia/pedidos?tipo=delivery').get_json()['pedidos'][0]
+    assert pedido_general_root['ubicacion_entrega_url']
 
 
 def test_delivery_repartidor_admite_usuario_global_activo():

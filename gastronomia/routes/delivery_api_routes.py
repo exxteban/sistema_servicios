@@ -16,6 +16,10 @@ from gastronomia.services.delivery_service import (
     obtener_repartidor_usuario,
     registrar_ubicacion_repartidor,
 )
+from gastronomia.services.delivery_privacy import (
+    ocultar_localizacion_pedidos,
+    puede_ver_localizacion_delivery,
+)
 from gastronomia.services.pedido_service import serializar_pedidos
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
@@ -95,7 +99,7 @@ def asignar_repartidor_api(pedido_id):
         pedido = asignar_repartidor_pedido(cliente_id, pedido_id, _payload().get('repartidor_id'))
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+    return jsonify({'ok': True, 'pedido': _serializar_pedidos_ruta([pedido])[0]})
 
 
 @gastronomia_delivery_api_bp.route('/delivery/ruta', methods=['GET'])
@@ -112,7 +116,7 @@ def ruta_delivery():
             'ok': True,
             'modo': 'repartidor',
             'repartidor': _repartidor.to_dict(),
-            'pedidos': serializar_pedidos(pedidos),
+            'pedidos': _serializar_pedidos_ruta(pedidos),
         })
     if _puede_ver_ruta_operativa():
         pedidos = listar_ruta_operativa(cliente_id)
@@ -120,7 +124,7 @@ def ruta_delivery():
             'ok': True,
             'modo': 'operativo',
             'repartidor': None,
-            'pedidos': serializar_pedidos(pedidos),
+            'pedidos': _serializar_pedidos_ruta(pedidos),
             'mensaje': 'Vista operativa: pedidos delivery listos o en camino.',
         })
     return jsonify({
@@ -150,6 +154,8 @@ def ruta_entregar(pedido_id):
 @login_required
 @requiere_permiso_gastronomia(PERMISO_DELIVERY)
 def ruta_ubicacion(pedido_id):
+    if not puede_ver_localizacion_delivery(current_user):
+        return _error_localizacion_restringida()
     cliente_id, error = _cliente_o_error()
     if error:
         return error
@@ -164,6 +170,8 @@ def ruta_ubicacion(pedido_id):
 @login_required
 @requiere_permiso_gastronomia(PERMISO_DELIVERY)
 def ruta_destino(pedido_id):
+    if not puede_ver_localizacion_delivery(current_user):
+        return _error_localizacion_restringida()
     cliente_id, error = _cliente_o_error()
     if error:
         return error
@@ -181,7 +189,7 @@ def ruta_destino(pedido_id):
         pedido = actualizar_destino_pedido_delivery(cliente_id, pedido_id, _payload())
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+    return jsonify({'ok': True, 'pedido': _serializar_pedidos_ruta([pedido])[0]})
 
 
 def _marcar_ruta(pedido_id: int, estado: str):
@@ -197,7 +205,18 @@ def _marcar_ruta(pedido_id: int, estado: str):
             raise ValueError('Este usuario no esta vinculado a un repartidor activo.')
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': serializar_pedidos([pedido])[0]})
+    return jsonify({'ok': True, 'pedido': _serializar_pedidos_ruta([pedido])[0]})
+
+
+def _serializar_pedidos_ruta(pedidos):
+    return ocultar_localizacion_pedidos(serializar_pedidos(pedidos), current_user)
+
+
+def _error_localizacion_restringida():
+    return jsonify({
+        'error': 'delivery_location_restricted',
+        'mensaje': 'La localizacion de delivery esta restringida al usuario root.',
+    }), 403
 
 
 def _puede_ver_ruta_operativa() -> bool:

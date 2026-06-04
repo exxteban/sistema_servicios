@@ -26,6 +26,10 @@ def inicializar_datos_base(config_name=None):
         Usuario, Caja, MetodoPago, Cliente, Categoria, Configuracion, Rol, Permiso
     )
     from app.services.ia_backoffice.settings import CLAVE_SYSTEM_ROOT_USER_ID
+    from gastronomia.services.delivery_privacy import (
+        CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT,
+        DESC_DELIVERY_LOCALIZACION_SOLO_ROOT,
+    )
     from sqlalchemy import text
     from cobranzas import (
         CLAVE_COBRANZAS_ACTIVO,
@@ -294,6 +298,7 @@ def inicializar_datos_base(config_name=None):
         ('caja_flujo_enviado_desde_vendedor', '0', 'Habilita flujo vendedor -> caja para cobro final'),
         ('caja_alerta_pendientes_activa', '0', 'Muestra alerta visual de pendientes de cobro para cajero'),
         ('caja_exigir_cajero_para_cobro', '0', 'Bloquea cobro directo cuando el flujo de caja está activo'),
+        (CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT, '0', DESC_DELIVERY_LOCALIZACION_SOLO_ROOT),
         (CLAVE_MODULO_FLUJO_CAJA, '1', DESC_MODULO_FLUJO_CAJA),
         ('control_empleados_activo', '0', 'Activa el módulo simple de control de empleados y salarios'),
         (CLAVE_VENTAS_CREDITO_ACTIVO, '0', DESC_VENTAS_CREDITO_ACTIVO),

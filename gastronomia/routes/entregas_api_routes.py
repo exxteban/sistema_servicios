@@ -1,8 +1,9 @@
 """API de entregas gastronomicas."""
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.delivery_privacy import ocultar_localizacion_objeto
 from gastronomia.services.entregas_service import buscar_entregas
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
@@ -23,4 +24,5 @@ def entregas_api():
     if not cliente_id:
         return jsonify({'error': 'gastronomia_no_activa'}), 403
     data = buscar_entregas(cliente_id, request.args)
+    data = ocultar_localizacion_objeto(data, current_user)
     return jsonify({'ok': True, **data})

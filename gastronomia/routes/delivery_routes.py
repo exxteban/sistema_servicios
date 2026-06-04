@@ -15,6 +15,7 @@ from gastronomia.services.permisos import (
     requiere_permiso_gastronomia,
     tiene_permiso_gastronomia,
 )
+from gastronomia.services.delivery_privacy import puede_ver_localizacion_delivery
 
 
 @gastronomia_bp.route('/delivery')
@@ -53,5 +54,5 @@ def delivery_ruta():
         return redirect(url_for('main.dashboard'))
     return render_template(
         'gastronomia/delivery_ruta.html',
-        gps_delivery_activo=True,
+        delivery_localizacion_visible=puede_ver_localizacion_delivery(),
     )

@@ -4,6 +4,11 @@ from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.caja_service import cobrar_pedido, listar_pedidos_caja
+from gastronomia.services.delivery_privacy import (
+    ocultar_localizacion_eventos,
+    ocultar_localizacion_pedido,
+    ocultar_localizacion_pedidos,
+)
 from gastronomia.services.pedido_service import listar_eventos_pedido, obtener_ultimo_evento_id, serializar_pedidos
 from gastronomia.services.permisos import PERMISO_CAJA, requiere_permiso_gastronomia
 
@@ -34,7 +39,7 @@ def caja_pedidos():
     pedidos = listar_pedidos_caja(cliente_id)
     return jsonify({
         'ok': True,
-        'pedidos': serializar_pedidos(pedidos),
+        'pedidos': ocultar_localizacion_pedidos(serializar_pedidos(pedidos), current_user),
         'ultimo_evento_id': obtener_ultimo_evento_id(cliente_id),
     })
 
@@ -50,7 +55,7 @@ def caja_eventos():
     eventos = listar_eventos_pedido(cliente_id, despues_de=despues_de)
     return jsonify({
         'ok': True,
-        'eventos': [evento.to_dict() for evento in eventos],
+        'eventos': ocultar_localizacion_eventos([evento.to_dict() for evento in eventos], current_user),
         'ultimo_evento_id': obtener_ultimo_evento_id(cliente_id),
     })
 
@@ -68,4 +73,4 @@ def caja_cobrar(pedido_id):
         if str(exc) == 'Pedido no encontrado.':
             return jsonify({'error': 'not_found'}), 404
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': ocultar_localizacion_pedido(pedido.to_dict(), current_user)})

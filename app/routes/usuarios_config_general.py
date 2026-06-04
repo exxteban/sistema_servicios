@@ -4,10 +4,15 @@ from flask_login import current_user, login_required
 
 from app.models import Configuracion
 from app.routes.usuarios import usuarios_bp
-from app.services.ia_backoffice.security import puede_gestionar_asistente_ia
+from app.services.ia_backoffice.security import es_usuario_root, puede_gestionar_asistente_ia
 from app.services.ia_backoffice.settings import obtener_configuracion_asistente
 from app.services.usuarios_branding import guardar_logo_empresa
 from app.utils.public_url import CLAVE_URL_PUBLICA_SISTEMA, DESC_URL_PUBLICA_SISTEMA
+from gastronomia.services.delivery_privacy import (
+    CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT,
+    DESC_DELIVERY_LOCALIZACION_SOLO_ROOT,
+    localizacion_delivery_solo_root_activa,
+)
 
 
 CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS = 'pos_ocultar_selector_vendedor_cajero'
@@ -63,6 +68,8 @@ def configuracion():
         caja_flujo_enviado_activo=Configuracion.obtener_bool(CLAVE_CAJA_FLUJO_ENVIADO, default=False),
         caja_alerta_pendientes_activa=Configuracion.obtener_bool(CLAVE_CAJA_ALERTA_PENDIENTES, default=False),
         caja_exigir_cajero_para_cobro=Configuracion.obtener_bool(CLAVE_CAJA_EXIGIR_CAJERO, default=False),
+        delivery_localizacion_solo_root=localizacion_delivery_solo_root_activa(),
+        puede_configurar_localizacion_delivery=es_usuario_root(current_user),
         nombre_empresa_ui=(Configuracion.obtener(CLAVE_NOMBRE_EMPRESA_UI, '') or '').strip(),
         url_publica_sistema=(Configuracion.obtener(CLAVE_URL_PUBLICA_SISTEMA, '') or '').strip(),
         mensaje_whatsapp_seguimiento=_mensaje_whatsapp_seguimiento(),
@@ -84,6 +91,12 @@ def _guardar_configuracion_general():
     Configuracion.establecer_bool(CLAVE_CAJA_FLUJO_ENVIADO, modo_cobro_exclusivo_cajero, DESC_CAJA_FLUJO_ENVIADO)
     Configuracion.establecer_bool(CLAVE_CAJA_ALERTA_PENDIENTES, caja_alerta_pendientes, DESC_CAJA_ALERTA_PENDIENTES)
     Configuracion.establecer_bool(CLAVE_CAJA_EXIGIR_CAJERO, modo_cobro_exclusivo_cajero, DESC_CAJA_EXIGIR_CAJERO)
+    if es_usuario_root(current_user) and CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT in request.form:
+        Configuracion.establecer_bool(
+            CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT,
+            _leer_toggle(CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT, default=False),
+            DESC_DELIVERY_LOCALIZACION_SOLO_ROOT,
+        )
     Configuracion.establecer(CLAVE_NOMBRE_EMPRESA_UI, (request.form.get('nombre_empresa_ui') or '').strip(), DESC_NOMBRE_EMPRESA_UI)
     Configuracion.establecer(CLAVE_URL_PUBLICA_SISTEMA, (request.form.get('url_publica_sistema') or '').strip().rstrip('/'), DESC_URL_PUBLICA_SISTEMA)
     Configuracion.establecer(CLAVE_MENSAJE_WHATSAPP_SEGUIMIENTO, (request.form.get('mensaje_whatsapp_seguimiento') or '').strip(), DESC_MENSAJE_WHATSAPP_SEGUIMIENTO)

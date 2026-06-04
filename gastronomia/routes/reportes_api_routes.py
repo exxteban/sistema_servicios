@@ -5,6 +5,7 @@ from flask_login import current_user, login_required
 from app.utils.permisos import validar_autorizacion
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.anulacion_service import anular_venta_gastronomica
+from gastronomia.services.delivery_privacy import ocultar_localizacion_pedido
 from gastronomia.services.permisos import PERMISO_CAJA, PERMISO_REPORTES, requiere_permiso_gastronomia
 from gastronomia.services.reportes_service import resumen_reportes
 
@@ -63,4 +64,4 @@ def reportes_anular_venta(pedido_id):
         if str(exc) == 'Pedido no encontrado.':
             return jsonify({'error': 'not_found'}), 404
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
-    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+    return jsonify({'ok': True, 'pedido': ocultar_localizacion_pedido(pedido.to_dict(), current_user)})
