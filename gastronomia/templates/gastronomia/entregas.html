@@ -19,56 +19,54 @@
 
     <div id="entregas-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <div class="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 xl:sticky xl:top-4 xl:self-start">
-            <div class="mb-4 flex items-center justify-between gap-3">
+    <div class="space-y-4">
+        <aside class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div class="mb-3 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="text-base font-black text-gray-900 dark:text-white">Filtros</h2>
                     <p class="text-xs font-semibold text-gray-500">Ajusta el historial visible.</p>
                 </div>
                 <i class="fas fa-filter text-emerald-600 dark:text-emerald-300"></i>
             </div>
-            <form id="entregas-filters" class="space-y-3">
-                <label class="block text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
+            <form id="entregas-filters" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-[160px_minmax(240px,1fr)_130px_130px_130px_110px] lg:items-end">
+                <label class="block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
                     Fecha
                     <input name="fecha" type="date"
-                           class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                           class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                 </label>
-                <label class="block text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
+                <label class="block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
                     Buscar
                     <input name="q" placeholder="Codigo, cliente, mesa o producto"
-                           class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                           class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                 </label>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                    <label class="block text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
-                        Tipo
-                        <select name="tipo_pedido" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                            <option value="">Todos</option>
-                            <option value="mesa">Mesa</option>
-                            <option value="mostrador">Mostrador</option>
-                            <option value="retiro">Retiro</option>
-                            <option value="delivery">Delivery</option>
-                        </select>
-                    </label>
-                    <label class="block text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
-                        Pago
-                        <select name="pagado" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                            <option value="">Todos</option>
-                            <option value="1">Pagados</option>
-                            <option value="0">Pendientes</option>
-                        </select>
-                    </label>
-                    <label class="block text-xs font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
-                        Estado
-                        <select name="estado" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                            <option value="">Todos</option>
-                            <option value="entregado">Entregado</option>
-                            <option value="cobrado">Cobrado</option>
-                            <option value="cancelado">Cancelado</option>
-                        </select>
-                    </label>
-                </div>
-                <button type="submit" class="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
+                <label class="block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
+                    Tipo
+                    <select name="tipo_pedido" class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="">Todos</option>
+                        <option value="mesa">Mesa</option>
+                        <option value="mostrador">Mostrador</option>
+                        <option value="retiro">Retiro</option>
+                        <option value="delivery">Delivery</option>
+                    </select>
+                </label>
+                <label class="block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
+                    Pago
+                    <select name="pagado" class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="">Todos</option>
+                        <option value="1">Pagados</option>
+                        <option value="0">Pendientes</option>
+                    </select>
+                </label>
+                <label class="block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300">
+                    Estado
+                    <select name="estado" class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="">Todos</option>
+                        <option value="entregado">Entregado</option>
+                        <option value="cobrado">Cobrado</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                </label>
+                <button type="submit" class="h-10 w-full rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-emerald-700">
                     Filtrar
                 </button>
             </form>
