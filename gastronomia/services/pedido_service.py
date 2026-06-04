@@ -54,7 +54,10 @@ def listar_pedidos_cocina(cliente_id: int) -> list[GastronomiaPedido]:
         GastronomiaPedido.query
         .filter(
             GastronomiaPedido.cliente_id == int(cliente_id),
-            GastronomiaPedido.estado.in_(['enviado_cocina', 'preparando', 'listo', 'en_camino']),
+            db.or_(
+                GastronomiaPedido.estado.in_(['enviado_cocina', 'preparando', 'listo', 'en_camino']),
+                db.and_(GastronomiaPedido.tipo_pedido == 'delivery', GastronomiaPedido.estado == 'abierto'),
+            ),
         )
         .order_by(GastronomiaPedido.fecha_envio_cocina.asc(), GastronomiaPedido.id_pedido.asc())
         .all()
@@ -234,6 +237,7 @@ def obtener_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido | None:
 
 def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPedido:
     pedido_data = _validar_datos_pedido(cliente_id, data)
+    estado_inicial = 'enviado_cocina' if pedido_data['tipo_pedido'] == 'delivery' else 'abierto'
 
     pedido = GastronomiaPedido(
         cliente_id=int(cliente_id),
@@ -251,7 +255,8 @@ def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPed
         tiempo_estimado_minutos=pedido_data['tiempo_estimado_minutos'],
         costo_envio=pedido_data['costo_envio'],
         notas=pedido_data['notas'],
-        estado='abierto',
+        estado=estado_inicial,
+        fecha_envio_cocina=datetime.utcnow() if estado_inicial == 'enviado_cocina' else None,
     )
     db.session.add(pedido)
     db.session.flush()
@@ -289,6 +294,9 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
     pedido.tiempo_estimado_minutos = pedido_data['tiempo_estimado_minutos']
     pedido.costo_envio = pedido_data['costo_envio']
     pedido.notas = pedido_data['notas']
+    if pedido_data['tipo_pedido'] == 'delivery':
+        pedido.estado = 'enviado_cocina'
+        pedido.fecha_envio_cocina = pedido.fecha_envio_cocina or datetime.utcnow()
     try:
         _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
     except ValueError:

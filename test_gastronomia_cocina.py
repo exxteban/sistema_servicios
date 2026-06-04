@@ -236,6 +236,46 @@ def test_cocina_muestra_delivery_en_camino_y_lo_entrega():
     assert client.get('/api/gastronomia/cocina/pedidos').get_json()['pedidos'] == []
 
 
+def test_cocina_recibe_delivery_automaticamente_sin_envio_manual():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto(app, 'Resto Delivery Automatico', 'resto_delivery_auto')
+    _loguear(client, app, 'resto_delivery_auto')
+
+    csrf = _csrf(client.get('/gastronomia/cocina').get_data(as_text=True))
+    pedido_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'delivery',
+            'referencia_entrega': 'Ana',
+            'celular_cliente': '0981555111',
+            'direccion_entrega': 'Centro 123',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert pedido_resp.status_code == 201
+    pedido = pedido_resp.get_json()['pedido']
+    assert pedido['estado'] == 'enviado_cocina'
+    assert pedido['fecha_envio_cocina'] is not None
+
+    cocina_resp = client.get('/api/gastronomia/cocina/pedidos')
+    assert cocina_resp.status_code == 200
+    pedidos = cocina_resp.get_json()['pedidos']
+    assert [item['id_pedido'] for item in pedidos] == [pedido['id_pedido']]
+    assert pedidos[0]['estado'] == 'enviado_cocina'
+
+    with app.app_context():
+        pedido_db = GastronomiaPedido.query.filter_by(cliente_id=cliente_id, id_pedido=pedido['id_pedido']).one()
+        pedido_db.estado = 'abierto'
+        pedido_db.fecha_envio_cocina = None
+        db.session.commit()
+
+    pedidos_legacy = client.get('/api/gastronomia/cocina/pedidos').get_json()['pedidos']
+    assert [item['id_pedido'] for item in pedidos_legacy] == [pedido['id_pedido']]
+    assert pedidos_legacy[0]['estado'] == 'enviado_cocina'
+
+
 def test_cocina_no_muestra_eventos_de_otro_cliente():
     app = create_app('testing')
     client_uno = app.test_client()

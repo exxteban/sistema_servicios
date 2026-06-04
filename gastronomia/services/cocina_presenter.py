@@ -22,11 +22,11 @@ _CLAVES_PRIVADAS_COCINA = {
 
 
 def serializar_pedidos_cocina(pedidos) -> list[dict]:
-    return [_sin_datos_privados(item) for item in serializar_pedidos(pedidos)]
+    return [_normalizar_pedido_cocina(_sin_datos_privados(item)) for item in serializar_pedidos(pedidos)]
 
 
 def serializar_eventos_cocina(eventos) -> list[dict]:
-    return [_sin_datos_privados(evento.to_dict()) for evento in eventos]
+    return [_normalizar_evento_cocina(_sin_datos_privados(evento.to_dict())) for evento in eventos]
 
 
 def _sin_datos_privados(value):
@@ -39,3 +39,17 @@ def _sin_datos_privados(value):
         for key, item in value.items()
         if key not in _CLAVES_PRIVADAS_COCINA
     }
+
+
+def _normalizar_pedido_cocina(pedido: dict) -> dict:
+    if pedido.get('tipo_pedido') == 'delivery' and pedido.get('estado') == 'abierto':
+        return {**pedido, 'estado': 'enviado_cocina'}
+    return pedido
+
+
+def _normalizar_evento_cocina(evento: dict) -> dict:
+    payload = evento.get('payload') if isinstance(evento.get('payload'), dict) else None
+    pedido = payload.get('pedido') if payload else None
+    if not isinstance(pedido, dict):
+        return evento
+    return {**evento, 'payload': {**payload, 'pedido': _normalizar_pedido_cocina(pedido)}}

@@ -156,11 +156,8 @@
       </article>
     `;
   };
-  const renderKitchenControl = (order) => {
+  const renderKitchenControl = () => {
     const classes = 'rounded-lg border border-orange-200 px-2 py-2 text-center text-xs font-black text-orange-800 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-200 dark:hover:bg-orange-500/10';
-    if (order.estado === 'abierto') {
-      return `<button type="button" data-send-kitchen="${order.id_pedido}" class="${classes}">Enviar cocina</button>`;
-    }
     return `<a href="/gastronomia/cocina" class="${classes}">Cocina</a>`;
   };
   const elapsed = (iso) => {
