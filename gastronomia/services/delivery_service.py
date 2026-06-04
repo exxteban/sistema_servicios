@@ -15,6 +15,7 @@ from gastronomia.services.pedido_service import (
 
 
 ESTADOS_RUTA = {'listo', 'en_camino'}
+GPS_PRECISION_MAXIMA_PUBLICABLE_M = 500
 
 
 def listar_repartidores(cliente_id: int, *, incluir_inactivos: bool = False) -> list[GastronomiaRepartidor]:
@@ -138,6 +139,8 @@ def registrar_ubicacion_repartidor(cliente_id: int, usuario_id: int, pedido_id: 
     latitud = _parse_coordinate(data.get('latitud'), -90, 90, 'Latitud invalida.')
     longitud = _parse_coordinate(data.get('longitud'), -180, 180, 'Longitud invalida.')
     precision = _parse_optional_float(data.get('precision_metros'))
+    if precision is not None and precision > GPS_PRECISION_MAXIMA_PUBLICABLE_M:
+        raise ValueError('La precision GPS es demasiado baja. Espera mejor senal antes de publicar la ubicacion.')
     ubicacion = GastronomiaDeliveryUbicacion(
         cliente_id=int(cliente_id),
         pedido_id=int(pedido.id_pedido),

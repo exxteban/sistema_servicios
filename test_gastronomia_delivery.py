@@ -143,6 +143,13 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
     assert ubicacion_resp.status_code == 200
     assert ubicacion_resp.get_json()['ubicacion']['pedido_id'] == pedido_id
 
+    ubicacion_imprecisa_resp = client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/ubicacion',
+        json={'latitud': -25.2900, 'longitud': -57.6200, 'precision_metros': 2000},
+        headers={'X-CSRFToken': csrf_ruta},
+    )
+    assert ubicacion_imprecisa_resp.status_code == 400
+
     seguimiento_resp = client.get(f'/gastronomia/pedido/{pedido_data["codigo_publico"]}/estado')
     assert seguimiento_resp.status_code == 200
     seguimiento = seguimiento_resp.get_json()
