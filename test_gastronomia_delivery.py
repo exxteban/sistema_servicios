@@ -168,6 +168,7 @@ def test_delivery_registra_repartidor_asigna_y_repartidor_entrega():
     seguimiento = seguimiento_resp.get_json()
     assert seguimiento['tracking']['visible'] is True
     assert seguimiento['tracking']['delivery']['latitud'] == -25.3001
+    assert seguimiento['tracking']['delivery_impreciso'] is None
     assert seguimiento['tracking']['destino']['latitud'] == -25.3001
 
     entregar_resp = client.post(

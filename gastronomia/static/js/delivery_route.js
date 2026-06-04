@@ -25,7 +25,7 @@
   const GPS_STALE_MS = 45000;
   // Precision objetivo (metros). Arriba de esto el fix es de antena/wifi, no GPS real.
   const GPS_ACCURACY_TARGET_M = 50;
-  const GPS_ACCURACY_MAX_M = 120;
+  const GPS_ACCURACY_MAX_M = 500;
   // Si no logramos un buen fix en este tiempo, aceptamos una ubicacion aproximada razonable.
   const GPS_ACCURACY_GRACE_MS = 30000;
   let destinationDrafts = {};
@@ -339,7 +339,7 @@
         gpsWatchRetries = 0;
         lastGpsFixAt = Date.now();
         if (!isAcceptableFix(position)) return;
-        sendGpsPosition(gpsOrderId, position).catch(() => {});
+        sendGpsPosition(gpsOrderId, position).catch((error) => showAlert(error.message, 'warning'));
       },
       (error) => handleWatchError(error),
       GPS_WATCH_OPTIONS,

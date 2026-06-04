@@ -230,7 +230,12 @@
                     var accTxt = Number.isFinite(accM) && accM > 0 ? ' - precision ~' + Math.round(accM) + ' m' : '';
                     mapStatus.textContent = 'Ultima ubicacion del delivery: ' + formatDate(tracking.delivery.fecha_registro) + accTxt + staleSuffix(tracking.delivery.fecha_registro);
                 }
-                if (mapStatus && !hasDelivery && hasDestination) mapStatus.textContent = 'Destino cargado. Esperando ubicacion GPS del delivery.';
+                if (mapStatus && !hasDelivery && tracking.delivery_impreciso) {
+                    var badAccM = Number(tracking.delivery_impreciso.precision_metros);
+                    var badAccTxt = Number.isFinite(badAccM) && badAccM > 0 ? ' precision ~' + Math.round(badAccM) + ' m.' : '';
+                    mapStatus.textContent = 'GPS recibido, pero demasiado impreciso para mostrarlo.' + badAccTxt + ' Esperando mejor senal del telefono.';
+                }
+                if (mapStatus && !hasDelivery && hasDestination && !tracking.delivery_impreciso) mapStatus.textContent = 'Destino cargado. Esperando ubicacion GPS del delivery.';
                 setTimeout(function () { map.invalidateSize(); }, 50);
             }
 

@@ -85,16 +85,24 @@ def _tracking_delivery(pedido):
     destino = None
     if pedido.destino_latitud is not None and pedido.destino_longitud is not None:
         destino = {'latitud': pedido.destino_latitud, 'longitud': pedido.destino_longitud}
-    ubicacion = (
+    ultima_ubicacion = (
+        GastronomiaDeliveryUbicacion.query
+        .filter_by(cliente_id=pedido.cliente_id, pedido_id=pedido.id_pedido)
+        .order_by(GastronomiaDeliveryUbicacion.fecha_registro.desc(), GastronomiaDeliveryUbicacion.id_ubicacion.desc())
+        .first()
+    )
+    ubicacion_publicable = (
         GastronomiaDeliveryUbicacion.query
         .filter_by(cliente_id=pedido.cliente_id, pedido_id=pedido.id_pedido)
         .filter(ubicacion_delivery_publicable_filter())
         .order_by(GastronomiaDeliveryUbicacion.fecha_registro.desc(), GastronomiaDeliveryUbicacion.id_ubicacion.desc())
         .first()
     )
+    gps_impreciso = ultima_ubicacion and not ubicacion_publicable
     return {
         'visible': True,
-        'delivery': ubicacion.to_dict() if ubicacion else None,
+        'delivery': ubicacion_publicable.to_dict() if ubicacion_publicable else None,
+        'delivery_impreciso': ultima_ubicacion.to_dict() if gps_impreciso else None,
         'destino': destino,
     }
 
