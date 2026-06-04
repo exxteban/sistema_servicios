@@ -298,9 +298,9 @@
     .pos-category > span:not([data-category-drag-handle]) {
         grid-column: 2;
         flex: 1 1 auto;
-        overflow: hidden;
+        overflow: visible;
         text-overflow: clip;
-        white-space: nowrap;
+        white-space: normal;
         line-height: 1.05;
         text-align: left;
     }
