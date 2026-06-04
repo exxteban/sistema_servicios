@@ -9,9 +9,11 @@
   const mapBox = () => byId('delivery-location-map');
   const closeMapButton = () => byId('delivery-close-location-map');
   const confirmMapButton = () => byId('delivery-confirm-location-map');
+  const mapStatus = () => byId('delivery-location-map-status');
   let map = null;
   let marker = null;
   let selectedCoords = null;
+  let tileErrorShown = false;
 
   const coordsFromText = (value) => {
     const rawText = String(value || '').trim();
@@ -52,25 +54,45 @@
     return true;
   };
   const currentOrDefaultCoords = () => validateCoords(latInput()?.value, lngInput()?.value) || {lat: -25.30066, lng: -57.63591};
+  const setMapStatus = (message, visible = true) => {
+    const status = mapStatus();
+    if (!status) return;
+    status.textContent = message || '';
+    status.classList.toggle('hidden', !visible || !message);
+  };
+  const waitForVisibleMap = (callback) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(callback));
+  };
   const openMap = () => {
-    if (!window.L || !modal() || !mapBox()) return;
+    if (!modal() || !mapBox()) return;
     modal().classList.remove('hidden');
     modal().classList.add('flex');
-    setTimeout(() => {
+    setMapStatus('');
+    waitForVisibleMap(() => {
       const center = currentOrDefaultCoords();
-      selectedCoords = center;
+      selectedCoords = null;
+      if (!window.L) {
+        setMapStatus('No se pudo cargar el mapa. Verifica internet o pega un link/coordenadas y toca Extraer.');
+        return;
+      }
       if (!map) {
         map = window.L.map(mapBox()).setView([center.lat, center.lng], 15);
-        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        const tiles = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '&copy; OpenStreetMap',
         }).addTo(map);
+        tiles.on('tileerror', () => {
+          if (tileErrorShown) return;
+          tileErrorShown = true;
+          setMapStatus('El mapa esta tardando en cargar. Podes tocar el fondo gris para marcar el punto o reintentar con mejor conexion.');
+        });
         map.on('click', (event) => setMapPoint(event.latlng.lat, event.latlng.lng));
       }
       map.setView([center.lat, center.lng], 15);
       setMapPoint(center.lat, center.lng);
-      map.invalidateSize();
-    }, 50);
+      map.invalidateSize(true);
+      window.setTimeout(() => map?.invalidateSize(true), 250);
+    });
   };
   const closeMap = () => {
     modal()?.classList.add('hidden');

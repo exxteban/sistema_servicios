@@ -24,6 +24,8 @@
   let destinationFeedbacks = {};
   let gpsStatusByOrder = {};
   let permissionState = 'unknown';
+  const GPS_POSITION_OPTIONS = {enableHighAccuracy: false, maximumAge: 60000, timeout: 45000};
+  const GPS_WATCH_OPTIONS = {enableHighAccuracy: false, maximumAge: 30000, timeout: 60000};
   const gpsTrackingEnabled = root.dataset.gpsTracking === '1';
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -271,7 +273,7 @@
         showAlert(gpsErrorMessage(error), false);
         render();
       },
-      {enableHighAccuracy: true, maximumAge: 0, timeout: 20000},
+      GPS_POSITION_OPTIONS,
     );
   };
   const warnIfPermissionBlocked = () => {
@@ -317,7 +319,7 @@
         showAlert(gpsErrorMessage(error), false);
         renderGpsPanel();
       },
-      {enableHighAccuracy: true, maximumAge: 0, timeout: 20000},
+      GPS_POSITION_OPTIONS,
     );
   };
   const startGpsWatch = () => {
@@ -329,7 +331,7 @@
         sendGpsPosition(gpsOrderId, position).catch(() => {});
       },
       (error) => handleWatchError(error),
-      {enableHighAccuracy: true, maximumAge: 10000, timeout: 20000},
+      GPS_WATCH_OPTIONS,
     );
   };
   const handleWatchError = (error) => {
@@ -371,7 +373,7 @@
   const gpsErrorMessage = (error) => {
     if (error?.code === 1) return 'Permiso de ubicacion denegado. Activalo en el candado/ajustes del navegador para usar GPS delivery.';
     if (error?.code === 2) return 'No se pudo obtener la ubicacion del telefono. Activa el GPS/ubicacion del dispositivo.';
-    if (error?.code === 3) return 'El telefono tardo demasiado en entregar la ubicacion GPS. Reintenta en una zona con mejor senal.';
+    if (error?.code === 3) return 'El telefono tardo demasiado en entregar la ubicacion GPS. Reintenta con la ubicacion del telefono encendida y esta pantalla abierta.';
     return 'No se pudo activar GPS. Revisa permisos, HTTPS y que la ubicacion del telefono este encendida.';
   };
   const stopGpsTracking = (orderId) => {

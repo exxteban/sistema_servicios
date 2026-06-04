@@ -225,7 +225,10 @@
                 </div>
                 <button type="button" id="delivery-close-location-map" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:text-gray-200">Cerrar</button>
             </div>
-            <div id="delivery-location-map" class="mt-4 h-96 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700"></div>
+            <div class="relative mt-4">
+                <div id="delivery-location-map" class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700"></div>
+                <p id="delivery-location-map-status" class="hidden mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800"></p>
+            </div>
             <div class="mt-4 flex flex-wrap justify-end gap-2">
                 <button type="button" id="delivery-confirm-location-map" class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-black text-white hover:bg-orange-700">Usar ubicacion</button>
             </div>
@@ -236,7 +239,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos.css', v='20260531-1') }}">
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos.css', v='20260603-1') }}">
 {% endblock %}
 
 {% block extra_js %}
@@ -244,7 +247,7 @@
 <script src="{{ url_for('gastronomia.static', filename='js/pos_stock_alerts.js', v='20260531-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_channel_prices.js', v='20260531-1') }}"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/pos_delivery_location.js', v='20260603-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos_delivery_location.js', v='20260603-3') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260603-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

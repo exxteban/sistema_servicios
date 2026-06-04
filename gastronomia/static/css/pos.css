@@ -24,6 +24,13 @@
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
     }
+    #delivery-location-map {
+        display: block;
+        width: 100%;
+        height: min(24rem, calc(var(--app-shell-vh, 100vh) - 14rem));
+        min-height: 18rem;
+        background: #e5e7eb;
+    }
     .pos-modal-card {
         position: relative;
         z-index: 221;
