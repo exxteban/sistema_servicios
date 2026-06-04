@@ -64,6 +64,20 @@
     renderOrders();
     renderSelected();
   };
+  const applyPreselectedOrder = () => {
+    const preselectId = Number(pageRoot?.dataset.pedidoPreseleccionado || 0);
+    if (!preselectId) return;
+    const order = orders.find((item) => Number(item.id_pedido) === preselectId);
+    if (!order) {
+      showAlert(`El pedido #${preselectId} ya no esta disponible para cobro.`, false);
+      return;
+    }
+    selectedOrderId = preselectId;
+    if (shippingInput) shippingInput.value = Number(order.costo_envio || 0);
+    renderOrders();
+    renderSelected();
+    document.querySelector(`.caja-card[data-order="${preselectId}"]`)?.scrollIntoView({behavior: 'smooth', block: 'center'});
+  };
   const pollEvents = async () => {
     try {
       const data = await apiJson(`/api/gastronomia/caja/eventos?after=${lastEventId}`);
@@ -273,6 +287,7 @@
     });
   });
   loadOrders()
+    .then(() => applyPreselectedOrder())
     .catch((error) => showAlert(error.message, false))
     .finally(() => { pollTimer = setInterval(pollEvents, 2500); });
   updateChargeButton();

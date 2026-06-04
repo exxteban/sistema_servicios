@@ -1,5 +1,5 @@
 """Pantalla de caja gastronomica."""
-from flask import abort, flash, redirect, render_template, url_for
+from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.models import Configuracion, SesionCaja
@@ -19,7 +19,11 @@ def caja():
         flash(mensaje_contexto_gastronomia(), 'warning')
         return redirect(url_for('main.dashboard'))
     sesion_caja_abierta = SesionCaja.query.filter_by(id_usuario=current_user.id_usuario, estado='abierta').first()
-    return render_template('gastronomia/caja.html', sesion_caja_abierta=sesion_caja_abierta)
+    return render_template(
+        'gastronomia/caja.html',
+        sesion_caja_abierta=sesion_caja_abierta,
+        pedido_preseleccionado_id=request.args.get('pedido', type=int) or '',
+    )
 
 
 @gastronomia_bp.route('/pedidos/<int:pedido_id>/ticket')

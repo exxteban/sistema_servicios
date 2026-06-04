@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from app import db
-from gastronomia.models import GastronomiaMesa, GastronomiaPedido
+from gastronomia.models import GastronomiaMesa, GastronomiaPedido, GastronomiaPedidoPago
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.pedido_service import obtener_pedido, registrar_evento_pedido
@@ -85,11 +85,13 @@ def mover_pedido_mesa(cliente_id: int, pedido_id: int, data: dict) -> Gastronomi
 def _pedidos_activos_por_mesa(cliente_id: int) -> dict[str, list[GastronomiaPedido]]:
     pedidos = (
         GastronomiaPedido.query
+        .outerjoin(GastronomiaPedidoPago, GastronomiaPedidoPago.pedido_id == GastronomiaPedido.id_pedido)
         .filter(
             GastronomiaPedido.cliente_id == int(cliente_id),
             GastronomiaPedido.tipo_pedido == 'mesa',
             GastronomiaPedido.mesa.isnot(None),
             GastronomiaPedido.estado.in_(ESTADOS_ACTIVOS),
+            GastronomiaPedidoPago.id_pago.is_(None),
         )
         .order_by(GastronomiaPedido.fecha_creacion.desc(), GastronomiaPedido.id_pedido.desc())
         .all()

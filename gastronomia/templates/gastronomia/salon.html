@@ -3,7 +3,9 @@
 {% block title %}Salon Gastronomia{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-7xl" data-gastro-salon>
+<div class="mx-auto max-w-7xl" data-gastro-salon
+     data-puede-cobrar="{{ 1 if puede_cobrar else 0 }}"
+     data-puede-editar-pedido="{{ 1 if puede_editar_pedido else 0 }}">
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
     <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -104,5 +106,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/salon.js') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/salon.js', v='20260603-1') }}"></script>
 {% endblock %}

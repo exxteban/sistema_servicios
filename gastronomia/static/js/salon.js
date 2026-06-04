@@ -1,8 +1,12 @@
 (function () {
   const csrf = document.getElementById('csrf-token')?.value || '';
+  const root = document.querySelector('[data-gastro-salon]');
   const board = document.getElementById('salon-board');
   const alertBox = document.getElementById('salon-alert');
   const moveTableGrid = document.getElementById('move-table-grid');
+  const puedeCobrar = root?.dataset.puedeCobrar === '1';
+  const puedeEditarPedido = root?.dataset.puedeEditarPedido === '1';
+  const estadosCobrables = new Set(['abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado']);
   let mesas = [];
   let mesaDestino = '';
 
@@ -47,12 +51,7 @@
     const pedidos = Array.isArray(mesa.pedidos_activos) && mesa.pedidos_activos.length
       ? mesa.pedidos_activos
       : (mesa.pedido_activo ? [mesa.pedido_activo] : []);
-    const pedidoEditable = pedidos.find((pedido) => pedido?.estado === 'abierto' && !pedido?.pagado);
     const statusClass = estadoStyles[mesa.estado_salon] || 'bg-gray-100 text-gray-800';
-    const posUrl = pedidoEditable
-      ? `/gastronomia/pos?pedido=${encodeURIComponent(pedidoEditable.id_pedido)}`
-      : `/gastronomia/pos?mesa=${encodeURIComponent(mesa.nombre)}`;
-    const actionLabel = pedidoEditable ? 'Editar pedido abierto' : 'Abrir pedido';
     return `
       <article class="salon-card" data-table="${mesa.id_mesa}">
         <div class="flex items-start justify-between gap-3">
@@ -69,22 +68,55 @@
         ` : ''}
         ${pedidos.map(renderPedidoResumen).join('')}
         <div class="mt-4 grid gap-2">
-          <a href="${posUrl}" class="rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-indigo-700">
-            ${actionLabel}
-          </a>
+          ${renderNuevoPedidoAccion(mesa)}
         </div>
       </article>
     `;
   };
-  const renderPedidoResumen = (pedido) => `
-    <div class="mt-4 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/40">
-      <div class="flex justify-between gap-3">
-        <strong class="text-gray-900 dark:text-white">Pedido #${pedido.id_pedido}</strong>
-        <span class="font-bold text-emerald-700 dark:text-emerald-300">${money(pedido.total)}</span>
+  const renderPedidoResumen = (pedido) => {
+    const editable = pedido?.estado === 'abierto' && !pedido?.pagado;
+    const cobrable = estadosCobrables.has(pedido?.estado) && !pedido?.pagado;
+    return `
+      <div class="mt-4 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/40">
+        <div class="flex justify-between gap-3">
+          <strong class="text-gray-900 dark:text-white">Pedido #${pedido.id_pedido}</strong>
+          <span class="font-bold text-emerald-700 dark:text-emerald-300">${money(pedido.total)}</span>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">${escapeHtml(pedido.estado)}</p>
+        ${renderPedidoAcciones(pedido, editable, cobrable)}
       </div>
-      <p class="mt-1 text-sm text-gray-500">${escapeHtml(pedido.estado)}</p>
-    </div>
-  `;
+    `;
+  };
+  const renderPedidoAcciones = (pedido, editable, cobrable) => {
+    const acciones = [];
+    if (editable && puedeEditarPedido) {
+      acciones.push(`
+        <a href="/gastronomia/pos?pedido=${encodeURIComponent(pedido.id_pedido)}"
+           class="rounded-lg border border-amber-200 px-3 py-2 text-center text-xs font-bold text-amber-700 hover:bg-amber-50">
+          Editar pedido
+        </a>
+      `);
+    }
+    if (cobrable && puedeCobrar) {
+      acciones.push(`
+        <a href="/gastronomia/caja?pedido=${encodeURIComponent(pedido.id_pedido)}"
+           class="rounded-lg border border-emerald-200 px-3 py-2 text-center text-xs font-bold text-emerald-700 hover:bg-emerald-50">
+          Cobrar pedido
+        </a>
+      `);
+    }
+    if (!acciones.length) return '';
+    return `<div class="mt-3 grid gap-2 sm:grid-cols-2">${acciones.join('')}</div>`;
+  };
+  const renderNuevoPedidoAccion = (mesa) => {
+    if (!puedeEditarPedido) return '';
+    return `
+      <a href="/gastronomia/pos?mesa=${encodeURIComponent(mesa.nombre)}"
+         class="rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-indigo-700">
+        Nuevo pedido
+      </a>
+    `;
+  };
   const renderMoveGrid = () => {
     if (!moveTableGrid) return;
     moveTableGrid.innerHTML = mesas.map((mesa) => `

@@ -1,7 +1,7 @@
 import re
 
 from app import create_app, db
-from app.models import Cliente, Permiso, Rol, Usuario
+from app.models import Caja, Cliente, Permiso, Rol, SesionCaja, Usuario
 from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
@@ -275,3 +275,78 @@ def test_salon_mueve_pedido_y_respeta_cliente():
             tipo='pedido_mesa_movido',
         ).first()
         assert evento is not None
+
+
+def _abrir_caja(app, username: str):
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username=username).first()
+        assert usuario is not None
+        caja = Caja(nombre=f'Caja {username}', ubicacion='Gastronomia')
+        db.session.add(caja)
+        db.session.flush()
+        sesion = SesionCaja(
+            id_caja=caja.id_caja,
+            id_usuario=usuario.id_usuario,
+            monto_inicial=0,
+            estado='abierta',
+        )
+        db.session.add(sesion)
+        db.session.commit()
+        return sesion.id_sesion
+
+
+def test_salon_expone_permisos_para_acciones_de_pedido():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_producto(app, 'Resto Salon Permisos', 'resto_salon_permisos')
+    _loguear(client, app, 'resto_salon_permisos')
+
+    page_html = client.get('/gastronomia/salon').get_data(as_text=True)
+    assert 'data-puede-cobrar="1"' in page_html
+    assert 'data-puede-editar-pedido="1"' in page_html
+
+
+def test_salon_excluye_pedido_de_mesa_ya_cobrado():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_producto(app, 'Resto Salon Cobro', 'resto_salon_cobro')
+    _loguear(client, app, 'resto_salon_cobro')
+    _abrir_caja(app, 'resto_salon_cobro')
+
+    csrf = _csrf(client.get('/gastronomia/salon').get_data(as_text=True))
+    client.post('/api/gastronomia/salon/mesas', json={'nombre': 'C1'}, headers={'X-CSRFToken': csrf})
+    pedido_id = _crear_pedido_mesa(client, csrf, _producto_id(app, 'resto_salon_cobro'), 'C1')
+
+    # Llevar el pedido a un estado activo posterior a "abierto" (enviado a cocina).
+    enviar = client.post(
+        f'/api/gastronomia/pedidos/{pedido_id}/enviar-cocina',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert enviar.status_code == 200
+
+    mesas = client.get('/api/gastronomia/salon/estado').get_json()['mesas']
+    mesa = next(item for item in mesas if item['nombre'] == 'C1')
+    assert mesa['pedidos_activos_count'] == 1
+    assert mesa['estado_salon'] == 'esperando_cocina'
+
+    # Una vez cobrado, deja de figurar como pedido activo en el salon.
+    cobrar = client.post(
+        f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
+        json={'metodo_pago': 'efectivo'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cobrar.status_code == 200
+
+    mesas_despues = client.get('/api/gastronomia/salon/estado').get_json()['mesas']
+    mesa_despues = next(item for item in mesas_despues if item['nombre'] == 'C1')
+    assert mesa_despues['pedidos_activos_count'] == 0
+    assert mesa_despues['pedido_activo'] is None
+    assert mesa_despues['estado_salon'] == 'libre'
+
+
+def _producto_id(app, username: str) -> int:
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username=username).first()
+        producto = GastronomiaProducto.query.filter_by(cliente_id=usuario.id_cliente).first()
+        return producto.id_producto
