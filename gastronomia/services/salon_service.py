@@ -1,6 +1,8 @@
 """Gestion basica de mesas y salon gastronomico."""
 from __future__ import annotations
 
+from datetime import datetime
+
 from app import db
 from gastronomia.models import GastronomiaMesa, GastronomiaPedido, GastronomiaPedidoPago
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
@@ -82,6 +84,25 @@ def mover_pedido_mesa(cliente_id: int, pedido_id: int, data: dict) -> Gastronomi
     return pedido
 
 
+def liberar_mesa_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido:
+    pedido = obtener_pedido(cliente_id, pedido_id)
+    if not pedido:
+        raise ValueError('Pedido no encontrado.')
+    if pedido.tipo_pedido != 'mesa' or not pedido.mesa:
+        raise ValueError('El pedido no pertenece a una mesa.')
+    if not pedido.pago:
+        raise ValueError('Solo se puede liberar una mesa con pedido pagado.')
+    if pedido.estado == 'cobrado':
+        raise ValueError('La mesa ya fue liberada para este pedido.')
+    if pedido.estado == 'cancelado':
+        raise ValueError('No se puede liberar una mesa con pedido cancelado.')
+    pedido.estado = 'cobrado'
+    pedido.fecha_entrega = pedido.fecha_entrega or datetime.utcnow()
+    db.session.commit()
+    registrar_evento_pedido(pedido, 'mesa_liberada')
+    return pedido
+
+
 def _pedidos_activos_por_mesa(cliente_id: int) -> dict[str, list[GastronomiaPedido]]:
     pedidos = (
         GastronomiaPedido.query
@@ -91,7 +112,6 @@ def _pedidos_activos_por_mesa(cliente_id: int) -> dict[str, list[GastronomiaPedi
             GastronomiaPedido.tipo_pedido == 'mesa',
             GastronomiaPedido.mesa.isnot(None),
             GastronomiaPedido.estado.in_(ESTADOS_ACTIVOS),
-            GastronomiaPedidoPago.id_pago.is_(None),
         )
         .order_by(GastronomiaPedido.fecha_creacion.desc(), GastronomiaPedido.id_pedido.desc())
         .all()
@@ -117,6 +137,8 @@ def _mesa_con_estado(mesa: GastronomiaMesa, pedidos: list[GastronomiaPedido]) ->
 def _estado_salon_para_pedido(pedido: GastronomiaPedido | None) -> str:
     if not pedido:
         return 'libre'
+    if pedido.pago:
+        return 'pagada'
     if pedido.estado == 'abierto':
         return 'ocupada'
     if pedido.estado in {'enviado_cocina', 'preparando'}:

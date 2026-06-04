@@ -6,6 +6,7 @@ from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.salon_service import (
     eliminar_mesa,
     guardar_mesa,
+    liberar_mesa_pedido,
     listar_mesas,
     listar_salon,
     mover_pedido_mesa,
@@ -104,6 +105,22 @@ def mover_pedido(pedido_id):
         return error
     try:
         pedido = mover_pedido_mesa(cliente_id, pedido_id, _payload())
+    except ValueError as exc:
+        if str(exc) == 'Pedido no encontrado.':
+            return jsonify({'error': 'not_found'}), 404
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'pedido': pedido.to_dict()})
+
+
+@gastronomia_salon_api_bp.route('/salon/pedidos/<int:pedido_id>/liberar-mesa', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_SALON)
+def liberar_mesa(pedido_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        pedido = liberar_mesa_pedido(cliente_id, pedido_id)
     except ValueError as exc:
         if str(exc) == 'Pedido no encontrado.':
             return jsonify({'error': 'not_found'}), 404

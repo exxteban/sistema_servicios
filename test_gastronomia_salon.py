@@ -306,7 +306,7 @@ def test_salon_expone_permisos_para_acciones_de_pedido():
     assert 'data-puede-editar-pedido="1"' in page_html
 
 
-def test_salon_excluye_pedido_de_mesa_ya_cobrado():
+def test_salon_mantiene_mesa_pagada_hasta_liberarla():
     app = create_app('testing')
     client = app.test_client()
     _crear_producto(app, 'Resto Salon Cobro', 'resto_salon_cobro')
@@ -330,7 +330,7 @@ def test_salon_excluye_pedido_de_mesa_ya_cobrado():
     assert mesa['pedidos_activos_count'] == 1
     assert mesa['estado_salon'] == 'esperando_cocina'
 
-    # Una vez cobrado, deja de figurar como pedido activo en el salon.
+    # Una vez cobrado, sigue figurando en el salon para evitar reutilizar la mesa antes de liberarla.
     cobrar = client.post(
         f'/api/gastronomia/caja/pedidos/{pedido_id}/cobrar',
         json={'metodo_pago': 'efectivo'},
@@ -340,9 +340,58 @@ def test_salon_excluye_pedido_de_mesa_ya_cobrado():
 
     mesas_despues = client.get('/api/gastronomia/salon/estado').get_json()['mesas']
     mesa_despues = next(item for item in mesas_despues if item['nombre'] == 'C1')
-    assert mesa_despues['pedidos_activos_count'] == 0
-    assert mesa_despues['pedido_activo'] is None
-    assert mesa_despues['estado_salon'] == 'libre'
+    assert mesa_despues['pedidos_activos_count'] == 1
+    assert mesa_despues['pedido_activo']['id_pedido'] == pedido_id
+    assert mesa_despues['pedido_activo']['pagado'] is True
+    assert mesa_despues['pedido_activo']['items'][0]['nombre_producto'] == 'Pizza'
+    assert mesa_despues['estado_salon'] == 'pagada'
+
+    liberar = client.post(
+        f'/api/gastronomia/salon/pedidos/{pedido_id}/liberar-mesa',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert liberar.status_code == 200
+
+    mesas_liberadas = client.get('/api/gastronomia/salon/estado').get_json()['mesas']
+    mesa_liberada = next(item for item in mesas_liberadas if item['nombre'] == 'C1')
+    assert mesa_liberada['pedidos_activos_count'] == 0
+    assert mesa_liberada['pedido_activo'] is None
+    assert mesa_liberada['estado_salon'] == 'libre'
+
+    with app.app_context():
+        pedido = GastronomiaPedido.query.get(pedido_id)
+        assert pedido.estado == 'cobrado'
+
+    liberar_otra_vez = client.post(
+        f'/api/gastronomia/salon/pedidos/{pedido_id}/liberar-mesa',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert liberar_otra_vez.status_code == 400
+
+
+def test_salon_no_libera_mesa_con_pedido_sin_cobrar():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_producto(app, 'Resto Salon Sin Cobro', 'resto_salon_sin_cobro')
+    _loguear(client, app, 'resto_salon_sin_cobro')
+
+    csrf = _csrf(client.get('/gastronomia/salon').get_data(as_text=True))
+    client.post('/api/gastronomia/salon/mesas', json={'nombre': 'S1'}, headers={'X-CSRFToken': csrf})
+    pedido_id = _crear_pedido_mesa(client, csrf, _producto_id(app, 'resto_salon_sin_cobro'), 'S1')
+
+    liberar = client.post(
+        f'/api/gastronomia/salon/pedidos/{pedido_id}/liberar-mesa',
+        json={},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert liberar.status_code == 400
+
+    mesas_despues = client.get('/api/gastronomia/salon/estado').get_json()['mesas']
+    mesa_despues = next(item for item in mesas_despues if item['nombre'] == 'S1')
+    assert mesa_despues['pedidos_activos_count'] == 1
+    assert mesa_despues['estado_salon'] == 'ocupada'
 
 
 def _producto_id(app, username: str) -> int:

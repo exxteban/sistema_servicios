@@ -59,6 +59,7 @@
                     <p><span class="font-semibold text-sky-700 dark:text-sky-300">Ocupada:</span> pedido abierto en salon.</p>
                     <p><span class="font-semibold text-amber-700 dark:text-amber-300">Esperando cocina:</span> pedido enviado o preparando.</p>
                     <p><span class="font-semibold text-rose-700 dark:text-rose-300">Lista:</span> pedido listo o entregado.</p>
+                    <p><span class="font-semibold text-indigo-700 dark:text-indigo-300">Pagada:</span> cuenta cobrada, mesa aun ocupada hasta liberarla.</p>
                 </div>
             </div>
         </aside>
@@ -106,5 +107,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/salon.js', v='20260603-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/salon.js', v='20260603-2') }}"></script>
 {% endblock %}
