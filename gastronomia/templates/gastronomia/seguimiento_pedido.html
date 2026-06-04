@@ -19,8 +19,20 @@
         .event { border-left: 4px solid #fb923c; background: #fff7ed; padding: 10px 12px; }
         .map-card { display: none; margin: 18px 0; border-radius: 16px; border: 1px solid #bae6fd; background: #f0f9ff; padding: 14px; }
         .map-card.visible { display: block; }
-        #delivery-map { height: 320px; border-radius: 14px; overflow: hidden; border: 1px solid #bae6fd; }
+        #delivery-map { height: min(62vh, 420px); min-height: 300px; border-radius: 14px; overflow: hidden; border: 1px solid #bae6fd; z-index: 0; }
         .muted { color: #6b7280; font-size: 13px; }
+        .map-live { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 12px; font-weight: 700; color: #0369a1; }
+        .map-live .live-dot { width: 10px; height: 10px; border-radius: 50%; background: #16a34a; box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55); animation: livePulse 1.7s infinite; flex: none; }
+        .map-live button { margin-left: auto; border: none; background: #0284c7; color: #fff; font-weight: 800; padding: 7px 14px; border-radius: 999px; font-size: 12px; cursor: pointer; }
+        .map-live button:hover { background: #0369a1; }
+        .map-live button:active { transform: translateY(1px); }
+        .map-live button:disabled { opacity: 0.6; cursor: default; }
+        .map-live.stopped .live-dot { background: #9ca3af; animation: none; }
+        @keyframes livePulse { 0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55); } 70% { box-shadow: 0 0 0 9px rgba(22, 163, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); } }
+        .map-badge-inner { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; border: 2px solid #fff; box-shadow: 0 3px 9px rgba(15, 23, 42, 0.4); }
+        .leaflet-tooltip.map-tip { background: #111827; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
+        .leaflet-tooltip.map-tip.delivery-tip { background: #ea580c; }
+        .leaflet-tooltip.map-tip.destino-tip { background: #2563eb; }
         @media (min-width: 640px) { .meta { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
@@ -46,6 +58,11 @@
 
             <section class="map-card{% if tracking.visible %} visible{% endif %}" data-delivery-map-card>
                 <h2 style="margin: 0 0 8px;">Ubicacion del delivery</h2>
+                <div class="map-live" data-map-live>
+                    <span class="live-dot"></span>
+                    <span data-map-live-label>Actualizacion automatica activa</span>
+                    <button type="button" data-map-refresh>Actualizar ahora</button>
+                </div>
                 <p class="muted" data-delivery-map-status>Ultima ubicacion registrada del repartidor.</p>
                 <div id="delivery-map"></div>
             </section>
@@ -76,9 +93,36 @@
             var eventsList = document.querySelector('[data-events-list]');
             var mapCard = document.querySelector('[data-delivery-map-card]');
             var mapStatus = document.querySelector('[data-delivery-map-status]');
+            var liveBox = document.querySelector('[data-map-live]');
+            var liveLabel = document.querySelector('[data-map-live-label]');
+            var refreshBtn = document.querySelector('[data-map-refresh]');
+            var ESTADOS_FINALES = ['entregado', 'cobrado', 'cancelado'];
             var map = null;
             var deliveryMarker = null;
             var destinationMarker = null;
+            var accuracyCircle = null;
+            var userInteracted = false;
+            var fittedOnce = false;
+            var pollTimer = null;
+            var stopped = false;
+
+            function deliveryIcon() {
+                return window.L.divIcon({
+                    className: '',
+                    html: '<div class="map-badge-inner" style="background:#ea580c;">&#128666;</div>',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15],
+                });
+            }
+
+            function destinationIcon() {
+                return window.L.divIcon({
+                    className: '',
+                    html: '<div class="map-badge-inner" style="background:#2563eb;">&#127968;</div>',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15],
+                });
+            }
 
             function escapeHtml(value) {
                 return String(value || '').replace(/[&<>"']/g, function (char) {
@@ -129,27 +173,63 @@
                 var centerLat = hasDelivery ? deliveryLat : destLat;
                 var centerLng = hasDelivery ? deliveryLng : destLng;
                 if (!map) {
-                    map = window.L.map('delivery-map').setView([centerLat, centerLng], 15);
+                    map = window.L.map('delivery-map', {zoomControl: true}).setView([centerLat, centerLng], 15);
                     window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         maxZoom: 19,
                         attribution: '&copy; OpenStreetMap'
                     }).addTo(map);
+                    // Si el usuario mueve o hace zoom, dejamos de reencuadrar para no interrumpirlo.
+                    map.on('zoomstart dragstart', function () { userInteracted = true; });
                 }
                 if (hasDelivery) {
-                    if (!deliveryMarker) deliveryMarker = window.L.marker([deliveryLat, deliveryLng]).addTo(map);
-                    else deliveryMarker.setLatLng([deliveryLat, deliveryLng]);
-                    deliveryMarker.bindPopup('Delivery').openPopup();
+                    if (!deliveryMarker) {
+                        deliveryMarker = window.L.marker([deliveryLat, deliveryLng], {icon: deliveryIcon()}).addTo(map);
+                        deliveryMarker.bindTooltip('Delivery', {permanent: true, direction: 'top', offset: [0, -14], className: 'map-tip delivery-tip'});
+                    } else {
+                        deliveryMarker.setLatLng([deliveryLat, deliveryLng]);
+                    }
+                    // Circulo de precision: muestra el margen de error real del GPS.
+                    var accuracy = tracking.delivery ? Number(tracking.delivery.precision_metros) : NaN;
+                    if (Number.isFinite(accuracy) && accuracy > 0) {
+                        if (!accuracyCircle) {
+                            accuracyCircle = window.L.circle([deliveryLat, deliveryLng], {
+                                radius: accuracy, color: '#ea580c', weight: 1, fillColor: '#ea580c', fillOpacity: 0.12
+                            }).addTo(map);
+                        } else {
+                            accuracyCircle.setLatLng([deliveryLat, deliveryLng]);
+                            accuracyCircle.setRadius(accuracy);
+                        }
+                    } else if (accuracyCircle) {
+                        map.removeLayer(accuracyCircle);
+                        accuracyCircle = null;
+                    }
                     points.push([deliveryLat, deliveryLng]);
                 }
                 if (hasDestination) {
-                    if (!destinationMarker) destinationMarker = window.L.marker([destLat, destLng]).addTo(map);
-                    else destinationMarker.setLatLng([destLat, destLng]);
-                    destinationMarker.bindPopup('Destino');
+                    if (!destinationMarker) {
+                        destinationMarker = window.L.marker([destLat, destLng], {icon: destinationIcon()}).addTo(map);
+                        destinationMarker.bindTooltip('Destino', {permanent: true, direction: 'top', offset: [0, -14], className: 'map-tip destino-tip'});
+                    } else {
+                        destinationMarker.setLatLng([destLat, destLng]);
+                    }
                     points.push([destLat, destLng]);
                 }
-                if (points.length > 1) map.fitBounds(points, {padding: [36, 36], maxZoom: 16});
-                else map.setView(points[0], 15);
-                if (mapStatus && hasDelivery) mapStatus.textContent = 'Ultima ubicacion del delivery: ' + formatDate(tracking.delivery.fecha_registro) + staleSuffix(tracking.delivery.fecha_registro);
+                // Solo encuadramos automaticamente mientras el usuario no haya tocado el mapa.
+                if (!userInteracted) {
+                    if (points.length > 1) {
+                        map.fitBounds(points, {padding: [40, 40], maxZoom: 16, animate: fittedOnce});
+                    } else if (fittedOnce) {
+                        map.panTo(points[0], {animate: true});
+                    } else {
+                        map.setView(points[0], 15);
+                    }
+                    fittedOnce = true;
+                }
+                if (mapStatus && hasDelivery) {
+                    var accM = tracking.delivery ? Number(tracking.delivery.precision_metros) : NaN;
+                    var accTxt = Number.isFinite(accM) && accM > 0 ? ' - precision ~' + Math.round(accM) + ' m' : '';
+                    mapStatus.textContent = 'Ultima ubicacion del delivery: ' + formatDate(tracking.delivery.fecha_registro) + accTxt + staleSuffix(tracking.delivery.fecha_registro);
+                }
                 if (mapStatus && !hasDelivery && hasDestination) mapStatus.textContent = 'Destino cargado. Esperando ubicacion GPS del delivery.';
                 setTimeout(function () { map.invalidateSize(); }, 50);
             }
@@ -163,7 +243,24 @@
                 return '';
             }
 
-            function refreshStatus() {
+            function setLive(active, label) {
+                if (!liveBox) return;
+                liveBox.classList.toggle('stopped', !active);
+                if (liveLabel && label) liveLabel.textContent = label;
+                if (refreshBtn) refreshBtn.style.display = active ? '' : 'none';
+            }
+
+            function stopPolling(label) {
+                stopped = true;
+                if (pollTimer) { window.clearInterval(pollTimer); pollTimer = null; }
+                setLive(false, label || 'Seguimiento finalizado');
+            }
+
+            function refreshStatus(manual) {
+                if (refreshBtn && manual) {
+                    refreshBtn.disabled = true;
+                    refreshBtn.textContent = 'Actualizando...';
+                }
                 fetch(statusUrl, {cache: 'no-store'})
                     .then(function (response) { return response.ok ? response.json() : null; })
                     .then(function (data) {
@@ -173,17 +270,45 @@
                         if (lastUpdate) lastUpdate.textContent = formatDate(data.pedido.fecha_modificacion);
                         renderTracking(data.tracking);
                         renderEvents(data.eventos);
+                        if (!stopped && liveBox) setLive(true, 'Actualizacion automatica activa');
+                        if (ESTADOS_FINALES.indexOf(data.pedido.estado) !== -1) {
+                            stopPolling('Pedido ' + (data.pedido.estado_label || data.pedido.estado));
+                        }
                     })
                     .catch(function () {
                         if (mapStatus && mapCard && mapCard.classList.contains('visible')) {
                             mapStatus.textContent = 'Sin conexion para actualizar la ubicacion. Reintentando...';
                         }
+                        if (!stopped) setLive(true, 'Reintentando conexion...');
+                    })
+                    .then(function () {
+                        if (refreshBtn && manual) {
+                            refreshBtn.disabled = false;
+                            refreshBtn.textContent = 'Actualizar ahora';
+                        }
                     });
             }
 
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', function () { refreshStatus(true); });
+            }
+
             renderTracking(initialTracking);
-            window.setInterval(refreshStatus, 8000);
+            if (initialTracking && initialTracking.visible) {
+                setLive(true, 'Actualizacion automatica activa');
+            }
+            pollTimer = window.setInterval(refreshStatus, 8000);
             window.setTimeout(refreshStatus, 1000);
+            // Pausamos el polling cuando la pestana no esta visible y reanudamos al volver.
+            document.addEventListener('visibilitychange', function () {
+                if (stopped) return;
+                if (document.hidden) {
+                    if (pollTimer) { window.clearInterval(pollTimer); pollTimer = null; }
+                } else if (!pollTimer) {
+                    refreshStatus();
+                    pollTimer = window.setInterval(refreshStatus, 8000);
+                }
+            });
         }());
     </script>
 </body>

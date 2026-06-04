@@ -16,16 +16,24 @@
   let gpsOrderId = null;
   let lastGpsSentAt = 0;
   let lastGpsFixAt = 0;
+  let lastGoodFixAt = 0;
+  let bestAccuracySeen = Infinity;
   let gpsWatchdogTimer = null;
   let gpsWatchRetries = 0;
   const GPS_MAX_WATCH_RETRIES = 5;
   const GPS_STALE_MS = 45000;
+  // Precision objetivo (metros). Arriba de esto el fix es de antena/wifi, no GPS real.
+  const GPS_ACCURACY_TARGET_M = 50;
+  const GPS_ACCURACY_MAX_M = 120;
+  // Si no logramos un buen fix en este tiempo, mandamos igual el ultimo disponible.
+  const GPS_ACCURACY_GRACE_MS = 30000;
   let destinationDrafts = {};
   let destinationFeedbacks = {};
   let gpsStatusByOrder = {};
   let permissionState = 'unknown';
-  const GPS_POSITION_OPTIONS = {enableHighAccuracy: false, maximumAge: 60000, timeout: 45000};
-  const GPS_WATCH_OPTIONS = {enableHighAccuracy: false, maximumAge: 30000, timeout: 60000};
+  // enableHighAccuracy fuerza el chip GPS real; maximumAge 0 evita posiciones cacheadas viejas.
+  const GPS_POSITION_OPTIONS = {enableHighAccuracy: true, maximumAge: 0, timeout: 20000};
+  const GPS_WATCH_OPTIONS = {enableHighAccuracy: true, maximumAge: 0, timeout: 30000};
   const gpsTrackingEnabled = root.dataset.gpsTracking === '1';
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -328,11 +336,30 @@
     gpsWatchId = navigator.geolocation.watchPosition(
       (position) => {
         gpsWatchRetries = 0;
+        lastGpsFixAt = Date.now();
+        if (!isAcceptableFix(position)) return;
         sendGpsPosition(gpsOrderId, position).catch(() => {});
       },
       (error) => handleWatchError(error),
       GPS_WATCH_OPTIONS,
     );
+  };
+  // Descarta fixes imprecisos (antena/wifi). Tras un tiempo sin buen fix, acepta el mejor disponible.
+  const isAcceptableFix = (position) => {
+    const accuracy = Number(position?.coords?.accuracy);
+    if (!Number.isFinite(accuracy)) return true;
+    bestAccuracySeen = Math.min(bestAccuracySeen, accuracy);
+    if (accuracy <= GPS_ACCURACY_TARGET_M) {
+      lastGoodFixAt = Date.now();
+      return true;
+    }
+    const waitedTooLong = lastGoodFixAt && (Date.now() - lastGoodFixAt > GPS_ACCURACY_GRACE_MS);
+    const neverGotGoodFix = !lastGoodFixAt && (Date.now() - lastGpsFixAt > GPS_ACCURACY_GRACE_MS);
+    if (accuracy <= GPS_ACCURACY_MAX_M && (waitedTooLong || neverGotGoodFix)) {
+      showAlert(`Senal GPS debil (precision ~${Math.round(accuracy)} m). Mostrando ubicacion aproximada.`, 'warning');
+      return true;
+    }
+    return false;
   };
   const handleWatchError = (error) => {
     if (error?.code === 1) {
@@ -353,12 +380,16 @@
     gpsOrderId = Number(orderId || 0);
     lastGpsSentAt = 0;
     lastGpsFixAt = Date.now();
+    lastGoodFixAt = 0;
+    bestAccuracySeen = Infinity;
     permissionState = 'granted';
     await sendGpsPosition(gpsOrderId, firstPosition, {force: true});
     startGpsWatch();
     startGpsWatchdog();
     gpsStatusByOrder[gpsOrderId] = 'active';
-    showAlert('GPS activo: primera ubicacion guardada correctamente. Manten esta pantalla abierta.', true);
+    const acc = Number(firstPosition?.coords?.accuracy);
+    const accNote = Number.isFinite(acc) ? ` (precision ~${Math.round(acc)} m)` : '';
+    showAlert(`GPS activo: primera ubicacion guardada${accNote}. Manten esta pantalla abierta.`, true);
     render();
   };
   const startGpsWatchdog = () => {
@@ -390,6 +421,8 @@
     gpsOrderId = null;
     lastGpsSentAt = 0;
     lastGpsFixAt = 0;
+    lastGoodFixAt = 0;
+    bestAccuracySeen = Infinity;
     gpsWatchRetries = 0;
   };
   const sendGpsPosition = async (orderId, position, options = {}) => {
