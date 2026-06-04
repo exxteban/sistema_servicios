@@ -1,4 +1,4 @@
-<div class="gastro-system-sidebar-toolbar" data-gastro-sidebar-toggle-host>
+<div class="gastro-system-sidebar-toolbar{% if gastro_sidebar_toggle_inline|default(false) %} gastro-system-sidebar-toolbar--inline{% endif %}" data-gastro-sidebar-toggle-host>
     <button type="button"
         class="gastro-system-sidebar-toggle"
         data-gastro-sidebar-toggle
@@ -19,6 +19,15 @@
         justify-content: flex-end;
         margin-bottom: 0.75rem;
         pointer-events: none;
+    }
+
+    .gastro-system-sidebar-toolbar--inline {
+        position: static;
+        z-index: auto;
+        display: inline-flex;
+        justify-content: flex-start;
+        margin-bottom: 0;
+        pointer-events: auto;
     }
 
     .gastro-system-sidebar-toggle {
@@ -48,6 +57,15 @@
         transform: translateY(-1px);
     }
 
+    .gastro-system-sidebar-toolbar--inline .gastro-system-sidebar-toggle {
+        min-height: auto;
+        border-color: rgb(229 231 235);
+        border-radius: 0.75rem;
+        box-shadow: none;
+        padding: 0.62rem 1rem;
+        font-size: 0.82rem;
+    }
+
     .gastro-system-sidebar-toggle__show,
     .gastro-system-sidebar-toggle.is-active .gastro-system-sidebar-toggle__hide {
         display: none;
@@ -64,16 +82,23 @@
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
     }
 
+    .dark .gastro-system-sidebar-toolbar--inline .gastro-system-sidebar-toggle {
+        border-color: rgb(75 85 99);
+        background: rgb(31 41 55);
+        box-shadow: none;
+        color: rgb(229 231 235);
+    }
+
     body.gastro-system-sidebar-hidden .app-shell-sidebar {
         display: none !important;
     }
 
     @media (max-width: 640px) {
-        .gastro-system-sidebar-toolbar {
+        .gastro-system-sidebar-toolbar:not(.gastro-system-sidebar-toolbar--inline) {
             justify-content: stretch;
         }
 
-        .gastro-system-sidebar-toggle {
+        .gastro-system-sidebar-toolbar:not(.gastro-system-sidebar-toolbar--inline) .gastro-system-sidebar-toggle {
             width: 100%;
         }
     }
