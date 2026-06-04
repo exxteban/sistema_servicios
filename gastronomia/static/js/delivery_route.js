@@ -268,22 +268,10 @@
     if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
     gpsWatchRetries = 0;
     gpsStatusByOrder[numericOrderId] = 'requesting';
-    showAlert('Solicitando permiso de ubicacion del telefono...', 'warning');
+    showAlert('Activando GPS del telefono. Manten esta pantalla abierta mientras busca senal...', 'warning');
     render();
     warnIfPermissionBlocked();
-    navigator.geolocation.getCurrentPosition(
-      (position) => activateGpsTracking(numericOrderId, position).catch((error) => {
-        gpsStatusByOrder[numericOrderId] = 'error';
-        showAlert(`No se pudo guardar la ubicacion GPS: ${error.message}`, false);
-        render();
-      }),
-      (error) => {
-        gpsStatusByOrder[numericOrderId] = 'error';
-        showAlert(gpsErrorMessage(error), false);
-        render();
-      },
-      GPS_POSITION_OPTIONS,
-    );
+    activateGpsTracking(numericOrderId);
   };
   const warnIfPermissionBlocked = () => {
     if (!navigator.permissions?.query) return;
@@ -380,7 +368,7 @@
     showAlert(`Reintentando GPS (${gpsWatchRetries}/${GPS_MAX_WATCH_RETRIES})...`, 'warning');
     startGpsWatch();
   };
-  const activateGpsTracking = async (orderId, firstPosition) => {
+  const activateGpsTracking = async (orderId, firstPosition = null) => {
     gpsOrderId = Number(orderId || 0);
     lastGpsSentAt = 0;
     lastGpsFixAt = Date.now();
@@ -388,8 +376,8 @@
     gpsStartedAt = Date.now();
     bestAccuracySeen = Infinity;
     permissionState = 'granted';
-    const firstFixAccepted = isAcceptableFix(firstPosition);
-    if (firstFixAccepted) {
+    const firstFixAccepted = firstPosition ? isAcceptableFix(firstPosition) : false;
+    if (firstPosition && firstFixAccepted) {
       await sendGpsPosition(gpsOrderId, firstPosition, {force: true});
     }
     startGpsWatch();
@@ -397,10 +385,12 @@
     gpsStatusByOrder[gpsOrderId] = 'active';
     const acc = Number(firstPosition?.coords?.accuracy);
     const accNote = Number.isFinite(acc) ? ` (precision ~${Math.round(acc)} m)` : '';
-    if (firstFixAccepted) {
+    if (firstPosition && firstFixAccepted) {
       showAlert(`GPS activo: primera ubicacion guardada${accNote}. Manten esta pantalla abierta.`, true);
-    } else {
+    } else if (firstPosition) {
       showAlert(`GPS activo, esperando mejor senal antes de publicar tu ubicacion${accNote}. Manten esta pantalla abierta.`, 'warning');
+    } else {
+      showAlert('GPS activo, buscando primera ubicacion del telefono. Manten esta pantalla abierta.', 'warning');
     }
     render();
   };
