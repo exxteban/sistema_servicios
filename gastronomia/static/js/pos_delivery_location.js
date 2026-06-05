@@ -21,12 +21,11 @@
     try {
       text = decodeURIComponent(rawText);
     } catch (_) {}
-    const patterns = [
-      /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    const priorityPatterns = [
       /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
-      /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
+      /[?&](?:q|query|ll|destination)=(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
     ];
-    for (const pattern of patterns) {
+    for (const pattern of priorityPatterns) {
       const match = text.match(pattern);
       if (match) return validateCoords(match[1], match[2]);
     }
@@ -37,6 +36,14 @@
         if (coords) return coords;
       }
     } catch (_) {}
+    const fallbackPatterns = [
+      /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
+    ];
+    for (const pattern of fallbackPatterns) {
+      const match = text.match(pattern);
+      if (match) return validateCoords(match[1], match[2]);
+    }
     return null;
   };
   const validateCoords = (latValue, lngValue) => {

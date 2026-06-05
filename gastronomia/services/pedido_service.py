@@ -471,10 +471,9 @@ def _parse_optional_coordinate(value, minimum: float, maximum: float) -> float |
 
 def _coords_from_location_text(value: str) -> tuple[float | None, float | None]:
     text_value = unquote(str(value or '').strip())
-    for pattern in (r'@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)', r'!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)'):
-        match = re.search(pattern, text_value)
-        if match:
-            return _validated_coords(match.group(1), match.group(2))
+    match = re.search(r'!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)', text_value)
+    if match:
+        return _validated_coords(match.group(1), match.group(2))
     parsed = urlparse(text_value)
     params = parse_qs(parsed.query)
     for key in ('q', 'query', 'll', 'destination'):
@@ -482,6 +481,10 @@ def _coords_from_location_text(value: str) -> tuple[float | None, float | None]:
             coords = _coords_from_plain_text(params[key][0])
             if coords != (None, None):
                 return coords
+    for pattern in (r'@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)',):
+        match = re.search(pattern, text_value)
+        if match:
+            return _validated_coords(match.group(1), match.group(2))
     return _coords_from_plain_text(text_value)
 
 
