@@ -77,6 +77,11 @@ export default function ProductoPage() {
     applyPageMeta(title, description)
   }, [config, producto])
 
+  useEffect(() => {
+    if (!productId || typeof window === 'undefined') return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [productId])
+
   const handleRetry = () => {
     retryConfig()
     window.location.reload()
@@ -91,9 +96,13 @@ export default function ProductoPage() {
   const modifiersTotal = getModifiersTotal(selectedModifiers)
   const productTotal = Number(producto?.precio || 0) + modifiersTotal
   const quickOrderEnabled = Boolean(config)
-  const quickOrderProducts = useMemo(
-    () => [producto, ...(producto?.relacionados || [])].filter(Boolean),
+  const relatedProducts = useMemo(
+    () => (producto?.relacionados || []).filter((item) => String(item?.id || '') !== String(producto?.id || '')),
     [producto]
+  )
+  const quickOrderProducts = useMemo(
+    () => [producto, ...relatedProducts].filter(Boolean),
+    [producto, relatedProducts]
   )
   const {
     items: quickOrderItems,
@@ -176,7 +185,7 @@ export default function ProductoPage() {
   const recordatorio = isTruthyFlag(config?.mostrar_recordatorio_whatsapp) ? normalizeText(config?.texto_recordatorio_whatsapp) : ''
   const beneficios = config?.beneficios_producto_items || []
   const senalesProducto = isTruthyFlag(config?.mostrar_bloque_confianza_producto) ? config?.senales_confianza || [] : []
-  const mostrarRelacionados = isTruthyFlag(config?.mostrar_relacionados ?? true) && producto.relacionados?.length > 0
+  const mostrarRelacionados = isTruthyFlag(config?.mostrar_relacionados ?? true) && relatedProducts.length > 0
 
   return (
     <div className={`theme-wrapper ${theme.wrapperClass}`} style={{ '--brand': config?.color_primario || '#2563eb' }}>
@@ -296,7 +305,7 @@ export default function ProductoPage() {
               {config?.titulo_relacionados || (producto.es_servicio ? 'Servicios relacionados' : 'Productos relacionados')}
             </h3>
             <div className="grid">
-              {producto.relacionados.map((r) => (
+              {relatedProducts.map((r) => (
                 <ProductoCard
                   key={r.id}
                   slug={slug}

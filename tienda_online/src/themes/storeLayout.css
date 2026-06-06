@@ -127,6 +127,16 @@
   letter-spacing: 0.04em;
 }
 
+.product-card-copy-link {
+  display: grid;
+  color: inherit;
+  text-decoration: none;
+}
+
+.product-card-copy-link:hover .product-title {
+  color: var(--brand-color);
+}
+
 .product-badge {
   background: #ef4444;
 }

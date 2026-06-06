@@ -52,17 +52,19 @@ export default function ProductoCard({
         )}
       </Link>
       <div className="card-content flex flex-col flex-grow">
-        {producto.es_servicio ? (
-          <span className="product-card-category">Servicio</span>
-        ) : null}
-        {producto.categoria ? (
-          <span className="product-card-category">
-            {producto.categoria}
-          </span>
-        ) : null}
-        <h3 className="product-title mb-1 line-clamp-2 leading-tight">
-          {producto.nombre}
-        </h3>
+        <Link to={productPath} className="product-card-copy-link">
+          {producto.es_servicio ? (
+            <span className="product-card-category">Servicio</span>
+          ) : null}
+          {producto.categoria ? (
+            <span className="product-card-category">
+              {producto.categoria}
+            </span>
+          ) : null}
+          <h3 className="product-title mb-1 line-clamp-2 leading-tight">
+            {producto.nombre}
+          </h3>
+        </Link>
 
         <div className="product-action">
           <ProductPriceBlock producto={producto} compact />

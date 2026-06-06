@@ -77,6 +77,9 @@ export function slugifyForUrl(value, fallback = 'producto') {
 
 export function buildProductPath(slug, producto) {
   const productId = producto?.id
+  const detailUrl = normalizeText(producto?.url_detalle)
+  if (detailUrl && detailUrl.startsWith('/tienda/')) return detailUrl
+  if (!productId) return `/tienda/${slug}`
   const productSlug = normalizeText(producto?.slug_producto) || slugifyForUrl(producto?.nombre, String(productId || 'producto'))
   return `/tienda/${slug}/producto/${productId}-${productSlug}`
 }
