@@ -7,6 +7,17 @@
 
             function getViewportHeight() {
                 const vv = window.visualViewport;
+                // Al hacer pinch-zoom, vv.height reporta el area visible (mas
+                // pequena) del viewport visual. Si encogemos el shell con ese
+                // valor, queda expuesta una franja del fondo del navegador
+                // (negra en modo oscuro). Cuando hay zoom (scale > 1) usamos la
+                // altura del layout viewport, que permanece estable.
+                if (vv && typeof vv.scale === 'number' && vv.scale > 1.01) {
+                    const layoutHeight = document.documentElement.clientHeight
+                        || window.innerHeight
+                        || 0;
+                    return Math.max(0, Math.round(layoutHeight));
+                }
                 const rawHeight = vv && typeof vv.height === 'number'
                     ? vv.height
                     : (window.innerHeight || document.documentElement.clientHeight || 0);

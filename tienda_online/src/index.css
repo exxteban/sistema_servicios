@@ -257,34 +257,16 @@
 }
 
 /* Base styles */
-html {
-  /* Evita que la franja del navegador (overscroll/zoom) se vea negra en moviles */
-  background: var(--page-bg, #f8fafc);
-  /* Mantiene el tamano de texto al hacer zoom y evita reescalado automatico */
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-
 body {
   margin: 0;
-  min-height: 100vh;
   background: var(--page-bg, #f8fafc);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
-  /* Evita el rebote/overscroll que deja ver el fondo negro del navegador */
-  overscroll-behavior-y: none;
-}
-
-#root {
-  min-height: 100vh;
-  background: var(--page-bg, #f8fafc);
 }
 
 /* Helper para el wrapper principal que aplica el theme al fondo */
 .theme-wrapper {
   min-height: 100vh;
-  /* Usa dvh cuando esta disponible para cubrir la barra dinamica del navegador movil */
-  min-height: 100dvh;
   background-color: var(--page-bg, #f8fafc);
   background-image: var(--bg-pattern, radial-gradient(#e2e8f0 1px, transparent 1px));
   background-size: 24px 24px;
