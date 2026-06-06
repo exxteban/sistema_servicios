@@ -50,7 +50,7 @@ export default function CatalogoPage() {
     hasMore,
     retry: retryProductos
   } = useProductos(slug, query, categoriaId, productsEnabled)
-  const quickOrderEnabled = Boolean(config)
+  const quickOrderEnabled = isTruthyFlag(config?.es_gastronomia)
   const quickOrderProducts = useMemo(() => {
     const seenIds = new Set()
     return [productos, destacados, ofertas, recomendados, imperdibles].flatMap((collection) => collection || []).filter((producto) => {

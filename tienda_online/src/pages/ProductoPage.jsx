@@ -39,9 +39,6 @@ export default function ProductoPage() {
     }
     let alive = true
     const controller = new AbortController()
-    setProducto(null)
-    setModifierSelections({})
-    setOrderNotice('')
     setError('')
     tiendaApi.getProducto(slug, productId, { signal: controller.signal })
       .then((data) => {
@@ -64,13 +61,12 @@ export default function ProductoPage() {
 
   useEffect(() => {
     if (!producto) return
-    if (String(producto.id || '') !== String(productId || '')) return
     const expectedPath = buildProductPath(slug, producto)
     const currentPath = `/tienda/${slug}/producto/${productRef || ''}`
     if (expectedPath !== currentPath) {
       navigate(expectedPath, { replace: true })
     }
-  }, [navigate, productId, productRef, producto, slug])
+  }, [navigate, productRef, producto, slug])
 
   useEffect(() => {
     if (!producto) return

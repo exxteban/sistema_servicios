@@ -22,6 +22,21 @@ def marcar_pendiente_cobrado_por_cierre(pendiente, *, venta_id=None, usuario_id=
     pendiente.set_metadata(metadata)
 
 
+def marcar_pendiente_cancelado_por_cierre(pendiente, *, venta_id=None, usuario_id=None, motivo=None):
+    metadata = pendiente.get_metadata()
+    if venta_id:
+        metadata['venta_id'] = int(venta_id)
+    metadata['cerrado_por_usuario'] = int(usuario_id or current_user.id_usuario)
+    metadata['regularizado_en_cierre_caja'] = True
+    if motivo:
+        metadata['regularizacion_motivo'] = motivo
+
+    pendiente.estado = 'cancelado'
+    pendiente.id_usuario_destino = int(usuario_id or current_user.id_usuario)
+    pendiente.fecha_toma = pendiente.fecha_toma or datetime.utcnow()
+    pendiente.set_metadata(metadata)
+
+
 def venta_completada_por_id(venta_id):
     if venta_id in (None, '', 0, '0'):
         return None
@@ -38,7 +53,8 @@ def resolver_pendiente_ya_cobrado(pendiente) -> bool:
     metadata = pendiente.get_metadata()
 
     if tipo == 'gastronomia':
-        from gastronomia.models import GastronomiaPedidoPago
+        from app.models import Venta
+        from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
 
         pedido_id = metadata.get('gastronomia_pedido_id') or pendiente.id_origen
         pago = (
@@ -48,10 +64,57 @@ def resolver_pendiente_ya_cobrado(pendiente) -> bool:
             .first()
         )
         if pago:
+            venta_pago = None
+            if pago.id_venta:
+                venta_pago = Venta.query.filter(
+                    Venta.id_venta == int(pago.id_venta),
+                    Venta.estado.in_(('completada', 'anulada')),
+                ).first()
+            if venta_pago and venta_pago.estado == 'anulada':
+                marcar_pendiente_cancelado_por_cierre(
+                    pendiente,
+                    venta_id=venta_pago.id_venta,
+                    usuario_id=current_user.id_usuario,
+                    motivo='venta_gastronomia_anulada',
+                )
+                return True
             marcar_pendiente_cobrado_por_cierre(
                 pendiente,
                 venta_id=pago.id_venta,
                 usuario_id=current_user.id_usuario,
+            )
+            return True
+
+        venta_id = metadata.get('venta_id')
+        if venta_id not in (None, '', 0, '0'):
+            venta = Venta.query.filter(
+                Venta.id_venta == int(venta_id),
+                Venta.estado.in_(('completada', 'anulada')),
+            ).first()
+            if venta and venta.estado == 'completada':
+                marcar_pendiente_cobrado_por_cierre(
+                    pendiente,
+                    venta_id=venta.id_venta,
+                    usuario_id=current_user.id_usuario,
+                )
+                return True
+            if venta and venta.estado == 'anulada':
+                marcar_pendiente_cancelado_por_cierre(
+                    pendiente,
+                    venta_id=venta.id_venta,
+                    usuario_id=current_user.id_usuario,
+                    motivo='venta_gastronomia_anulada',
+                )
+                return True
+
+        pedido = GastronomiaPedido.query.filter(
+            GastronomiaPedido.id_pedido == int(pedido_id or 0),
+        ).first()
+        if pedido and pedido.estado == 'cancelado':
+            marcar_pendiente_cancelado_por_cierre(
+                pendiente,
+                usuario_id=current_user.id_usuario,
+                motivo='pedido_gastronomia_cancelado',
             )
             return True
         return False

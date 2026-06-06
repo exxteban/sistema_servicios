@@ -222,17 +222,21 @@ def registrar_pago_gastronomia_desde_venta_central(cola_metadata: dict, venta, u
 
 def registrar_anulacion_gastronomia_desde_venta_central(venta, usuario_id: int) -> list[dict]:
     pago = GastronomiaPedidoPago.query.filter_by(id_venta=int(venta.id_venta)).first()
-    if not pago:
-        return []
-    pedido = GastronomiaPedido.query.filter(
-        GastronomiaPedido.id_pedido == int(pago.pedido_id),
-        GastronomiaPedido.cliente_id == int(pago.cliente_id),
-    ).first()
+    pedido = None
+    if pago:
+        pedido = GastronomiaPedido.query.filter(
+            GastronomiaPedido.id_pedido == int(pago.pedido_id),
+            GastronomiaPedido.cliente_id == int(pago.cliente_id),
+        ).first()
+    else:
+        pedido = _pedido_gastronomia_desde_cola_venta(venta)
     if not pedido:
-        db.session.delete(pago)
+        if pago:
+            db.session.delete(pago)
         return []
 
     eventos = []
+    cancelar_colas_activas_gastronomia_pedido(pedido, venta, usuario_id)
     if pedido.estado != 'cancelado':
         from gastronomia.services.pedido_service import _restaurar_stock_items
 
@@ -240,9 +244,61 @@ def registrar_anulacion_gastronomia_desde_venta_central(venta, usuario_id: int) 
         pedido.estado = 'cancelado'
         pedido.fecha_modificacion = datetime.utcnow()
         eventos.append({'pedido': pedido, 'tipo': 'pedido_cancelado'})
-    db.session.delete(pago)
+    if pago:
+        db.session.delete(pago)
     eventos.append({'pedido': pedido, 'tipo': 'pedido_cobro_anulado'})
     return eventos
+
+
+def cancelar_colas_activas_gastronomia_pedido(
+    pedido: GastronomiaPedido,
+    venta,
+    usuario_id: int,
+) -> list[ColaCobro]:
+    ahora = datetime.utcnow()
+    colas = (
+        ColaCobro.query
+        .filter(
+            ColaCobro.tipo_origen == 'gastronomia',
+            ColaCobro.id_origen == int(pedido.id_pedido),
+            ColaCobro.estado.in_(['pendiente', 'en_proceso']),
+        )
+        .all()
+    )
+    for cola in colas:
+        metadata = cola.get_metadata()
+        metadata['venta_id'] = int(venta.id_venta)
+        metadata['cancelado_por_usuario'] = int(usuario_id)
+        metadata['gastronomia_venta_anulada'] = True
+        cola.estado = 'cancelado'
+        cola.id_usuario_destino = cola.id_usuario_destino or int(usuario_id)
+        cola.fecha_toma = cola.fecha_toma or ahora
+        cola.set_metadata(metadata)
+    return colas
+
+
+def _pedido_gastronomia_desde_cola_venta(venta):
+    colas = (
+        ColaCobro.query
+        .filter(
+            ColaCobro.tipo_origen == 'gastronomia',
+            ColaCobro.estado.in_(['pendiente', 'en_proceso']),
+        )
+        .all()
+    )
+    for cola in colas:
+        metadata = cola.get_metadata()
+        if int(metadata.get('venta_id') or 0) != int(venta.id_venta):
+            continue
+        pedido_id = metadata.get('gastronomia_pedido_id') or cola.id_origen
+        if pedido_id in (None, '', 0, '0'):
+            continue
+        pedido = GastronomiaPedido.query.filter(
+            GastronomiaPedido.id_pedido == int(pedido_id),
+        ).first()
+        if pedido:
+            return pedido
+    return None
 
 
 def _sesion_abierta_usuario(usuario_id: int):
