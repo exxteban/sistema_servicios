@@ -309,7 +309,9 @@
         .app-tab-panel {
             -webkit-overflow-scrolling: touch;
             overscroll-behavior-y: contain;
-            touch-action: pan-y pinch-zoom;
+            /* Permite desplazarse en ambos ejes (incluido cuando hay pinch-zoom)
+               para poder recorrer el contenido ampliado, ademas del zoom. */
+            touch-action: pan-x pan-y pinch-zoom;
         }
 
         body.crm-config-active input[type="number"] {
