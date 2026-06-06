@@ -251,20 +251,20 @@ export default function CatalogoPage() {
           themeKey={theme.key}
           brandColor={config?.color_primario}
         />
-        {quickOrderEnabled ? (
-          <GastronomiaOrderPanel
-            items={quickOrderItems}
-            totalItems={quickOrderCount}
-            totalAmount={quickOrderTotal}
-            whatsAppHref={quickOrderWhatsAppHref}
-            onIncrement={incrementQuickOrder}
-            onDecrement={decrementQuickOrder}
-            onClear={clearQuickOrder}
-            onWhatsAppClick={() => trackCatalogWhatsAppClick()}
-          />
-        ) : null}
       </div>
     ),
+    quickOrder: quickOrderEnabled ? (
+      <GastronomiaOrderPanel
+        items={quickOrderItems}
+        totalItems={quickOrderCount}
+        totalAmount={quickOrderTotal}
+        whatsAppHref={quickOrderWhatsAppHref}
+        onIncrement={incrementQuickOrder}
+        onDecrement={decrementQuickOrder}
+        onClear={clearQuickOrder}
+        onWhatsAppClick={() => trackCatalogWhatsAppClick()}
+      />
+    ) : null,
     destacados: isHome && mostrarDestacados && !loading && destacados?.length > 0 ? renderProductSection('destacados', tituloDestacados, destacados) : null,
     ofertas: isHome && mostrarOfertas && !loading && ofertas?.length > 0 ? renderProductSection('ofertas', tituloOfertas, ofertas) : null,
     recomendados: isHome && mostrarRecomendados && !loading && recomendados?.length > 0 ? renderProductSection('recomendados', tituloRecomendados, recomendados) : null,
@@ -300,7 +300,7 @@ export default function CatalogoPage() {
     )
   }
 
-  const sectionOrder = isHome
+  const baseSectionOrder = isHome
     ? theme.sectionOrderHome.reduce((acc, sectionId) => {
       acc.push(sectionId)
       if (sectionId === 'hero' && spotlightProducts.length > 0) {
@@ -309,6 +309,7 @@ export default function CatalogoPage() {
       return acc
     }, [])
     : theme.sectionOrderResults
+  const sectionOrder = quickOrderEnabled ? withQuickOrderBeforeCatalog(baseSectionOrder) : baseSectionOrder
   const sectionLinks = [
     isHome && mostrarDestacados && destacados?.length > 0 ? { id: 'destacados', label: tituloDestacados } : null,
     isHome && mostrarOfertas && ofertas?.length > 0 ? { id: 'ofertas', label: tituloOfertas } : null,
@@ -415,4 +416,15 @@ function applyPageMeta(title, description) {
     document.head.appendChild(descriptionMeta)
   }
   descriptionMeta.setAttribute('content', description)
+}
+
+function withQuickOrderBeforeCatalog(sectionOrder) {
+  if (sectionOrder.includes('quickOrder')) return sectionOrder
+  const catalogIndex = sectionOrder.indexOf('catalog')
+  if (catalogIndex < 0) return [...sectionOrder, 'quickOrder']
+  return [
+    ...sectionOrder.slice(0, catalogIndex),
+    'quickOrder',
+    ...sectionOrder.slice(catalogIndex)
+  ]
 }
