@@ -63,6 +63,6 @@ DEFAULT_ROLE_PERMISSION_CODES = {
     'Cocina': ['gastronomia_acceso', 'gastronomia_cocina'],
     'Mozo': ['gastronomia_acceso', 'gastronomia_pos', 'gastronomia_salon'],
     'Caja Gastronomia': ['gastronomia_acceso', 'gastronomia_caja'],
-    'Delivery Gastronomia': ['gastronomia_acceso', 'gastronomia_delivery'],
+    'Delivery Gastronomia': ['gastronomia_acceso', 'gastronomia_delivery', 'gastronomia_delivery_gps'],
     'Auditoria': ['ver_auditoria'],
 }

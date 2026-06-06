@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Footer from '../components/layout/Footer'
 import FloatingWhatsApp from '../components/layout/FloatingWhatsApp'
@@ -9,12 +9,14 @@ import ImageGallery from '../components/ui/ImageGallery'
 import ProductoPageSkeleton from '../components/ui/ProductoPageSkeleton'
 import ProductPriceBlock from '../components/ui/ProductPriceBlock'
 import ProductoCard from '../components/ui/ProductoCard'
+import GastronomiaOrderPanel from '../components/ui/GastronomiaOrderPanel'
 import TrustSignals from '../components/ui/TrustSignals'
 import ProductModifiersSelector, { getModifiersTotal, getSelectedModifiers } from '../components/ui/ProductModifiersSelector'
+import { useQuickOrderCart } from '../hooks/useQuickOrderCart'
 import { useMetaPixelPageView, useMetaPixelProductView } from '../hooks/useMetaPixel'
 import { trackMetaPixelContact } from '../services/metaPixel'
 import { resolveStoreTheme } from '../themes/storeTheme'
-import { getStoreWhatsAppMessage } from '../utils/gastronomiaBudget'
+import { buildGastronomiaOrderHref } from '../utils/gastronomiaOrder'
 import { buildProductPath, formatGs, getStoreHeaderTitle, isTruthyFlag, normalizeText, parseProductIdFromParam } from '../utils/storeFormatting'
 import WebBotWidget from '../features/web-bot/components/WebBotWidget'
 
@@ -25,6 +27,7 @@ export default function ProductoPage() {
   const theme = resolveStoreTheme(config?.estilo_tienda)
   const [producto, setProducto] = useState(null)
   const [modifierSelections, setModifierSelections] = useState({})
+  const [orderNotice, setOrderNotice] = useState('')
   const [error, setError] = useState('')
   const productId = parseProductIdFromParam(productRef)
 
@@ -42,6 +45,7 @@ export default function ProductoPage() {
         if (alive) {
           setProducto(data)
           setModifierSelections({})
+          setOrderNotice('')
         }
       })
       .catch(() => {
@@ -86,9 +90,29 @@ export default function ProductoPage() {
   const selectedModifiers = getSelectedModifiers(producto?.grupos_opciones || [], modifierSelections)
   const modifiersTotal = getModifiersTotal(selectedModifiers)
   const productTotal = Number(producto?.precio || 0) + modifiersTotal
-  const dynamicWhatsAppHref = selectedModifiers.length
-    ? buildProductWhatsAppHref(config, producto, selectedModifiers, productTotal)
-    : ''
+  const quickOrderEnabled = Boolean(config)
+  const quickOrderProducts = useMemo(
+    () => [producto, ...(producto?.relacionados || [])].filter(Boolean),
+    [producto]
+  )
+  const {
+    items: quickOrderItems,
+    totalItems: quickOrderCount,
+    totalAmount: quickOrderTotal,
+    increment: incrementQuickOrder,
+    decrement: decrementQuickOrder,
+    clearCart: clearQuickOrder,
+    getQuantity: getQuickOrderQuantity,
+    addCustomizedItem
+  } = useQuickOrderCart(quickOrderEnabled ? slug : '', quickOrderProducts)
+  const quickOrderWhatsAppHref = useMemo(
+    () => buildGastronomiaOrderHref(config, quickOrderItems),
+    [config, quickOrderItems]
+  )
+  const hasProductOptions = Boolean(
+    producto?.tiene_opciones || producto?.grupos_opciones?.some((grupo) => grupo?.opciones?.length > 0)
+  )
+  const currentProductQuantity = producto ? getQuickOrderQuantity(producto.id) : 0
 
   const trackProductWhatsAppClick = (item = producto) => {
     if (!metaPixelId) return
@@ -99,6 +123,17 @@ export default function ProductoPage() {
       currency: 'PYG',
       value: item?.id === producto?.id ? productTotal : Number(item?.precio) || 0
     })
+  }
+
+  const handleAddToOrder = () => {
+    if (!producto) return
+    if (hasProductOptions || selectedModifiers.length > 0) {
+      addCustomizedItem(producto, selectedModifiers, productTotal, 1)
+    } else {
+      incrementQuickOrder(producto)
+    }
+    setOrderNotice('Agregado al pedido. Podés seguir eligiendo productos o enviar todo junto por WhatsApp.')
+    trackProductWhatsAppClick(producto)
   }
 
   if (!producto && !error) return (
@@ -136,14 +171,12 @@ export default function ProductoPage() {
 
   const btnStyle = config?.color_primario ? { background: config.color_primario, boxShadow: `0 4px 14px 0 color-mix(in srgb, ${config.color_primario} 40%, transparent)` } : {}
   const btnClass = config?.color_primario ? 'btn btn-primary product-btn' : 'btn btn-brand-whatsapp product-btn'
-  const ctaProducto = config?.texto_cta_producto || 'Comprar por WhatsApp'
   const ctaCatalogo = config?.texto_cta_catalogo || 'Consultar'
   const textoApoyo = isTruthyFlag(config?.mostrar_texto_apoyo_whatsapp) ? normalizeText(config?.texto_apoyo_whatsapp) : ''
   const recordatorio = isTruthyFlag(config?.mostrar_recordatorio_whatsapp) ? normalizeText(config?.texto_recordatorio_whatsapp) : ''
   const beneficios = config?.beneficios_producto_items || []
   const senalesProducto = isTruthyFlag(config?.mostrar_bloque_confianza_producto) ? config?.senales_confianza || [] : []
   const mostrarRelacionados = isTruthyFlag(config?.mostrar_relacionados ?? true) && producto.relacionados?.length > 0
-  const whatsappHref = dynamicWhatsAppHref || producto.whatsapp_link || (config?.telefono_whatsapp ? `https://wa.me/${String(config.telefono_whatsapp).replace(/\D/g, '')}` : '')
 
   return (
     <div className={`theme-wrapper ${theme.wrapperClass}`} style={{ '--brand': config?.color_primario || '#2563eb' }}>
@@ -208,23 +241,55 @@ export default function ProductoPage() {
                 <TrustSignals items={senalesProducto} />
               </div>
             )}
-            <a
-              className={btnClass}
-              href={whatsappHref || undefined}
-              onClick={() => trackProductWhatsAppClick()}
-              target="_blank"
-              rel="noreferrer"
-              aria-disabled={!whatsappHref}
-              style={{ width: '100%', padding: '16px 24px', fontSize: '1.1rem', pointerEvents: whatsappHref ? 'auto' : 'none', opacity: whatsappHref ? 1 : 0.6, ...btnStyle }}
-            >
-              <svg style={{ width: 24, height: 24 }} fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12 21.054a9.05 9.05 0 0 1-4.609-1.257l-.33-.195-3.424.897.913-3.338-.214-.342a9.04 9.04 0 0 1-1.386-4.765 9.05 9.05 0 1 1 9.05 9.05M12 1.15A10.82 10.82 0 0 0 1.171 11.97 10.82 10.82 0 0 0 2.651 17.3l-1.48 5.41 5.539-1.452h.001c1.636.896 3.475 1.366 5.318 1.366A10.81 10.81 0 1 0 12 1.151z" /></svg>
-              {ctaProducto}
-            </a>
-            {!whatsappHref ? <p className="product-cta-support">Este producto no tiene un enlace de compra disponible en este momento.</p> : null}
+            <section className="product-detail-order-box" aria-live="polite">
+              <div className="product-detail-order-box__top">
+                <div>
+                  <span>Total de este producto</span>
+                  <strong>{formatGs(productTotal)}</strong>
+                </div>
+                {currentProductQuantity > 0 && !hasProductOptions ? (
+                  <div className="gastronomia-qty-stepper">
+                    <button type="button" onClick={() => decrementQuickOrder(producto)} aria-label={`Quitar una unidad de ${producto.nombre}`}>
+                      -
+                    </button>
+                    <span>{currentProductQuantity}</span>
+                    <button type="button" onClick={() => incrementQuickOrder(producto)} aria-label={`Agregar una unidad de ${producto.nombre}`}>
+                      +
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className={btnClass}
+                onClick={handleAddToOrder}
+                style={{ width: '100%', padding: '16px 24px', fontSize: '1.1rem', ...btnStyle }}
+              >
+                Agregar al pedido
+              </button>
+              {orderNotice ? <p className="product-detail-order-box__notice">{orderNotice}</p> : null}
+              <Link to={`/tienda/${slug}`} className="product-detail-order-box__continue">
+                Seguir eligiendo productos
+              </Link>
+            </section>
             {textoApoyo ? <p className="product-cta-support">{textoApoyo}</p> : null}
             {recordatorio ? <p className="product-cta-reminder">{recordatorio}</p> : null}
           </div>
         </div>
+        {quickOrderEnabled ? (
+          <div style={{ marginTop: 32 }}>
+            <GastronomiaOrderPanel
+              items={quickOrderItems}
+              totalItems={quickOrderCount}
+              totalAmount={quickOrderTotal}
+              whatsAppHref={quickOrderWhatsAppHref}
+              onIncrement={incrementQuickOrder}
+              onDecrement={decrementQuickOrder}
+              onClear={clearQuickOrder}
+              onWhatsAppClick={() => trackProductWhatsAppClick()}
+            />
+          </div>
+        ) : null}
         {mostrarRelacionados && (
           <div style={{ marginTop: 48 }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 20 }}>
@@ -232,7 +297,19 @@ export default function ProductoPage() {
             </h3>
             <div className="grid">
               {producto.relacionados.map((r) => (
-                <ProductoCard key={r.id} slug={slug} producto={r} brandColor={config?.color_primario} themeKey={theme.key} ctaText={ctaCatalogo} onWhatsAppClick={trackProductWhatsAppClick} />
+                <ProductoCard
+                  key={r.id}
+                  slug={slug}
+                  producto={r}
+                  brandColor={config?.color_primario}
+                  themeKey={theme.key}
+                  ctaText={ctaCatalogo}
+                  onWhatsAppClick={trackProductWhatsAppClick}
+                  quickOrderEnabled={quickOrderEnabled}
+                  selectedQuantity={quickOrderEnabled ? getQuickOrderQuantity(r.id) : 0}
+                  onIncrementQuickOrder={incrementQuickOrder}
+                  onDecrementQuickOrder={decrementQuickOrder}
+                />
               ))}
             </div>
           </div>
@@ -240,11 +317,13 @@ export default function ProductoPage() {
       </main>
       <SocialSideRails config={config} />
       <Footer config={config} themeKey={theme.key} />
-      <FloatingWhatsApp
-        phone={config?.telefono_whatsapp}
-        message={getStoreWhatsAppMessage(config, `Hola, me interesa ${producto.nombre}`)}
-        onClick={() => trackProductWhatsAppClick()}
-      />
+      {!(quickOrderEnabled && quickOrderCount > 0) ? (
+        <FloatingWhatsApp
+          phone={config?.telefono_whatsapp}
+          message={`Hola, me interesa ${producto.nombre}`}
+          onClick={() => trackProductWhatsAppClick()}
+        />
+      ) : null}
       <WebBotWidget slug={slug} />
     </div>
   )
@@ -277,20 +356,3 @@ function applyPageMeta(title, description) {
   descriptionMeta.setAttribute('content', description)
 }
 
-function buildProductWhatsAppHref(config, producto, selectedModifiers, total) {
-  const phone = String(config?.telefono_whatsapp || '').replace(/\D/g, '')
-  if (!phone || !producto) return ''
-  const lines = [
-    `Hola, vengo de la tienda web y quiero pedir: ${producto.nombre}`,
-    `Precio base: ${formatGs(producto.precio)}`
-  ]
-  if (selectedModifiers.length) {
-    lines.push('Opciones:')
-    selectedModifiers.forEach((item) => {
-      const lineTotal = Number(item.precio_delta || 0) * Number(item.cantidad || 0)
-      lines.push(`- ${item.nombre} x${item.cantidad}: ${lineTotal > 0 ? formatGs(lineTotal) : 'sin costo'}`)
-    })
-  }
-  lines.push(`Total estimado: ${formatGs(total)}`)
-  return `https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`
-}

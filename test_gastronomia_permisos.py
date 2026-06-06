@@ -149,13 +149,15 @@ def test_cajero_sin_cliente_usa_contexto_operativo_unico():
     assert dashboard.status_code == 200
     html = dashboard.get_data(as_text=True)
     assert 'Este usuario no tiene un contexto operativo asignado' not in html
+    assert 'Categorias, productos y disponibilidad.' not in html
+    assert 'Cobro y cierre del flujo operativo.' in html
 
-    assert client.get('/gastronomia/menu').status_code == 200
     assert client.get('/gastronomia/pos').status_code == 200
-    assert client.get('/gastronomia/cocina').status_code == 200
     assert client.get('/gastronomia/caja').status_code == 200
-    assert client.get('/gastronomia/salon').status_code == 200
-    assert client.get('/gastronomia/reportes').status_code == 200
+    assert client.get('/gastronomia/menu', follow_redirects=False).status_code in (302, 303)
+    assert client.get('/gastronomia/cocina', follow_redirects=False).status_code in (302, 303)
+    assert client.get('/gastronomia/salon', follow_redirects=False).status_code in (302, 303)
+    assert client.get('/gastronomia/reportes', follow_redirects=False).status_code in (302, 303)
 
 
 def test_admin_sin_cliente_usa_cliente_gastronomico_activo_unico():

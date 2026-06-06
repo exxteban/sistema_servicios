@@ -36,8 +36,6 @@ def tiene_permiso_gastronomia(*codigos: str) -> bool:
         return False
     if getattr(current_user, 'es_admin', lambda: False)():
         return True
-    if _es_cajero_con_acceso_total():
-        return True
     requeridos = codigos or (PERMISO_ACCESO,)
     return any(getattr(current_user, 'tiene_permiso', lambda _codigo: False)(codigo) for codigo in requeridos)
 
@@ -67,9 +65,3 @@ def _wants_json() -> bool:
         or request.is_json
         or 'application/json' in (request.headers.get('Accept') or '')
     )
-
-
-def _es_cajero_con_acceso_total() -> bool:
-    rol = getattr(current_user, 'rol', None)
-    nombre = ((getattr(rol, 'nombre', '') or '')).strip().lower()
-    return nombre == 'cajero'

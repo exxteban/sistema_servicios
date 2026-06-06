@@ -1,7 +1,7 @@
 import re
 
 from app import create_app, db
-from app.models import Cliente, Configuracion, Usuario
+from app.models import Cliente, Configuracion, Permiso, Rol, Usuario
 from app.services.ia_backoffice.settings import CLAVE_SYSTEM_ROOT_USER_ID
 from gastronomia.services.delivery_privacy import CLAVE_DELIVERY_LOCALIZACION_SOLO_ROOT
 from gastronomia.models import (
@@ -31,6 +31,10 @@ def _csrf(html: str) -> str:
 
 def _crear_contexto(app, suffix: str = ''):
     with app.app_context():
+        admin_rol = Rol.query.filter_by(nombre='Administrador').first()
+        delivery_rol = Rol.query.filter_by(nombre='Delivery Gastronomia').first()
+        assert admin_rol is not None
+        assert delivery_rol is not None
         cliente = Cliente(nombre=f'Resto Delivery Ruta{suffix}', ruc_ci=f'delivery_ruta{suffix}', tipo='minorista', activo=True)
         db.session.add(cliente)
         db.session.flush()
@@ -38,14 +42,14 @@ def _crear_contexto(app, suffix: str = ''):
             id_cliente=cliente.id_cliente,
             username=f'admin_delivery_ruta{suffix}',
             nombre_completo='Admin Delivery Ruta',
-            id_rol=1,
+            id_rol=admin_rol.id_rol,
             activo=True,
         )
         delivery = Usuario(
             id_cliente=cliente.id_cliente,
             username=f'repartidor_delivery_ruta{suffix}',
             nombre_completo='Repartidor Delivery Ruta',
-            id_rol=1,
+            id_rol=delivery_rol.id_rol,
             activo=True,
         )
         admin.set_password('clave123')
@@ -286,10 +290,7 @@ def test_delivery_localizacion_solo_root_oculta_y_bloquea_no_root():
     assert 'destino_latitud' not in pedido_repartidor
     assert 'ultima_ubicacion_delivery' not in pedido_repartidor
     pedidos_generales_resp = client.get('/api/gastronomia/pedidos?tipo=delivery')
-    assert pedidos_generales_resp.status_code == 200
-    pedido_general = pedidos_generales_resp.get_json()['pedidos'][0]
-    assert 'ubicacion_entrega_url' not in pedido_general
-    assert 'destino_latitud' not in pedido_general
+    assert pedidos_generales_resp.status_code == 403
 
     salir_resp = client.post(
         f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/salir',
@@ -326,6 +327,68 @@ def test_delivery_localizacion_solo_root_oculta_y_bloquea_no_root():
     assert pedido_root['destino_latitud'] == -25.3001
     pedido_general_root = client.get('/api/gastronomia/pedidos?tipo=delivery').get_json()['pedidos'][0]
     assert pedido_general_root['ubicacion_entrega_url']
+
+
+def test_delivery_ubicacion_requiere_permiso_gps():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, producto_id, delivery_user_id = _crear_contexto(app, '_sin_gps')
+    with app.app_context():
+        delivery_rol = Rol.query.filter_by(nombre='Delivery Gastronomia').first()
+        permiso_gps = Permiso.query.filter_by(codigo='gastronomia_delivery_gps').first()
+        assert delivery_rol is not None
+        assert permiso_gps is not None
+        if delivery_rol.permisos.filter_by(id_permiso=permiso_gps.id_permiso).first():
+            delivery_rol.permisos.remove(permiso_gps)
+            db.session.commit()
+
+    _loguear(client, app, 'admin_delivery_ruta_sin_gps')
+    csrf = _csrf(client.get('/gastronomia/delivery').get_data(as_text=True))
+    repartidor_resp = client.post(
+        '/api/gastronomia/delivery/repartidores',
+        json={'nombre': 'Moto Sin GPS', 'usuario_id': delivery_user_id},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert repartidor_resp.status_code == 201
+    repartidor_id = repartidor_resp.get_json()['repartidor']['id_repartidor']
+
+    pedido_resp = client.post(
+        '/api/gastronomia/pedidos',
+        json={
+            'tipo_pedido': 'delivery',
+            'referencia_entrega': 'Laura',
+            'celular_cliente': '0981123456',
+            'direccion_entrega': 'Calle 1',
+            'items': [{'producto_id': producto_id, 'cantidad': 1}],
+        },
+        headers={'X-CSRFToken': csrf},
+    )
+    assert pedido_resp.status_code == 201
+    pedido_id = pedido_resp.get_json()['pedido']['id_pedido']
+    assert client.post(f'/api/gastronomia/pedidos/{pedido_id}/enviar-cocina', json={}, headers={'X-CSRFToken': csrf}).status_code == 200
+    assert client.post(f'/api/gastronomia/cocina/pedidos/{pedido_id}/listo', json={}, headers={'X-CSRFToken': csrf}).status_code == 200
+    assert client.post(
+        f'/api/gastronomia/delivery/pedidos/{pedido_id}/repartidor',
+        json={'repartidor_id': repartidor_id},
+        headers={'X-CSRFToken': csrf},
+    ).status_code == 200
+
+    _loguear(client, app, 'repartidor_delivery_ruta_sin_gps')
+    csrf_ruta = _csrf(client.get('/gastronomia/delivery/ruta').get_data(as_text=True))
+    salir_resp = client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/salir',
+        json={},
+        headers={'X-CSRFToken': csrf_ruta},
+    )
+    assert salir_resp.status_code == 200
+
+    ubicacion_resp = client.post(
+        f'/api/gastronomia/delivery/ruta/pedidos/{pedido_id}/ubicacion',
+        json={'latitud': -25.3001, 'longitud': -57.6359, 'precision_metros': 12},
+        headers={'X-CSRFToken': csrf_ruta},
+    )
+    assert ubicacion_resp.status_code == 403
+    assert ubicacion_resp.get_json()['permiso_requerido'] == 'gastronomia_delivery_gps'
 
 
 def test_delivery_repartidor_admite_usuario_global_activo():

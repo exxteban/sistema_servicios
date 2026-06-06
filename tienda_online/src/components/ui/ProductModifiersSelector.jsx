@@ -32,7 +32,7 @@ export default function ProductModifiersSelector({ grupos = [], selections, onCh
       <div className="product-modifiers-header">
         <div>
           <h2>Personalizar</h2>
-          <p>Elegí extras o cambios antes de consultar por WhatsApp.</p>
+          <p>Elegí extras o cambios antes de agregar al pedido.</p>
         </div>
         <div className="product-modifiers-total">
           <span>Total</span>

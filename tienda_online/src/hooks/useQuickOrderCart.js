@@ -216,7 +216,8 @@ export function useQuickOrderCart(slug, productosActuales = []) {
   const increment = (producto) => {
     if (!producto?.id) return
     setCartMap((current) => {
-      const currentQuantity = Number(current?.[producto.id]?.quantity || 0)
+      const cartKey = getCartKey(producto)
+      const currentQuantity = Number(current?.[cartKey]?.quantity || 0)
       const nextItem = normalizeCartItem(producto, currentQuantity + 1)
       if (!nextItem) return current
       return {
@@ -229,11 +230,12 @@ export function useQuickOrderCart(slug, productosActuales = []) {
   const decrement = (producto) => {
     if (!producto?.id) return
     setCartMap((current) => {
-      const currentQuantity = Number(current?.[producto.id]?.quantity || 0)
+      const cartKey = getCartKey(producto)
+      const currentQuantity = Number(current?.[cartKey]?.quantity || 0)
       const nextItem = normalizeCartItem(producto, currentQuantity - 1)
       if (!nextItem) {
         const nextMap = { ...current }
-        delete nextMap[getCartKey(producto)]
+        delete nextMap[cartKey]
         return nextMap
       }
       return {

@@ -25,6 +25,7 @@ from gastronomia.services.permisos import (
     PERMISO_CAJA,
     PERMISO_COCINA,
     PERMISO_DELIVERY,
+    PERMISO_DELIVERY_GPS,
     PERMISO_POS,
     requiere_permiso_gastronomia,
     tiene_permiso_gastronomia,
@@ -154,6 +155,8 @@ def ruta_entregar(pedido_id):
 @login_required
 @requiere_permiso_gastronomia(PERMISO_DELIVERY)
 def ruta_ubicacion(pedido_id):
+    if not tiene_permiso_gastronomia(PERMISO_DELIVERY_GPS):
+        return _error_gps_sin_permiso()
     if not puede_ver_localizacion_delivery(current_user):
         return _error_localizacion_restringida()
     cliente_id, error = _cliente_o_error()
@@ -216,6 +219,14 @@ def _error_localizacion_restringida():
     return jsonify({
         'error': 'delivery_location_restricted',
         'mensaje': 'La localizacion de delivery esta restringida al usuario root.',
+    }), 403
+
+
+def _error_gps_sin_permiso():
+    return jsonify({
+        'error': 'Sin permisos',
+        'mensaje': 'No tienes permiso para registrar ubicacion GPS en delivery.',
+        'permiso_requerido': PERMISO_DELIVERY_GPS,
     }), 403
 
 
