@@ -16,6 +16,8 @@ from gastronomia.models import (
     GastronomiaPedidoPago,
     GastronomiaProducto,
 )
+from gastronomia.services.inteligencia_promos import promociones_horario_bajo
+from gastronomia.services.inteligencia_stock import alertas_stock_menu
 
 
 def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dict, cliente_id: int | None = None) -> dict:
@@ -30,6 +32,8 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
     canales = _canales(cliente_id_resuelto, periodo_actual)
     modificadores = _modificadores_top(cliente_id_resuelto, periodo_actual)
     horarios = _horarios_pico(cliente_id_resuelto, periodo_actual)
+    stock_menu = alertas_stock_menu(cliente_id_resuelto, periodo_actual)
+    promos_horario_bajo = promociones_horario_bajo(cliente_id_resuelto, periodo_actual, productos)
     insights = _construir_insights(resumen_actual, resumen_anterior, productos, canales, horarios)
 
     return {
@@ -42,6 +46,8 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
         'canales': canales,
         'modificadores_top': modificadores,
         'horarios_pico': horarios,
+        'stock_menu_alertas': stock_menu,
+        'promos_horario_bajo': promos_horario_bajo,
         'insights': insights,
     }
 
@@ -415,6 +421,8 @@ def _panel_vacio(periodo_actual: dict) -> dict:
         'canales': [],
         'modificadores_top': [],
         'horarios_pico': [],
+        'stock_menu_alertas': [],
+        'promos_horario_bajo': [],
         'insights': [{
             'prioridad': 'baja',
             'titulo': 'Gastronomia no esta activa para este contexto',

@@ -90,6 +90,17 @@ _DASHBOARD_CARD_DEFINITIONS = (
         'icon_class': 'text-violet-500',
         'hover_class': 'hover:border-amber-300',
     },
+    {
+        'id': 'bi',
+        'permission': 'reportes',
+        'title': 'BI Gastronomia',
+        'description': 'Radar de menu, stock, horarios bajos y decisiones comerciales.',
+        'endpoint': 'inteligencia.dashboard',
+        'endpoint_params': {'vista': 'gastronomia'},
+        'icon': 'fas fa-chart-pie',
+        'icon_class': 'text-fuchsia-500',
+        'hover_class': 'hover:border-fuchsia-300',
+    },
 )
 
 

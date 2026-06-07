@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from flask import current_app, has_app_context
 from sqlalchemy import distinct, func
 
 from app import db
 from app.models import DetalleVenta, Producto, Venta
 from app.services.inteligencia.campanas import obtener_sugerencias_campanas
 from app.services.inteligencia.clientes import obtener_inteligencia_clientes
-from app.services.inteligencia.common import DIAS_STOCK_INMOVILIZADO
+from app.services.inteligencia.common import DIAS_STOCK_INMOVILIZADO, formatear_rango
 from app.services.inteligencia.inventario import obtener_inteligencia_inventario
 from app.services.inteligencia.panel import construir_panel_inteligencia, construir_resumen_dashboard
 from app.services.inteligencia.periodos import (
@@ -43,7 +44,7 @@ def obtener_panel_inteligencia_comercial(
     ventas = obtener_inteligencia_ventas(fecha_corte, periodo_actual, periodo_anterior)
     tienda = obtener_inteligencia_tienda(periodo_actual, id_cliente_tienda)
     inventario = obtener_inteligencia_inventario(fecha_corte, periodo_actual, id_cliente_tienda)
-    gastronomia = obtener_inteligencia_gastronomia(periodo_actual, periodo_anterior, id_cliente_tienda)
+    gastronomia = _obtener_inteligencia_gastronomia_segura(periodo_actual, periodo_anterior, id_cliente_tienda)
     campanas = obtener_sugerencias_campanas(fecha_corte, periodo_actual, clientes, tienda, inventario)
     acciones = _construir_acciones(clientes, stock, ventas, tienda, inventario, gastronomia, campanas)
     return construir_panel_inteligencia(
@@ -84,7 +85,7 @@ def obtener_resumen_dashboard_inteligencia(
     ventas = obtener_inteligencia_ventas(fecha_corte, periodo_actual, periodo_anterior)
     tienda = obtener_inteligencia_tienda(periodo_actual, id_cliente_tienda)
     inventario = obtener_inteligencia_inventario(fecha_corte, periodo_actual, id_cliente_tienda)
-    gastronomia = obtener_inteligencia_gastronomia(periodo_actual, periodo_anterior, id_cliente_tienda)
+    gastronomia = _obtener_inteligencia_gastronomia_segura(periodo_actual, periodo_anterior, id_cliente_tienda)
     campanas = obtener_sugerencias_campanas(fecha_corte, periodo_actual, clientes, tienda, inventario)
     acciones = _construir_acciones(clientes, stock, ventas, tienda, inventario, gastronomia, campanas)
     return construir_resumen_dashboard(clientes, stock, campanas, len(acciones))
@@ -268,6 +269,49 @@ def _serializar_producto_stock_inmovilizado(producto: Producto) -> dict:
         'stock_actual': stock_actual,
         'dias_sin_salida': DIAS_STOCK_INMOVILIZADO,
         'accion': 'Liquidar, agrupar en promo o pausar compra hasta que vuelva a rotar.',
+    }
+
+
+def _obtener_inteligencia_gastronomia_segura(periodo_actual: dict, periodo_anterior: dict, cliente_id: int | None) -> dict:
+    try:
+        return obtener_inteligencia_gastronomia(periodo_actual, periodo_anterior, cliente_id)
+    except Exception:
+        if has_app_context():
+            current_app.logger.exception('No se pudo construir inteligencia gastronomica.')
+        return _panel_gastronomia_no_disponible(periodo_actual)
+
+
+def _panel_gastronomia_no_disponible(periodo_actual: dict) -> dict:
+    return {
+        'activo': False,
+        'cliente_id': None,
+        'periodo_label': formatear_rango(periodo_actual['desde'], periodo_actual['hasta']),
+        'resumen': {
+            'ventas_total': 0,
+            'ventas_total_label': '₲ 0',
+            'pedidos_cobrados': 0,
+            'ticket_promedio': 0,
+            'ticket_promedio_label': '₲ 0',
+            'tiempo_preparacion_min': 0,
+            'pedidos_cancelados': 0,
+            'ventas_variacion_label': 'Sin cambios',
+            'ventas_direccion': 'flat',
+            'ticket_variacion_label': 'Sin cambios',
+            'ticket_direccion': 'flat',
+        },
+        'productos_top': [],
+        'categorias_top': [],
+        'canales': [],
+        'modificadores_top': [],
+        'horarios_pico': [],
+        'stock_menu_alertas': [],
+        'promos_horario_bajo': [],
+        'insights': [{
+            'prioridad': 'baja',
+            'titulo': 'Radar gastronomico no disponible',
+            'detalle': 'No se pudo leer la informacion gastronomica en este momento.',
+            'accion': 'Revisar migraciones o volver a intentar luego.',
+        }],
     }
 
 

@@ -1,9 +1,10 @@
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from app import create_app, db
-from app.models import Caja, Cliente, MovimientoCaja, SesionCaja, Usuario, Venta
+from app.models import Caja, Categoria, Cliente, MovimientoCaja, Producto, SesionCaja, Usuario, Venta
 from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaPedido, GastronomiaPedidoPago, GastronomiaProducto
+from gastronomia.stock_models import GastronomiaRecetaInsumo
 from gastronomia.services.inteligencia_service import obtener_inteligencia_gastronomia
 
 
@@ -80,6 +81,35 @@ def _abrir_caja(app, username: str):
         db.session.commit()
 
 
+def _crear_insumo_receta(app, cliente_id, producto_id, nombre='Queso BI', stock=2, cantidad=1):
+    with app.app_context():
+        categoria = Categoria.query.filter_by(nombre='Insumos BI').first()
+        if not categoria:
+            categoria = Categoria(nombre='Insumos BI')
+            db.session.add(categoria)
+            db.session.flush()
+        insumo = Producto(
+            codigo=f'INS-{nombre.upper().replace(" ", "-")}',
+            nombre=nombre,
+            id_categoria=categoria.id_categoria,
+            id_cliente=cliente_id,
+            precio_compra=0,
+            precio_venta=0,
+            stock_actual=stock,
+            unidad_stock='unidad',
+        )
+        db.session.add(insumo)
+        db.session.flush()
+        db.session.add(GastronomiaRecetaInsumo(
+            cliente_id=cliente_id,
+            producto_id=producto_id,
+            insumo_id=insumo.id_producto,
+            cantidad=cantidad,
+        ))
+        db.session.commit()
+        return insumo.id_producto
+
+
 def _pedido_cobrado(client, csrf, items, metodo_pago='efectivo', descuento=0):
     pedido_resp = client.post(
         '/api/gastronomia/pedidos',
@@ -111,6 +141,14 @@ def _pedido_cobrado(client, csrf, items, metodo_pago='efectivo', descuento=0):
     )
     assert cobrar_resp.status_code == 200
     return pedido_id
+
+
+def _mover_pago_pedido(app, pedido_id, hora):
+    with app.app_context():
+        pago = GastronomiaPedidoPago.query.filter_by(pedido_id=pedido_id).first()
+        assert pago is not None
+        pago.fecha_pago = datetime.combine(date.today(), time(hour=hora))
+        db.session.commit()
 
 
 def test_reportes_resumen_filtra_cliente_y_calcula_metricas():
@@ -183,13 +221,27 @@ def test_inteligencia_gastronomia_calcula_metricas_accionables():
     _loguear(client, app, 'resto_bi_gastro')
     _abrir_caja(app, 'resto_bi_gastro')
     csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+    _crear_insumo_receta(app, cliente_id, bebida_id, stock=2, cantidad=1)
 
-    _pedido_cobrado(
+    pedido_uno = _pedido_cobrado(
         client,
         csrf,
         [{'producto_id': pizza_id, 'cantidad': 2}, {'producto_id': bebida_id, 'cantidad': 1}],
     )
-    _pedido_cobrado(client, csrf, [{'producto_id': bebida_id, 'cantidad': 3}])
+    pedido_dos = _pedido_cobrado(client, csrf, [{'producto_id': bebida_id, 'cantidad': 3}])
+    pedido_tres = _pedido_cobrado(client, csrf, [{'producto_id': pizza_id, 'cantidad': 1}])
+    pedido_cuatro = _pedido_cobrado(client, csrf, [{'producto_id': pizza_id, 'cantidad': 1}])
+    pedido_cinco = _pedido_cobrado(client, csrf, [{'producto_id': pizza_id, 'cantidad': 1}])
+    pedido_seis = _pedido_cobrado(client, csrf, [{'producto_id': bebida_id, 'cantidad': 1}])
+    for pedido_id, hora in (
+        (pedido_uno, 10),
+        (pedido_tres, 10),
+        (pedido_cuatro, 10),
+        (pedido_dos, 11),
+        (pedido_cinco, 12),
+        (pedido_seis, 13),
+    ):
+        _mover_pago_pedido(app, pedido_id, hora)
 
     hoy = date.today()
     ayer = hoy - timedelta(days=1)
@@ -201,14 +253,17 @@ def test_inteligencia_gastronomia_calcula_metricas_accionables():
         )
 
     assert panel['activo'] is True
-    assert panel['resumen']['pedidos_cobrados'] == 2
-    assert panel['resumen']['ventas_total'] == 120000
-    assert panel['resumen']['ticket_promedio'] == 60000
+    assert panel['resumen']['pedidos_cobrados'] == 6
+    assert panel['resumen']['ventas_total'] == 250000
     productos = {item['nombre']: item for item in panel['productos_top']}
-    assert productos['Bebida']['cantidad'] == 4
-    assert productos['Pizza']['cantidad'] == 2
+    assert productos['Bebida']['cantidad'] == 5
+    assert productos['Pizza']['cantidad'] == 5
     assert panel['canales'][0]['canal'] == 'mostrador'
-    assert panel['canales'][0]['pedidos'] == 2
+    assert panel['canales'][0]['pedidos'] == 6
+    assert panel['stock_menu_alertas'][0]['nombre'] == 'Queso BI'
+    assert 'dura' in panel['stock_menu_alertas'][0]['mensaje']
+    assert panel['promos_horario_bajo']
+    assert all(item['pedidos'] <= item['promedio_pedidos'] for item in panel['promos_horario_bajo'])
     assert panel['insights']
 
     response = client.get('/inteligencia', query_string={'vista': 'gastronomia'})
@@ -216,6 +271,8 @@ def test_inteligencia_gastronomia_calcula_metricas_accionables():
     html = response.get_data(as_text=True)
     assert 'Gastronomía' in html
     assert 'Productos más vendidos' in html
+    assert 'Stock conectado al menú' in html
+    assert 'Horarios flojos para empujar venta' in html
     assert 'Bebida' in html
 
 

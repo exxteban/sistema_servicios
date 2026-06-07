@@ -95,7 +95,10 @@ def test_dashboard_redirige_a_gastronomia_si_modo_global_activo():
 
     gastronomia_response = client.get('/gastronomia/')
     assert gastronomia_response.status_code == 200
-    assert 'Gastronomia' in gastronomia_response.get_data(as_text=True)
+    html = gastronomia_response.get_data(as_text=True)
+    assert 'Gastronomia' in html
+    assert 'BI Gastronomia' in html
+    assert '/inteligencia?vista=gastronomia' in html
 
 
 def test_root_sin_cliente_usa_contexto_unico_en_gastronomia():

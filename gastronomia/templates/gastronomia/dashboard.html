@@ -24,7 +24,7 @@
         <div id="gastro-dashboard-cards" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {% for card in dashboard_cards %}
         {% set card_alert = card.alert_count|default(0) > 0 %}
-        <a href="{{ url_for(card.endpoint) if contexto_operativo else '#' }}"
+        <a href="{{ url_for(card.endpoint, **card.endpoint_params|default({})) if contexto_operativo else '#' }}"
             data-dashboard-card-id="{{ card.id }}"
             draggable="true"
             class="gastro-dashboard-card group relative rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition {{ card.hover_class }} hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if card_alert %}gastro-dashboard-card--alert{% endif %} {% if card.disabled %}pointer-events-none opacity-60{% endif %}">
