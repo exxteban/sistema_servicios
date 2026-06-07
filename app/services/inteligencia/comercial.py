@@ -306,6 +306,8 @@ def _panel_gastronomia_no_disponible(periodo_actual: dict) -> dict:
         'horarios_pico': [],
         'stock_menu_alertas': [],
         'promos_horario_bajo': [],
+        'productos_bajo_margen': [],
+        'clientes_frecuentes': [],
         'insights': [{
             'prioridad': 'baja',
             'titulo': 'Radar gastronomico no disponible',

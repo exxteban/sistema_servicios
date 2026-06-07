@@ -224,6 +224,83 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div class="rounded-2xl bg-white p-4 shadow-md dark:bg-gray-800 2xl:p-5">
+            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <p class="text-[11px] uppercase tracking-wider text-red-600 dark:text-red-400 font-semibold">Margen estimado</p>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Alto volumen con bajo margen</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Productos que venden bien pero dejan poca utilidad segun receta e insumos.</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                    {{ panel.gastronomia.productos_bajo_margen|length }} alerta{% if panel.gastronomia.productos_bajo_margen|length != 1 %}s{% endif %}
+                </span>
+            </div>
+            <div class="mt-4 space-y-3">
+                {% for producto in panel.gastronomia.productos_bajo_margen %}
+                <div class="rounded-xl border border-red-100 bg-red-50/60 p-3 dark:border-red-500/20 dark:bg-red-500/10">
+                    <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</p>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ producto.cantidad }} unidades · Venta {{ producto.total_label }} · Costo {{ producto.costo_total_label }}</p>
+                        </div>
+                        <div class="rounded-xl bg-white/80 px-3 py-2 text-right dark:bg-gray-900/50">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Margen</p>
+                            <p class="text-sm font-bold text-red-700 dark:text-red-200">{{ producto.margen_pct_label }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ producto.margen_label }}</p>
+                        </div>
+                    </div>
+                    <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ producto.accion }}</p>
+                </div>
+                {% else %}
+                <div class="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    No hay productos de alto volumen con margen bajo, o faltan costos de receta para estimarlo.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="rounded-2xl bg-white p-4 shadow-md dark:bg-gray-800 2xl:p-5">
+            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <p class="text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">Clientes</p>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Clientes frecuentes gastronómicos</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Recurrencia detectada por nombre o celular en pedidos cobrados.</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    {{ panel.gastronomia.clientes_frecuentes|length }} cliente{% if panel.gastronomia.clientes_frecuentes|length != 1 %}s{% endif %}
+                </span>
+            </div>
+            <div class="mt-4 space-y-3">
+                {% for cliente in panel.gastronomia.clientes_frecuentes %}
+                <div class="rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                    <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ cliente.nombre }}</p>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ cliente.pedidos }} pedidos · {{ cliente.total_label }} · Ticket {{ cliente.ticket_promedio_label }}</p>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Favorito: {{ cliente.producto_favorito }} · {{ cliente.canales_label }}</p>
+                        </div>
+                        <div class="text-left md:text-right">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Última visita</p>
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ cliente.ultima_visita_label }}</p>
+                            {% if cliente.whatsapp_url %}
+                            <a href="{{ cliente.whatsapp_url }}" target="_blank" rel="noopener" class="mt-1 inline-flex text-xs font-semibold text-emerald-700 dark:text-emerald-300">WhatsApp</a>
+                            {% else %}
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ cliente.telefono_label }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ cliente.accion }}</p>
+                </div>
+                {% else %}
+                <div class="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    Todavía no hay suficientes pedidos con nombre o celular repetido para detectar clientes frecuentes.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
     <div class="rounded-2xl bg-white p-4 shadow-md dark:bg-gray-800 2xl:p-5">
         <h2 class="text-lg font-bold text-gray-900 dark:text-white">Categorías fuertes del menú</h2>
         <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">

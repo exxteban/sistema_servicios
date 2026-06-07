@@ -16,6 +16,8 @@ from gastronomia.models import (
     GastronomiaPedidoPago,
     GastronomiaProducto,
 )
+from gastronomia.services.inteligencia_clientes import clientes_frecuentes_gastronomia
+from gastronomia.services.inteligencia_margen import productos_alto_volumen_bajo_margen
 from gastronomia.services.inteligencia_promos import promociones_horario_bajo
 from gastronomia.services.inteligencia_stock import alertas_stock_menu
 
@@ -34,6 +36,8 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
     horarios = _horarios_pico(cliente_id_resuelto, periodo_actual)
     stock_menu = alertas_stock_menu(cliente_id_resuelto, periodo_actual)
     promos_horario_bajo = promociones_horario_bajo(cliente_id_resuelto, periodo_actual, productos)
+    productos_bajo_margen = productos_alto_volumen_bajo_margen(cliente_id_resuelto, periodo_actual)
+    clientes_frecuentes = clientes_frecuentes_gastronomia(cliente_id_resuelto, periodo_actual)
     insights = _construir_insights(resumen_actual, resumen_anterior, productos, canales, horarios)
 
     return {
@@ -48,6 +52,8 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
         'horarios_pico': horarios,
         'stock_menu_alertas': stock_menu,
         'promos_horario_bajo': promos_horario_bajo,
+        'productos_bajo_margen': productos_bajo_margen,
+        'clientes_frecuentes': clientes_frecuentes,
         'insights': insights,
     }
 
@@ -423,6 +429,8 @@ def _panel_vacio(periodo_actual: dict) -> dict:
         'horarios_pico': [],
         'stock_menu_alertas': [],
         'promos_horario_bajo': [],
+        'productos_bajo_margen': [],
+        'clientes_frecuentes': [],
         'insights': [{
             'prioridad': 'baja',
             'titulo': 'Gastronomia no esta activa para este contexto',

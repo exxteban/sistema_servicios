@@ -81,7 +81,7 @@ def _abrir_caja(app, username: str):
         db.session.commit()
 
 
-def _crear_insumo_receta(app, cliente_id, producto_id, nombre='Queso BI', stock=2, cantidad=1):
+def _crear_insumo_receta(app, cliente_id, producto_id, nombre='Queso BI', stock=2, cantidad=1, precio_compra=0):
     with app.app_context():
         categoria = Categoria.query.filter_by(nombre='Insumos BI').first()
         if not categoria:
@@ -93,7 +93,7 @@ def _crear_insumo_receta(app, cliente_id, producto_id, nombre='Queso BI', stock=
             nombre=nombre,
             id_categoria=categoria.id_categoria,
             id_cliente=cliente_id,
-            precio_compra=0,
+            precio_compra=precio_compra,
             precio_venta=0,
             stock_actual=stock,
             unidad_stock='unidad',
@@ -110,10 +110,13 @@ def _crear_insumo_receta(app, cliente_id, producto_id, nombre='Queso BI', stock=
         return insumo.id_producto
 
 
-def _pedido_cobrado(client, csrf, items, metodo_pago='efectivo', descuento=0):
+def _pedido_cobrado(client, csrf, items, metodo_pago='efectivo', descuento=0, pedido_extra=None):
+    payload = {'tipo_pedido': 'mostrador', 'items': items}
+    if pedido_extra:
+        payload.update(pedido_extra)
     pedido_resp = client.post(
         '/api/gastronomia/pedidos',
-        json={'tipo_pedido': 'mostrador', 'items': items},
+        json=payload,
         headers={'X-CSRFToken': csrf},
     )
     assert pedido_resp.status_code == 201
@@ -222,13 +225,21 @@ def test_inteligencia_gastronomia_calcula_metricas_accionables():
     _abrir_caja(app, 'resto_bi_gastro')
     csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
     _crear_insumo_receta(app, cliente_id, bebida_id, stock=2, cantidad=1)
+    _crear_insumo_receta(app, cliente_id, pizza_id, nombre='Harina BI', stock=30, cantidad=1, precio_compra=1000)
+    _crear_insumo_receta(app, cliente_id, bebida_id, nombre='Bebida Costo BI', stock=30, cantidad=1, precio_compra=9000)
 
     pedido_uno = _pedido_cobrado(
         client,
         csrf,
         [{'producto_id': pizza_id, 'cantidad': 2}, {'producto_id': bebida_id, 'cantidad': 1}],
+        pedido_extra={'nombre_cliente': 'Ana Gastro', 'celular_cliente': '0981123456'},
     )
-    pedido_dos = _pedido_cobrado(client, csrf, [{'producto_id': bebida_id, 'cantidad': 3}])
+    pedido_dos = _pedido_cobrado(
+        client,
+        csrf,
+        [{'producto_id': bebida_id, 'cantidad': 3}],
+        pedido_extra={'nombre_cliente': 'Ana Gastro', 'celular_cliente': '0981123456'},
+    )
     pedido_tres = _pedido_cobrado(client, csrf, [{'producto_id': pizza_id, 'cantidad': 1}])
     pedido_cuatro = _pedido_cobrado(client, csrf, [{'producto_id': pizza_id, 'cantidad': 1}])
     pedido_cinco = _pedido_cobrado(client, csrf, [{'producto_id': pizza_id, 'cantidad': 1}])
@@ -264,6 +275,10 @@ def test_inteligencia_gastronomia_calcula_metricas_accionables():
     assert 'dura' in panel['stock_menu_alertas'][0]['mensaje']
     assert panel['promos_horario_bajo']
     assert all(item['pedidos'] <= item['promedio_pedidos'] for item in panel['promos_horario_bajo'])
+    assert panel['productos_bajo_margen'][0]['nombre'] == 'Bebida'
+    assert panel['productos_bajo_margen'][0]['margen_pct'] == 10.0
+    assert panel['clientes_frecuentes'][0]['nombre'] == 'Ana Gastro'
+    assert panel['clientes_frecuentes'][0]['pedidos'] == 2
     assert panel['insights']
 
     response = client.get('/inteligencia', query_string={'vista': 'gastronomia'})
@@ -273,6 +288,8 @@ def test_inteligencia_gastronomia_calcula_metricas_accionables():
     assert 'Productos más vendidos' in html
     assert 'Stock conectado al menú' in html
     assert 'Horarios flojos para empujar venta' in html
+    assert 'Alto volumen con bajo margen' in html
+    assert 'Clientes frecuentes gastronómicos' in html
     assert 'Bebida' in html
 
 
