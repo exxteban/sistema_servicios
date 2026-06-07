@@ -10,25 +10,15 @@ from app.models import Caja, ColaCobro, Configuracion, MovimientoCaja, SesionCaj
 from app.routes.caja import caja_bp
 from app.routes.caja.cola_cobro import obtener_contexto_cola_cobro, puede_acceder_cola_cobro
 from app.routes.caja.common import _enriquecer_motivos_movimientos
+from app.routes.caja.gastronomia_cierre import (
+    agregar_observacion_pedidos_terminados,
+    mensaje_confirmacion_pedidos_terminados,
+    resumen_pedidos_gastronomia_cierre,
+)
 from app.routes.caja.regularizacion_cola import regularizar_pendientes_ya_cobrados_para_cierre
+from app.routes.caja.resumen_cierre import resumen_pendientes_para_cierre
 from app.utils.auditoria_utils import registrar_auditoria
 from app.utils.helpers import local_strftime
-
-
-def _resumen_pendientes_para_cierre(pendientes):
-    items = []
-    for pendiente in pendientes[:5]:
-        cliente = ((pendiente.cliente.nombre if pendiente.cliente else '') or '').strip() or 'Consumidor Final'
-        tipo = 'Reparación' if pendiente.tipo_origen == 'reparacion' else 'Venta'
-        if pendiente.tipo_origen == 'cobro_credito':
-            tipo = 'Cobro crédito'
-        elif pendiente.tipo_origen == 'pedido':
-            tipo = 'Pedido'
-        elif pendiente.tipo_origen == 'gastronomia':
-            tipo = 'Pedido gastronomia'
-        monto = f'₲ {float(pendiente.monto_total or 0):,.0f}'
-        items.append(f'#{pendiente.id} {tipo} · {cliente} · {monto}')
-    return ' | '.join(items)
 
 
 def _cajas_disponibles_contexto():
@@ -469,7 +459,7 @@ def cerrar():
     )
     pendientes_en_proceso = regularizar_pendientes_ya_cobrados_para_cierre(pendientes_en_proceso)
     if pendientes_en_proceso:
-        pendientes_mostrados = _resumen_pendientes_para_cierre(pendientes_en_proceso)
+        pendientes_mostrados = resumen_pendientes_para_cierre(pendientes_en_proceso)
         sufijo = '...' if len(pendientes_en_proceso) > 5 else ''
         flash(
             f'No puede cerrar la caja mientras tenga pendientes en proceso asignados. Revise y cobre o libere: {pendientes_mostrados}{sufijo}.',
@@ -493,7 +483,7 @@ def cerrar():
         )
         pendientes_bloqueantes = regularizar_pendientes_ya_cobrados_para_cierre(pendientes_bloqueantes)
         if pendientes_bloqueantes:
-            pendientes_mostrados = _resumen_pendientes_para_cierre(pendientes_bloqueantes)
+            pendientes_mostrados = resumen_pendientes_para_cierre(pendientes_bloqueantes)
             sufijo = '...' if len(pendientes_bloqueantes) > 5 else ''
             estados_bloqueantes = {item.estado for item in pendientes_bloqueantes}
             cola_estado = 'todas' if len(estados_bloqueantes) > 1 else next(iter(estados_bloqueantes), 'todas')
@@ -511,11 +501,18 @@ def cerrar():
     except Exception:
         pass
 
+    resumen_gastronomia = resumen_pedidos_gastronomia_cierre()
+
     if request.method == 'POST':
         monto_declarado = request.form.get('monto_declarado', 0, type=float)
         observaciones = request.form.get('observaciones', '')
         if not _es_monto_no_negativo(monto_declarado):
             flash('El monto declarado debe ser un número válido mayor o igual a cero.', 'warning')
+            return redirect(url_for('caja.cerrar'))
+
+        mensaje_confirmacion = mensaje_confirmacion_pedidos_terminados(resumen_gastronomia, request.form)
+        if mensaje_confirmacion:
+            flash(mensaje_confirmacion, 'warning')
             return redirect(url_for('caja.cerrar'))
         try:
             req_id = getattr(g, 'request_id', None)
@@ -542,6 +539,7 @@ def cerrar():
         sesion.fecha_cierre = datetime.utcnow()
         sesion.estado = 'cerrada'
         sesion.id_usuario_cierre = current_user.id_usuario
+        observaciones = agregar_observacion_pedidos_terminados(observaciones, resumen_gastronomia)
         sesion.observaciones = observaciones
 
         try:
@@ -589,5 +587,6 @@ def cerrar():
     return render_template(
         'caja/cerrar.html',
         sesion=sesion,
-        total_sistema=total_sistema
+        total_sistema=total_sistema,
+        resumen_gastronomia=resumen_gastronomia
     )

@@ -128,3 +128,33 @@ def test_cierre_cancela_cola_gastronomia_si_pago_apunta_a_venta_anulada():
         assert cola.get_metadata()['venta_id'] == venta_id
         assert cola.get_metadata()['regularizacion_motivo'] == 'venta_gastronomia_anulada'
         assert GastronomiaPedidoPago.query.filter_by(pedido_id=pedido_id).count() == 1
+
+
+def test_polling_resumen_no_regulariza_cola_fantasma_en_tiempo_real():
+    """El polling no debe mutar colas ni hacer limpieza masiva."""
+    app = create_app('testing')
+    client = app.test_client()
+    username = 'resto_polling_regulariza'
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Polling Regulariza', username)
+    _loguear(client, app, username)
+    _abrir_caja(app, username)
+
+    pedido_id, cola_id, venta_id = _crear_venta_gastronomia_desde_checkout(client, app, username, producto_id)
+
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username=username).first()
+        cola = ColaCobro.query.get(cola_id)
+        venta = Venta.query.get(venta_id)
+        venta.estado = 'anulada'
+        cola.estado = 'en_proceso'
+        cola.id_usuario_destino = usuario.id_usuario
+        cola.fecha_cobro = None
+        db.session.commit()
+
+    resp = client.get('/caja/api/cola-cobro/resumen?forzar_activa=1')
+    assert resp.status_code == 200
+
+    with app.app_context():
+        cola = ColaCobro.query.get(cola_id)
+        assert cola.estado == 'en_proceso'
+        assert cola.get_metadata().get('regularizacion_motivo') is None

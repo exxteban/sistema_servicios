@@ -6,7 +6,7 @@ from app.services.inteligencia import obtener_panel_inteligencia_comercial
 from app.services.inteligencia.periodos import normalizar_periodo
 from app.utils.bi_context import construir_resumen_dashboard_desde_panel, enriquecer_panel_productos_inteligencia
 
-VISTAS_INTELIGENCIA_VALIDAS = {'resumen', 'comercial', 'operacion'}
+VISTAS_INTELIGENCIA_VALIDAS = {'resumen', 'comercial', 'operacion', 'gastronomia'}
 
 
 def _puede_ver_inteligencia() -> bool:

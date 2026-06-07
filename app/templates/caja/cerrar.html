@@ -30,6 +30,60 @@
 
         <form method="POST" action="{{ url_for('caja.cerrar') }}" class="space-y-6">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            {% if resumen_gastronomia and resumen_gastronomia.en_curso %}
+            <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div class="flex items-start">
+                    <i class="fas fa-info-circle text-blue-500 dark:text-blue-300 mt-1 mr-3"></i>
+                    <div class="text-sm text-blue-800 dark:text-blue-200">
+                        <p class="font-semibold mb-1">
+                            {{ resumen_gastronomia.en_curso|length }} pedido(s) en preparación sin cobrar
+                            (₲ {{ "{:,.0f}".format(resumen_gastronomia.total_en_curso).replace(",", ".") }})
+                        </p>
+                        <p>Quedarán pendientes para el próximo turno. No es necesario hacer nada.</p>
+                        <ul class="mt-2 space-y-1">
+                            {% for p in resumen_gastronomia.en_curso[:5] %}
+                            <li>· {{ p.codigo_entrega }} — {{ p.mesa or p.nombre_cliente or p.tipo_pedido }} —
+                                ₲ {{ "{:,.0f}".format(p.total).replace(",", ".") }} <span class="opacity-70">({{ p.estado }})</span></li>
+                            {% endfor %}
+                            {% if resumen_gastronomia.en_curso|length > 5 %}
+                            <li class="opacity-70">… y {{ resumen_gastronomia.en_curso|length - 5 }} más</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if resumen_gastronomia and resumen_gastronomia.terminados %}
+            <div class="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg p-4">
+                <div class="flex items-start">
+                    <i class="fas fa-triangle-exclamation text-amber-500 dark:text-amber-300 mt-1 mr-3"></i>
+                    <div class="text-sm text-amber-800 dark:text-amber-100 w-full">
+                        <p class="font-semibold mb-1">
+                            {{ resumen_gastronomia.terminados|length }} pedido(s) entregados/listos SIN cobrar
+                            (₲ {{ "{:,.0f}".format(resumen_gastronomia.total_terminados).replace(",", ".") }})
+                        </p>
+                        <p>Producto que ya salió y todavía no fue cobrado. Revise antes de cerrar.</p>
+                        <ul class="mt-2 space-y-1">
+                            {% for p in resumen_gastronomia.terminados[:5] %}
+                            <li>· {{ p.codigo_entrega }} — {{ p.mesa or p.nombre_cliente or p.tipo_pedido }} —
+                                ₲ {{ "{:,.0f}".format(p.total).replace(",", ".") }} <span class="opacity-70">({{ p.estado }})</span></li>
+                            {% endfor %}
+                            {% if resumen_gastronomia.terminados|length > 5 %}
+                            <li class="opacity-70">… y {{ resumen_gastronomia.terminados|length - 5 }} más</li>
+                            {% endif %}
+                        </ul>
+                        <label class="flex items-start mt-3 cursor-pointer">
+                            <input type="checkbox" name="confirmar_pedidos_pendientes" value="1" required
+                                class="mt-1 mr-2 h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500">
+                            <span class="font-medium">Confirmo que dejo estos pedidos pendientes y deseo cerrar la caja.</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Monto Contado
                     (Declarado)</label>

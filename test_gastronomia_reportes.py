@@ -1,9 +1,10 @@
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from app import create_app, db
 from app.models import Caja, Cliente, MovimientoCaja, SesionCaja, Usuario, Venta
 from gastronomia.models import GastronomiaCategoria, GastronomiaClienteConfig, GastronomiaPedido, GastronomiaPedidoPago, GastronomiaProducto
+from gastronomia.services.inteligencia_service import obtener_inteligencia_gastronomia
 
 
 def _loguear(client, app, username: str):
@@ -173,6 +174,49 @@ def test_reportes_page_carga_para_cliente_gastronomico():
     assert 'Reportes' in html
     assert 'js/reportes.js' in html
     assert 'Ventas cobradas para anular' in html
+
+
+def test_inteligencia_gastronomia_calcula_metricas_accionables():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, pizza_id, bebida_id = _crear_productos(app, 'Resto BI Gastro', 'resto_bi_gastro')
+    _loguear(client, app, 'resto_bi_gastro')
+    _abrir_caja(app, 'resto_bi_gastro')
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+
+    _pedido_cobrado(
+        client,
+        csrf,
+        [{'producto_id': pizza_id, 'cantidad': 2}, {'producto_id': bebida_id, 'cantidad': 1}],
+    )
+    _pedido_cobrado(client, csrf, [{'producto_id': bebida_id, 'cantidad': 3}])
+
+    hoy = date.today()
+    ayer = hoy - timedelta(days=1)
+    with app.app_context():
+        panel = obtener_inteligencia_gastronomia(
+            {'desde': hoy, 'hasta': hoy},
+            {'desde': ayer, 'hasta': ayer},
+            cliente_id,
+        )
+
+    assert panel['activo'] is True
+    assert panel['resumen']['pedidos_cobrados'] == 2
+    assert panel['resumen']['ventas_total'] == 120000
+    assert panel['resumen']['ticket_promedio'] == 60000
+    productos = {item['nombre']: item for item in panel['productos_top']}
+    assert productos['Bebida']['cantidad'] == 4
+    assert productos['Pizza']['cantidad'] == 2
+    assert panel['canales'][0]['canal'] == 'mostrador'
+    assert panel['canales'][0]['pedidos'] == 2
+    assert panel['insights']
+
+    response = client.get('/inteligencia', query_string={'vista': 'gastronomia'})
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'Gastronomía' in html
+    assert 'Productos más vendidos' in html
+    assert 'Bebida' in html
 
 
 def test_reportes_anula_venta_gastronomica_y_actualiza_stock_caja_metricas():

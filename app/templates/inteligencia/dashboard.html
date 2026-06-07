@@ -14,7 +14,7 @@
                 <p class="text-[11px] uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 font-semibold mb-1">Centro de Inteligencia Comercial</p>
                 <h1 class="text-xl md:text-2xl font-bold text-gray-900 dark:text-white leading-tight">Radar ejecutivo del negocio</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-600 dark:text-slate-300">
-                    Esta etapa reúne señales rápidas de ventas, clientes, tienda e inventario para decidir qué conviene mover hoy.
+                    Esta etapa reúne señales rápidas de ventas, clientes, tienda, inventario y gastronomía para decidir qué conviene mover hoy.
                 </p>
             </div>
             
@@ -61,7 +61,7 @@
                 <p class="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">Navegación</p>
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">Elegí una vista del centro de inteligencia</h2>
             </div>
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-3" role="tablist" aria-label="Vistas del centro de inteligencia">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" role="tablist" aria-label="Vistas del centro de inteligencia">
                 <a href="{{ url_for('inteligencia.dashboard', vista='resumen', periodo=panel.periodo_clave) }}"
                    role="tab"
                    aria-selected="{{ 'true' if vista_activa == 'resumen' else 'false' }}"
@@ -101,6 +101,19 @@
                     </div>
                     <p class="mt-2 text-sm opacity-80">Stock, tienda e inventario para detectar trabas rápidas.</p>
                 </a>
+                <a href="{{ url_for('inteligencia.dashboard', vista='gastronomia', periodo=panel.periodo_clave) }}"
+                   role="tab"
+                   aria-selected="{{ 'true' if vista_activa == 'gastronomia' else 'false' }}"
+                   @click.prevent="inteligenciaTab = 'gastronomia'; window.history.replaceState({}, '', $el.href)"
+                   class="rounded-2xl border p-4 text-left transition"
+                   :aria-selected="inteligenciaTab === 'gastronomia'"
+                   :class="inteligenciaTab === 'gastronomia' ? 'border-violet-300 bg-violet-50 text-violet-900 shadow-sm dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-100' : 'border-gray-200 bg-white text-gray-700 hover:border-violet-200 hover:bg-violet-50/60 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-200 dark:hover:border-violet-500/40 dark:hover:bg-violet-500/5'">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-base font-bold">Gastronomía</span>
+                        <span class="inline-flex min-w-9 items-center justify-center rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold dark:bg-gray-800/70">{{ panel.gastronomia.resumen.pedidos_cobrados }}</span>
+                    </div>
+                    <p class="mt-2 text-sm opacity-80">Menú, canales, cocina, horarios y decisiones del restaurante.</p>
+                </a>
             </div>
         </div>
     </div>
@@ -108,6 +121,7 @@
     {% include "inteligencia/_tab_resumen.html" %}
     {% include "inteligencia/_tab_comercial.html" %}
     {% include "inteligencia/_tab_operacion.html" %}
+    {% include "inteligencia/_tab_gastronomia.html" %}
     {% include "inteligencia/_modal_detalles.html" %}
 </div>
 {% endblock %}

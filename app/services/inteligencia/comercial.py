@@ -20,6 +20,7 @@ from app.services.inteligencia.periodos import (
 from app.services.inteligencia.tienda import obtener_inteligencia_tienda
 from app.services.inteligencia.ventas import obtener_inteligencia_ventas
 from app.utils.helpers import today_local, utc_bounds_for_local_dates, utc_naive_to_local
+from gastronomia.services.inteligencia_service import obtener_inteligencia_gastronomia
 
 
 def obtener_panel_inteligencia_comercial(
@@ -42,8 +43,9 @@ def obtener_panel_inteligencia_comercial(
     ventas = obtener_inteligencia_ventas(fecha_corte, periodo_actual, periodo_anterior)
     tienda = obtener_inteligencia_tienda(periodo_actual, id_cliente_tienda)
     inventario = obtener_inteligencia_inventario(fecha_corte, periodo_actual, id_cliente_tienda)
+    gastronomia = obtener_inteligencia_gastronomia(periodo_actual, periodo_anterior, id_cliente_tienda)
     campanas = obtener_sugerencias_campanas(fecha_corte, periodo_actual, clientes, tienda, inventario)
-    acciones = _construir_acciones(clientes, stock, ventas, tienda, inventario, campanas)
+    acciones = _construir_acciones(clientes, stock, ventas, tienda, inventario, gastronomia, campanas)
     return construir_panel_inteligencia(
         fecha_corte=fecha_corte,
         periodo_actual=periodo_actual,
@@ -61,6 +63,7 @@ def obtener_panel_inteligencia_comercial(
         clientes=clientes,
         stock=stock,
         inventario=inventario,
+        gastronomia=gastronomia,
         campanas=campanas,
         ventas=ventas,
         tienda=tienda,
@@ -81,8 +84,9 @@ def obtener_resumen_dashboard_inteligencia(
     ventas = obtener_inteligencia_ventas(fecha_corte, periodo_actual, periodo_anterior)
     tienda = obtener_inteligencia_tienda(periodo_actual, id_cliente_tienda)
     inventario = obtener_inteligencia_inventario(fecha_corte, periodo_actual, id_cliente_tienda)
+    gastronomia = obtener_inteligencia_gastronomia(periodo_actual, periodo_anterior, id_cliente_tienda)
     campanas = obtener_sugerencias_campanas(fecha_corte, periodo_actual, clientes, tienda, inventario)
-    acciones = _construir_acciones(clientes, stock, ventas, tienda, inventario, campanas)
+    acciones = _construir_acciones(clientes, stock, ventas, tienda, inventario, gastronomia, campanas)
     return construir_resumen_dashboard(clientes, stock, campanas, len(acciones))
 
 
@@ -273,6 +277,7 @@ def _construir_acciones(
     ventas: dict,
     tienda: dict,
     inventario: dict,
+    gastronomia: dict,
     campanas: dict,
 ) -> list[dict]:
     acciones = []
@@ -346,6 +351,14 @@ def _construir_acciones(
             'titulo': insight['titulo'],
             'detalle': insight['accion'],
         })
+
+    if gastronomia.get('activo'):
+        for insight in gastronomia.get('insights', [])[:1]:
+            acciones.append({
+                'prioridad': insight['prioridad'],
+                'titulo': insight['titulo'],
+                'detalle': insight['accion'],
+            })
 
     if not acciones:
         acciones.append({

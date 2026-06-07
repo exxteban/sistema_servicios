@@ -17,6 +17,10 @@ from gastronomia.services.venta_integration_service import (
 
 METODOS_PAGO = {'efectivo', 'tarjeta', 'transferencia', 'qr', 'mixto'}
 ESTADOS_COBRABLES = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado'}
+# Pedidos que todavia estan en curso: es normal que existan al cerrar turno.
+ESTADOS_EN_CURSO = {'abierto', 'enviado_cocina', 'preparando'}
+# Pedidos cuyo producto ya salio pero siguen sin cobrar: requieren atencion al cerrar.
+ESTADOS_TERMINADOS_SIN_COBRO = {'listo', 'entregado'}
 
 
 def _query_pedidos_caja(cliente_id: int):
@@ -41,6 +45,52 @@ def listar_pedidos_caja(cliente_id: int) -> list[GastronomiaPedido]:
 
 def contar_pedidos_caja(cliente_id: int) -> int:
     return _query_pedidos_caja(cliente_id).count()
+
+
+def resumen_pedidos_impagos_para_cierre(cliente_id: int) -> dict:
+    """Agrupa los pedidos cobrables sin pago para advertir al cerrar caja.
+
+    Devuelve dos grupos:
+    - ``en_curso``: pedidos legitimos en proceso (aviso informativo, no bloquea).
+    - ``terminados``: producto ya entregado/listo sin cobrar (confirmacion explicita).
+    """
+    pedidos = (
+        _query_pedidos_caja(cliente_id)
+        .order_by(GastronomiaPedido.fecha_creacion.asc(), GastronomiaPedido.id_pedido.asc())
+        .all()
+    )
+
+    en_curso: list[dict] = []
+    terminados: list[dict] = []
+    total_en_curso = Decimal('0.00')
+    total_terminados = Decimal('0.00')
+
+    for pedido in pedidos:
+        monto = Decimal(str(pedido.total or 0)).quantize(Decimal('0.01'))
+        item = {
+            'id_pedido': pedido.id_pedido,
+            'codigo_entrega': pedido.codigo_entrega,
+            'estado': pedido.estado,
+            'tipo_pedido': pedido.tipo_pedido,
+            'mesa': (pedido.mesa or '').strip(),
+            'nombre_cliente': (pedido.nombre_cliente or '').strip(),
+            'total': float(monto),
+        }
+        if pedido.estado in ESTADOS_TERMINADOS_SIN_COBRO:
+            terminados.append(item)
+            total_terminados += monto
+        else:
+            en_curso.append(item)
+            total_en_curso += monto
+
+    return {
+        'en_curso': en_curso,
+        'terminados': terminados,
+        'total_en_curso': float(total_en_curso),
+        'total_terminados': float(total_terminados),
+        'hay_terminados': bool(terminados),
+        'hay_en_curso': bool(en_curso),
+    }
 
 
 def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) -> GastronomiaPedido:
