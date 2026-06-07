@@ -122,9 +122,12 @@
             <h2 class="text-lg font-bold text-gray-900 dark:text-white">Horarios pico</h2>
             <div class="mt-4 space-y-3">
                 {% for horario in panel.gastronomia.horarios_pico %}
-                <div class="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-900/40">
-                    <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ horario.hora_label }}</span>
-                    <span class="text-sm text-gray-600 dark:text-gray-300">{{ horario.pedidos }} pedido{% if horario.pedidos != 1 %}s{% endif %}</span>
+                <div class="flex items-center justify-between rounded-xl px-3 py-2 {% if loop.index0 == 0 %}bg-emerald-50 text-emerald-900 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-500/20{% elif loop.index0 == 1 %}bg-sky-50 text-sky-900 ring-1 ring-sky-100 dark:bg-sky-500/10 dark:text-sky-100 dark:ring-sky-500/20{% elif loop.index0 == 2 %}bg-violet-50 text-violet-900 ring-1 ring-violet-100 dark:bg-violet-500/10 dark:text-violet-100 dark:ring-violet-500/20{% elif loop.index0 == 3 %}bg-amber-50 text-amber-900 ring-1 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-500/20{% else %}bg-rose-50 text-rose-900 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-100 dark:ring-rose-500/20{% endif %}">
+                    <span class="inline-flex items-center gap-2 text-sm font-semibold">
+                        <span class="h-2.5 w-2.5 rounded-full {% if loop.index0 == 0 %}bg-emerald-500{% elif loop.index0 == 1 %}bg-sky-500{% elif loop.index0 == 2 %}bg-violet-500{% elif loop.index0 == 3 %}bg-amber-500{% else %}bg-rose-500{% endif %}"></span>
+                        {{ horario.hora_label }}
+                    </span>
+                    <span class="rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold dark:bg-gray-900/40">{{ horario.pedidos }} pedido{% if horario.pedidos != 1 %}s{% endif %}</span>
                 </div>
                 {% else %}
                 <p class="text-sm text-gray-500 dark:text-gray-400">Sin volumen suficiente para detectar picos.</p>
