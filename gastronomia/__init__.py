@@ -21,6 +21,7 @@ from gastronomia.routes import pos_routes as _pos_routes  # noqa: F401
 from gastronomia.routes import public_routes as _public_routes  # noqa: F401
 from gastronomia.routes import reportes_routes as _reportes_routes  # noqa: F401
 from gastronomia.routes import salon_routes as _salon_routes  # noqa: F401
+from gastronomia.routes import tienda_pedidos_routes as _tienda_pedidos_routes  # noqa: F401
 
 
 __all__ = [

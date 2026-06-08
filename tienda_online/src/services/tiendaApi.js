@@ -256,5 +256,7 @@ export const tiendaApi = {
     ...normalizeProduct(r.data),
     relacionados: Array.isArray(r.data?.relacionados) ? r.data.relacionados.map(normalizeProduct) : []
   })),
+  getGastronomiaPerfil: (slug, params = {}) => api.get(`/api/tienda/${slug}/gastronomia/perfil`, { params }).then(r => r.data),
+  postGastronomiaPedido: (slug, payload) => api.post(`/api/tienda/${slug}/gastronomia/pedido`, payload).then(r => r.data),
   postLead: (payload) => api.post('/api/tienda/lead', payload).then(r => r.data)
 }

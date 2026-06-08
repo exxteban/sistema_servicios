@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Pedidos tienda{% endblock %}
+
+{% block content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+<div class="mx-auto max-w-6xl space-y-5" data-pedidos-tienda>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <p class="text-sm font-black uppercase tracking-wide text-blue-600 dark:text-blue-300">Tienda online</p>
+            <h1 class="text-2xl font-black text-gray-900 dark:text-white">Pedidos pendientes de tienda</h1>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Contactá al cliente, confirmá disponibilidad y recién después enviá el pedido a cocina.</p>
+        </div>
+        <a href="{{ url_for('gastronomia.dashboard') }}" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">Volver</a>
+    </div>
+
+    <div id="pedidos-tienda-alert" class="hidden rounded-xl border px-4 py-3 text-sm font-bold"></div>
+    <div id="pedidos-tienda-list" class="grid gap-4"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const list = document.getElementById('pedidos-tienda-list');
+    const alertBox = document.getElementById('pedidos-tienda-alert');
+    const csrfToken = document.getElementById('csrf-token')?.value || '';
+
+    function showAlert(message, type = 'error') {
+        alertBox.className = `rounded-xl border px-4 py-3 text-sm font-bold ${type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`;
+        alertBox.textContent = message;
+        alertBox.classList.remove('hidden');
+    }
+
+    function money(value) {
+        return `₲ ${Number(value || 0).toLocaleString('es-PY')}`;
+    }
+
+    function itemLine(item) {
+        const mods = (item.modificadores || []).map((mod) => mod.nombre_opcion).join(', ');
+        return `<li>${item.cantidad} x ${item.nombre_producto}${mods ? ` <span class="text-gray-500">(${mods})</span>` : ''}</li>`;
+    }
+
+    function pedidoCard(pedido) {
+        const tipo = pedido.tipo_pedido === 'delivery' ? 'Delivery' : 'Retiro';
+        return `
+            <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800" data-pedido-id="${pedido.id_pedido}">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-black text-blue-600 dark:text-blue-300">${pedido.codigo_entrega || `#${pedido.id_pedido}`} · ${tipo}</p>
+                        <h2 class="mt-1 text-lg font-black text-gray-900 dark:text-white">${pedido.nombre_cliente || 'Cliente tienda'}</h2>
+                        <p class="text-sm font-semibold text-gray-600 dark:text-gray-300">${pedido.celular_cliente || 'Sin WhatsApp'}</p>
+                        ${pedido.direccion_entrega ? `<p class="mt-2 text-sm text-gray-600 dark:text-gray-300">${pedido.direccion_entrega}</p>` : ''}
+                        ${pedido.referencia_entrega ? `<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Ref: ${pedido.referencia_entrega}</p>` : ''}
+                    </div>
+                    <strong class="rounded-full bg-gray-100 px-4 py-2 text-sm font-black text-gray-900 dark:bg-gray-700 dark:text-white">${money(pedido.total)}</strong>
+                </div>
+                <ul class="mt-4 list-disc space-y-1 pl-5 text-sm text-gray-700 dark:text-gray-300">${(pedido.items || []).map(itemLine).join('')}</ul>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    ${pedido.whatsapp_cliente_url ? `<a href="${pedido.whatsapp_cliente_url}" target="_blank" rel="noreferrer" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-black text-white hover:bg-green-700">Contactar por WhatsApp</a>` : ''}
+                    <button type="button" data-confirmar-pedido="${pedido.id_pedido}" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700">Confirmar y enviar a cocina</button>
+                </div>
+            </article>`;
+    }
+
+    async function loadPedidos() {
+        const response = await fetch('/api/gastronomia/tienda/pedidos', { headers: { Accept: 'application/json' } });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.mensaje || data.error || 'No se pudieron cargar los pedidos.');
+        list.innerHTML = data.pedidos.length ? data.pedidos.map(pedidoCard).join('') : '<div class="rounded-2xl border border-gray-200 bg-white p-6 text-center text-sm font-bold text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">No hay pedidos pendientes de tienda.</div>';
+    }
+
+    async function confirmarPedido(pedidoId) {
+        const response = await fetch(`/api/gastronomia/tienda/pedidos/${pedidoId}/confirmar`, {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.mensaje || data.error || 'No se pudo confirmar el pedido.');
+        showAlert('Pedido confirmado y enviado a cocina.', 'success');
+        await loadPedidos();
+    }
+
+    list.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-confirmar-pedido]');
+        if (!button) return;
+        confirmarPedido(button.dataset.confirmarPedido).catch((error) => showAlert(error.message));
+    });
+
+    loadPedidos().catch((error) => showAlert(error.message));
+})();
+</script>
+{% endblock %}

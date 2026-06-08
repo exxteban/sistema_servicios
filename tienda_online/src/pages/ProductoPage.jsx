@@ -112,7 +112,8 @@ export default function ProductoPage() {
     decrement: decrementQuickOrder,
     clearCart: clearQuickOrder,
     getQuantity: getQuickOrderQuantity,
-    addCustomizedItem
+    addCustomizedItem,
+    replaceWithItems: replaceQuickOrderItems
   } = useQuickOrderCart(quickOrderEnabled ? slug : '', quickOrderProducts)
   const quickOrderWhatsAppHref = useMemo(
     () => buildGastronomiaOrderHref(config, quickOrderItems),
@@ -288,6 +289,8 @@ export default function ProductoPage() {
         {quickOrderEnabled ? (
           <div style={{ marginTop: 32 }}>
             <GastronomiaOrderPanel
+              slug={slug}
+              config={config}
               items={quickOrderItems}
               totalItems={quickOrderCount}
               totalAmount={quickOrderTotal}
@@ -295,6 +298,7 @@ export default function ProductoPage() {
               onIncrement={incrementQuickOrder}
               onDecrement={decrementQuickOrder}
               onClear={clearQuickOrder}
+              onReplaceItems={replaceQuickOrderItems}
               onWhatsAppClick={() => trackProductWhatsAppClick()}
             />
           </div>

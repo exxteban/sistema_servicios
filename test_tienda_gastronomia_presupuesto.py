@@ -21,6 +21,7 @@ from gastronomia.models import (
     GastronomiaOpcionProducto,
     GastronomiaProducto,
 )
+from gastronomia.customer_models import GastronomiaClienteDireccion, GastronomiaClienteFinal
 from gastronomia.services.modo_operacion import (
     CLAVE_MODO_OPERACION_PRINCIPAL,
     MODO_GASTRONOMIA,
@@ -116,6 +117,8 @@ def test_tienda_gastronomia_adapta_cta_y_mensaje_de_presupuesto():
         assert config_response.status_code == 200
         config_data = config_response.get_json()
         assert config_data['es_gastronomia'] is True
+        assert config_data['tienda_delivery_activo'] is True
+        assert config_data['tienda_retiro_activo'] is True
         assert config_data['texto_cta_catalogo'] == 'Pedir presupuesto'
         assert config_data['texto_cta_producto'] == 'Solicitar presupuesto'
 
@@ -280,6 +283,63 @@ def test_tienda_gastronomia_expone_modificadores_con_foto_y_precio():
             Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
 
 
+def test_tienda_gastronomia_pedido_publico_crea_cliente_final_y_perfil():
+    app = create_app('testing')
+    client = app.test_client()
+
+    with app.app_context():
+        Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_GASTRONOMIA)
+        tienda, producto = _crear_tienda_gastronomia(slug='gastro-cliente-final-test')
+        admin = Usuario.query.filter_by(username='admin').first()
+        admin.id_cliente = tienda.id_cliente
+        db.session.commit()
+        slug = tienda.slug
+        producto_id = producto.id_producto
+        cliente_id = tienda.id_cliente
+
+    try:
+        response = client.post(f'/api/tienda/{slug}/gastronomia/pedido', json={
+            'tipo_pedido': 'delivery',
+            'nombre': 'Carlos Cliente',
+            'celular': '0981123456',
+            'direccion_entrega': 'Casa 123, Barrio Centro',
+            'referencia_entrega': 'Porton negro',
+            'items': [{'id': producto_id, 'quantity': 2}],
+        })
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data['pedido']['codigo_entrega'] == '#001'
+        assert data['cliente']['nombre'] == 'Carlos Cliente'
+        assert data['token_cliente']
+
+        with app.app_context():
+            cliente_final = GastronomiaClienteFinal.query.filter_by(cliente_id=cliente_id).one()
+            assert cliente_final.telefono_normalizado == '+595981123456'
+            assert cliente_final.total_pedidos == 1
+            direccion = GastronomiaClienteDireccion.query.filter_by(cliente_final_id=cliente_final.id_cliente_final).one()
+            assert direccion.direccion == 'Casa 123, Barrio Centro'
+            assert direccion.referencia == 'Porton negro'
+
+        perfil_sin_token = client.get(f'/api/tienda/{slug}/gastronomia/perfil', query_string={'telefono': '0981123456'})
+        assert perfil_sin_token.status_code == 200
+        assert perfil_sin_token.get_json()['encontrado'] is False
+
+        perfil = client.get(f'/api/tienda/{slug}/gastronomia/perfil', query_string={
+            'telefono': '0981123456',
+            'token': data['token_cliente'],
+        })
+        assert perfil.status_code == 200
+        perfil_data = perfil.get_json()
+        assert perfil_data['encontrado'] is True
+        assert perfil_data['direcciones'][0]['direccion'] == 'Casa 123, Barrio Centro'
+        assert perfil_data['ultimo_pedido']['items'][0]['id'] == producto_id
+        assert perfil_data['ultimo_pedido']['items'][0]['quantity'] == 2
+        assert perfil_data['favoritos'][0]['producto_id'] == producto_id
+    finally:
+        with app.app_context():
+            Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)
+
+
 def test_tienda_gastronomia_hereda_imagenes_de_menu_para_modificadores_sin_foto():
     app = create_app('testing')
     client = app.test_client()
@@ -401,9 +461,15 @@ def test_panel_tienda_gastronomia_muestra_menu_y_permite_guardar_config():
             'slug': 'gastro-admin-test',
             'nombre_tienda': 'Gastro Admin Test',
             'telefono_whatsapp': '595981000000',
+            'tienda_delivery_activo': False,
+            'tienda_retiro_activo': True,
         })
         assert save_response.status_code == 200
         assert save_response.get_json()['ok'] is True
+        with app.app_context():
+            tienda_guardada = TiendaConfig.query.get(config_id)
+            assert tienda_guardada.tienda_delivery_activo is False
+            assert tienda_guardada.tienda_retiro_activo is True
     finally:
         with app.app_context():
             Configuracion.establecer(CLAVE_MODO_OPERACION_PRINCIPAL, MODO_SERVICIOS)

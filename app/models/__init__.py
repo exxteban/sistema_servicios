@@ -55,6 +55,7 @@ from gastronomia.models import (
     GastronomiaProducto,
 )
 from gastronomia.channel_models import GastronomiaProductoPrecioCanal
+from gastronomia.customer_models import GastronomiaClienteDireccion, GastronomiaClienteFavorito, GastronomiaClienteFinal
 from gastronomia.stock_models import (
     GastronomiaOpcionInsumo,
     GastronomiaPedidoItemConsumo,
@@ -95,6 +96,7 @@ __all__ = [
     'GastronomiaGrupoOpciones', 'GastronomiaOpcionProducto', 'GastronomiaMesa',
     'GastronomiaPedido', 'GastronomiaPedidoItem', 'GastronomiaPedidoItemModificador',
     'GastronomiaPedidoEvento', 'GastronomiaPedidoPago',
+    'GastronomiaClienteFinal', 'GastronomiaClienteDireccion', 'GastronomiaClienteFavorito',
     'GastronomiaRecetaInsumo', 'GastronomiaOpcionInsumo', 'GastronomiaPedidoItemConsumo',
     'PedidoCliente', 'PedidoClienteDetalle', 'PedidoClienteHistorial', 'PedidoClientePago',
     'PlanCreditoVenta', 'CuotaCreditoVenta', 'PagoCuentaCobrarAplicacion',

@@ -254,12 +254,14 @@ class GastronomiaPedido(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False, index=True)
     tipo_pedido = db.Column(db.String(30), nullable=False, default='mostrador')
+    origen_pedido = db.Column(db.String(30), nullable=False, default='pos', server_default='pos', index=True)
     codigo_publico = db.Column(db.String(32), unique=True, index=True)
     mesa = db.Column(db.String(40))
     referencia_entrega = db.Column(db.String(80))
     nombre_cliente = db.Column(db.String(120))
     celular_cliente = db.Column(db.String(40))
     direccion_entrega = db.Column(db.String(240))
+    cliente_final_id = db.Column(db.Integer, db.ForeignKey('gastronomia_clientes_finales.id_cliente_final'), nullable=True, index=True)
     ubicacion_entrega_url = db.Column(db.String(500))
     destino_latitud = db.Column(db.Float)
     destino_longitud = db.Column(db.Float)
@@ -298,6 +300,7 @@ class GastronomiaPedido(db.Model):
             'cliente_id': self.cliente_id,
             'usuario_id': self.usuario_id,
             'tipo_pedido': self.tipo_pedido,
+            'origen_pedido': self.origen_pedido,
             'codigo_publico': self.codigo_publico,
             'url_seguimiento': f'/gastronomia/pedido/{self.codigo_publico}' if self.codigo_publico else None,
             'mesa': self.mesa,
@@ -305,6 +308,7 @@ class GastronomiaPedido(db.Model):
             'nombre_cliente': self.nombre_cliente,
             'celular_cliente': self.celular_cliente,
             'direccion_entrega': self.direccion_entrega,
+            'cliente_final_id': self.cliente_final_id,
             'ubicacion_entrega_url': self.ubicacion_entrega_url,
             'destino_latitud': self.destino_latitud,
             'destino_longitud': self.destino_longitud,

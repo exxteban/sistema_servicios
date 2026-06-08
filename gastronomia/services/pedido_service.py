@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
-import re
-from urllib.parse import parse_qs, unquote, urlparse
+from decimal import Decimal
 
 from app import db
 from app.services.promociones_calculo import calculate_promotion_totals, money
@@ -23,6 +21,13 @@ from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filt
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
+from gastronomia.services.pedido_validation_utils import (
+    coords_from_location_text,
+    parse_estimated_minutes,
+    parse_nonnegative_money,
+    parse_optional_coordinate,
+    parse_optional_positive_int,
+)
 from gastronomia.services.stock_service import (
     alertas_stock_pedido,
     consumir_stock_item,
@@ -32,6 +37,7 @@ from gastronomia.services.stock_service import (
 
 TIPOS_PEDIDO = {'mesa', 'mostrador', 'retiro', 'delivery'}
 ESTADOS_PEDIDO = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino', 'entregado', 'cobrado', 'cancelado'}
+ORIGENES_PEDIDO = {'pos', 'tienda_online'}
 
 
 def listar_pedidos(
@@ -57,7 +63,11 @@ def listar_pedidos_cocina(cliente_id: int) -> list[GastronomiaPedido]:
             GastronomiaPedido.cliente_id == int(cliente_id),
             db.or_(
                 GastronomiaPedido.estado.in_(['enviado_cocina', 'preparando', 'listo', 'en_camino']),
-                db.and_(GastronomiaPedido.tipo_pedido == 'delivery', GastronomiaPedido.estado == 'abierto'),
+                db.and_(
+                    GastronomiaPedido.tipo_pedido == 'delivery',
+                    GastronomiaPedido.estado == 'abierto',
+                    GastronomiaPedido.origen_pedido != 'tienda_online',
+                ),
             ),
         )
         .order_by(GastronomiaPedido.fecha_envio_cocina.asc(), GastronomiaPedido.id_pedido.asc())
@@ -187,6 +197,7 @@ def _pedido_to_dict_prearmado(
         'cliente_id': pedido.cliente_id,
         'usuario_id': pedido.usuario_id,
         'tipo_pedido': pedido.tipo_pedido,
+        'origen_pedido': pedido.origen_pedido,
         'codigo_publico': pedido.codigo_publico,
         'url_seguimiento': url_seguimiento,
         'url_seguimiento_publica': _url_seguimiento_publica(pedido.codigo_publico),
@@ -239,18 +250,20 @@ def obtener_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido | None:
 
 def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPedido:
     pedido_data = _validar_datos_pedido(cliente_id, data)
-    estado_inicial = 'enviado_cocina' if pedido_data['tipo_pedido'] == 'delivery' else 'abierto'
+    estado_inicial = 'enviado_cocina' if pedido_data['tipo_pedido'] == 'delivery' and pedido_data['origen_pedido'] != 'tienda_online' else 'abierto'
 
     pedido = GastronomiaPedido(
         cliente_id=int(cliente_id),
         usuario_id=int(usuario_id),
         tipo_pedido=pedido_data['tipo_pedido'],
+        origen_pedido=pedido_data['origen_pedido'],
         codigo_publico=_codigo_publico_unico(),
         mesa=pedido_data['mesa'],
         referencia_entrega=pedido_data['referencia_entrega'],
         nombre_cliente=pedido_data['nombre_cliente'],
         celular_cliente=pedido_data['celular_cliente'],
         direccion_entrega=pedido_data['direccion_entrega'],
+        cliente_final_id=pedido_data['cliente_final_id'],
         ubicacion_entrega_url=pedido_data['ubicacion_entrega_url'],
         destino_latitud=pedido_data['destino_latitud'],
         destino_longitud=pedido_data['destino_longitud'],
@@ -284,12 +297,14 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
 
     pedido_data = _validar_datos_pedido(cliente_id, data)
     pedido.tipo_pedido = pedido_data['tipo_pedido']
+    pedido.origen_pedido = pedido_data['origen_pedido']
     pedido.codigo_publico = pedido.codigo_publico or _codigo_publico_unico()
     pedido.mesa = pedido_data['mesa']
     pedido.referencia_entrega = pedido_data['referencia_entrega']
     pedido.nombre_cliente = pedido_data['nombre_cliente']
     pedido.celular_cliente = pedido_data['celular_cliente']
     pedido.direccion_entrega = pedido_data['direccion_entrega']
+    pedido.cliente_final_id = pedido_data['cliente_final_id']
     pedido.ubicacion_entrega_url = pedido_data['ubicacion_entrega_url']
     pedido.destino_latitud = pedido_data['destino_latitud']
     pedido.destino_longitud = pedido_data['destino_longitud']
@@ -395,10 +410,10 @@ def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
     celular_cliente = (data.get('celular_cliente') or '').strip()[:40] or None
     direccion_entrega = (data.get('direccion_entrega') or '').strip()[:240] or None
     ubicacion_entrega_url = (data.get('ubicacion_entrega_url') or '').strip()[:500] or None
-    destino_latitud = _parse_optional_coordinate(data.get('destino_latitud'), -90, 90)
-    destino_longitud = _parse_optional_coordinate(data.get('destino_longitud'), -180, 180)
+    destino_latitud = parse_optional_coordinate(data.get('destino_latitud'), -90, 90)
+    destino_longitud = parse_optional_coordinate(data.get('destino_longitud'), -180, 180)
     if ubicacion_entrega_url and (destino_latitud is None or destino_longitud is None):
-        parsed_lat, parsed_lng = _coords_from_location_text(ubicacion_entrega_url)
+        parsed_lat, parsed_lng = coords_from_location_text(ubicacion_entrega_url)
         destino_latitud = destino_latitud if destino_latitud is not None else parsed_lat
         destino_longitud = destino_longitud if destino_longitud is not None else parsed_lng
     if tipo == 'delivery' and not celular_cliente:
@@ -419,11 +434,13 @@ def _validar_datos_pedido(cliente_id: int, data: dict) -> dict:
         'nombre_cliente': nombre_cliente,
         'celular_cliente': celular_cliente,
         'direccion_entrega': direccion_entrega,
+        'cliente_final_id': parse_optional_positive_int(data.get('cliente_final_id')),
+        'origen_pedido': _normalizar_origen_pedido(data.get('origen_pedido')),
         'ubicacion_entrega_url': ubicacion_entrega_url if tipo == 'delivery' else None,
         'destino_latitud': destino_latitud if tipo == 'delivery' else None,
         'destino_longitud': destino_longitud if tipo == 'delivery' else None,
-        'tiempo_estimado_minutos': _parse_estimated_minutes(data.get('tiempo_estimado_minutos')),
-        'costo_envio': _parse_nonnegative_money(data.get('costo_envio')) if tipo == 'delivery' else Decimal('0.00'),
+        'tiempo_estimado_minutos': parse_estimated_minutes(data.get('tiempo_estimado_minutos')),
+        'costo_envio': parse_nonnegative_money(data.get('costo_envio')) if tipo == 'delivery' else Decimal('0.00'),
         'notas': (data.get('notas') or '').strip() or None,
         'items': items_data,
     }
@@ -437,70 +454,9 @@ def _codigo_publico_unico() -> str:
     raise ValueError('No se pudo generar el codigo publico del pedido.')
 
 
-def _parse_estimated_minutes(value) -> int | None:
-    try:
-        minutes = int(value)
-    except (TypeError, ValueError):
-        return None
-    if minutes <= 0:
-        return None
-    return min(minutes, 1440)
-
-
-def _parse_nonnegative_money(value) -> Decimal:
-    if value in (None, ''):
-        return Decimal('0.00')
-    try:
-        amount = Decimal(str(value)).quantize(Decimal('0.01'))
-    except (InvalidOperation, ValueError, TypeError) as exc:
-        raise ValueError('Monto invalido.') from exc
-    if amount < 0:
-        raise ValueError('El costo de envio no puede ser negativo.')
-    return amount
-
-
-def _parse_optional_coordinate(value, minimum: float, maximum: float) -> float | None:
-    if value in (None, ''):
-        return None
-    try:
-        parsed = float(str(value).strip())
-    except (TypeError, ValueError):
-        return None
-    return parsed if minimum <= parsed <= maximum else None
-
-
-def _coords_from_location_text(value: str) -> tuple[float | None, float | None]:
-    text_value = unquote(str(value or '').strip())
-    match = re.search(r'!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)', text_value)
-    if match:
-        return _validated_coords(match.group(1), match.group(2))
-    parsed = urlparse(text_value)
-    params = parse_qs(parsed.query)
-    for key in ('q', 'query', 'll', 'destination'):
-        if params.get(key):
-            coords = _coords_from_plain_text(params[key][0])
-            if coords != (None, None):
-                return coords
-    for pattern in (r'@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)',):
-        match = re.search(pattern, text_value)
-        if match:
-            return _validated_coords(match.group(1), match.group(2))
-    return _coords_from_plain_text(text_value)
-
-
-def _coords_from_plain_text(value: str) -> tuple[float | None, float | None]:
-    match = re.search(r'(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)', str(value or ''))
-    if not match:
-        return None, None
-    return _validated_coords(match.group(1), match.group(2))
-
-
-def _validated_coords(lat_value, lng_value) -> tuple[float | None, float | None]:
-    lat = _parse_optional_coordinate(lat_value, -90, 90)
-    lng = _parse_optional_coordinate(lng_value, -180, 180)
-    if lat is None or lng is None:
-        return None, None
-    return lat, lng
+def _normalizar_origen_pedido(value) -> str:
+    origen = (value or 'pos').strip().lower()
+    return origen if origen in ORIGENES_PEDIDO else 'pos'
 
 
 def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_data: list[dict]) -> None:

@@ -457,64 +457,8 @@ def _apply_sqlite_migrations(db):
             _execute_and_commit(db, sqlite_statements)
             existing_columns.add(column_name)
 
-    cola_table_exists = db.session.execute(
-        text("SELECT name FROM sqlite_master WHERE type='table' AND name='cola_cobro'")
-    ).scalar()
-    if cola_table_exists:
-        _execute_and_commit(db, ("CREATE INDEX IF NOT EXISTS ix_cola_cobro_estado_fecha_envio ON cola_cobro(estado, fecha_envio)",))
-        duplicated_active = db.session.execute(
-            text(
-                """
-                SELECT COUNT(*) FROM (
-                    SELECT tipo_origen, id_origen, COUNT(*) AS total
-                    FROM cola_cobro
-                    WHERE estado IN ('pendiente', 'en_proceso')
-                    GROUP BY tipo_origen, id_origen
-                    HAVING COUNT(*) > 1
-                ) dup
-                """
-            )
-        ).scalar()
-        if int(duplicated_active or 0) == 0:
-            _execute_and_commit(
-                db,
-                (
-                    """
-                    CREATE UNIQUE INDEX IF NOT EXISTS uq_cola_cobro_origen_activo
-                    ON cola_cobro(tipo_origen, id_origen)
-                    WHERE estado IN ('pendiente', 'en_proceso')
-                    """,
-                ),
-            )
-
-    sesiones_table_exists = db.session.execute(
-        text("SELECT name FROM sqlite_master WHERE type='table' AND name='sesiones_caja'")
-    ).scalar()
-    if sesiones_table_exists:
-        duplicated_open = db.session.execute(
-            text(
-                """
-                SELECT COUNT(*) FROM (
-                    SELECT id_caja, COUNT(*) AS total
-                    FROM sesiones_caja
-                    WHERE estado = 'abierta'
-                    GROUP BY id_caja
-                    HAVING COUNT(*) > 1
-                ) dup
-                """
-            )
-        ).scalar()
-        if int(duplicated_open or 0) == 0:
-            _execute_and_commit(
-                db,
-                (
-                    """
-                    CREATE UNIQUE INDEX IF NOT EXISTS uq_sesiones_caja_caja_abierta
-                    ON sesiones_caja(id_caja)
-                    WHERE estado = 'abierta'
-                    """,
-                ),
-            )
+    from app.bootstrap.caja_unique_schema import ensure_sqlite_caja_unique_indexes
+    ensure_sqlite_caja_unique_indexes(db)
 
     _execute_and_commit(db, SQLITE_POST_STATEMENTS)
 
@@ -533,83 +477,8 @@ def _apply_mysql_migrations(db):
             continue
         _execute_and_commit(db, (ddl,))
 
-    if _mysql_table_exists(db, 'cola_cobro'):
-        if not _mysql_column_exists(db, 'cola_cobro', 'activo_para_unico'):
-            _execute_and_commit(
-                db,
-                (
-                    """
-                    ALTER TABLE cola_cobro
-                    ADD COLUMN activo_para_unico TINYINT
-                    GENERATED ALWAYS AS (
-                        CASE WHEN estado IN ('pendiente', 'en_proceso') THEN 1 ELSE NULL END
-                    ) STORED
-                    """,
-                ),
-            )
-        if not _mysql_index_exists(db, 'cola_cobro', 'uq_cola_cobro_origen_activo'):
-            duplicated_active = db.session.execute(
-                text(
-                    """
-                    SELECT COUNT(*) FROM (
-                        SELECT tipo_origen, id_origen, COUNT(*) AS total
-                        FROM cola_cobro
-                        WHERE estado IN ('pendiente', 'en_proceso')
-                        GROUP BY tipo_origen, id_origen
-                        HAVING COUNT(*) > 1
-                    ) dup
-                    """
-                )
-            ).scalar()
-            if int(duplicated_active or 0) == 0:
-                _execute_and_commit(
-                    db,
-                    (
-                        """
-                        CREATE UNIQUE INDEX uq_cola_cobro_origen_activo
-                        ON cola_cobro(tipo_origen, id_origen, activo_para_unico)
-                        """,
-                    ),
-                )
-
-    if _mysql_table_exists(db, 'sesiones_caja'):
-        if not _mysql_column_exists(db, 'sesiones_caja', 'activo_para_unico'):
-            _execute_and_commit(
-                db,
-                (
-                    """
-                    ALTER TABLE sesiones_caja
-                    ADD COLUMN activo_para_unico TINYINT
-                    GENERATED ALWAYS AS (
-                        CASE WHEN estado = 'abierta' THEN 1 ELSE NULL END
-                    ) STORED
-                    """,
-                ),
-            )
-        if not _mysql_index_exists(db, 'sesiones_caja', 'uq_sesiones_caja_caja_abierta'):
-            duplicated_open = db.session.execute(
-                text(
-                    """
-                    SELECT COUNT(*) FROM (
-                        SELECT id_caja, COUNT(*) AS total
-                        FROM sesiones_caja
-                        WHERE estado = 'abierta'
-                        GROUP BY id_caja
-                        HAVING COUNT(*) > 1
-                    ) dup
-                    """
-                )
-            ).scalar()
-            if int(duplicated_open or 0) == 0:
-                _execute_and_commit(
-                    db,
-                    (
-                        """
-                        CREATE UNIQUE INDEX uq_sesiones_caja_caja_abierta
-                        ON sesiones_caja(id_caja, activo_para_unico)
-                        """,
-                    ),
-                )
+    from app.bootstrap.caja_unique_schema import ensure_mysql_caja_unique_indexes
+    ensure_mysql_caja_unique_indexes(db, _mysql_table_exists, _mysql_column_exists, _mysql_index_exists)
 
 
 def initialize_database(app, db, config_name='default'):

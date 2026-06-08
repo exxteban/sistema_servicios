@@ -9,10 +9,12 @@ from app import db
 
 ORDER_COLUMN_MIGRATIONS = (
     ('codigo_publico', 'VARCHAR(32)'),
+    ('origen_pedido', "VARCHAR(30) NOT NULL DEFAULT 'pos'"),
     ('referencia_entrega', 'VARCHAR(80)'),
     ('nombre_cliente', 'VARCHAR(120)'),
     ('celular_cliente', 'VARCHAR(40)'),
     ('direccion_entrega', 'VARCHAR(240)'),
+    ('cliente_final_id', 'INTEGER'),
     ('ubicacion_entrega_url', 'VARCHAR(500)'),
     ('destino_latitud', 'FLOAT'),
     ('destino_longitud', 'FLOAT'),
@@ -66,16 +68,22 @@ CENTRAL_PRODUCT_COLUMN_MIGRATIONS = (
 
 def ensure_gastronomia_schema():
     from gastronomia.channel_models import GastronomiaProductoPrecioCanal
+    from gastronomia.customer_models import GastronomiaClienteDireccion, GastronomiaClienteFavorito, GastronomiaClienteFinal
     from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaProducto
     from gastronomia.services.channel_price_service import asegurar_precios_productos
 
     GastronomiaProductoPrecioCanal.__table__.create(bind=db.engine, checkfirst=True)
     GastronomiaDeliveryUbicacion.__table__.create(bind=db.engine, checkfirst=True)
+    GastronomiaClienteFinal.__table__.create(bind=db.engine, checkfirst=True)
+    GastronomiaClienteDireccion.__table__.create(bind=db.engine, checkfirst=True)
+    GastronomiaClienteFavorito.__table__.create(bind=db.engine, checkfirst=True)
     dialect = db.engine.dialect.name
     if dialect == 'sqlite':
         _ensure_sqlite_columns()
+        _ensure_sqlite_customer_columns()
     elif dialect == 'mysql':
         _ensure_mysql_columns()
+        _ensure_mysql_customer_columns()
     asegurar_precios_productos(GastronomiaProducto.query.filter_by(activo=True).all())
 
 
@@ -110,6 +118,29 @@ def _ensure_sqlite_columns():
         for column, column_type in ORDER_ITEM_COLUMN_MIGRATIONS:
             if column not in item_columns:
                 db.session.execute(text(f'ALTER TABLE gastronomia_pedido_items ADD COLUMN {column} {column_type}'))
+    db.session.commit()
+
+
+def _ensure_sqlite_customer_columns():
+    if not _sqlite_table_exists('gastronomia_clientes_finales'):
+        return
+    columns = {
+        row[1]
+        for row in db.session.execute(text('PRAGMA table_info(gastronomia_clientes_finales)')).fetchall()
+    }
+    if 'token_publico' not in columns:
+        db.session.execute(text('ALTER TABLE gastronomia_clientes_finales ADD COLUMN token_publico VARCHAR(80)'))
+        db.session.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS ix_gastronomia_clientes_finales_token_publico ON gastronomia_clientes_finales(token_publico)'))
+    db.session.commit()
+
+
+def _ensure_mysql_customer_columns():
+    if not _mysql_table_exists('gastronomia_clientes_finales'):
+        return
+    if not _mysql_column_exists('gastronomia_clientes_finales', 'token_publico'):
+        db.session.execute(text('ALTER TABLE gastronomia_clientes_finales ADD COLUMN token_publico VARCHAR(80) NULL'))
+    if not _mysql_index_exists('gastronomia_clientes_finales', 'ix_gastronomia_clientes_finales_token_publico'):
+        db.session.execute(text('CREATE UNIQUE INDEX ix_gastronomia_clientes_finales_token_publico ON gastronomia_clientes_finales(token_publico)'))
     db.session.commit()
 
 

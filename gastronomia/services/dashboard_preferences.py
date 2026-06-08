@@ -9,6 +9,18 @@ DASHBOARD_CARD_ORDER_PREF_KEY = 'gastronomia_dashboard_cards_order'
 
 _DASHBOARD_CARD_DEFINITIONS = (
     {
+        'id': 'pedidos_tienda',
+        'permission': 'pos',
+        'title': 'Pedidos tienda',
+        'description': 'Pedidos web pendientes de contactar y confirmar.',
+        'alert_description': 'Hay pedidos de tienda esperando confirmacion.',
+        'endpoint': 'gastronomia.pedidos_tienda',
+        'icon': 'fas fa-store',
+        'icon_class': 'text-blue-500',
+        'alert_icon_class': 'text-rose-600 dark:text-rose-300',
+        'hover_class': 'hover:border-blue-300',
+    },
+    {
         'id': 'pos',
         'permission': 'pos',
         'title': 'POS Touch',
@@ -110,9 +122,10 @@ def build_dashboard_cards(
     *,
     contexto_operativo: bool,
     pedidos_pendientes_caja: int = 0,
+    pedidos_pendientes_tienda: int = 0,
 ) -> list[dict]:
     available = [
-        _build_card(definition, contexto_operativo, pedidos_pendientes_caja)
+        _build_card(definition, contexto_operativo, pedidos_pendientes_caja, pedidos_pendientes_tienda)
         for definition in _DASHBOARD_CARD_DEFINITIONS
         if permisos.get(definition['permission'])
     ]
@@ -130,10 +143,12 @@ def set_dashboard_card_order(user: Any, card_ids: list[str] | None, permisos: di
     return order
 
 
-def _build_card(definition: dict, contexto_operativo: bool, pedidos_pendientes_caja: int) -> dict:
+def _build_card(definition: dict, contexto_operativo: bool, pedidos_pendientes_caja: int, pedidos_pendientes_tienda: int) -> dict:
     card = dict(definition)
     card['disabled'] = not contexto_operativo
     card['alert_count'] = int(pedidos_pendientes_caja or 0) if card['id'] == 'caja' else 0
+    if card['id'] == 'pedidos_tienda':
+        card['alert_count'] = int(pedidos_pendientes_tienda or 0)
     if card['alert_count'] > 0:
         card['description'] = card.get('alert_description') or card['description']
         card['icon_class'] = card.get('alert_icon_class') or card['icon_class']

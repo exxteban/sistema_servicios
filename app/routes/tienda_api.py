@@ -1228,6 +1228,8 @@ def admin_guardar_config():
         config.texto_cta_catalogo = clean_text('texto_cta_catalogo') or 'Consultar'
     if 'texto_cta_producto' in data:
         config.texto_cta_producto = clean_text('texto_cta_producto') or 'Comprar por WhatsApp'
+    config.tienda_delivery_activo = parse_bool('tienda_delivery_activo', True)
+    config.tienda_retiro_activo = parse_bool('tienda_retiro_activo', True)
     if 'texto_whatsapp_confianza' in data:
         config.texto_whatsapp_confianza = clean_text('texto_whatsapp_confianza')
     if 'texto_envios' in data:

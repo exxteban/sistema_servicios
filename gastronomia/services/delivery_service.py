@@ -8,11 +8,10 @@ from app.models import Usuario
 from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaRepartidor
 from gastronomia.services.delivery_gps import GPS_PRECISION_MAXIMA_PUBLICABLE_M
 from gastronomia.services.pedido_service import (
-    _coords_from_location_text,
-    _parse_optional_coordinate,
     cambiar_estado_pedido,
     registrar_evento_pedido,
 )
+from gastronomia.services.pedido_validation_utils import coords_from_location_text, parse_optional_coordinate
 
 
 ESTADOS_RUTA = {'listo', 'en_camino'}
@@ -161,10 +160,10 @@ def actualizar_destino_pedido_delivery(cliente_id: int, pedido_id: int, data: di
         raise ValueError('Solo se puede actualizar destino de pedidos delivery activos.')
 
     ubicacion_url = (data.get('ubicacion_entrega_url') or data.get('destino') or '').strip()[:500] or None
-    latitud = _parse_optional_coordinate(data.get('destino_latitud'), -90, 90)
-    longitud = _parse_optional_coordinate(data.get('destino_longitud'), -180, 180)
+    latitud = parse_optional_coordinate(data.get('destino_latitud'), -90, 90)
+    longitud = parse_optional_coordinate(data.get('destino_longitud'), -180, 180)
     if ubicacion_url and (latitud is None or longitud is None):
-        parsed_lat, parsed_lng = _coords_from_location_text(ubicacion_url)
+        parsed_lat, parsed_lng = coords_from_location_text(ubicacion_url)
         latitud = latitud if latitud is not None else parsed_lat
         longitud = longitud if longitud is not None else parsed_lng
 

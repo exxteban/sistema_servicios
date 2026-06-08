@@ -79,6 +79,8 @@ class TiendaConfig(db.Model):
     mostrar_youtube = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
     texto_cta_catalogo = db.Column(db.String(120), nullable=False, default='Consultar', server_default='Consultar')
     texto_cta_producto = db.Column(db.String(120), nullable=False, default='Comprar por WhatsApp', server_default='Comprar por WhatsApp')
+    tienda_delivery_activo = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
+    tienda_retiro_activo = db.Column(db.Boolean, nullable=False, default=True, server_default='1')
     mostrar_whatsapp_confianza = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
     texto_whatsapp_confianza = db.Column(db.String(255), nullable=True)
     mostrar_envios = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
@@ -237,6 +239,8 @@ class TiendaConfig(db.Model):
             'mostrar_youtube': self.mostrar_youtube,
             'texto_cta_catalogo': self.texto_cta_catalogo or 'Consultar',
             'texto_cta_producto': self.texto_cta_producto or 'Comprar por WhatsApp',
+            'tienda_delivery_activo': bool(self.tienda_delivery_activo),
+            'tienda_retiro_activo': bool(self.tienda_retiro_activo),
             'mostrar_whatsapp_confianza': self.mostrar_whatsapp_confianza,
             'texto_whatsapp_confianza': self.texto_whatsapp_confianza,
             'mostrar_envios': self.mostrar_envios,

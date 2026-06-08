@@ -14,6 +14,11 @@ from gastronomia.services.pedido_service import (
     obtener_pedido,
     serializar_pedidos,
 )
+from gastronomia.services.tienda_pedido_service import (
+    confirmar_pedido_tienda,
+    listar_pedidos_tienda,
+    serializar_pedidos_tienda,
+)
 from gastronomia.services.venta_integration_service import crear_cola_cobro_central_desde_pedido
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
@@ -107,6 +112,32 @@ def enviar_cocina(pedido_id):
         return error
     try:
         pedido = enviar_pedido_cocina(cliente_id, pedido_id)
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'pedido': _pedido_data(pedido)})
+
+
+@gastronomia_pedidos_api_bp.route('/tienda/pedidos', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_POS, PERMISO_CAJA)
+def pedidos_tienda_listar():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    solo_pendientes = (request.args.get('pendientes', '1') or '1').strip() != '0'
+    pedidos = listar_pedidos_tienda(cliente_id, solo_pendientes=solo_pendientes)
+    return jsonify({'ok': True, 'pedidos': serializar_pedidos_tienda(pedidos)})
+
+
+@gastronomia_pedidos_api_bp.route('/tienda/pedidos/<int:pedido_id>/confirmar', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_POS, PERMISO_CAJA)
+def pedidos_tienda_confirmar(pedido_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        pedido = confirmar_pedido_tienda(cliente_id, pedido_id)
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'pedido': _pedido_data(pedido)})

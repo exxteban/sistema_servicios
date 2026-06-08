@@ -16,6 +16,7 @@ from gastronomia.services.permisos import (
     PERMISO_SALON,
     tiene_permiso_gastronomia,
 )
+from gastronomia.services.tienda_pedido_service import contar_pedidos_tienda_pendientes
 
 
 gastronomia_bp = Blueprint(
@@ -45,11 +46,13 @@ def dashboard():
         'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
     }
     pedidos_pendientes_caja = contar_pedidos_caja(cliente_id) if cliente_id and permisos['caja'] else 0
+    pedidos_pendientes_tienda = contar_pedidos_tienda_pendientes(cliente_id) if cliente_id and permisos['pos'] else 0
     dashboard_cards = build_dashboard_cards(
         current_user,
         permisos,
         contexto_operativo=bool(cliente_id),
         pedidos_pendientes_caja=pedidos_pendientes_caja,
+        pedidos_pendientes_tienda=pedidos_pendientes_tienda,
     )
 
     return render_template(
@@ -60,4 +63,5 @@ def dashboard():
         permisos=permisos,
         dashboard_cards=dashboard_cards,
         pedidos_pendientes_caja=pedidos_pendientes_caja,
+        pedidos_pendientes_tienda=pedidos_pendientes_tienda,
     )

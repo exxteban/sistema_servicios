@@ -66,7 +66,8 @@ export default function CatalogoPage() {
     increment: incrementQuickOrder,
     decrement: decrementQuickOrder,
     clearCart: clearQuickOrder,
-    getQuantity: getQuickOrderQuantity
+    getQuantity: getQuickOrderQuantity,
+    replaceWithItems: replaceQuickOrderItems
   } = useQuickOrderCart(quickOrderEnabled ? slug : '', quickOrderProducts)
   const skeletons = useMemo(() => Array.from({ length: 8 }), [])
   const ctaCatalogo = config?.texto_cta_catalogo || 'Consultar'
@@ -255,6 +256,8 @@ export default function CatalogoPage() {
     ),
     quickOrder: quickOrderEnabled ? (
       <GastronomiaOrderPanel
+        slug={slug}
+        config={config}
         items={quickOrderItems}
         totalItems={quickOrderCount}
         totalAmount={quickOrderTotal}
@@ -262,6 +265,7 @@ export default function CatalogoPage() {
         onIncrement={incrementQuickOrder}
         onDecrement={decrementQuickOrder}
         onClear={clearQuickOrder}
+        onReplaceItems={replaceQuickOrderItems}
         onWhatsAppClick={() => trackCatalogWhatsAppClick()}
       />
     ) : null,

@@ -247,6 +247,21 @@ export function useQuickOrderCart(slug, productosActuales = []) {
 
   const clearCart = () => setCartMap({})
   const getQuantity = (productId) => Number(cartMap?.[String(productId)]?.quantity || 0)
+  const replaceWithItems = (nextItems = []) => {
+    const nextMap = nextItems.reduce((acc, item) => {
+      const normalizedItem = normalizeCartItem(item, item?.quantity || item?.cantidad, {
+        allowCustomization: Boolean(item?.customized || item?.modifiers?.length),
+        key: item?.key,
+        modifiers: item?.modifiers,
+        unitPrice: item?.precio,
+        basePrice: item?.basePrice,
+        promotion: item?.promotion
+      })
+      if (normalizedItem) acc[normalizedItem.key] = normalizedItem
+      return acc
+    }, {})
+    setCartMap(nextMap)
+  }
 
   return {
     items,
@@ -257,6 +272,7 @@ export function useQuickOrderCart(slug, productosActuales = []) {
     increment,
     decrement,
     clearCart,
-    getQuantity
+    getQuantity,
+    replaceWithItems
   }
 }

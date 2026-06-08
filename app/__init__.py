@@ -382,6 +382,7 @@ def create_app(config_name='default'):
     from app.routes.asistente_ia import asistente_ia_bp
     from app.routes.insights_diarios import insights_diarios_bp
     from app.routes.tienda_api import tienda_api_bp
+    from app.routes.tienda_gastronomia_api import tienda_gastronomia_api_bp
     from app.routes.tienda_promociones_api import tienda_promociones_api_bp
     from app.routes.tienda_bot_api import tienda_bot_api_bp
     from app.routes.tienda_admin import tienda_admin_bp
@@ -440,6 +441,8 @@ def create_app(config_name='default'):
     app.register_blueprint(insights_diarios_bp)
     app.register_blueprint(tienda_api_bp, url_prefix='/api/tienda')
     app.register_blueprint(tienda_api_bp, url_prefix='/tienda/api/tienda', name='tienda_api_prefixed')
+    app.register_blueprint(tienda_gastronomia_api_bp, url_prefix='/api/tienda')
+    app.register_blueprint(tienda_gastronomia_api_bp, url_prefix='/tienda/api/tienda', name='tienda_gastronomia_api_prefixed')
     app.register_blueprint(tienda_promociones_api_bp, url_prefix='/api/tienda')
     app.register_blueprint(tienda_bot_api_bp, url_prefix='/api/tienda')
     app.register_blueprint(tienda_admin_bp)
@@ -474,8 +477,12 @@ def create_app(config_name='default'):
     # Eximir webhook de WhatsApp de CSRF (Meta no envia token CSRF)
     csrf.exempt(whatsapp_bp)
     csrf.exempt(tienda_bot_api_bp)
+    csrf.exempt(tienda_gastronomia_api_bp)
     
     initialize_database(app, db, config_name)
+    from app.bootstrap.tienda_schema import ensure_tienda_config_schema
+    with app.app_context():
+        ensure_tienda_config_schema()
     register_runtime_features(app, db)
 
     return app
