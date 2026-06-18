@@ -6,22 +6,22 @@
 <div class="kds-shell" data-gastro-kds>
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
-    <div class="kds-header mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div class="kds-header mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <p class="text-xs font-black uppercase tracking-[0.22em] text-rose-400">Gastronomia</p>
-            <h1 class="mt-1 text-3xl font-black tracking-tight text-slate-100">Cocina</h1>
+            <h1 class="text-2xl font-black tracking-tight text-slate-100">Cocina</h1>
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="{{ url_for('gastronomia.dashboard') }}"
-               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
+               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-bold">
                 <i class="fas fa-arrow-left"></i>Volver
             </a>
             <a href="{{ url_for('gastronomia.pos') }}"
-               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
+               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-bold">
                 <i class="fas fa-tablet-alt"></i>POS
             </a>
             <a href="{{ url_for('gastronomia.delivery') }}"
-               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
+               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-bold">
                 <i class="fas fa-motorcycle"></i>Delivery
             </a>
         </div>
@@ -29,13 +29,13 @@
 
     <div id="kds-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <section class="kds-toolbar mb-4 rounded-2xl border border-slate-700/60 bg-slate-900/40 p-4">
+    <section class="kds-toolbar mb-3 rounded-xl border border-slate-700/60 bg-slate-900/40 p-3">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
                 <p class="text-xs font-black uppercase tracking-[0.20em] text-sky-300">Avisos de cocina</p>
                 <p class="mt-1 text-sm font-semibold text-slate-400">Configura el sonido para nuevos pedidos y pruebalo desde esta pantalla.</p>
             </div>
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[auto_auto_minmax(180px,220px)_auto] xl:items-center">
+            <div class="kds-settings-grid grid gap-3 md:grid-cols-2">
                 <label class="kds-setting-toggle">
                     <input type="checkbox" id="kds-sound-enabled">
                     <span>Sonidos activos</span>
@@ -52,7 +52,7 @@
                     <span>Volumen <strong id="kds-sound-volume-label">65%</strong></span>
                     <input type="range" id="kds-sound-volume" min="0" max="100" step="5" class="kds-setting-range">
                 </label>
-                <button type="button" id="kds-test-sound" class="kds-nav-button inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
+                <button type="button" id="kds-test-sound" class="kds-nav-button inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-bold">
                     <i class="fas fa-volume-up"></i>Probar sonido
                 </button>
             </div>
@@ -178,7 +178,7 @@
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
     .kds-column-body {
-        max-height: calc(100vh - 18rem);
+        max-height: calc(100vh - 14.5rem);
         overflow-y: auto;
         padding-right: 2px;
     }
@@ -191,6 +191,12 @@
     }
     .kds-toolbar {
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    }
+    @media (min-width: 1280px) {
+        .kds-settings-grid {
+            grid-template-columns: auto minmax(140px, 170px) minmax(170px, 210px) auto;
+            align-items: center;
+        }
     }
     .kds-setting-toggle,
     .kds-setting-field {
