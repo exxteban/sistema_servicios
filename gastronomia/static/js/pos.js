@@ -35,6 +35,8 @@
   let cart = [];
   let activeProduct = null;
   let editingItemKey = null;
+  let nextItemKey = 1;
+  const generarItemKey = () => `nuevo-${nextItemKey++}`;
   let activeOrderId = null;
   let lastOrderId = null;
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
@@ -159,7 +161,7 @@
   const mapOrderItemToCartItem = (item) => {
     const modifiers = item.modificadores || [];
     return {
-      key: item.id_item ? `pedido-item-${item.id_item}` : `${Date.now()}-${Math.random()}`,
+      key: item.id_item ? `pedido-item-${item.id_item}` : generarItemKey(),
       producto_id: item.producto_id,
       canal_precio: item.canal_precio || null,
       nombre: item.nombre_producto,
@@ -289,7 +291,7 @@
       body: JSON.stringify({opciones: selectedOptions, canal_precio: activeProduct.canal_precio || null}),
     });
     const configuredItem = {
-      key: editingItemKey || `${Date.now()}-${Math.random()}`,
+      key: editingItemKey || generarItemKey(),
       producto_id: activeProduct.id_producto,
       canal_precio: activeProduct.canal_precio || null,
       nombre: activeProduct.nombre,
@@ -555,7 +557,9 @@
     }
     const button = event.target.closest('[data-remove]');
     if (!button) return;
-    cart = cart.filter((item) => item.key !== button.dataset.remove);
+    const idx = cart.findIndex((item) => item.key === button.dataset.remove);
+    if (idx === -1) return;
+    cart.splice(idx, 1);
     lastOrderId = null;
     renderCart();
   });
