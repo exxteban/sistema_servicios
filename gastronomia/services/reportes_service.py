@@ -1,7 +1,9 @@
 """Metricas iniciales para reportes de Gastronomia."""
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timedelta
+from io import StringIO
 
 from sqlalchemy import func
 
@@ -32,6 +34,54 @@ def resumen_reportes(cliente_id: int, fecha_desde: str | None = None, fecha_hast
         'pedidos_cancelados': pedidos_cancelados(cliente_id, inicio, fin),
         'ventas_anulables': ventas_anulables(cliente_id, inicio, fin),
     }
+
+
+def generar_csv_reportes(resumen: dict) -> str:
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    periodo = resumen.get('periodo') or {}
+    writer.writerow(['Reporte', 'Gastronomia'])
+    writer.writerow(['Desde', periodo.get('desde') or ''])
+    writer.writerow(['Hasta', periodo.get('hasta') or ''])
+    writer.writerow(['Ventas totales', round(float(resumen.get('ventas_total') or 0), 2)])
+    writer.writerow(['Descuentos', round(float(resumen.get('descuentos_total') or 0), 2)])
+    writer.writerow(['Pedidos cobrados', int(resumen.get('pedidos_cobrados') or 0)])
+    writer.writerow(['Ticket promedio', round(float(resumen.get('ticket_promedio') or 0), 2)])
+    writer.writerow(['Tiempo promedio preparacion (min)', round(float(resumen.get('tiempo_promedio_preparacion_min') or 0), 2)])
+    writer.writerow(['Pedidos cancelados', int(resumen.get('pedidos_cancelados') or 0)])
+    writer.writerow([])
+    writer.writerow(['Productos mas vendidos'])
+    writer.writerow(['Producto', 'Cantidad', 'Total'])
+    for item in resumen.get('productos_mas_vendidos') or []:
+        writer.writerow([item.get('nombre_producto') or '', int(item.get('cantidad') or 0), round(float(item.get('total') or 0), 2)])
+    writer.writerow([])
+    writer.writerow(['Ventas por metodo'])
+    writer.writerow(['Metodo', 'Cantidad', 'Total'])
+    for item in resumen.get('ventas_por_metodo') or []:
+        writer.writerow([item.get('metodo_pago') or '', int(item.get('cantidad') or 0), round(float(item.get('total') or 0), 2)])
+    writer.writerow([])
+    writer.writerow(['Ventas anulables'])
+    writer.writerow(['Pedido', 'Venta', 'Tipo', 'Mesa', 'Referencia', 'Estado', 'Metodo', 'Total', 'Fecha pago'])
+    for item in resumen.get('ventas_anulables') or []:
+        writer.writerow([
+            item.get('codigo_entrega') or f"#{int(item.get('id_pedido') or 0)}",
+            int(item.get('id_venta') or 0),
+            item.get('tipo_pedido') or '',
+            item.get('mesa') or '',
+            item.get('referencia_entrega') or '',
+            item.get('estado_pedido') or '',
+            item.get('metodo_pago') or '',
+            round(float(item.get('total_cobrado') or 0), 2),
+            item.get('fecha_pago') or '',
+        ])
+    return buffer.getvalue()
+
+
+def nombre_archivo_reportes_csv(resumen: dict) -> str:
+    periodo = resumen.get('periodo') or {}
+    desde = str(periodo.get('desde') or 'sin_desde')
+    hasta = str(periodo.get('hasta') or 'sin_hasta')
+    return f'gastronomia_reportes_{desde}_a_{hasta}.csv'
 
 
 def ventas_por_metodo(cliente_id: int, inicio: datetime, fin: datetime) -> list[dict]:

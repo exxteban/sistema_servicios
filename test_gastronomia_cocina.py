@@ -296,3 +296,36 @@ def test_cocina_no_muestra_eventos_de_otro_cliente():
     pedidos_dos = client_dos.get('/api/gastronomia/cocina/pedidos').get_json()['pedidos']
     assert [pedido['id_pedido'] for pedido in pedidos_dos] == [pedido_dos_id]
     assert pedido_uno_id not in {pedido['id_pedido'] for pedido in pedidos_dos}
+
+
+def test_cocina_guarda_preferencias_de_sonido_por_usuario():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_producto(app, 'Resto Sonido Cocina', 'resto_sonido_cocina')
+    _loguear(client, app, 'resto_sonido_cocina')
+
+    page = client.get('/gastronomia/cocina')
+    csrf = _csrf(page.get_data(as_text=True))
+
+    inicial = client.get('/api/gastronomia/cocina/preferencias-sonido')
+    assert inicial.status_code == 200
+    assert inicial.get_json()['preferencias'] == {'enabled': True, 'profile': 'clasico', 'volume': 65}
+
+    guardar = client.post(
+        '/api/gastronomia/cocina/preferencias-sonido',
+        json={'enabled': False, 'profile': 'urgente', 'volume': 30},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert guardar.status_code == 200
+    assert guardar.get_json()['preferencias'] == {'enabled': False, 'profile': 'urgente', 'volume': 30}
+
+    refresco = client.get('/api/gastronomia/cocina/preferencias-sonido')
+    assert refresco.status_code == 200
+    assert refresco.get_json()['preferencias'] == {'enabled': False, 'profile': 'urgente', 'volume': 30}
+
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username='resto_sonido_cocina').first()
+        assert usuario is not None
+        assert usuario.get_preferencia('gastronomia_cocina_sound_enabled') == '0'
+        assert usuario.get_preferencia('gastronomia_cocina_sound_profile') == 'urgente'
+        assert usuario.get_preferencia('gastronomia_cocina_sound_volume') == '30'

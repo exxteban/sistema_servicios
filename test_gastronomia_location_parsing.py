@@ -1,4 +1,4 @@
-from gastronomia.services.pedido_service import _coords_from_location_text
+from gastronomia.services.pedido_validation_utils import coords_from_location_text
 
 
 def test_google_place_url_prefers_exact_place_coords_over_viewport_center():
@@ -8,10 +8,10 @@ def test_google_place_url_prefers_exact_place_coords_over_viewport_center():
         '0x23188e8785efa023!8m2!3d-25.3641298!4d-57.5308095!16s%2Fg%2F11vdn9v6jb'
     )
 
-    assert _coords_from_location_text(url) == (-25.3641298, -57.5308095)
+    assert coords_from_location_text(url) == (-25.3641298, -57.5308095)
 
 
 def test_google_place_url_without_exact_coords_uses_viewport_center():
     url = 'https://www.google.com/maps/place/test/@-25.3001,-57.6359,17z'
 
-    assert _coords_from_location_text(url) == (-25.3001, -57.6359)
+    assert coords_from_location_text(url) == (-25.3001, -57.6359)

@@ -29,7 +29,37 @@
 
     <div id="kds-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <div class="grid gap-4 xl:grid-cols-4" id="kds-board"></div>
+    <section class="kds-toolbar mb-4 rounded-2xl border border-slate-700/60 bg-slate-900/40 p-4">
+        <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+                <p class="text-xs font-black uppercase tracking-[0.20em] text-sky-300">Avisos de cocina</p>
+                <p class="mt-1 text-sm font-semibold text-slate-400">Configura el sonido para nuevos pedidos y pruebalo desde esta pantalla.</p>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[auto_auto_minmax(180px,220px)_auto] xl:items-center">
+                <label class="kds-setting-toggle">
+                    <input type="checkbox" id="kds-sound-enabled">
+                    <span>Sonidos activos</span>
+                </label>
+                <label class="kds-setting-field">
+                    <span>Perfil</span>
+                    <select id="kds-sound-profile" class="kds-setting-input">
+                        <option value="clasico">Clasico</option>
+                        <option value="suave">Suave</option>
+                        <option value="urgente">Urgente</option>
+                    </select>
+                </label>
+                <label class="kds-setting-field">
+                    <span>Volumen <strong id="kds-sound-volume-label">65%</strong></span>
+                    <input type="range" id="kds-sound-volume" min="0" max="100" step="5" class="kds-setting-range">
+                </label>
+                <button type="button" id="kds-test-sound" class="kds-nav-button inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold">
+                    <i class="fas fa-volume-up"></i>Probar sonido
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <div class="grid gap-4 md:grid-cols-2 2xl:grid-cols-4" id="kds-board"></div>
 </div>
 {% endblock %}
 
@@ -159,6 +189,52 @@
         border-radius: 999px;
         background: rgba(100, 116, 139, 0.40);
     }
+    .kds-toolbar {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    }
+    .kds-setting-toggle,
+    .kds-setting-field {
+        display: grid;
+        gap: 0.45rem;
+        color: #0f172a;
+    }
+    .kds-setting-toggle {
+        grid-auto-flow: column;
+        align-items: center;
+        justify-content: start;
+        gap: 0.6rem;
+        font-size: 0.88rem;
+        font-weight: 800;
+    }
+    .kds-setting-toggle input {
+        width: 1rem;
+        height: 1rem;
+        accent-color: #0ea5e9;
+    }
+    .kds-setting-field span {
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #475569;
+    }
+    .kds-setting-input,
+    .kds-setting-range {
+        width: 100%;
+    }
+    .kds-setting-input {
+        border: 1px solid rgba(15, 23, 42, 0.14);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.92);
+        color: #0f172a;
+        min-height: 2.65rem;
+        padding: 0.55rem 0.75rem;
+        font-size: 0.92rem;
+        font-weight: 700;
+    }
+    .kds-setting-range {
+        accent-color: #0ea5e9;
+    }
     .kds-shell .text-slate-100,
     .kds-shell .text-slate-200,
     .kds-shell .text-slate-300 {
@@ -229,6 +305,18 @@
     .dark .kds-shell .bg-slate-800 {
         background: #1e293b;
     }
+    .dark .kds-setting-toggle,
+    .dark .kds-setting-field {
+        color: #e5edf8;
+    }
+    .dark .kds-setting-field span {
+        color: #94a3b8;
+    }
+    .dark .kds-setting-input {
+        border-color: rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.72);
+        color: #e5edf8;
+    }
     .kds-warning-note {
         position: relative;
         border: 2px solid rgba(239, 68, 68, 0.82) !important;
@@ -263,6 +351,9 @@
             min-height: calc(100vh - 7rem);
             padding: 14px;
         }
+        .kds-toolbar {
+            padding: 14px;
+        }
         .kds-column-body {
             max-height: none;
         }
@@ -280,5 +371,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260602-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260613-1') }}"></script>
 {% endblock %}

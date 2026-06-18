@@ -3,7 +3,7 @@
 {% block title %}Salon Gastronomia{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-7xl" data-gastro-salon
+<div class="salon-shell mx-auto max-w-7xl" data-gastro-salon
      data-puede-cobrar="{{ 1 if puede_cobrar else 0 }}"
      data-puede-editar-pedido="{{ 1 if puede_editar_pedido else 0 }}">
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
@@ -32,7 +32,7 @@
 
     <div id="salon-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <div class="grid gap-5 xl:grid-cols-[1fr_340px]">
+    <div class="grid gap-5 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_340px]">
         <section>
             <div id="salon-board" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
         </section>
@@ -102,6 +102,17 @@
         background: rgb(127 29 29 / 0.45);
         border-color: rgb(248 113 113);
         color: rgb(254 202 202);
+    }
+    @media (min-width: 768px) and (max-width: 1279px) {
+        .salon-shell {
+            max-width: min(100%, calc(100vw - 1rem));
+        }
+        .salon-card {
+            padding: 16px;
+        }
+        .mesa-boton {
+            min-height: 64px;
+        }
     }
 </style>
 {% endblock %}

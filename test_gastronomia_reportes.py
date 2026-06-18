@@ -215,6 +215,35 @@ def test_reportes_page_carga_para_cliente_gastronomico():
     assert 'Reportes' in html
     assert 'js/reportes.js' in html
     assert 'Ventas cobradas para anular' in html
+    assert 'Exportar CSV' in html
+
+
+def test_reportes_exporta_csv_simple_del_periodo():
+    app = create_app('testing')
+    client = app.test_client()
+    _cliente_id, pizza_id, bebida_id = _crear_productos(app, 'Resto Reporte CSV', 'resto_reporte_csv')
+    _loguear(client, app, 'resto_reporte_csv')
+    _abrir_caja(app, 'resto_reporte_csv')
+    csrf = _csrf(client.get('/gastronomia/reportes').get_data(as_text=True))
+    _pedido_cobrado(
+        client,
+        csrf,
+        [{'producto_id': pizza_id, 'cantidad': 1}, {'producto_id': bebida_id, 'cantidad': 2}],
+        metodo_pago='qr',
+    )
+
+    fecha = date.today().isoformat()
+    response = client.get('/api/gastronomia/reportes/exportar.csv', query_string={'desde': fecha, 'hasta': fecha})
+    assert response.status_code == 200
+    assert 'text/csv' in response.headers.get('Content-Type', '')
+    assert f'gastronomia_reportes_{fecha}_a_{fecha}.csv' in response.headers.get('Content-Disposition', '')
+    content = response.get_data(as_text=True)
+    assert 'Reporte,Gastronomia' in content
+    assert 'Productos mas vendidos' in content
+    assert 'Ventas por metodo' in content
+    assert 'Ventas anulables' in content
+    assert 'Pizza' in content
+    assert 'qr' in content
 
 
 def test_inteligencia_gastronomia_calcula_metricas_accionables():

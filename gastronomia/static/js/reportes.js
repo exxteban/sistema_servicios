@@ -6,6 +6,7 @@
   const voidableSales = document.getElementById('voidable-sales');
   const fromInput = document.getElementById('report-from');
   const toInput = document.getElementById('report-to');
+  const exportLink = document.getElementById('export-report');
   const csrf = document.getElementById('csrf-token')?.value || '';
 
   const today = new Date().toISOString().slice(0, 10);
@@ -29,10 +30,18 @@
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
+  const exportUrl = () => {
+    const params = new URLSearchParams({desde: fromInput.value, hasta: toInput.value});
+    return `/api/gastronomia/reportes/exportar.csv?${params.toString()}`;
+  };
+  const syncExportLink = () => {
+    if (exportLink) exportLink.href = exportUrl();
+  };
 
   const loadReport = async () => {
     const params = new URLSearchParams({desde: fromInput.value, hasta: toInput.value});
     const data = await apiJson(`/api/gastronomia/reportes/resumen?${params.toString()}`);
+    syncExportLink();
     render(data.resumen || {});
   };
   const render = (summary) => {
@@ -136,11 +145,14 @@
   document.getElementById('load-report')?.addEventListener('click', () => {
     loadReport().catch((error) => showAlert(error.message, false));
   });
+  fromInput?.addEventListener('change', syncExportLink);
+  toInput?.addEventListener('change', syncExportLink);
   voidableSales?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-void-sale]');
     if (!button) return;
     voidSale(Number(button.dataset.voidSale), Number(button.dataset.ventaId))
       .catch((error) => showAlert(error.message, false));
   });
+  syncExportLink();
   loadReport().catch((error) => showAlert(error.message, false));
 }());

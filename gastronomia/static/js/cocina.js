@@ -4,6 +4,11 @@
   const csrf = document.getElementById('csrf-token')?.value || '';
   const board = document.getElementById('kds-board');
   const alertBox = document.getElementById('kds-alert');
+  const soundEnabledInput = document.getElementById('kds-sound-enabled');
+  const soundProfileInput = document.getElementById('kds-sound-profile');
+  const soundVolumeInput = document.getElementById('kds-sound-volume');
+  const soundVolumeLabel = document.getElementById('kds-sound-volume-label');
+  const testSoundButton = document.getElementById('kds-test-sound');
   if (!root || !board || !alertBox) return;
 
   let orders = [];
@@ -12,8 +17,10 @@
   let tickTimer = null;
   let lastPaintedMinutes = new Map();
   let destroyed = false;
+  let audioContext = null;
   const activeControllers = new Set();
   const pendingOrders = new Set();
+  let soundSettings = {enabled: true, profile: 'clasico', volume: 65};
   const kitchenStates = new Set(['enviado_cocina', 'preparando', 'listo', 'en_camino']);
   const nextStateByAction = {tomar: 'preparando', listo: 'listo', salir: 'en_camino', entregar: 'entregado'};
   const columns = [
@@ -138,6 +145,68 @@
       </p>
     `;
   };
+  const syncSoundControls = () => {
+    if (soundEnabledInput) soundEnabledInput.checked = Boolean(soundSettings.enabled);
+    if (soundProfileInput) soundProfileInput.value = soundSettings.profile || 'clasico';
+    if (soundVolumeInput) soundVolumeInput.value = Number(soundSettings.volume || 0);
+    if (soundVolumeLabel) soundVolumeLabel.textContent = `${Number(soundSettings.volume || 0)}%`;
+  };
+  const loadSoundSettings = async () => {
+    const data = await apiJson('/api/gastronomia/cocina/preferencias-sonido');
+    soundSettings = {...soundSettings, ...(data.preferencias || {})};
+    syncSoundControls();
+  };
+  const saveSoundSettings = async (partial = {}) => {
+    soundSettings = {
+      ...soundSettings,
+      ...partial,
+      enabled: Boolean(partial.enabled ?? soundEnabledInput?.checked ?? soundSettings.enabled),
+      profile: partial.profile || soundProfileInput?.value || soundSettings.profile,
+      volume: Number(partial.volume ?? soundVolumeInput?.value ?? soundSettings.volume),
+    };
+    syncSoundControls();
+    const data = await apiJson('/api/gastronomia/cocina/preferencias-sonido', {
+      method: 'POST',
+      body: JSON.stringify(soundSettings),
+    });
+    soundSettings = {...soundSettings, ...(data.preferencias || {})};
+    syncSoundControls();
+  };
+  const getAudioContext = () => {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!audioContext) audioContext = new Ctx();
+    if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+    return audioContext;
+  };
+  const beep = (context, when, frequency, duration, gainValue) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, gainValue), when + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(when);
+    oscillator.stop(when + duration + 0.02);
+  };
+  const profileSequence = (profile) => {
+    if (profile === 'suave') return [[0, 740, 0.14], [0.18, 880, 0.18]];
+    if (profile === 'urgente') return [[0, 830, 0.12], [0.15, 830, 0.12], [0.3, 1100, 0.22]];
+    return [[0, 740, 0.14], [0.17, 988, 0.18], [0.39, 740, 0.14]];
+  };
+  const playKitchenSound = async () => {
+    if (!soundSettings.enabled) return;
+    const context = getAudioContext();
+    if (!context) return;
+    const gainValue = Math.max(0.0001, Math.min(0.35, Number(soundSettings.volume || 0) / 260));
+    const startAt = context.currentTime + 0.01;
+    profileSequence(soundSettings.profile).forEach(([offset, frequency, duration]) => {
+      beep(context, startAt + offset, frequency, duration, gainValue);
+    });
+  };
 
   const loadBoard = async () => {
     const data = await apiJson('/api/gastronomia/cocina/pedidos');
@@ -160,6 +229,11 @@
     }
   };
   const applyOrderEvents = (events) => {
+    const newIncomingOrders = events.filter((event) => {
+      const order = event?.payload?.pedido;
+      if (!order?.id_pedido || order.estado !== 'enviado_cocina') return false;
+      return !orders.some((item) => Number(item.id_pedido) === Number(order.id_pedido));
+    }).length;
     let changed = false;
     events.forEach((event) => {
       const order = event?.payload?.pedido;
@@ -169,6 +243,7 @@
     if (!changed) return;
     sortOrders();
     render(orders);
+    if (newIncomingOrders > 0) playKitchenSound().catch(() => {});
   };
   const applyOrderSnapshot = (order) => {
     const orderId = Number(order.id_pedido);
@@ -411,13 +486,40 @@
     clearInterval(pollTimer);
     clearInterval(tickTimer);
     board.removeEventListener('click', handleBoardClick);
+    soundEnabledInput?.removeEventListener('change', handleSoundEnabledChange);
+    soundProfileInput?.removeEventListener('change', handleSoundProfileChange);
+    soundVolumeInput?.removeEventListener('input', handleSoundVolumeInput);
+    soundVolumeInput?.removeEventListener('change', handleSoundVolumeChange);
+    testSoundButton?.removeEventListener('click', handleTestSoundClick);
     activeControllers.forEach((controller) => controller.abort());
     activeControllers.clear();
     if (window.__gastroKdsCleanup === cleanup) window.__gastroKdsCleanup = null;
   };
+  const handleSoundEnabledChange = () => {
+    saveSoundSettings({enabled: Boolean(soundEnabledInput?.checked)}).catch((error) => showAlert(error.message, false));
+  };
+  const handleSoundProfileChange = () => {
+    saveSoundSettings({profile: soundProfileInput?.value || 'clasico'}).catch((error) => showAlert(error.message, false));
+  };
+  const handleSoundVolumeInput = () => {
+    soundSettings.volume = Number(soundVolumeInput?.value || 0);
+    syncSoundControls();
+  };
+  const handleSoundVolumeChange = () => {
+    saveSoundSettings({volume: Number(soundVolumeInput?.value || 0)}).catch((error) => showAlert(error.message, false));
+  };
+  const handleTestSoundClick = () => {
+    playKitchenSound().catch((error) => showAlert(error.message, false));
+  };
 
   window.__gastroKdsCleanup = cleanup;
   board.addEventListener('click', handleBoardClick);
+  soundEnabledInput?.addEventListener('change', handleSoundEnabledChange);
+  soundProfileInput?.addEventListener('change', handleSoundProfileChange);
+  soundVolumeInput?.addEventListener('input', handleSoundVolumeInput);
+  soundVolumeInput?.addEventListener('change', handleSoundVolumeChange);
+  testSoundButton?.addEventListener('click', handleTestSoundClick);
+  loadSoundSettings().catch((error) => showAlert(error.message, false));
   loadBoard()
     .catch((error) => {
       if (error.name === 'AbortError' || destroyed) return;

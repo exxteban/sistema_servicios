@@ -3,7 +3,7 @@
 {% block title %}Reportes Gastronomia{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-7xl" data-gastro-reportes>
+<div class="reportes-shell mx-auto max-w-7xl" data-gastro-reportes>
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
     <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -23,7 +23,7 @@
     </div>
 
     <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div class="grid gap-3 sm:grid-cols-[180px_180px_1fr] sm:items-end">
+        <div class="grid gap-3 lg:grid-cols-[180px_180px_auto_auto] lg:items-end">
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
                 Desde
                 <input id="report-from" type="date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
@@ -35,6 +35,9 @@
             <button type="button" id="load-report" class="rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white hover:bg-violet-700 sm:w-36">
                 Actualizar
             </button>
+            <a id="export-report" href="#" class="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
+                <i class="fas fa-file-csv mr-2"></i>Exportar CSV
+            </a>
         </div>
     </div>
 
@@ -66,6 +69,16 @@
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    @media (min-width: 768px) and (max-width: 1279px) {
+        .reportes-shell {
+            max-width: min(100%, calc(100vw - 1rem));
+        }
+    }
+</style>
+{% endblock %}
+
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/reportes.js') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20260613-1') }}"></script>
 {% endblock %}

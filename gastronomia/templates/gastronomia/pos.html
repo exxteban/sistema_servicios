@@ -242,6 +242,28 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos.css', v='20260604-1') }}">
+<style>
+    @media (min-width: 768px) and (max-width: 1279px) {
+        .pos-shell {
+            max-width: min(100%, calc(100vw - 0.75rem));
+        }
+        .pos-touch-layout {
+            grid-template-columns: minmax(0, 1fr) minmax(290px, 340px);
+        }
+        .pos-category-panel,
+        .pos-product-panel {
+            grid-column: 1 / -1;
+        }
+        .pos-order-panel,
+        .pos-checkout-panel {
+            grid-column: auto;
+        }
+        #order-type-buttons,
+        #table-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}

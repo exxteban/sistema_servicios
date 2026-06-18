@@ -2,7 +2,9 @@
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
+from app import db
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.cocina_preferences import get_cocina_sound_settings, save_cocina_sound_settings
 from gastronomia.services.cocina_presenter import serializar_eventos_cocina, serializar_pedidos_cocina
 from gastronomia.services.delivery_privacy import ocultar_localizacion_eventos, ocultar_localizacion_pedidos
 from gastronomia.services.pedido_service import (
@@ -53,6 +55,28 @@ def cocina_eventos():
         'eventos': ocultar_localizacion_eventos(serializar_eventos_cocina(eventos), current_user),
         'ultimo_evento_id': obtener_ultimo_evento_id(cliente_id),
     })
+
+
+@gastronomia_cocina_api_bp.route('/cocina/preferencias-sonido', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_COCINA)
+def cocina_preferencias_sonido():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    return jsonify({'ok': True, 'preferencias': get_cocina_sound_settings(current_user), 'cliente_id': cliente_id})
+
+
+@gastronomia_cocina_api_bp.route('/cocina/preferencias-sonido', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_COCINA)
+def guardar_cocina_preferencias_sonido():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    preferencias = save_cocina_sound_settings(current_user, request.get_json(silent=True) or request.form.to_dict())
+    db.session.commit()
+    return jsonify({'ok': True, 'preferencias': preferencias, 'cliente_id': cliente_id})
 
 
 @gastronomia_cocina_api_bp.route('/cocina/pedidos/<int:pedido_id>/tomar', methods=['POST'])

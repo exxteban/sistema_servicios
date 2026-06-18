@@ -1,5 +1,5 @@
 """API de reportes para Gastronomia."""
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, make_response, request
 from flask_login import current_user, login_required
 
 from app.utils.permisos import validar_autorizacion
@@ -7,7 +7,7 @@ from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.anulacion_service import anular_venta_gastronomica
 from gastronomia.services.delivery_privacy import ocultar_localizacion_pedido
 from gastronomia.services.permisos import PERMISO_CAJA, PERMISO_REPORTES, requiere_permiso_gastronomia
-from gastronomia.services.reportes_service import resumen_reportes
+from gastronomia.services.reportes_service import generar_csv_reportes, nombre_archivo_reportes_csv, resumen_reportes
 
 
 gastronomia_reportes_api_bp = Blueprint('gastronomia_reportes_api', __name__)
@@ -33,6 +33,24 @@ def reportes_resumen():
         fecha_hasta=request.args.get('hasta'),
     )
     return jsonify({'ok': True, 'resumen': data})
+
+
+@gastronomia_reportes_api_bp.route('/reportes/exportar.csv', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_REPORTES)
+def reportes_exportar_csv():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    data = resumen_reportes(
+        cliente_id,
+        fecha_desde=request.args.get('desde'),
+        fecha_hasta=request.args.get('hasta'),
+    )
+    response = make_response(('\ufeff' + generar_csv_reportes(data)).encode('utf-8'))
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename="{nombre_archivo_reportes_csv(data)}"'
+    return response
 
 
 @gastronomia_reportes_api_bp.route('/reportes/pedidos/<int:pedido_id>/anular-venta', methods=['POST'])
