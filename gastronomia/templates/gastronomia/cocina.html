@@ -6,7 +6,7 @@
 <div class="kds-shell" data-gastro-kds>
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
-    <div class="kds-header mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div class="kds-header mb-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <p class="text-xs font-black uppercase tracking-[0.22em] text-rose-400">Gastronomia</p>
             <h1 class="text-2xl font-black tracking-tight text-slate-100">Cocina</h1>
@@ -29,9 +29,9 @@
 
     <div id="kds-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <section class="kds-toolbar mb-3 rounded-xl border border-slate-700/60 bg-slate-900/40 p-3">
+    <section class="kds-toolbar mb-2 rounded-xl border border-slate-700/60 bg-slate-900/40 p-2">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div>
+            <div class="kds-toolbar-copy">
                 <p class="text-xs font-black uppercase tracking-[0.20em] text-sky-300">Avisos de cocina</p>
                 <p class="mt-1 text-sm font-semibold text-slate-400">Configura el sonido para nuevos pedidos y pruebalo desde esta pantalla.</p>
             </div>
@@ -67,60 +67,46 @@
 <style>
     .kds-shell {
         min-height: calc(100vh - 8.5rem);
-        border-radius: 18px;
-        background:
-            radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.18), transparent 30%),
-            radial-gradient(circle at 88% 8%, rgba(16, 185, 129, 0.14), transparent 28%),
-            linear-gradient(135deg, #f8fbff 0%, #eef5ff 48%, #f8fafc 100%);
+        border-radius: 16px;
+        background: #e2e8f0;
         color: #0f172a;
-        padding: 20px;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 24px 80px rgba(15, 23, 42, 0.10);
+        padding: 16px;
     }
     .dark .kds-shell {
-        background:
-            radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.14), transparent 30%),
-            radial-gradient(circle at 88% 8%, rgba(16, 185, 129, 0.10), transparent 28%),
-            linear-gradient(135deg, #07111f 0%, #0f172a 48%, #07111f 100%);
-        color: #e5edf8;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 80px rgba(2, 6, 23, 0.24);
+        background: #070b12;
+        color: #f1f5f9;
     }
     .kds-header {
         position: relative;
         z-index: 1;
     }
     .kds-nav-button {
-        border: 1px solid rgba(15, 23, 42, 0.12);
-        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(15, 23, 42, 0.14);
+        background: #ffffff;
         color: #0f172a;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.80), 0 10px 24px rgba(15, 23, 42, 0.08);
-        transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+        transition: border-color 160ms ease, background 160ms ease;
     }
     .kds-nav-button:hover {
-        border-color: rgba(37, 99, 235, 0.28);
-        background: rgba(255, 255, 255, 0.96);
-        transform: translateY(-1px);
+        border-color: rgba(37, 99, 235, 0.32);
+        background: #f1f5f9;
     }
     .dark .kds-nav-button {
-        border-color: rgba(148, 163, 184, 0.20);
-        background: rgba(15, 23, 42, 0.62);
+        border-color: rgba(148, 163, 184, 0.22);
+        background: #16202f;
         color: #dbe7f7;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        box-shadow: none;
     }
     .dark .kds-nav-button:hover {
         border-color: rgba(148, 163, 184, 0.38);
         background: rgba(30, 41, 59, 0.72);
     }
     .kds-card {
-        border: 1px solid rgba(15, 23, 42, 0.10);
-        border-radius: 14px;
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.94));
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-left-width: 6px;
+        border-radius: 12px;
+        background: #ffffff;
         padding: 14px;
-        box-shadow: 0 14px 36px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.75);
-        transition: border-color 160ms ease, transform 160ms ease;
-    }
-    .kds-card:hover {
-        border-color: rgba(37, 99, 235, 0.24);
-        transform: translateY(-1px);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
     }
     .kds-order-top {
         display: grid;
@@ -146,39 +132,70 @@
         white-space: nowrap;
         font-size: clamp(0.56rem, 1.8vw, 0.68rem);
     }
+    .kds-items {
+        margin-top: 0.85rem;
+        display: grid;
+        gap: 0.65rem;
+    }
     .kds-item-row {
         display: grid;
-        grid-template-columns: 1.35rem minmax(0, 1fr);
-        gap: 0.45rem;
-        font-size: clamp(0.82rem, 2.35vw, 0.95rem);
-        line-height: 1.12;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.55rem;
+        align-items: center;
+        line-height: 1.15;
+    }
+    .kds-item-name {
+        font-size: clamp(1.05rem, 2.6vw, 1.35rem);
+        font-weight: 800;
     }
     .kds-item-qty {
-        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.95rem;
+        height: 1.95rem;
+        padding: 0 0.45rem;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: clamp(0.95rem, 2.4vw, 1.15rem);
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+    }
+    .dark .kds-item-qty {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+    .kds-item-extra {
+        margin-top: 0.3rem;
+        padding-left: 2.5rem;
+        display: grid;
+        gap: 0.3rem;
+    }
+    .kds-card p {
+        overflow-wrap: break-word;
     }
     .dark .kds-card {
-        border-color: rgba(148, 163, 184, 0.15);
-        background: linear-gradient(145deg, rgba(30, 41, 59, 0.90), rgba(15, 23, 42, 0.92));
-        box-shadow: 0 14px 36px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        border-color: rgba(148, 163, 184, 0.18);
+        background: #1b2738;
+        box-shadow: none;
     }
-    .dark .kds-card:hover {
-        border-color: rgba(148, 163, 184, 0.30);
-    }
+    .kds-card.kds-card--fresh { border-left-color: #10b981; }
+    .kds-card.kds-card--soon { border-left-color: #f59e0b; }
+    .kds-card.kds-card--late { border-left-color: #ef4444; }
     .kds-column {
-        border: 1px solid rgba(15, 23, 42, 0.12);
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.58);
-        padding: 14px;
-        min-height: 18rem;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.80), 0 14px 36px rgba(15, 23, 42, 0.07);
+        border: 1px solid rgba(15, 23, 42, 0.10);
+        border-radius: 14px;
+        background: #f1f5f9;
+        padding: 12px;
+        min-height: 16rem;
     }
     .dark .kds-column {
-        border-color: rgba(148, 163, 184, 0.18);
-        background: rgba(15, 23, 42, 0.58);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        border-color: rgba(148, 163, 184, 0.14);
+        background: #0e1623;
     }
     .kds-column-body {
-        max-height: calc(100vh - 14.5rem);
+        max-height: calc(100vh - 12.5rem);
         overflow-y: auto;
         padding-right: 2px;
     }
@@ -191,12 +208,6 @@
     }
     .kds-toolbar {
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    }
-    @media (min-width: 1280px) {
-        .kds-settings-grid {
-            grid-template-columns: auto minmax(140px, 170px) minmax(170px, 210px) auto;
-            align-items: center;
-        }
     }
     .kds-setting-toggle,
     .kds-setting-field {
@@ -240,6 +251,28 @@
     }
     .kds-setting-range {
         accent-color: #0ea5e9;
+    }
+    @media (min-width: 1280px) {
+        .kds-toolbar-copy p:last-child {
+            display: none;
+        }
+        .kds-settings-grid {
+            grid-template-columns: auto minmax(210px, 240px) minmax(240px, 280px) auto;
+            align-items: center;
+        }
+        .kds-setting-field {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+        }
+        .kds-setting-field span {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+        .kds-setting-input {
+            min-height: 2.3rem;
+            padding: 0.4rem 0.65rem;
+        }
     }
     .kds-shell .text-slate-100,
     .kds-shell .text-slate-200,
@@ -377,5 +410,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260613-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260618-1') }}"></script>
 {% endblock %}

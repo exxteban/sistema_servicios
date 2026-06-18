@@ -129,10 +129,16 @@
   const deliveryCode = (order) => escapeHtml(order.codigo_entrega || `#${String(order.id_pedido || 0).padStart(3, '0')}`);
   const timeDotClass = (order) => {
     const minutes = ageMinutes(order.fecha_envio_cocina || order.fecha_creacion);
-    if (minutes >= 12) return 'bg-red-400 shadow-red-400/40';
-    if (minutes >= 7) return 'bg-orange-400 shadow-orange-400/40';
-    if (minutes >= 4) return 'bg-amber-400 shadow-amber-400/40';
-    return 'bg-emerald-400 shadow-emerald-400/40';
+    if (minutes >= 12) return 'bg-red-500';
+    if (minutes >= 7) return 'bg-orange-500';
+    if (minutes >= 4) return 'bg-amber-500';
+    return 'bg-emerald-500';
+  };
+  const cardUrgencyClass = (order) => {
+    const minutes = ageMinutes(order.fecha_envio_cocina || order.fecha_creacion);
+    if (minutes >= 12) return 'kds-card--late';
+    if (minutes >= 6) return 'kds-card--soon';
+    return 'kds-card--fresh';
   };
   const isExclusionNote = (note) => /\b(sin|no|quitar|sacar|excluir|evitar|alergia|alergico|al[eé]rgico)\b/i.test(String(note || ''));
   const renderNote = (note, normalClasses) => {
@@ -317,13 +323,13 @@
     </section>
   `;
   const renderOrder = (order) => `
-    <article class="kds-card" data-order="${order.id_pedido}">
+    <article class="kds-card ${cardUrgencyClass(order)}" data-order="${order.id_pedido}">
       <div class="kds-order-top">
         <div class="kds-order-code border-r border-slate-700/80 pr-3">
-          <h2 class="text-2xl font-black leading-none text-slate-100">${deliveryCode(order)}</h2>
+          <h2 class="text-xl font-black leading-none text-slate-100">${deliveryCode(order)}</h2>
           <p class="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Pedido #${order.id_pedido}</p>
           <p class="mt-2 flex items-center gap-2 text-xs font-bold text-slate-400">
-              <span class="h-2 w-2 rounded-full shadow-lg ${timeDotClass(order)}"></span>
+              <span class="h-2.5 w-2.5 rounded-full ${timeDotClass(order)}"></span>
               ${elapsed(order.fecha_envio_cocina || order.fecha_creacion)}
           </p>
         </div>
@@ -335,36 +341,37 @@
           ${order.referencia_entrega ? `<p class="mt-1 text-xs font-black uppercase tracking-wide text-sky-200">${escapeHtml(order.referencia_entrega)}</p>` : ''}
           ${order.celular_cliente ? `<p class="mt-1 kds-contact text-xs font-bold text-slate-400">Cel: ${escapeHtml(order.celular_cliente)}</p>` : ''}
           ${order.direccion_entrega ? `<p class="mt-1 kds-contact text-xs font-bold text-slate-400">Dir: ${escapeHtml(order.direccion_entrega)}</p>` : ''}
-          <div class="mt-3 space-y-1.5">
-            ${(order.items || []).map((item) => `
-              <div class="kds-item-row">
-                <span class="kds-item-qty font-black text-slate-100">${item.cantidad}</span>
-                <span class="kds-item-name text-slate-200">${escapeHtml(item.nombre_producto)}</span>
-              </div>
-            `).join('')}
-          </div>
         </div>
       </div>
-      <div class="mt-4 space-y-2">
-        ${renderDetails(order)}
+      <div class="kds-items">
+        ${(order.items || []).map(renderItem).join('')}
       </div>
+      ${renderOrderNotes(order)}
       ${renderActions(order)}
     </article>
   `;
-  const renderDetails = (order) => {
-    const itemDetails = (order.items || []).map((item) => {
-      const modifierText = item.modificadores?.length ? item.modificadores.map(displayModifier).join(', ') : '';
-      const modifiers = modifierText ? renderNote(modifierText, 'mt-1 text-xs font-semibold text-slate-400') : '';
-      const notes = item.notas
-        ? renderNote(item.notas, 'mt-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-xs font-bold text-amber-200')
-        : '';
-      return modifiers || notes ? `<div>${modifiers}${notes}</div>` : '';
-    }).join('');
-    const orderNotes = order.notas
-      ? renderNote(order.notas, 'rounded-lg border border-amber-400/25 bg-amber-400/10 p-2 text-xs font-bold text-amber-200')
+  const renderItemExtras = (item) => {
+    const modifierText = item.modificadores?.length ? item.modificadores.map(displayModifier).join(', ') : '';
+    const modifiers = modifierText ? renderNote(modifierText, 'text-xs font-semibold text-slate-400') : '';
+    const notes = item.notas
+      ? renderNote(item.notas, 'rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-xs font-bold text-amber-200')
       : '';
-    return `${itemDetails}${orderNotes}`;
+    return modifiers || notes ? `<div class="kds-item-extra">${modifiers}${notes}</div>` : '';
   };
+  const renderItem = (item) => `
+    <div class="kds-item">
+      <div class="kds-item-row">
+        <span class="kds-item-qty">${item.cantidad}</span>
+        <span class="kds-item-name text-slate-200">${escapeHtml(item.nombre_producto)}</span>
+      </div>
+      ${renderItemExtras(item)}
+    </div>
+  `;
+  const renderOrderNotes = (order) => (
+    order.notas
+      ? `<div class="mt-3">${renderNote(order.notas, 'rounded-lg border border-amber-400/25 bg-amber-400/10 p-2 text-xs font-bold text-amber-200')}</div>`
+      : ''
+  );
   const renderActions = (order) => {
     const pending = pendingOrders.has(Number(order.id_pedido));
     const disabledAttrs = pending ? 'disabled aria-busy="true"' : '';
@@ -372,14 +379,14 @@
     if (order.estado === 'enviado_cocina') {
       return `
         <div class="mt-3">
-          <button type="button" data-action="tomar" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.enviado_cocina.actionClass}${disabledClass}">${pending ? 'Actualizando...' : stateMeta.enviado_cocina.action}</button>
+          <button type="button" data-action="tomar" ${disabledAttrs} class="w-full rounded-lg px-4 py-3.5 text-base font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.enviado_cocina.actionClass}${disabledClass}">${pending ? 'Actualizando...' : stateMeta.enviado_cocina.action}</button>
         </div>
       `;
     }
     if (order.estado === 'preparando') {
       return `
         <div class="mt-3">
-          <button type="button" data-action="listo" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.preparando.actionClass}${disabledClass}">${pending ? 'Actualizando...' : stateMeta.preparando.action}</button>
+          <button type="button" data-action="listo" ${disabledAttrs} class="w-full rounded-lg px-4 py-3.5 text-base font-black text-white shadow-lg shadow-emerald-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.preparando.actionClass}${disabledClass}">${pending ? 'Actualizando...' : stateMeta.preparando.action}</button>
         </div>
       `;
     }
@@ -389,7 +396,7 @@
           <div class="rounded-lg border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-center text-sm font-black text-sky-200">
             Listo para delivery
           </div>
-          <button type="button" data-action="salir" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.listo.actionClass}${disabledClass}">${pending ? 'Actualizando...' : 'Marcar en camino'}</button>
+          <button type="button" data-action="salir" ${disabledAttrs} class="w-full rounded-lg px-4 py-3.5 text-base font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${stateMeta.listo.actionClass}${disabledClass}">${pending ? 'Actualizando...' : 'Marcar en camino'}</button>
         </div>
       `;
     }
@@ -399,7 +406,7 @@
         <div class="rounded-lg border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-center text-sm font-black text-sky-200">
           Esperando entrega o retiro
         </div>
-        <button type="button" data-action="entregar" ${disabledAttrs} class="w-full rounded-lg px-4 py-3 text-sm font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${meta.actionClass}${disabledClass}">${pending ? 'Actualizando...' : meta.action}</button>
+        <button type="button" data-action="entregar" ${disabledAttrs} class="w-full rounded-lg px-4 py-3.5 text-base font-black text-white shadow-lg shadow-sky-950/30 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${meta.actionClass}${disabledClass}">${pending ? 'Actualizando...' : meta.action}</button>
       </div>
     `;
   };
