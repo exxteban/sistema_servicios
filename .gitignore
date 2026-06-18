@@ -22,9 +22,22 @@ instance/
 *.sqlite
 *.sqlite3
 
+# Dumps y backups SQL (pueden contener datos reales del cliente)
+*_backup*.sql
+bd_*_*.sql
+dump_*.sql
+*.dump.sql
+# Nota: scripts de migracion legitimos (migrations/*.sql, setup_local_db.sql) siguen versionados
+
 # Datos locales del cliente (no versionar)
 Base de datos/*
 !Base de datos/*.csv.bundle
+
+# Archivos de salida/diagnostico temporales
+_tmp_*
+*_output.txt
+ticket_config_output.txt
+verify_output*.txt
 
 # CSV de importación (se copia al servidor, no se versiona)
 deploy/**/*.csv
@@ -39,8 +52,7 @@ deploy/*.env
 logs/
 *.log
 
-# Archivos de salida/diagnóstico locales
-verify_output*.txt
+# Artefactos locales varios
 .local-arm/
 
 # IDEs

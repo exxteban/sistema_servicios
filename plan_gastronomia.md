@@ -270,8 +270,8 @@ Estado de avance al 2026-05-24:
 - Sprint 6 completado: caja inicial con cobro, descuento simple, metodo de pago y estado `cobrado`.
 - Sprint 7 completado: mesas y salon inicial con estados por pedidos activos y movimiento entre mesas.
 - Sprint 8 completado: reportes iniciales con ventas, productos mas vendidos, metodos de pago, cancelados y tiempos de preparacion.
-- Sprint 9 en avance: permisos operativos por rol completados con roles `Cocina`, `Mozo` y `Caja Gastronomia`.
-- Proximo foco: pulido visual en tablet, sonidos configurables y exportacion simple de reportes.
+- Sprint 9 completado: permisos operativos por rol (roles `Cocina`, `Mozo` y `Caja Gastronomia`), sonidos configurables en cocina (perfiles clasico/suave/urgente con preferencias por usuario) y exportacion CSV de reportes (compatible Excel con BOM UTF-8).
+- Proximo foco: pulido visual en tablet y sesion de pruebas E2E en dispositivo real.
 
 ### Sprint 0: Analisis y Preparacion
 
@@ -512,13 +512,13 @@ Objetivo: mejorar usabilidad y robustez antes de considerarlo modulo vendible.
 
 Tareas:
 
-- Agregar permisos por rol: caja, cocina, administrador.
-- Agregar sonidos configurables en cocina.
-- Mejorar estados vacios y errores.
-- Agregar validaciones de stock/disponibilidad.
-- Optimizar flujo tactil.
-- Pruebas en tablet o viewport chico.
-- Revisar archivos mayores a 600 lineas y dividir.
+- [x] Agregar permisos por rol: caja, cocina, administrador.
+- [x] Agregar sonidos configurables en cocina.
+- [x] Mejorar estados vacios y errores.
+- [x] Agregar validaciones de stock/disponibilidad.
+- [x] Optimizar flujo tactil.
+- [ ] Pruebas en tablet o viewport chico (pendiente sesion E2E en dispositivo real).
+- [x] Revisar archivos mayores a 600 lineas y dividir.
 
 Entregables:
 
@@ -528,10 +528,10 @@ Entregables:
 
 Criterios de aceptacion:
 
-- Cocina puede operar sin acceso a configuracion.
-- Caja puede cobrar sin editar menu.
-- Administrador puede configurar menu.
-- La experiencia touch es fluida.
+- [x] Cocina puede operar sin acceso a configuracion.
+- [x] Caja puede cobrar sin editar menu.
+- [x] Administrador puede configurar menu.
+- [ ] La experiencia touch es fluida (validar en tablet real).
 
 ## Riesgos y Cuidados
 
