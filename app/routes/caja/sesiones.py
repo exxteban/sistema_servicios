@@ -15,7 +15,10 @@ from app.routes.caja.gastronomia_cierre import (
     mensaje_confirmacion_pedidos_terminados,
     resumen_pedidos_gastronomia_cierre,
 )
-from app.routes.caja.regularizacion_cola import regularizar_pendientes_ya_cobrados_para_cierre
+from app.routes.caja.regularizacion_cola import (
+    liberar_pendientes_en_proceso_huerfanos,
+    regularizar_pendientes_ya_cobrados_para_cierre,
+)
 from app.routes.caja.resumen_cierre import resumen_pendientes_para_cierre
 from app.utils.auditoria_utils import registrar_auditoria
 from app.utils.helpers import local_strftime
@@ -458,6 +461,7 @@ def cerrar():
         .all()
     )
     pendientes_en_proceso = regularizar_pendientes_ya_cobrados_para_cierre(pendientes_en_proceso)
+    pendientes_en_proceso = liberar_pendientes_en_proceso_huerfanos(pendientes_en_proceso)
     if pendientes_en_proceso:
         pendientes_mostrados = resumen_pendientes_para_cierre(pendientes_en_proceso)
         sufijo = '...' if len(pendientes_en_proceso) > 5 else ''

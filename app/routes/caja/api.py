@@ -100,6 +100,26 @@ def _resolver_metodo_pago(payload):
     return None, ({'error': 'No hay métodos de pago activos configurados'}, 400)
 
 
+def _liberar_otros_en_proceso_usuario(usuario_id, excepto_id):
+    otros = (
+        ColaCobro.query
+        .filter(
+            ColaCobro.id != excepto_id,
+            ColaCobro.estado == 'en_proceso',
+            ColaCobro.id_usuario_destino == usuario_id,
+        )
+        .all()
+    )
+    for cola in otros:
+        metadata = cola.get_metadata()
+        metadata['liberado_por_tomar_otra'] = True
+        cola.estado = 'pendiente'
+        cola.id_usuario_destino = None
+        cola.fecha_toma = None
+        cola.set_metadata(metadata)
+    return otros
+
+
 def _asegurar_en_proceso(cola_id, commit=True):
     usuario_id = int(current_user.id_usuario)
     ahora = datetime.utcnow()
@@ -124,6 +144,7 @@ def _asegurar_en_proceso(cola_id, commit=True):
     if filas_actualizadas:
         db.session.expire_all()
         item = db.session.get(ColaCobro, cola_id)
+        _liberar_otros_en_proceso_usuario(usuario_id, excepto_id=cola_id)
         _registrar_auditoria_cola(
             'tomar_pendiente_caja',
             item,

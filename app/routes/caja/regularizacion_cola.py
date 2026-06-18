@@ -176,6 +176,40 @@ def resolver_pendiente_ya_cobrado(pendiente) -> bool:
     return False
 
 
+def _pedido_gastronomia_sigue_activo(pendiente) -> bool:
+    if (pendiente.tipo_origen or '').strip().lower() != 'gastronomia':
+        return False
+    from gastronomia.models import GastronomiaPedido
+
+    metadata = pendiente.get_metadata()
+    pedido_id = metadata.get('gastronomia_pedido_id') or pendiente.id_origen
+    pedido = GastronomiaPedido.query.filter(
+        GastronomiaPedido.id_pedido == int(pedido_id or 0),
+    ).first()
+    return bool(pedido and pedido.estado != 'cancelado')
+
+
+def liberar_pendientes_en_proceso_huerfanos(pendientes) -> list:
+    """Devuelve a 'pendiente' colas de gastronomía tomadas sin cobrar (checkout abandonado)."""
+    restantes = []
+    liberados = 0
+    for pendiente in pendientes:
+        if pendiente.estado == 'en_proceso' and _pedido_gastronomia_sigue_activo(pendiente):
+            metadata = pendiente.get_metadata()
+            metadata['liberado_por_cierre_caja'] = True
+            pendiente.estado = 'pendiente'
+            pendiente.id_usuario_destino = None
+            pendiente.fecha_toma = None
+            pendiente.set_metadata(metadata)
+            liberados += 1
+        else:
+            restantes.append(pendiente)
+    if liberados:
+        db.session.commit()
+        flash(f'Se liberaron {liberados} pendiente(s) de gastronomía que quedaron tomados sin cobrar.', 'info')
+    return restantes
+
+
 def regularizar_pendientes_ya_cobrados_para_cierre(pendientes) -> list:
     bloqueantes = []
     regularizados = 0

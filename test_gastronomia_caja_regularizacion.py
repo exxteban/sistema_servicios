@@ -130,6 +130,74 @@ def test_cierre_cancela_cola_gastronomia_si_pago_apunta_a_venta_anulada():
         assert GastronomiaPedidoPago.query.filter_by(pedido_id=pedido_id).count() == 1
 
 
+def _crear_cola_pendiente_gastronomia(client, csrf, producto_id, referencia):
+    pedido_id = _crear_pedido_abierto(client, csrf, producto_id, referencia_entrega=referencia)
+    cola_resp = client.post(
+        f'/api/gastronomia/pedidos/{pedido_id}/cobro-avanzado',
+        json={'enviar_cocina': True},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert cola_resp.status_code == 200
+    return pedido_id, cola_resp.get_json()['cola_id']
+
+
+def test_cierre_libera_cola_gastronomia_tomada_sin_cobrar():
+    app = create_app('testing')
+    client = app.test_client()
+    username = 'resto_libera_huerfana'
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Libera Huerfana', username)
+    _loguear(client, app, username)
+    _abrir_caja(app, username)
+
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    pedido_id, cola_id = _crear_cola_pendiente_gastronomia(client, csrf, producto_id, 'Huerfana')
+
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username=username).first()
+        cola = ColaCobro.query.get(cola_id)
+        cola.estado = 'en_proceso'
+        cola.id_usuario_destino = usuario.id_usuario
+        db.session.commit()
+
+    cierre_resp = client.get('/caja/cerrar')
+    assert 'No puede cerrar la caja mientras tenga pendientes en proceso asignados' not in cierre_resp.get_data(as_text=True)
+
+    with app.app_context():
+        cola = ColaCobro.query.get(cola_id)
+        assert cola.estado == 'pendiente'
+        assert cola.id_usuario_destino is None
+        assert cola.fecha_toma is None
+        assert cola.get_metadata()['liberado_por_cierre_caja'] is True
+        assert GastronomiaPedidoPago.query.filter_by(pedido_id=pedido_id).count() == 0
+
+
+def test_tomar_otra_cola_libera_la_anterior():
+    app = create_app('testing')
+    client = app.test_client()
+    username = 'resto_tomar_otra'
+    _cliente_id, producto_id = _crear_producto(app, 'Resto Tomar Otra', username)
+    _loguear(client, app, username)
+    _abrir_caja(app, username)
+
+    csrf = _csrf(client.get('/gastronomia/pos').get_data(as_text=True))
+    _pedido1, cola1 = _crear_cola_pendiente_gastronomia(client, csrf, producto_id, 'Primera')
+    _pedido2, cola2 = _crear_cola_pendiente_gastronomia(client, csrf, producto_id, 'Segunda')
+
+    assert client.post(f'/caja/api/cola-cobro/{cola1}/tomar', headers={'X-CSRFToken': csrf}).status_code == 200
+    assert client.post(f'/caja/api/cola-cobro/{cola2}/tomar', headers={'X-CSRFToken': csrf}).status_code == 200
+
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username=username).first()
+        anterior = ColaCobro.query.get(cola1)
+        nueva = ColaCobro.query.get(cola2)
+        assert anterior.estado == 'pendiente'
+        assert anterior.id_usuario_destino is None
+        assert anterior.fecha_toma is None
+        assert anterior.get_metadata()['liberado_por_tomar_otra'] is True
+        assert nueva.estado == 'en_proceso'
+        assert nueva.id_usuario_destino == usuario.id_usuario
+
+
 def test_polling_resumen_no_regulariza_cola_fantasma_en_tiempo_real():
     """El polling no debe mutar colas ni hacer limpieza masiva."""
     app = create_app('testing')
