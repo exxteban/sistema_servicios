@@ -1,6 +1,7 @@
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import csv
-import os
-import sys
 from decimal import Decimal
 from datetime import datetime
 from app import create_app, db
@@ -10,8 +11,6 @@ from app.models.usuario import Usuario
 from sqlalchemy.exc import IntegrityError
 
 import csv
-import os
-import sys
 from decimal import Decimal
 from datetime import datetime
 from app import create_app, db

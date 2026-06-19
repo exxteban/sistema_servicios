@@ -1,8 +1,8 @@
 import os
 import sys
 
-# Agregar la ruta base si es necesario
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+# Agregar la ruta base (raiz del proyecto) al path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import create_app, db
 

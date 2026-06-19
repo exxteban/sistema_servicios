@@ -56,7 +56,7 @@ Si quieres copiar los datos del sistema anterior a la nueva base de datos:
 # source venv/bin/activate  # En Linux/Mac
 
 # Ejecutar la migración
-python migrar_sqlite_a_mysql.py
+python migrations/migrar_sqlite_a_mysql.py
 ```
 
 ### 4. Inicializar la Nueva Base de Datos

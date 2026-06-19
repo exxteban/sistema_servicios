@@ -1,3 +1,6 @@
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import random
 from app import create_app, db
 from app.models.producto import Producto, Categoria
@@ -126,7 +129,6 @@ def poblar_masivo(cantidad=100):
         print(f"✅ Finalizado! Se agregaron {productos_creados} productos nuevos.")
 
 if __name__ == '__main__':
-    import sys
     qty = 500
     if len(sys.argv) > 1:
         try:

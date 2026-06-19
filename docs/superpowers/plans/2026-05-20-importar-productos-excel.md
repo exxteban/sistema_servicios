@@ -4,7 +4,7 @@
 
 **Goal:** Add a standalone script that imports products from `PRECIO_SISTEMA_NUEVO.xlsx` into the existing product tables without changing the system structure.
 
-**Architecture:** Keep the app unchanged and add only `importar_productos_excel.py` plus focused unit tests. The script uses existing `create_app`, `db`, `Producto`, and `Categoria` models, creates missing categories, and upserts products by `codigo`.
+**Architecture:** Keep the app unchanged and add only `importar_productos_excel.py` plus focused unit tests. The script uses existing `create_app`, `db`, `Producto`, and `Categoria` models, creates missing categories, and upserts products by `codigo`. The script lives in `scripts/` and is discovered by tests via `pythonpath = . scripts` in `pytest.ini`.
 
 **Tech Stack:** Python, Flask app context, SQLAlchemy models, openpyxl, pytest
 
@@ -12,7 +12,7 @@
 
 ## Files
 
-- Create: `importar_productos_excel.py`
+- Create: `scripts/importar_productos_excel.py`
 - Create: `test_importar_productos_excel.py`
 
 ## Tasks
