@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Facturación Electrónica{% endblock %}
+
+{% macro campo(nombre, etiqueta, valor, tipo='text', placeholder='', ayuda='') %}
+<div>
+    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ etiqueta }}</label>
+    <input type="{{ tipo }}" name="{{ nombre }}" value="{{ valor or '' }}" placeholder="{{ placeholder }}"
+        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+    {% if ayuda %}<p class="mt-1 text-xs text-gray-400">{{ ayuda }}</p>{% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Facturación Electrónica (SIFEN)</h1>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            Datos del emisor y firma digital. Esta pantalla solo guarda la configuración; todavía no emite documentos.
+        </p>
+        <a href="{{ url_for('facturacion_electronica.vista_previa') }}"
+            class="mt-3 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700">
+            <i class="fas fa-eye mr-2"></i>Ver vista previa de una venta
+        </a>
+    </div>
+
+    {% if faltantes %}
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-5">
+        <h2 class="text-sm font-bold text-amber-800 dark:text-amber-300">
+            <i class="fas fa-triangle-exclamation mr-2"></i>Falta para poder facturar
+        </h2>
+        <ul class="mt-2 list-disc list-inside text-sm text-amber-700 dark:text-amber-200 space-y-0.5">
+            {% for item in faltantes %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% else %}
+    <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700 rounded-xl p-4">
+        <p class="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+            <i class="fas fa-circle-check mr-2"></i>Configuración completa para empezar a facturar.
+        </p>
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Ambiente</h2>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Ambiente de trabajo</label>
+                <select name="ambiente"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                    <option value="test" {% if config.ambiente == 'test' %}selected{% endif %}>Prueba (test)</option>
+                    <option value="produccion" {% if config.ambiente == 'produccion' %}selected{% endif %}>Producción</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-400">Empezá siempre en Prueba hasta validar la emisión.</p>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Datos del emisor</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {{ campo('razon_social', 'Razón social', config.razon_social) }}
+                {{ campo('nombre_fantasia', 'Nombre de fantasía', config.nombre_fantasia) }}
+                {{ campo('ruc', 'RUC (sin dígito verificador)', config.ruc, placeholder='80012345') }}
+                {{ campo('dv_ruc', 'Dígito verificador', config.dv_ruc, placeholder='7') }}
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tipo de contribuyente</label>
+                    <select name="tipo_contribuyente"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        {% for valor, etiqueta in tipos_contribuyente %}
+                        <option value="{{ valor }}" {% if config.tipo_contribuyente == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {{ campo('actividad_economica_codigo', 'Código actividad económica', config.actividad_economica_codigo) }}
+                {{ campo('actividad_economica_desc', 'Descripción actividad', config.actividad_economica_desc) }}
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Timbrado y punto de expedición</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {{ campo('timbrado_numero', 'Número de timbrado', config.timbrado_numero) }}
+                {{ campo('timbrado_fecha_inicio', 'Inicio de vigencia', config.timbrado_fecha_inicio.isoformat() if config.timbrado_fecha_inicio else '', tipo='date') }}
+                {{ campo('establecimiento', 'Establecimiento', config.establecimiento, placeholder='001') }}
+                {{ campo('punto_expedicion', 'Punto de expedición', config.punto_expedicion, placeholder='001') }}
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Dirección y contacto</h2>
+            <p class="text-xs text-gray-400">Elegí departamento, distrito y ciudad de la lista oficial de SIFEN (no escribas códigos a mano).</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Departamento</label>
+                    <select name="departamento_codigo" id="fe-departamento"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="">— Elegí —</option>
+                        {% for d in departamentos %}
+                        <option value="{{ d.codigo }}" {% if config.departamento_codigo == d.codigo|string %}selected{% endif %}>{{ d.descripcion }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Distrito</label>
+                    <select name="distrito_codigo" id="fe-distrito" data-current="{{ config.distrito_codigo or '' }}"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="">— Elegí departamento —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Ciudad</label>
+                    <select name="ciudad_codigo" id="fe-ciudad" data-current="{{ config.ciudad_codigo or '' }}"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="">— Elegí distrito —</option>
+                    </select>
+                </div>
+                {{ campo('direccion', 'Dirección', config.direccion) }}
+                {{ campo('numero_casa', 'Nro. de casa', config.numero_casa) }}
+                {{ campo('telefono', 'Teléfono', config.telefono) }}
+                {{ campo('email', 'Email', config.email, tipo='email') }}
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Firma digital y CSC</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Certificado digital (.p12 / .pfx)</label>
+                    <input type="file" name="certificado" accept=".p12,.pfx"
+                        class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-white">
+                    {% if config.certificado_cargado %}
+                    <p class="mt-1 text-xs text-emerald-500">Certificado cargado: {{ config.cert_nombre_original }}</p>
+                    {% else %}
+                    <p class="mt-1 text-xs text-gray-400">Aún no hay certificado cargado.</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Contraseña del certificado</label>
+                    <input type="password" name="cert_password" placeholder="{% if config.cert_password %}•••••••• (sin cambios){% endif %}"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                    <p class="mt-1 text-xs text-gray-400">Dejá vacío para mantener la actual.</p>
+                </div>
+                {{ campo('csc', 'CSC (Código de Seguridad del Contribuyente)', config.csc) }}
+                {{ campo('csc_id', 'ID del CSC', config.csc_id, placeholder='0001') }}
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit"
+                class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700">
+                <i class="fas fa-save mr-2"></i>Guardar configuración
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    const urlDistritos = "{{ url_for('facturacion_electronica.geo_distritos') }}";
+    const urlCiudades = "{{ url_for('facturacion_electronica.geo_ciudades') }}";
+    const dep = document.getElementById('fe-departamento');
+    const dis = document.getElementById('fe-distrito');
+    const ciu = document.getElementById('fe-ciudad');
+    if (!dep || !dis || !ciu) return;
+
+    function fill(select, items, placeholder, current) {
+        select.innerHTML = '';
+        const vacio = document.createElement('option');
+        vacio.value = '';
+        vacio.textContent = placeholder;
+        select.appendChild(vacio);
+        items.forEach(function (it) {
+            const o = document.createElement('option');
+            o.value = it.codigo;
+            o.textContent = it.descripcion;
+            if (current && String(it.codigo) === String(current)) o.selected = true;
+            select.appendChild(o);
+        });
+    }
+
+    function cargarCiudades(distrito, current) {
+        if (!distrito) { fill(ciu, [], '— Elegí distrito —'); return; }
+        fetch(urlCiudades + '?distrito=' + encodeURIComponent(distrito))
+            .then(function (r) { return r.json(); })
+            .then(function (items) { fill(ciu, items, '— Elegí ciudad —', current); });
+    }
+
+    function cargarDistritos(departamento, currentDis, currentCiu) {
+        if (!departamento) {
+            fill(dis, [], '— Elegí departamento —');
+            fill(ciu, [], '— Elegí distrito —');
+            return;
+        }
+        fetch(urlDistritos + '?departamento=' + encodeURIComponent(departamento))
+            .then(function (r) { return r.json(); })
+            .then(function (items) {
+                fill(dis, items, '— Elegí distrito —', currentDis);
+                if (currentDis) cargarCiudades(currentDis, currentCiu);
+                else fill(ciu, [], '— Elegí distrito —');
+            });
+    }
+
+    dep.addEventListener('change', function () { cargarDistritos(dep.value, null, null); });
+    dis.addEventListener('change', function () { cargarCiudades(dis.value, null); });
+
+    cargarDistritos(dep.value, dis.dataset.current, ciu.dataset.current);
+})();
+</script>
+{% endblock %}

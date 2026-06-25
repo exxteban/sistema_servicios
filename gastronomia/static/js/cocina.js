@@ -9,6 +9,8 @@
   const soundVolumeInput = document.getElementById('kds-sound-volume');
   const soundVolumeLabel = document.getElementById('kds-sound-volume-label');
   const testSoundButton = document.getElementById('kds-test-sound');
+  const settingsToggle = document.getElementById('kds-settings-toggle');
+  const settingsPanel = document.getElementById('kds-toolbar');
   if (!root || !board || !alertBox) return;
 
   let orders = [];
@@ -301,15 +303,12 @@
   };
   const renderColumn = (column, orders) => `
     <section class="kds-column">
-      <div class="mb-4 flex items-center justify-between gap-3 border-b border-slate-700/60 pb-3">
-        <div class="flex items-center gap-3">
-          <span class="flex h-9 w-9 items-center justify-center rounded-lg border ${column.iconBox}">
+      <div class="mb-2 flex items-center justify-between gap-3 border-b border-slate-700/60 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="flex h-8 w-8 items-center justify-center rounded-lg border ${column.iconBox}">
             <i class="fas ${column.icon}"></i>
           </span>
-          <div>
-            <p class="text-xs font-black uppercase tracking-[0.20em] ${column.accent}">Cocina</p>
-            <h2 class="text-lg font-black text-slate-100">${column.title}</h2>
-          </div>
+          <h2 class="text-base font-black text-slate-100">${column.title}</h2>
         </div>
         <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-sm font-black ${column.counter}">${orders.length}</span>
       </div>
@@ -498,6 +497,7 @@
     soundVolumeInput?.removeEventListener('input', handleSoundVolumeInput);
     soundVolumeInput?.removeEventListener('change', handleSoundVolumeChange);
     testSoundButton?.removeEventListener('click', handleTestSoundClick);
+    settingsToggle?.removeEventListener('click', handleSettingsToggleClick);
     activeControllers.forEach((controller) => controller.abort());
     activeControllers.clear();
     if (window.__gastroKdsCleanup === cleanup) window.__gastroKdsCleanup = null;
@@ -518,6 +518,17 @@
   const handleTestSoundClick = () => {
     playKitchenSound().catch((error) => showAlert(error.message, false));
   };
+  const setSettingsOpen = (open) => {
+    if (!settingsPanel || !settingsToggle) return;
+    settingsPanel.hidden = !open;
+    settingsToggle.setAttribute('aria-expanded', String(open));
+    try {
+      localStorage.setItem('kds-settings-open', open ? '1' : '0');
+    } catch (e) {}
+  };
+  const handleSettingsToggleClick = () => {
+    setSettingsOpen(settingsPanel?.hidden ?? true);
+  };
 
   window.__gastroKdsCleanup = cleanup;
   board.addEventListener('click', handleBoardClick);
@@ -526,6 +537,14 @@
   soundVolumeInput?.addEventListener('input', handleSoundVolumeInput);
   soundVolumeInput?.addEventListener('change', handleSoundVolumeChange);
   testSoundButton?.addEventListener('click', handleTestSoundClick);
+  settingsToggle?.addEventListener('click', handleSettingsToggleClick);
+  setSettingsOpen((() => {
+    try {
+      return localStorage.getItem('kds-settings-open') === '1';
+    } catch (e) {
+      return false;
+    }
+  })());
   loadSoundSettings().catch((error) => showAlert(error.message, false));
   loadBoard()
     .catch((error) => {

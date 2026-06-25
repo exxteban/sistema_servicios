@@ -1,0 +1,5 @@
+node_modules/
+npm-debug.log*
+*.p12
+*.pfx
+*.pem

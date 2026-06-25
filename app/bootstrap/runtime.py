@@ -63,6 +63,7 @@ def register_runtime_features(app, db):
         'crm_activo',
         'cobranzas_activo',
         'flujo_caja_activo',
+        'facturacion_electronica_activo',
         'ia_provider',
         'ia_model',
         'ia_max_tokens',
@@ -105,10 +106,12 @@ def register_runtime_features(app, db):
         modulo_crm_activo = bool(app.config.get('CRM_ENABLED', True))
         modulo_cobranzas_activo = False
         modulo_flujo_caja_activo = True
+        modulo_facturacion_electronica_activo = False
         es_usuario_root_actual = False
         try:
             from control_de_empleados import CLAVE_MODULO_CONTROL_EMPLEADOS
             from cobranzas import CLAVE_COBRANZAS_ACTIVO, CLAVE_VENTAS_CREDITO_ACTIVO
+            from facturacion_electronica import CLAVE_FACTURACION_ELECTRONICA_ACTIVO
             from app.models import Configuracion
             from app.services.ia_backoffice.security import es_usuario_root
             from app.services.system_modules import (
@@ -152,6 +155,10 @@ def register_runtime_features(app, db):
                 configuraciones.get(CLAVE_MODULO_FLUJO_CAJA),
                 default=bool((get_system_module(CLAVE_MODULO_FLUJO_CAJA) or {}).get('default', True)),
             )
+            modulo_facturacion_electronica_activo = Configuracion.parse_bool(
+                configuraciones.get(CLAVE_FACTURACION_ELECTRONICA_ACTIVO),
+                default=bool((get_system_module(CLAVE_FACTURACION_ELECTRONICA_ACTIVO) or {}).get('default', False)),
+            )
             es_usuario_root_actual = es_usuario_root(current_user)
         except Exception:
             nombre_empresa = ''
@@ -163,6 +170,7 @@ def register_runtime_features(app, db):
             modulo_crm_activo = bool(app.config.get('CRM_ENABLED', True))
             modulo_cobranzas_activo = False
             modulo_flujo_caja_activo = True
+            modulo_facturacion_electronica_activo = False
             es_usuario_root_actual = False
         return {
             'app_brand_name': nombre_empresa,
@@ -174,6 +182,7 @@ def register_runtime_features(app, db):
             'modulo_crm_activo': modulo_crm_activo,
             'modulo_cobranzas_activo': modulo_cobranzas_activo,
             'modulo_flujo_caja_activo': modulo_flujo_caja_activo,
+            'modulo_facturacion_electronica_activo': modulo_facturacion_electronica_activo,
             'es_usuario_root_actual': es_usuario_root_actual,
         }
 

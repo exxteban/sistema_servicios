@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Vista previa documento electrónico{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Vista previa del documento electrónico</h1>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            Muestra el JSON que se enviaría al motor de firma para una venta. Es solo lectura: no firma ni envía nada.
+        </p>
+        <form method="get" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div class="flex-1">
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">N° de venta</label>
+                <input type="number" name="venta" value="{{ venta_id }}" placeholder="Ej: 1024"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <button type="submit"
+                class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
+                <i class="fas fa-eye mr-2"></i>Ver
+            </button>
+        </form>
+    </div>
+
+    {% if documento_json %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Venta #{{ venta.id_venta }} — {{ venta.cliente.nombre if venta.cliente else '' }}
+            </h2>
+            <a href="{{ url_for('facturacion_electronica.vista_previa', venta=venta.id_venta, generar=1) }}"
+                class="inline-flex items-center rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-teal-700">
+                <i class="fas fa-file-code mr-2"></i>Generar XML
+            </a>
+        </div>
+        <pre class="overflow-x-auto rounded-lg bg-gray-900 text-gray-100 text-xs p-4">{{ documento_json }}</pre>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Documento electrónico</h2>
+                {% if documento %}
+                <p class="mt-1 text-sm text-gray-700 dark:text-gray-200">
+                    Estado: <span class="font-semibold">{{ documento.estado }}</span>
+                    {% if documento.ambiente %}· Ambiente: {{ documento.ambiente }}{% endif %}
+                </p>
+                {% if documento.cdc %}
+                <p class="mt-1 text-xs font-mono text-gray-500 dark:text-gray-400 break-all">CDC: {{ documento.cdc_formateado }}</p>
+                {% endif %}
+                {% else %}
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Todavía no se generó el documento para esta venta.</p>
+                {% endif %}
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <form method="post" action="{{ url_for('facturacion_electronica.emitir', venta_id=venta.id_venta) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit"
+                        class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700">
+                        <i class="fas fa-file-circle-check mr-2"></i>{{ 'Regenerar y guardar' if documento else 'Generar y guardar documento' }}
+                    </button>
+                </form>
+                {% if documento and documento.estado in ['generado', 'firmado'] %}
+                <form method="post" action="{{ url_for('facturacion_electronica.firmar', venta_id=venta.id_venta) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit"
+                        class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700">
+                        <i class="fas fa-signature mr-2"></i>{{ 'Volver a firmar' if documento.estado == 'firmado' else 'Firmar documento' }}
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% if documento and documento.xml_firmado %}
+        <p class="mt-3 text-xs text-emerald-600 dark:text-emerald-400"><i class="fas fa-circle-check mr-1"></i>XML firmado guardado.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if xml_error %}
+    <div class="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-xl p-5">
+        <h2 class="text-sm font-bold text-red-800 dark:text-red-300 mb-2">
+            <i class="fas fa-circle-xmark mr-2"></i>No se pudo generar el XML
+        </h2>
+        <p class="text-sm text-red-700 dark:text-red-200 whitespace-pre-line">{{ xml_error }}</p>
+    </div>
+    {% endif %}
+
+    {% if xml_generado %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+            <i class="fas fa-circle-check mr-2 text-emerald-500"></i>XML generado (sin firmar)
+        </h2>
+        <pre class="overflow-x-auto rounded-lg bg-gray-900 text-emerald-100 text-xs p-4">{{ xml_generado }}</pre>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -348,6 +348,19 @@
                         <span class="text-sm font-medium">Config. Ticket</span>
                     </a>
                     {% endif %}
+
+                    {% if modulo_facturacion_electronica_activo and p_ticket %}
+                    <a href="{{ url_for('facturacion_electronica.configuracion') }}" data-permiso="editar_configuracion"
+                        data-tab-url="{{ url_for('facturacion_electronica.configuracion') }}" data-tab-title="Facturación Electrónica"
+                        data-tab-icon="fas fa-file-invoice"
+                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+                        <div
+                            class="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center text-teal-400 group-hover/item:bg-teal-500 group-hover/item:text-white transition-colors">
+                            <i class="fas fa-file-invoice text-sm"></i>
+                        </div>
+                        <span class="text-sm font-medium">Facturación Electrónica</span>
+                    </a>
+                    {% endif %}
                 </div>
                 </template>
             </div>

@@ -8,6 +8,10 @@ from cobranzas import (
     DESC_VENTAS_CREDITO_ACTIVO,
 )
 from control_de_empleados import CLAVE_MODULO_CONTROL_EMPLEADOS, DESC_MODULO_CONTROL_EMPLEADOS
+from facturacion_electronica import (
+    CLAVE_FACTURACION_ELECTRONICA_ACTIVO,
+    DESC_FACTURACION_ELECTRONICA_ACTIVO,
+)
 from flujo_caja import CLAVE_MODULO_FLUJO_CAJA, DESC_MODULO_FLUJO_CAJA
 
 
@@ -74,6 +78,14 @@ SYSTEM_MODULES = (
         'nombre': 'cobranzas',
         'titulo': 'Modulo de cobranzas',
         'detalle': 'Muestra el acceso operativo de cobranzas en el menu y habilita sus rutas protegidas.',
+        'default': False,
+    },
+    {
+        'clave': CLAVE_FACTURACION_ELECTRONICA_ACTIVO,
+        'descripcion': DESC_FACTURACION_ELECTRONICA_ACTIVO,
+        'nombre': 'facturacion electronica',
+        'titulo': 'Facturacion electronica (SIFEN)',
+        'detalle': 'Muestra el acceso a la configuracion de facturacion electronica y habilita sus rutas protegidas.',
         'default': False,
     },
 )

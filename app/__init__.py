@@ -410,6 +410,7 @@ def create_app(config_name='default'):
     from control_de_empleados.routes import control_empleados_bp
     from gastos_corrientes.routes import gastos_corrientes_bp
     from flujo_caja.routes import flujo_caja_bp
+    from facturacion_electronica.routes import facturacion_electronica_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -470,6 +471,7 @@ def create_app(config_name='default'):
     app.register_blueprint(control_empleados_bp, url_prefix='/control-empleados')
     app.register_blueprint(gastos_corrientes_bp, url_prefix='/gastos-corrientes')
     app.register_blueprint(flujo_caja_bp, url_prefix='/flujo-caja')
+    app.register_blueprint(facturacion_electronica_bp, url_prefix='/facturacion-electronica')
     if app.config.get('CRM_ENABLED', True):
         from app.routes.crm import crm_bp
         app.register_blueprint(crm_bp, url_prefix='/crm')

@@ -6,11 +6,13 @@
 <div class="kds-shell" data-gastro-kds>
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
-    <div class="kds-header mb-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-            <h1 class="text-2xl font-black tracking-tight text-slate-100">Cocina</h1>
-        </div>
+    <div class="kds-header mb-2 flex flex-row items-center justify-between gap-2">
+        <h1 class="text-lg font-black tracking-tight text-slate-100">Cocina</h1>
         <div class="flex flex-wrap gap-2">
+            <button type="button" id="kds-settings-toggle" aria-expanded="false" aria-controls="kds-toolbar"
+               class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-bold">
+                <i class="fas fa-volume-up"></i>Avisos
+            </button>
             <a href="{{ url_for('gastronomia.dashboard') }}"
                class="kds-nav-button inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-bold">
                 <i class="fas fa-arrow-left"></i>Volver
@@ -28,7 +30,7 @@
 
     <div id="kds-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
-    <section class="kds-toolbar mb-2 rounded-xl border border-slate-700/60 bg-slate-900/40 p-2">
+    <section id="kds-toolbar" hidden class="kds-toolbar mb-2 rounded-xl border border-slate-700/60 bg-slate-900/40 p-2">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div class="kds-toolbar-copy">
                 <p class="text-xs font-black uppercase tracking-[0.20em] text-sky-300">Avisos de cocina</p>
@@ -69,7 +71,7 @@
         border-radius: 16px;
         background: #e2e8f0;
         color: #0f172a;
-        padding: 16px;
+        padding: 10px;
     }
     .dark .kds-shell {
         background: #070b12;
@@ -409,5 +411,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260618-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260625-2') }}"></script>
 {% endblock %}

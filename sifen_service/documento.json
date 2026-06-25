@@ -1,0 +1,77 @@
+{
+  "params": {
+    "version": 150,
+    "ruc": "4281292-5",
+    "razonSocial": "Esteban Lezcano",
+    "nombreFantasia": "py systems",
+    "actividadesEconomicas": [
+      { "codigo": "1", "descripcion": "ventas varias" }
+    ],
+    "timbradoNumero": "12345678",
+    "timbradoFecha": "2026-04-01",
+    "tipoContribuyente": 1,
+    "tipoRegimen": null,
+    "establecimientos": [
+      {
+        "codigo": "001",
+        "direccion": "Paseo Guillermo Gimenez",
+        "numeroCasa": "125",
+        "departamento": 12,
+        "departamentoDescripcion": "CENTRAL",
+        "distrito": 161,
+        "distritoDescripcion": "NEMBY",
+        "ciudad": 5975,
+        "ciudadDescripcion": "NEMBY",
+        "telefono": "0961862624",
+        "email": "csarlezcano@gmail.com",
+        "denominacion": "py systems"
+      }
+    ]
+  },
+  "data": {
+    "tipoDocumento": 1,
+    "establecimiento": "001",
+    "punto": "001",
+    "numero": "0000001",
+    "codigoSeguridadAleatorio": "985398748",
+    "fecha": "2026-02-24T17:26:21",
+    "tipoEmision": 1,
+    "tipoTransaccion": 1,
+    "tipoImpuesto": 1,
+    "moneda": "PYG",
+    "factura": { "presencia": 1 },
+    "cliente": {
+      "razonSocial": "CONSUMIDOR FINAL",
+      "pais": "PRY",
+      "paisDescripcion": "Paraguay",
+      "codigo": "001",
+      "contribuyente": false,
+      "tipoOperacion": 2,
+      "documentoTipo": 5,
+      "documentoNumero": "0"
+    },
+    "condicion": {
+      "tipo": 1,
+      "entregas": [
+        { "tipo": 1, "monto": "352000", "moneda": "PYG", "cambio": 0 }
+      ]
+    },
+    "items": [
+      {
+        "codigo": "CAR-XIA-8409",
+        "descripcion": "Cargador para Xiaomi iPhone83 - Blanco",
+        "unidadMedida": 77,
+        "cantidad": 1,
+        "precioUnitario": 352000,
+        "cambio": 0,
+        "descuento": 0,
+        "anticipo": 0,
+        "pais": "PRY",
+        "paisDescripcion": "Paraguay",
+        "ivaTipo": 1,
+        "iva": 10,
+        "ivaProporcion": 100
+      }
+    ]
+  }
+}

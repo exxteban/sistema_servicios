@@ -1,0 +1,15 @@
+{
+  "name": "sifen-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Microservicio que genera (y luego firmará/enviará) documentos electrónicos SIFEN usando las librerías TIPS. Aislado: el sistema Flask sólo lo consume por HTTP.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "facturacionelectronicapy-xmlgen": "^1.0.283",
+    "facturacionelectronicapy-xmlsign": "^1.0.28"
+  }
+}
