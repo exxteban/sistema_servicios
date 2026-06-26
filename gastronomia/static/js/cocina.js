@@ -283,7 +283,7 @@
     board.innerHTML = columns.map((column) => renderColumn(column, groups[column.key] || [])).join('');
     if (!total) {
       board.innerHTML = `
-        <div class="rounded-2xl border border-dashed border-slate-700/80 bg-slate-900/45 p-10 text-center text-slate-400 xl:col-span-4">
+        <div class="rounded-2xl border border-dashed border-slate-700/80 bg-slate-900/45 p-10 text-center text-slate-400 lg:col-span-4">
           <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 text-slate-500">
             <i class="fas fa-check"></i>
           </div>
