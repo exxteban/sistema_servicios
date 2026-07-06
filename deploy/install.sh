@@ -479,7 +479,6 @@ as_root chmod 775 "$app_dir/logs" 2>/dev/null || true
 uploads_dir="$app_dir/app/static/uploads"
 tienda_uploads_dir="$app_dir/app/static/tienda_uploads"
 tienda_upload_web_user="${TIENDA_UPLOAD_WEB_USER:-www-data}"
-
 mkdir -p "$uploads_dir" "$tienda_uploads_dir/portadas" "$tienda_uploads_dir/compras/facturas"
 as_root chown -R "$service_user:$service_group" "$uploads_dir" "$tienda_uploads_dir" 2>/dev/null || true
 as_root find "$uploads_dir" "$tienda_uploads_dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
@@ -502,6 +501,7 @@ User=$service_user
 Group=$service_group
 WorkingDirectory=$app_dir
 EnvironmentFile=$env_file_path
+Environment=ENV_FILE_PATH=$env_file_path
 ExecStart=$python_bin $app_dir/run.py
 Restart=always
 RestartSec=3
