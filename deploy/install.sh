@@ -558,54 +558,16 @@ if have_cmd systemctl; then
   as_root systemctl enable --now "${service_name}-backup.timer"
 fi
 
-if [ "$import_legacy_csv" = "1" ]; then
-  if ls "$app_dir/deploy/"*.csv* >/dev/null 2>&1 || ls "$app_dir/Base de datos/"*.csv >/dev/null 2>&1; then
-    export ENV_FILE_PATH="$env_file_path"
-    export VENV_PATH="$venv_path"
-    /usr/bin/env bash "$app_dir/deploy/import_legacy_data.sh" || true
-  fi
-fi
-
-if have_cmd ufw; then
-  if [ "$bind_host" = "0.0.0.0" ] || [ "$bind_host" = "::" ]; then
-    as_root ufw allow "${app_port}/tcp" >/dev/null 2>&1 || true
-  fi
-  if [ -n "$domain" ]; then
-    as_root ufw allow "80/tcp" >/dev/null 2>&1 || true
-    as_root ufw allow "443/tcp" >/dev/null 2>&1 || true
-  fi
-  as_root ufw reload >/dev/null 2>&1 || true
-fi
-
-if have_cmd fail2ban-client; then
-  filter_src="$app_dir/deploy/fail2ban/filter.d/sistema-cliente2-auth.conf"
-  jail_tpl="$app_dir/deploy/fail2ban/jail.d/sistema-cliente2.conf.template"
-  as_root install -D -m 0644 "$filter_src" "/etc/fail2ban/filter.d/sistema-cliente2-auth.conf"
-  as_root env \
-    JAIL_TEMPLATE="$jail_tpl" \
-    APP_LOG_PATH="$app_dir/logs/sistema.log" \
-    APP_PORT="$app_port" \
-    python3 - <<'PY'
-from pathlib import Path
-import os
-
-tpl = Path(os.environ["JAIL_TEMPLATE"]).read_text(encoding="utf-8")
-out = tpl.replace("__APP_LOG_PATH__", os.environ["APP_LOG_PATH"]).replace("__APP_PORT__", os.environ["APP_PORT"])
-Path("/etc/fail2ban/jail.d/sistema-cliente2.conf").write_text(out, encoding="utf-8")
-PY
-  as_root systemctl enable --now fail2ban >/dev/null 2>&1 || true
-  as_root systemctl restart fail2ban >/dev/null 2>&1 || true
-fi
-
-if [ -n "$domain" ]; then
-  export DOMAIN="$domain"
-  export APP_PORT="$app_port"
-  export SERVICE_NAME="$service_name"
-  export CADDYFILE_PATH="$caddyfile_path"
-  export CADDY_SITES_DIR="$caddy_sites_dir"
-  export SETUP_CADDY="$setup_caddy"
-  /usr/bin/env bash "$app_dir/deploy/setup_caddy.sh"
-fi
+APP_DIR="$app_dir" \
+IMPORT_LEGACY_CSV="$import_legacy_csv" \
+ENV_FILE_PATH="$env_file_path" \
+VENV_PATH="$venv_path" \
+BIND_HOST="$bind_host" \
+APP_PORT="$app_port" \
+DOMAIN="$domain" \
+SERVICE_NAME="$service_name" \
+CADDYFILE_PATH="$caddyfile_path" CADDY_SITES_DIR="$caddy_sites_dir" SETUP_CADDY="$setup_caddy" \
+/usr/bin/env bash "$app_dir/deploy/post_install_instance.sh"
 
 echo "Listo."
 echo "Servicio: $service_name"

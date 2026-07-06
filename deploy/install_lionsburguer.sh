@@ -38,9 +38,9 @@ detect_service_user() {
 }
 
 export DOMAIN="${DOMAIN:-lionsburguer.pysystems.online}"
-export EXPECTED_PUBLIC_IP="${EXPECTED_PUBLIC_IP:-173.208.162.124}"
+export EXPECTED_PUBLIC_IP="${EXPECTED_PUBLIC_IP:-151.243.137.190}"
 export SERVICE_NAME="${SERVICE_NAME:-sistema-lionsburguer}"
-export APP_PORT="${APP_PORT:-3117}"
+export APP_PORT="${APP_PORT:-3118}"
 export ENV_FILE_PATH="${ENV_FILE_PATH:-/etc/sistema_lionsburguer.env}"
 export DB_NAME="${DB_NAME:-lionsburguer}"
 export DB_USER="${DB_USER:-lionsburguer_user}"

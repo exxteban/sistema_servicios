@@ -3,9 +3,9 @@
 Datos fijos del cliente:
 
 - Dominio: `lionsburguer.pysystems.online`
-- IP publica: `173.208.162.124`
+- IP publica: `151.243.137.190`
 - Servicio systemd: `sistema-lionsburguer`
-- Puerto interno app: `3117`
+- Puerto interno app: `3118`
 - Env server: `/etc/sistema_lionsburguer.env`
 
 ## DNS en Namecheap
@@ -15,13 +15,13 @@ Crear o verificar este registro:
 ```text
 Type: A Record
 Host: lionsburguer
-Value: 173.208.162.124
+Value: 151.243.137.190
 TTL: Automatic
 ```
 
 ## Panel del servidor
 
-La regla web debe exponer `https://lionsburguer.pysystems.online` y enviar el trafico al servidor interno donde corre la app. Si el panel maneja el certificado y proxy, debe apuntar al puerto `3117`. Si Caddy queda dentro del servidor, el trafico publico 80/443 debe llegar al Caddy y Caddy hace proxy a `127.0.0.1:3117`.
+La regla web debe exponer `https://lionsburguer.pysystems.online` y enviar el trafico al servidor interno donde corre la app. Si el panel maneja el certificado y proxy, debe apuntar al puerto `3118`. Si Caddy queda dentro del servidor, el trafico publico 80/443 debe llegar al Caddy y Caddy hace proxy a `127.0.0.1:3118`.
 
 ## Primer Deploy
 
@@ -32,6 +32,8 @@ cp deploy/lionsburguer.env.example deploy/lionsburguer.env
 nano deploy/lionsburguer.env
 bash deploy/install_lionsburguer.sh
 ```
+
+En un servidor compartido con otro cliente, el instalador crea o actualiza solo `/etc/caddy/sites.d/sistema-lionsburguer.caddy`. Si el `Caddyfile` base ya importa `sites.d/*.caddy`, no toca nada mas. Si no existe ese import, el script se detiene y te pide integrarlo manualmente o ejecutar con `CADDY_APPEND_IMPORT=1`.
 
 Si MariaDB `root` usa password, define `DB_ROOT_PASSWORD`. Si el servidor usa `auth_socket` y ejecutas el instalador con `sudo/root`, puede quedar vacio. Si dejas vacios `DB_PASSWORD`, `SECRET_KEY`, `APP_BOOTSTRAP_ADMIN_PASSWORD` y `APP_BOOTSTRAP_ROOT_PASSWORD`, el instalador genera valores seguros.
 

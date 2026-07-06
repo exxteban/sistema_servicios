@@ -1,14 +1,7 @@
-[sshd]
-enabled = true
-
-[mysqld-auth]
-enabled = true
-logpath = /var/log/mysql/error.log /var/log/mariadb/mariadb.log /var/log/mysqld.log
-
-[sistema-cliente2-auth]
+[__JAIL_NAME__]
 enabled = true
 port = __APP_PORT__
-filter = sistema-cliente2-auth
+filter = __FILTER_NAME__
 logpath = __APP_LOG_PATH__
 maxretry = 5
 findtime = 600
