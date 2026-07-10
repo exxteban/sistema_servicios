@@ -14,6 +14,7 @@ from .base import (
     _buscar_pendiente_cobro_reparacion_activa,
     _get_detalle_reparacion_or_404_safe,
     _get_reparacion_or_404_safe,
+    _motivo_bloqueo_financiero_reparacion,
     _obtener_o_crear_pendiente_cobro_reparacion,
     _puede_cobrar_reparacion_pos,
     _reparacion_tiene_saldo_pendiente,
@@ -29,6 +30,9 @@ def agregar_item(id):
             return jsonify({'error': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
         return jsonify({'error': 'No tienes permisos para editar reparaciones', 'modo_demo': False}), 403
     reparacion = _get_reparacion_or_404_safe(id)
+    bloqueo = _motivo_bloqueo_financiero_reparacion(reparacion)
+    if bloqueo:
+        return jsonify({'error': bloqueo}), 409
 
     id_producto = request.form.get('id_producto')
     cantidad = request.form.get('cantidad', 1, type=int)
@@ -92,6 +96,9 @@ def eliminar_item(id, id_detalle):
             return jsonify({'error': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
         return jsonify({'error': 'No tienes permisos para editar reparaciones', 'modo_demo': False}), 403
     reparacion = _get_reparacion_or_404_safe(id)
+    bloqueo = _motivo_bloqueo_financiero_reparacion(reparacion)
+    if bloqueo:
+        return jsonify({'error': bloqueo}), 409
     detalle = _get_detalle_reparacion_or_404_safe(id_detalle)
 
     if detalle.id_reparacion != id:
@@ -119,6 +126,9 @@ def toggle_item_costo(id, id_detalle):
             return jsonify({'error': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
         return jsonify({'error': 'No tienes permisos para editar reparaciones', 'modo_demo': False}), 403
     reparacion = _get_reparacion_or_404_safe(id)
+    bloqueo = _motivo_bloqueo_financiero_reparacion(reparacion)
+    if bloqueo:
+        return jsonify({'error': bloqueo}), 409
     detalle = _get_detalle_reparacion_or_404_safe(id_detalle)
 
     if detalle.id_reparacion != id:

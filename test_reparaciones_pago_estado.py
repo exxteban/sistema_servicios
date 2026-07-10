@@ -28,6 +28,98 @@ class ReparacionesBase(unittest.TestCase):
 
 
 class TestReparacionesPagoEstado(ReparacionesBase):
+    def test_actualizar_costos_rechaza_importes_negativos(self):
+        from app.models import Reparacion
+
+        reparacion = self._crear_reparacion(costo_final=120000, abono=0)
+        respuesta = self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/costos',
+            data={'costo_estimado': '-1', 'costo_final': '120000', 'abono': '0'},
+            headers={'Accept': 'application/json'},
+        )
+
+        self.assertEqual(respuesta.status_code, 400)
+        db.session.expire_all()
+        actualizada = db.session.get(Reparacion, reparacion.id_reparacion)
+        self.assertAlmostEqual(float(actualizada.costo_final or 0), 120000.0)
+
+    def test_estado_rechaza_salto_no_permitido(self):
+        from app.models import Reparacion
+
+        reparacion = self._crear_reparacion(costo_final=0, abono=0)
+        respuesta = self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/estado',
+            data={'estado': 'pendiente'},
+            follow_redirects=False,
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        db.session.expire_all()
+        actualizada = db.session.get(Reparacion, reparacion.id_reparacion)
+        self.assertEqual((actualizada.estado or '').lower(), 'listo')
+
+    def test_reimprimir_ticket_no_rota_el_token_de_seguimiento(self):
+        from app.models.reparacion_seguimiento import ReparacionSeguimiento
+
+        reparacion = self._crear_reparacion(costo_final=0, abono=0)
+        primera = self.client.get(f'/reparaciones/{reparacion.id_reparacion}/ticket')
+        self.assertEqual(primera.status_code, 200)
+        seguimiento = ReparacionSeguimiento.query.filter_by(
+            id_reparacion=reparacion.id_reparacion
+        ).first()
+        hash_original = seguimiento.token_hash
+
+        segunda = self.client.get(f'/reparaciones/{reparacion.id_reparacion}/ticket')
+        self.assertEqual(segunda.status_code, 200)
+        db.session.expire_all()
+        seguimiento = ReparacionSeguimiento.query.filter_by(
+            id_reparacion=reparacion.id_reparacion
+        ).first()
+        self.assertEqual(seguimiento.token_hash, hash_original)
+
+    def test_api_seguimiento_no_simula_actualizaciones(self):
+        from app.models.reparacion_seguimiento import ReparacionSeguimiento
+        from app.utils.seguimiento_utils import hash_token
+
+        reparacion = self._crear_reparacion(costo_final=0, abono=0)
+        token = 'token-seguimiento-estable'
+        db.session.add(ReparacionSeguimiento(
+            id_reparacion=reparacion.id_reparacion,
+            token_hash=hash_token(token),
+        ))
+        db.session.commit()
+
+        primera = self.client.get(f'/seguimiento/api/{token}').get_json()
+        segunda = self.client.get(f'/seguimiento/api/{token}').get_json()
+        self.assertEqual(primera.get('updated_at'), segunda.get('updated_at'))
+
+    def test_orden_cobrada_bloquea_costos_e_items(self):
+        from app.models import Venta
+
+        reparacion = self._crear_reparacion(costo_final=120000, abono=0)
+        db.session.add(Venta(
+            id_cliente=self.cliente.id_cliente,
+            id_sesion_caja=self.sesion.id_sesion,
+            id_reparacion=reparacion.id_reparacion,
+            subtotal=120000,
+            total=120000,
+            estado='completada',
+        ))
+        db.session.commit()
+
+        costos = self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/costos',
+            data={'costo_estimado': '120000', 'costo_final': '1', 'abono': '0'},
+            headers={'Accept': 'application/json'},
+        )
+        item = self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/items/agregar',
+            data={'id_producto': '1', 'cantidad': '1'},
+        )
+
+        self.assertEqual(costos.status_code, 409)
+        self.assertEqual(item.status_code, 409)
+
     def test_revertir_desde_entregado_limpia_fecha_entrega_y_registra_historial(self):
         from datetime import datetime
 

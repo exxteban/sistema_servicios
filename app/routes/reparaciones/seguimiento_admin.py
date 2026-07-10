@@ -2,16 +2,18 @@ import re
 from datetime import datetime
 from types import SimpleNamespace
 
-from flask import current_app, flash, jsonify, redirect, render_template, render_template_string, request, url_for
+from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from jinja2 import TemplateSyntaxError
+from jinja2 import TemplateError, TemplateSyntaxError
+from jinja2.sandbox import SandboxedEnvironment
+from markupsafe import Markup
 
 from app import db
 from app.models import Configuracion, Reparacion
 from app.models.reparacion_seguimiento import ReparacionSeguimiento, SeguimientoAcceso
 from app.services.whatsapp.verificacion_service import generar_codigo
 from app.utils.public_url import build_public_url
-from app.utils.seguimiento_utils import generar_qr_svg, generar_token, hash_token
+from app.utils.seguimiento_utils import cifrar_token, descifrar_token, generar_qr_svg, generar_token, hash_token
 
 from .base import REPARACION_TICKET_FOOTER_DEFAULT, _get_reparacion_or_404_safe, reparaciones_bp
 
@@ -39,6 +41,42 @@ def _should_use_builtin_repair_ticket_template(template_html: str) -> bool:
     return all(marker in normalized for marker in markers)
 
 
+def _render_custom_repair_ticket(template_html: str, **ctx) -> str:
+    """Renderiza plantillas configurables sin exponer objetos de Flask/SQLAlchemy."""
+    reparacion = ctx['reparacion']
+    cliente = getattr(reparacion, 'cliente', None)
+    reparacion_segura = SimpleNamespace(
+        id_reparacion=reparacion.id_reparacion,
+        fecha_ingreso=reparacion.fecha_ingreso,
+        estado=reparacion.estado,
+        estado_display=reparacion.estado_display,
+        tipo_equipo=reparacion.tipo_equipo,
+        marca_modelo=reparacion.marca_modelo,
+        imei_serie=reparacion.imei_serie,
+        falla_reportada=reparacion.falla_reportada,
+        accesorios=reparacion.accesorios,
+        cliente=SimpleNamespace(
+            nombre=getattr(cliente, 'nombre', ''),
+            telefono=getattr(cliente, 'telefono', ''),
+            ruc_ci=getattr(cliente, 'ruc_ci', ''),
+        ),
+    )
+    entorno = SandboxedEnvironment(autoescape=True)
+    plantilla = entorno.from_string(template_html)
+    return plantilla.render(
+        reparacion=reparacion_segura,
+        empresa=dict(ctx.get('empresa') or {}),
+        footer_text=ctx.get('footer_text') or '',
+        qr_svg=Markup(ctx.get('qr_svg') or ''),
+        seguimiento_url=ctx.get('seguimiento_url') or '',
+        codigo_bot=ctx.get('codigo_bot') or '',
+        preview=bool(ctx.get('preview')),
+        embedded=bool(ctx.get('embedded')),
+        thermal_mode=bool(ctx.get('thermal_mode')),
+        paper_width_mm=ctx.get('paper_width_mm') or 58,
+    )
+
+
 @reparaciones_bp.route('/<int:id>/ticket')
 @login_required
 def ticket(id):
@@ -57,34 +95,39 @@ def ticket(id):
         id_reparacion=reparacion.id_reparacion
     ).first()
 
-    token = generar_token()
-
-    if seguimiento:
-        seguimiento.token_hash = hash_token(token)
-        seguimiento.revoked_at = None
-        seguimiento.created_at = datetime.utcnow()
-        seguimiento.access_count = 0
-        seguimiento.last_accessed_at = None
-    else:
+    if not seguimiento:
+        token = generar_token()
         seguimiento = ReparacionSeguimiento(
             id_reparacion=reparacion.id_reparacion,
-            token_hash=hash_token(token)
+            token_hash=hash_token(token),
+            token_cifrado=cifrar_token(token)
         )
         db.session.add(seguimiento)
-
-    db.session.commit()
+        db.session.commit()
+    else:
+        # A reprint preserves the original QR link.
+        # Rotation only happens through the explicit POST action.
+        token = descifrar_token(seguimiento.token_cifrado)
 
     codigo_bot = None
     if reparacion.cliente and reparacion.cliente.telefono:
         codigo_bot = generar_codigo(reparacion.cliente.telefono, reparacion.id_reparacion)
 
-    seguimiento_url = build_public_url('seguimiento.ver_seguimiento', token=token)
+    if token is None:
+        # El token original no se puede reconstruir desde su hash. Para reimpresiones
+        # it remains valid and can only be replaced through an explicit rotation.
+        seguimiento_url = ''
+    else:
+        seguimiento_url = build_public_url('seguimiento.ver_seguimiento', token=token)
     qr_svg = None
-    try:
-        qr_svg = generar_qr_svg(seguimiento_url)
-    except ImportError:
-        qr_svg = None
-        flash('No se pudo generar el código QR. Instale: pip install segno', 'warning')
+    if seguimiento_url:
+        try:
+            qr_svg = generar_qr_svg(seguimiento_url)
+        except ImportError:
+            qr_svg = None
+            flash('No se pudo generar el código QR. Instale: pip install segno', 'warning')
+    elif not preview:
+        flash('Esta es una reimpresión. El QR original sigue activo; rote el enlace solo si necesita reemplazarlo.', 'info')
 
     base_nombre = Configuracion.obtener('nombre_empresa', '') or ''
     base_ruc = Configuracion.obtener('ruc_empresa', '') or ''
@@ -119,8 +162,8 @@ def ticket(id):
 
     if template_html and not _should_use_builtin_repair_ticket_template(template_html):
         try:
-            return render_template_string(template_html, **ctx)
-        except TemplateSyntaxError as e:
+            return _render_custom_repair_ticket(template_html, **ctx)
+        except TemplateError as e:
             pos = None
             m = re.search(r'at (\d+)\s*$', str(e))
             if m:
@@ -220,7 +263,7 @@ def config_ticket_preview():
 
     try:
         if template_html.strip() and not _should_use_builtin_repair_ticket_template(template_html):
-            html = render_template_string(template_html, **ctx)
+            html = _render_custom_repair_ticket(template_html, **ctx)
         else:
             html = render_template('reparaciones/ticket.html', **ctx)
         return jsonify({'success': True, 'html': html})
@@ -260,6 +303,7 @@ def rotar_token(id):
     ahora = datetime.utcnow()
     if seguimiento_actual:
         seguimiento_actual.token_hash = hash_token(token)
+        seguimiento_actual.token_cifrado = cifrar_token(token)
         seguimiento_actual.created_at = ahora
         seguimiento_actual.revoked_at = None
         seguimiento_actual.last_accessed_at = None
@@ -268,6 +312,7 @@ def rotar_token(id):
         nuevo_seguimiento = ReparacionSeguimiento(
             id_reparacion=reparacion.id_reparacion,
             token_hash=hash_token(token),
+            token_cifrado=cifrar_token(token),
             created_at=ahora
         )
         db.session.add(nuevo_seguimiento)

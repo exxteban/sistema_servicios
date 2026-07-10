@@ -304,6 +304,7 @@ SCHEMA_COLUMN_MIGRATIONS = {
         ),
     ],
     'reparaciones': [
+        ('password_patron_cifrado', ("ALTER TABLE reparaciones ADD COLUMN password_patron_cifrado VARCHAR(255)",), ("ALTER TABLE reparaciones ADD COLUMN password_patron_cifrado VARCHAR(255) NULL",)),
         ('patron_dibujo', ("ALTER TABLE reparaciones ADD COLUMN patron_dibujo TEXT",), ("ALTER TABLE reparaciones ADD COLUMN patron_dibujo TEXT NULL",)),
         ('nota_cliente', ("ALTER TABLE reparaciones ADD COLUMN nota_cliente TEXT",), ("ALTER TABLE reparaciones ADD COLUMN nota_cliente TEXT NULL",)),
         ('mostrar_costo', ("ALTER TABLE reparaciones ADD COLUMN mostrar_costo BOOLEAN NOT NULL DEFAULT 0",), ("ALTER TABLE reparaciones ADD COLUMN mostrar_costo BOOLEAN NOT NULL DEFAULT 0",)),
@@ -342,6 +343,9 @@ SCHEMA_COLUMN_MIGRATIONS = {
             ),
         ),
         ('fecha_listo_tecnico', ("ALTER TABLE reparaciones ADD COLUMN fecha_listo_tecnico DATETIME",), ("ALTER TABLE reparaciones ADD COLUMN fecha_listo_tecnico DATETIME NULL",)),
+    ],
+    'reparacion_seguimiento': [
+        ('token_cifrado', ("ALTER TABLE reparacion_seguimiento ADD COLUMN token_cifrado VARCHAR(255)",), ("ALTER TABLE reparacion_seguimiento ADD COLUMN token_cifrado VARCHAR(255) NULL",)),
     ],
     'clientes_fidelizacion_movimientos': [
         (

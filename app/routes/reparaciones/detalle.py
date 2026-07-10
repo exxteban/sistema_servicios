@@ -11,6 +11,7 @@ from app.services.reparaciones_tecnicos import (
     usuario_es_tecnico,
     usuarios_asignables_reparacion_activos,
 )
+from app.utils.seguimiento_utils import descifrar_token
 
 from .base import (
     CLAVE_CAJA_EXIGIR_CAJERO,
@@ -21,6 +22,7 @@ from .base import (
     _get_reparacion_or_404_safe,
     _puede_cambiar_estado_reparacion,
     _reparacion_tiene_saldo_pendiente,
+    _transicion_estado_reparacion_permitida,
     reparaciones_bp,
 )
 
@@ -58,6 +60,15 @@ def detalle(id):
     tecnicos_activos = usuarios_asignables_reparacion_activos()
     puede_asignar_tecnico = current_user.es_admin() or current_user.tiene_permiso('editar_reparacion')
     puede_tomar_reparacion = usuario_es_tecnico(current_user)
+    puede_ver_credenciales_equipo = (
+        current_user.es_admin() or current_user.tiene_permiso('editar_reparacion')
+    )
+    password_patron_visible = None
+    if puede_ver_credenciales_equipo:
+        password_patron_visible = (
+            descifrar_token(getattr(reparacion, 'password_patron_cifrado', None))
+            or getattr(reparacion, 'password_patron', None)
+        )
 
     ventas_posibles = []
     if not venta_asociada:
@@ -105,6 +116,8 @@ def detalle(id):
         tecnicos_activos=tecnicos_activos,
         puede_asignar_tecnico=puede_asignar_tecnico,
         puede_tomar_reparacion=puede_tomar_reparacion,
+        puede_ver_credenciales_equipo=puede_ver_credenciales_equipo,
+        password_patron_visible=password_patron_visible,
     )
 
 
@@ -179,6 +192,12 @@ def cambiar_estado(id):
         return redirect(url_for('reparaciones.detalle', id=id))
 
     if nuevo_estado:
+        if not _transicion_estado_reparacion_permitida(reparacion.estado, nuevo_estado):
+            flash(
+                f'No se puede cambiar una reparacion de {reparacion.estado_display} a {nuevo_estado.replace("_", " ")}.',
+                'warning'
+            )
+            return redirect(url_for('reparaciones.detalle', id=id))
         if nuevo_estado == 'entregado':
             venta_asociada = (
                 Venta.query

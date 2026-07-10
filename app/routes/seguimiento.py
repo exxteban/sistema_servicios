@@ -116,6 +116,13 @@ def api_seguimiento(token):
         elif reparacion.costo_estimado and reparacion.costo_estimado > 0:
             costo = float(reparacion.costo_estimado)
     
+    ultimo_cambio = reparacion.historial_estados.order_by(
+        db.desc('fecha_cambio')
+    ).first()
+    fecha_actualizacion = (
+        ultimo_cambio.fecha_cambio if ultimo_cambio else reparacion.fecha_ingreso
+    )
+
     # Preparar respuesta
     data = {
         'estado': reparacion.estado,
@@ -124,7 +131,7 @@ def api_seguimiento(token):
         'costo': costo,
         'fecha_estimada': reparacion.fecha_estimada.isoformat() if reparacion.fecha_estimada else None,
         'fecha_estimada_hora': reparacion.fecha_estimada_hora.isoformat() if reparacion.fecha_estimada_hora else None,
-        'updated_at': datetime.utcnow().isoformat()
+        'updated_at': fecha_actualizacion.isoformat() if fecha_actualizacion else None
     }
     
     response = jsonify(data)

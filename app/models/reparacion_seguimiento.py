@@ -12,6 +12,8 @@ class ReparacionSeguimiento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     id_reparacion = db.Column(db.Integer, db.ForeignKey('reparaciones.id_reparacion'), nullable=False, unique=True)
     token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)  # SHA-256
+    # Se cifra para poder reimprimir el QR sin guardar el token en claro.
+    token_cifrado = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     revoked_at = db.Column(db.DateTime, nullable=True)  # NULL = activo
     last_accessed_at = db.Column(db.DateTime, nullable=True)

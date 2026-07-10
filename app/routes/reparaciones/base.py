@@ -40,6 +40,22 @@ REPARACION_TICKET_FOOTER_DEFAULT = (
     'en caso contrario, el equipo será considerado como abandono y la empresa se hará cargo del mismo.'
 )
 
+# El flujo no es lineal: una reparación entregada puede reabrirse tras una
+# anulación, pero no debe poder saltar arbitrariamente entre estados.
+TRANSICIONES_ESTADO_REPARACION = {
+    'pendiente': {'diagnostico', 'espera_presupuesto', 'en_proceso', 'cancelado'},
+    'diagnostico': {'espera_presupuesto', 'espera_repuesto', 'espera_cliente', 'en_proceso', 'listo', 'no_se_pudo', 'cancelado'},
+    'espera_presupuesto': {'diagnostico', 'espera_repuesto', 'espera_cliente', 'en_proceso', 'cancelado'},
+    'espera_repuesto': {'diagnostico', 'espera_presupuesto', 'espera_cliente', 'en_proceso', 'cancelado'},
+    'espera_cliente': {'diagnostico', 'espera_presupuesto', 'espera_repuesto', 'en_proceso', 'listo', 'no_se_pudo', 'cancelado'},
+    'en_proceso': {'espera_repuesto', 'espera_cliente', 'listo', 'no_se_pudo', 'cancelado'},
+    'listo': {'en_proceso', 'espera_cliente', 'entregado', 'cancelado'},
+    'no_se_pudo': {'diagnostico', 'en_proceso', 'cancelado'},
+    'entregado': {'listo', 'en_proceso'},
+    'cancelado': {'pendiente'},
+    'antiguos': {'pendiente'},
+}
+
 
 def _modulo_servicio_tecnico_activo() -> bool:
     return system_module_enabled(CLAVE_MODULO_SERVICIO_TECNICO, default=True)
@@ -139,6 +155,58 @@ def _reparacion_tiene_saldo_pendiente(reparacion):
         return float(reparacion.saldo_pendiente or 0) > 0
     except Exception:
         return False
+
+
+def _reparacion_tiene_venta_cobrada(reparacion):
+    """Una venta vigente convierte la orden en un comprobante inmutable."""
+    return db.session.query(Venta.id_venta).filter(
+        Venta.id_reparacion == reparacion.id_reparacion,
+        Venta.estado != 'anulada',
+    ).first() is not None
+
+
+def _reparacion_tiene_cobro_en_proceso(reparacion):
+    return _buscar_pendiente_cobro_reparacion_activa(reparacion.id_reparacion) is not None
+
+
+def _motivo_bloqueo_financiero_reparacion(reparacion):
+    if _reparacion_tiene_venta_cobrada(reparacion):
+        return 'La reparación ya fue cobrada y no se pueden modificar sus importes ni sus items.'
+    if _reparacion_tiene_cobro_en_proceso(reparacion):
+        return 'La reparación ya está enviada a caja; cancele el pendiente antes de modificar importes o items.'
+    return None
+
+
+def _transicion_estado_reparacion_permitida(estado_anterior, estado_nuevo):
+    anterior = (estado_anterior or '').strip().lower()
+    nuevo = (estado_nuevo or '').strip().lower()
+    return anterior == nuevo or nuevo in TRANSICIONES_ESTADO_REPARACION.get(anterior, set())
+
+
+def _importes_reparacion_validos(*importes):
+    """Los costos y abonos nunca pueden ser negativos."""
+    try:
+        return all(float(importe or 0) >= 0 for importe in importes)
+    except (TypeError, ValueError):
+        return False
+
+
+def _abono_reparacion_valido(costo_estimado, costo_final, abono):
+    """El abono se aplica al importe efectivo que se cobrará."""
+    if not _importes_reparacion_validos(costo_estimado, costo_final, abono):
+        return False
+    final = float(costo_final or 0)
+    estimado = float(costo_estimado or 0)
+    total = final if final > 0 else estimado
+    return float(abono or 0) <= total
+
+
+def _mensaje_importes_reparacion(costo_estimado, costo_final, abono):
+    if not _importes_reparacion_validos(costo_estimado, costo_final, abono):
+        return 'Los importes no pueden ser negativos.'
+    if not _abono_reparacion_valido(costo_estimado, costo_final, abono):
+        return 'El abono no puede superar el importe efectivo de la reparación.'
+    return None
 
 
 def _puede_cobrar_reparacion_pos(usuario):
@@ -423,8 +491,6 @@ def _normalizar_horas_estimadas_invalidas_global():
 
 
 def _get_reparacion_or_404_safe(id_reparacion):
-    _normalizar_horas_estimadas_invalidas_global()
-    _normalizar_numericos_reparaciones_global()
     try:
         reparacion = db.session.get(Reparacion, id_reparacion)
         if not reparacion:

@@ -103,12 +103,14 @@
                             class="font-mono bg-gray-100 dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 px-2 rounded inline-block">
                             {{ reparacion.imei_serie or '---' }}</p>
                     </div>
+                    {% if puede_ver_credenciales_equipo %}
                     <div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">Contraseña / Patrón</p>
                         <p
                             class="font-mono bg-red-50 dark:bg-red-900/25 text-red-600 dark:text-red-200 px-2 rounded inline-block">
-                            {{ reparacion.password_patron or 'No especificado' }}</p>
+                            {{ password_patron_visible or 'No especificado' }}</p>
                     </div>
+                    {% endif %}
                 </div>
                 {% if reparacion.patron_dibujo and reparacion.patron_dibujo.startswith('data:image/') %}
                 <div class="mt-4">
@@ -174,7 +176,7 @@
                                 for="costo_estimado_detalle">
                                 Costo Estimado (Gs)
                             </label>
-                            <input type="number" name="costo_estimado" id="costo_estimado_detalle"
+                            <input type="number" name="costo_estimado" id="costo_estimado_detalle" min="0"
                                 value="{{ reparacion.costo_estimado or 0 }}"
                                 class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400">
                         </div>
@@ -183,7 +185,7 @@
                                 for="costo_final_detalle">
                                 Costo Final (Gs)
                             </label>
-                            <input type="number" name="costo_final" id="costo_final_detalle"
+                            <input type="number" name="costo_final" id="costo_final_detalle" min="0"
                                 value="{{ reparacion.costo_final or 0 }}"
                                 class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400">
                         </div>
@@ -192,7 +194,7 @@
                                 for="abono_detalle">
                                 Abono (Gs)
                             </label>
-                            <input type="number" name="abono" id="abono_detalle"
+                            <input type="number" name="abono" id="abono_detalle" min="0"
                                 value="{{ reparacion.abono or 0 }}"
                                 class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400">
                         </div>

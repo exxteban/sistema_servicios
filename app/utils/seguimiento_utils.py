@@ -4,6 +4,9 @@ Utilidades para el sistema de seguimiento público de reparaciones
 import secrets
 import hashlib
 import io
+import base64
+from flask import current_app
+from cryptography.fernet import Fernet, InvalidToken
 try:
     import segno
 except ImportError:
@@ -31,6 +34,28 @@ def hash_token(token: str) -> str:
         str: Hash hexadecimal del token
     """
     return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+
+def _secret_cipher() -> Fernet:
+    """Cifrador estable derivado de la clave de la instancia."""
+    secret = str(current_app.config.get('SECRET_KEY') or '').encode('utf-8')
+    if not secret:
+        raise RuntimeError('SECRET_KEY es obligatorio para cifrar tokens')
+    key = base64.urlsafe_b64encode(hashlib.sha256(secret).digest())
+    return Fernet(key)
+
+
+def cifrar_token(token: str) -> str:
+    return _secret_cipher().encrypt(token.encode('utf-8')).decode('ascii')
+
+
+def descifrar_token(token_cifrado: str) -> str | None:
+    if not token_cifrado:
+        return None
+    try:
+        return _secret_cipher().decrypt(token_cifrado.encode('ascii')).decode('utf-8')
+    except (InvalidToken, ValueError, TypeError):
+        return None
 
 
 def generar_qr_svg(url: str, scale: int = 3, border: int = 2) -> str:

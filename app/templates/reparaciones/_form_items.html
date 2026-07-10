@@ -1,0 +1,61 @@
+<div class="mb-6" data-permiso="editar_reparacion">
+    <h2
+        class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">
+        5. Repuestos y Servicios</h2>
+
+    <input type="hidden" name="items_json" id="items_json" value="[]">
+
+    <div class="bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700">
+        <div class="space-y-3">
+            <div class="relative">
+                <input type="text" id="buscar_producto_nuevo" placeholder="Buscar repuesto o servicio..."
+                    class="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400">
+                <div id="resultados_busqueda_nuevo"
+                    class="absolute z-10 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto hidden">
+                </div>
+            </div>
+
+            <div class="flex gap-2 items-center">
+                <input type="number" id="cantidad_producto_nuevo" value="1" min="1"
+                    class="w-24 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400">
+                <button type="button" id="btn_agregar_item_nuevo" disabled
+                    class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg shadow">
+                    Agregar
+                </button>
+                <div class="text-sm text-gray-500 dark:text-gray-400 flex-1 truncate"
+                    id="producto_seleccionado_label_nuevo"></div>
+            </div>
+        </div>
+
+        <div class="mt-4 overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-gray-600 dark:text-gray-300">Item</th>
+                        <th class="px-3 py-2 text-center text-gray-600 dark:text-gray-300 w-20">Cant.</th>
+                        <th class="px-3 py-2 text-right text-gray-600 dark:text-gray-300 w-28">Precio</th>
+                        <th class="px-3 py-2 text-right text-gray-600 dark:text-gray-300 w-32">Subtotal</th>
+                        <th class="px-3 py-2 text-center text-gray-600 dark:text-gray-300 w-36">Costo Final</th>
+                        <th class="px-3 py-2 w-12"></th>
+                    </tr>
+                </thead>
+                <tbody id="tabla_detalles_nuevo" class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tr id="fila_sin_items_nuevo">
+                        <td colspan="6" class="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
+                            No hay repuestos/servicios cargados todavía.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 flex justify-between items-center">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Costo Final calculado
+            </div>
+            <div class="text-xl font-bold text-green-600 dark:text-green-400" id="costo_final_calculado_preview">
+                ₲ 0
+            </div>
+        </div>
+    </div>
+</div>

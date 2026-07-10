@@ -396,6 +396,9 @@
             </div>
         </div>
 
+        {% if not seguimiento_url and not preview %}
+        <p class="qr-caption">Reimpresion: el QR original de seguimiento permanece vigente.</p>
+        {% endif %}
         {% if qr_svg and seguimiento_url %}
         <div class="qr-section">
             {{ qr_svg|safe }}

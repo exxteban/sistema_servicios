@@ -1,0 +1,541 @@
+{% if not editar %}
+<script>
+    (function () {
+        const urlBuscarProductos = "{{ url_for('productos.buscar_api') }}";
+
+        const inputBuscar = document.getElementById('buscar_producto_nuevo');
+        const resultados = document.getElementById('resultados_busqueda_nuevo');
+        const inputCantidad = document.getElementById('cantidad_producto_nuevo');
+        const btnAgregar = document.getElementById('btn_agregar_item_nuevo');
+        const labelSeleccion = document.getElementById('producto_seleccionado_label_nuevo');
+        const tbody = document.getElementById('tabla_detalles_nuevo');
+        const itemsJsonInput = document.getElementById('items_json');
+        const costoFinalBaseInput = document.getElementById('costo_final');
+        const previewTotal = document.getElementById('costo_final_calculado_preview');
+
+        let productoSeleccionado = null;
+        let timeoutId = null;
+        let abortBuscarProductos = null;
+        let secuenciaBusquedaProductos = 0;
+        const cacheBusquedaProductos = new Map();
+        let items = [];
+
+        function formatGs(value) {
+            const n = Number(value || 0);
+            try {
+                return new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(Math.round(n));
+            } catch (e) {
+                return String(Math.round(n));
+            }
+        }
+
+        function calcSubtotal(it) {
+            const precio = Number(it.precio_unitario || 0);
+            const cant = Number(it.cantidad || 0);
+            return precio * cant;
+        }
+
+        function setPreviewTotal() {
+            if (!previewTotal) return;
+            const base = Number((costoFinalBaseInput && costoFinalBaseInput.value) ? costoFinalBaseInput.value : 0) || 0;
+            let extra = 0;
+            for (const it of items) {
+                if (it.incluye_costo_final) extra += calcSubtotal(it);
+            }
+            previewTotal.textContent = `₲ ${formatGs(base + extra)}`;
+        }
+
+        function syncItemsJson() {
+            if (!itemsJsonInput) return;
+            const payload = items.map(it => ({
+                id_producto: it.id_producto,
+                cantidad: it.cantidad,
+                incluye_costo_final: !!it.incluye_costo_final,
+            }));
+            itemsJsonInput.value = JSON.stringify(payload);
+        }
+
+        function render() {
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            if (!items.length) {
+                const tr = document.createElement('tr');
+                tr.id = 'fila_sin_items_nuevo';
+                tr.innerHTML = `<td colspan="6" class="px-3 py-6 text-center text-gray-400 dark:text-gray-500">No hay repuestos/servicios cargados todavía.</td>`;
+                tbody.appendChild(tr);
+                syncItemsJson();
+                setPreviewTotal();
+                return;
+            }
+
+            for (const it of items) {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-id-producto', String(it.id_producto));
+                const tipo = it.es_servicio ? 'Servicio' : 'Repuesto';
+                const subtotal = calcSubtotal(it);
+                const incluye = !!it.incluye_costo_final;
+                const btnClase = incluye
+                    ? 'btn_toggle_costo_nuevo px-2 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow'
+                    : 'btn_toggle_costo_nuevo px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 text-xs font-bold';
+                const btnTexto = incluye ? 'Incluido' : 'Sumar';
+                tr.innerHTML = `
+                    <td class="px-3 py-2 text-gray-800 dark:text-gray-100">
+                        <div class="font-medium">${it.nombre}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${tipo}</div>
+                    </td>
+                    <td class="px-3 py-2 text-center text-gray-700 dark:text-gray-200">${it.cantidad}</td>
+                    <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-200">₲ ${formatGs(it.precio_unitario)}</td>
+                    <td class="px-3 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">₲ ${formatGs(subtotal)}</td>
+                    <td class="px-3 py-2 text-center">
+                        <button type="button" class="${btnClase}" data-id-producto="${it.id_producto}" data-incluye="${incluye ? 1 : 0}">
+                            ${btnTexto}
+                        </button>
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                        <button type="button" class="btn_eliminar_item_nuevo text-red-600 hover:text-red-800" data-id-producto="${it.id_producto}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            syncItemsJson();
+            setPreviewTotal();
+        }
+
+        function hideResultados() {
+            resultados.classList.add('hidden');
+            resultados.innerHTML = '';
+        }
+
+        function showResultados(itemsApi) {
+            resultados.innerHTML = '';
+            if (!Array.isArray(itemsApi) || itemsApi.length === 0) {
+                hideResultados();
+                return;
+            }
+            for (const p of itemsApi) {
+                const div = document.createElement('div');
+                div.className = 'px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors';
+                const tipo = p.es_servicio ? 'Servicio' : `Stock: ${p.stock}`;
+                div.innerHTML = `
+                    <div class="flex justify-between items-center gap-3">
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">${p.codigo} - ${p.nombre}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">${tipo}</div>
+                        </div>
+                        <div class="text-sm font-bold text-green-600 dark:text-green-400 whitespace-nowrap">₲ ${formatGs(p.precio)}</div>
+                    </div>
+                `;
+                div.addEventListener('click', () => {
+                    productoSeleccionado = p;
+                    labelSeleccion.textContent = `${p.codigo} - ${p.nombre}`;
+                    btnAgregar.disabled = false;
+                    hideResultados();
+                    inputBuscar.value = '';
+                    inputCantidad.focus();
+                    inputCantidad.select();
+                });
+                resultados.appendChild(div);
+            }
+            resultados.classList.remove('hidden');
+        }
+
+        async function buscarProductos(q) {
+            const query = (q || '').trim();
+            if (query.length < 2) {
+                secuenciaBusquedaProductos += 1;
+                if (abortBuscarProductos) abortBuscarProductos.abort();
+                hideResultados();
+                return;
+            }
+
+            const requestId = ++secuenciaBusquedaProductos;
+            if (abortBuscarProductos) abortBuscarProductos.abort();
+
+            const cacheKey = query.toLowerCase();
+            if (cacheBusquedaProductos.has(cacheKey)) {
+                showResultados(cacheBusquedaProductos.get(cacheKey));
+                return;
+            }
+
+            abortBuscarProductos = typeof AbortController !== 'undefined' ? new AbortController() : null;
+
+            try {
+                const res = await fetch(`${urlBuscarProductos}?q=${encodeURIComponent(query)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    signal: abortBuscarProductos ? abortBuscarProductos.signal : undefined
+                });
+                if (requestId !== secuenciaBusquedaProductos) return;
+                if (!res.ok) {
+                    hideResultados();
+                    return;
+                }
+                const data = await res.json();
+                cacheBusquedaProductos.set(cacheKey, data);
+                showResultados(data);
+            } catch (e) {
+                if (!e || e.name !== 'AbortError') hideResultados();
+            }
+        }
+
+        function agregarItem() {
+            if (!productoSeleccionado) return;
+            const cantidad = Math.max(1, parseInt(inputCantidad.value || '1', 10));
+            const existente = items.find(it => String(it.id_producto) === String(productoSeleccionado.id));
+            if (existente) {
+                existente.cantidad = (parseInt(existente.cantidad || 0, 10) || 0) + cantidad;
+            } else {
+                items.push({
+                    id_producto: productoSeleccionado.id,
+                    nombre: productoSeleccionado.nombre,
+                    es_servicio: !!productoSeleccionado.es_servicio,
+                    cantidad: cantidad,
+                    precio_unitario: Number(productoSeleccionado.precio || 0),
+                    incluye_costo_final: false,
+                });
+            }
+
+            render();
+            mostrarNotificacion('Item agregado', 'success');
+            productoSeleccionado = null;
+            labelSeleccion.textContent = '';
+            btnAgregar.disabled = true;
+            inputCantidad.value = '1';
+        }
+
+        if (inputBuscar) {
+            inputBuscar.addEventListener('input', () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => buscarProductos(inputBuscar.value), 250);
+            });
+            document.addEventListener('click', (e) => {
+                if (!resultados.contains(e.target) && e.target !== inputBuscar) hideResultados();
+            });
+        }
+
+        if (btnAgregar) {
+            btnAgregar.addEventListener('click', agregarItem);
+        }
+
+        if (tbody) {
+            tbody.addEventListener('click', (e) => {
+                const btnDel = e.target.closest('.btn_eliminar_item_nuevo');
+                if (btnDel) {
+                    const idProducto = btnDel.getAttribute('data-id-producto');
+                    items = items.filter(it => String(it.id_producto) !== String(idProducto));
+                    render();
+                    return;
+                }
+                const btnCosto = e.target.closest('.btn_toggle_costo_nuevo');
+                if (btnCosto) {
+                    const idProducto = btnCosto.getAttribute('data-id-producto');
+                    const it = items.find(x => String(x.id_producto) === String(idProducto));
+                    if (!it) return;
+                    it.incluye_costo_final = !it.incluye_costo_final;
+                    render();
+                }
+            });
+        }
+
+        if (costoFinalBaseInput) {
+            costoFinalBaseInput.addEventListener('input', setPreviewTotal);
+        }
+
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', () => {
+                syncItemsJson();
+            });
+        }
+
+        render();
+    })();
+</script>
+{% endif %}
+<script>
+    (function () {
+        const input = document.getElementById('password_patron');
+        const canvas = document.getElementById('patron_canvas');
+        const btnReset = document.getElementById('patron_reset');
+        const dibujoInput = document.getElementById('patron_dibujo');
+        if (!input || !canvas || !btnReset) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const state = {
+            selected: [],
+            active: false,
+            pointer: null,
+            size: 120,
+            padding: 18,
+            dotRadius: 6,
+            hitRadius: 14,
+            lineWidth: 5,
+            points: [],
+        };
+
+        function isDark() {
+            return document.documentElement.classList.contains('dark');
+        }
+
+        function clamp(n, min, max) {
+            return Math.max(min, Math.min(max, n));
+        }
+
+        function updateCanvasScale() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+            const cssW = Math.max(1, Math.round(rect.width || 120));
+            const cssH = Math.max(1, Math.round(rect.height || 120));
+            canvas.width = cssW * dpr;
+            canvas.height = cssH * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            state.size = Math.min(cssW, cssH);
+            state.padding = clamp(Math.round(state.size * 0.15), 14, 22);
+            state.dotRadius = clamp(Math.round(state.size * 0.05), 5, 7);
+            state.hitRadius = clamp(Math.round(state.size * 0.12), 12, 18);
+            state.lineWidth = clamp(Math.round(state.size * 0.045), 4, 6);
+            computePoints();
+            draw();
+        }
+
+        function computePoints() {
+            const s = state.size;
+            const p = state.padding;
+            const step = (s - p * 2) / 2;
+            const pts = [];
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const x = p + c * step;
+                    const y = p + r * step;
+                    const idx = r * 3 + c + 1;
+                    pts.push({ idx, r, c, x, y });
+                }
+            }
+            state.points = pts;
+        }
+
+        function getPosFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = clamp((e.clientX - rect.left), 0, rect.width);
+            const y = clamp((e.clientY - rect.top), 0, rect.height);
+            return { x, y };
+        }
+
+        function dist2(a, b) {
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            return dx * dx + dy * dy;
+        }
+
+        function nearestDot(pos) {
+            let best = null;
+            let bestD2 = Infinity;
+            for (const pt of state.points) {
+                const d2 = dist2(pos, pt);
+                if (d2 < bestD2) {
+                    bestD2 = d2;
+                    best = pt;
+                }
+            }
+            if (!best) return null;
+            if (bestD2 > state.hitRadius * state.hitRadius) return null;
+            return best;
+        }
+
+        function idxToRC(idx) {
+            const i = idx - 1;
+            return { r: Math.floor(i / 3), c: i % 3 };
+        }
+
+        function rcToIdx(r, c) {
+            return r * 3 + c + 1;
+        }
+
+        function intermediateIdx(aIdx, bIdx) {
+            const a = idxToRC(aIdx);
+            const b = idxToRC(bIdx);
+            const dr = b.r - a.r;
+            const dc = b.c - a.c;
+            if (dr === 0 && Math.abs(dc) === 2) return rcToIdx(a.r, a.c + dc / 2);
+            if (dc === 0 && Math.abs(dr) === 2) return rcToIdx(a.r + dr / 2, a.c);
+            if (Math.abs(dr) === 2 && Math.abs(dc) === 2) return rcToIdx(a.r + dr / 2, a.c + dc / 2);
+            return null;
+        }
+
+        function setInputFromSelected() {
+            if (!state.selected.length) return;
+            input.value = `patron:${state.selected.join('-')}`;
+        }
+
+        function tryAddDot(dot) {
+            if (!dot) return false;
+            const idx = dot.idx;
+            if (state.selected.includes(idx)) return false;
+
+            const last = state.selected[state.selected.length - 1];
+            if (last) {
+                const mid = intermediateIdx(last, idx);
+                if (mid && !state.selected.includes(mid)) {
+                    state.selected.push(mid);
+                }
+            }
+            state.selected.push(idx);
+            setInputFromSelected();
+            return true;
+        }
+
+        function clearIfPatternValue() {
+            const v = String(input.value || '');
+            if (v.trim().toLowerCase().startsWith('patron:')) {
+                input.value = '';
+            }
+        }
+
+        function reset() {
+            state.active = false;
+            state.pointer = null;
+            state.selected = [];
+            clearIfPatternValue();
+            if (dibujoInput) dibujoInput.value = '';
+            draw();
+        }
+
+        function setDibujoFromCanvas() {
+            if (!dibujoInput) return;
+            if (!state.selected.length) {
+                dibujoInput.value = '';
+                return;
+            }
+            try {
+                const out = document.createElement('canvas');
+                out.width = 120;
+                out.height = 120;
+                const octx = out.getContext('2d');
+                if (!octx) return;
+                octx.fillStyle = isDark() ? 'rgb(17,24,39)' : 'rgb(249,250,251)';
+                octx.fillRect(0, 0, out.width, out.height);
+                octx.drawImage(canvas, 0, 0, out.width, out.height);
+                dibujoInput.value = out.toDataURL('image/png');
+            } catch (e) {
+                dibujoInput.value = '';
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const dark = isDark();
+            ctx.fillStyle = dark ? 'rgb(17,24,39)' : 'rgb(249,250,251)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const lineColor = dark ? 'rgba(147,197,253,0.95)' : 'rgba(37,99,235,0.95)';
+            const dotColor = dark ? 'rgba(156,163,175,0.9)' : 'rgba(107,114,128,0.9)';
+            const dotSelectedColor = dark ? 'rgba(147,197,253,1)' : 'rgba(37,99,235,1)';
+            const dotInnerColor = dark ? 'rgba(17,24,39,0.9)' : 'rgba(255,255,255,0.95)';
+
+            const selectedPts = state.selected.map(i => state.points.find(p => p.idx === i)).filter(Boolean);
+
+            if (selectedPts.length) {
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = lineColor;
+                ctx.lineWidth = state.lineWidth;
+                ctx.beginPath();
+                ctx.moveTo(selectedPts[0].x, selectedPts[0].y);
+                for (let i = 1; i < selectedPts.length; i++) {
+                    ctx.lineTo(selectedPts[i].x, selectedPts[i].y);
+                }
+                if (state.active && state.pointer) {
+                    ctx.lineTo(state.pointer.x, state.pointer.y);
+                }
+                ctx.stroke();
+            }
+
+            for (const pt of state.points) {
+                const selected = state.selected.includes(pt.idx);
+                ctx.fillStyle = selected ? dotSelectedColor : dotColor;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, state.dotRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = dotInnerColor;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, Math.max(1, state.dotRadius - 2), 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function hydrateFromInput() {
+            const raw = String(input.value || '').trim();
+            const m = raw.match(/^patron:\s*([0-9-]+)\s*$/i);
+            if (!m) return;
+            const seq = m[1]
+                .split('-')
+                .map(s => parseInt(s, 10))
+                .filter(n => Number.isFinite(n) && n >= 1 && n <= 9);
+            const uniqueSeq = [];
+            for (const n of seq) {
+                if (!uniqueSeq.includes(n)) uniqueSeq.push(n);
+            }
+            state.selected = uniqueSeq;
+            draw();
+            setDibujoFromCanvas();
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            state.active = true;
+            state.pointer = getPosFromEvent(e);
+            canvas.setPointerCapture(e.pointerId);
+            const dot = nearestDot(state.pointer);
+            tryAddDot(dot);
+            draw();
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!state.active) return;
+            state.pointer = getPosFromEvent(e);
+            const dot = nearestDot(state.pointer);
+            if (dot) {
+                const changed = tryAddDot(dot);
+                if (changed) {
+                    state.pointer = { x: dot.x, y: dot.y };
+                }
+            }
+            draw();
+            e.preventDefault();
+        });
+
+        function endPointer(e) {
+            if (!state.active) return;
+            state.active = false;
+            state.pointer = null;
+            draw();
+            setDibujoFromCanvas();
+            e.preventDefault();
+        }
+
+        canvas.addEventListener('pointerup', endPointer);
+        canvas.addEventListener('pointercancel', endPointer);
+        canvas.addEventListener('lostpointercapture', () => {
+            state.active = false;
+            state.pointer = null;
+            draw();
+        });
+
+        btnReset.addEventListener('click', reset);
+        input.addEventListener('input', () => {
+            const v = String(input.value || '').trim().toLowerCase();
+            if (!v.startsWith('patron:')) {
+                state.selected = [];
+                if (dibujoInput) dibujoInput.value = '';
+                draw();
+            }
+        });
+
+        updateCanvasScale();
+        window.addEventListener('resize', updateCanvasScale);
+        hydrateFromInput();
+    })();
+</script>

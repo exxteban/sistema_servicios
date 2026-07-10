@@ -8,11 +8,14 @@ from flask_login import current_user, login_required
 from app import db
 from app.models import Cliente, DetalleReparacion, Producto, Reparacion
 from app.models.reparacion_seguimiento import ReparacionHistorialEstado, ReparacionSeguimiento
-from app.utils.seguimiento_utils import generar_token, hash_token
+from app.utils.seguimiento_utils import cifrar_token, generar_token, hash_token
+from app.utils.auditoria_utils import registrar_auditoria
 
 from .base import (
     _a_float_seguro,
     _get_reparacion_or_404_safe,
+    _mensaje_importes_reparacion,
+    _motivo_bloqueo_financiero_reparacion,
     _usuarios_vendedores_cajeros_activos,
     reparaciones_bp,
 )
@@ -100,7 +103,8 @@ def nuevo():
             tipo_equipo=tipo_equipo,
             marca_modelo=marca_modelo,
             imei_serie=imei_serie or None,
-            password_patron=password_patron or None,
+            password_patron=None,
+            password_patron_cifrado=cifrar_token(password_patron) if password_patron else None,
             patron_dibujo=patron_dibujo,
             accesorios=accesorios_str,
             falla_reportada=falla_reportada,
@@ -115,6 +119,14 @@ def nuevo():
             fecha_estimada_hora=fecha_estimada_hora,
         )
 
+        mensaje_importes = _mensaje_importes_reparacion(costo_estimado, costo_final, abono)
+        if mensaje_importes:
+            flash(mensaje_importes, 'danger')
+            return render_template(
+                'reparaciones/form.html', clientes=Cliente.query.filter_by(activo=True).order_by(Cliente.nombre).all(),
+                reparacion=reparacion_form, vendedores_cajeros=vendedores_cajeros,
+                vendedor_preseleccionado_id=vendedor_preseleccionado_id
+            )
         if not cliente_id:
             flash('Selecciona un cliente válido', 'danger')
             return render_template(
@@ -166,11 +178,6 @@ def nuevo():
             else:
                 dup_q = dup_q.filter(db.or_(Reparacion.imei_serie == None, Reparacion.imei_serie == ''))
 
-            if password_patron:
-                dup_q = dup_q.filter(Reparacion.password_patron == password_patron)
-            else:
-                dup_q = dup_q.filter(db.or_(Reparacion.password_patron == None, Reparacion.password_patron == ''))
-
             if accesorios_str:
                 dup_q = dup_q.filter(Reparacion.accesorios == accesorios_str)
             else:
@@ -204,7 +211,8 @@ def nuevo():
                 tipo_equipo=tipo_equipo,
                 marca_modelo=marca_modelo,
                 imei_serie=imei_serie or None,
-                password_patron=password_patron or None,
+                password_patron=None,
+                password_patron_cifrado=cifrar_token(password_patron) if password_patron else None,
                 patron_dibujo=patron_dibujo,
                 accesorios=accesorios_str,
                 falla_reportada=falla_reportada,
@@ -227,7 +235,8 @@ def nuevo():
             token = generar_token()
             seguimiento = ReparacionSeguimiento(
                 id_reparacion=reparacion.id_reparacion,
-                token_hash=hash_token(token)
+                token_hash=hash_token(token),
+                token_cifrado=cifrar_token(token)
             )
             db.session.add(seguimiento)
 
@@ -278,6 +287,17 @@ def nuevo():
                     )
                     db.session.add(detalle)
 
+            if abono > 0:
+                registrar_auditoria(
+                    accion='registrar_abono_reparacion',
+                    modulo='reparaciones',
+                    descripcion=f'Abono inicial registrado en reparación #{reparacion.id_reparacion}',
+                    referencia_tipo='reparacion',
+                    referencia_id=reparacion.id_reparacion,
+                    datos_nuevos={'abono': float(abono), 'nota': 'Verificar cobro en caja'},
+                    commit=False,
+                )
+
             db.session.commit()
 
             flash('Equipo recepcionado correctamente', 'success')
@@ -318,14 +338,41 @@ def actualizar_costos(id):
             flash('No tienes permisos para editar reparaciones.', 'danger')
         return redirect(url_for('main.dashboard'))
     reparacion = _get_reparacion_or_404_safe(id)
+    abono_anterior = float(reparacion.abono or 0)
 
-    reparacion.costo_estimado = _a_float_seguro(request.form.get('costo_estimado'))
-    reparacion.costo_final = _a_float_seguro(request.form.get('costo_final'))
-    reparacion.abono = _a_float_seguro(request.form.get('abono'))
-
+    bloqueo = _motivo_bloqueo_financiero_reparacion(reparacion)
     wants_json = bool(request.is_json) or ('application/json' in (request.headers.get('Accept') or ''))
+    if bloqueo:
+        if wants_json:
+            return jsonify({'error': bloqueo}), 409
+        flash(bloqueo, 'warning')
+        return redirect(url_for('reparaciones.detalle', id=reparacion.id_reparacion))
+
+    costo_estimado = _a_float_seguro(request.form.get('costo_estimado'))
+    costo_final = _a_float_seguro(request.form.get('costo_final'))
+    abono = _a_float_seguro(request.form.get('abono'))
+    mensaje = _mensaje_importes_reparacion(costo_estimado, costo_final, abono)
+    if mensaje:
+        if wants_json:
+            return jsonify({'error': mensaje}), 400
+        flash(mensaje, 'danger')
+        return redirect(url_for('reparaciones.detalle', id=reparacion.id_reparacion))
+    reparacion.costo_estimado = costo_estimado
+    reparacion.costo_final = costo_final
+    reparacion.abono = abono
 
     try:
+        if abono != abono_anterior:
+            registrar_auditoria(
+                accion='actualizar_abono_reparacion',
+                modulo='reparaciones',
+                descripcion=f'Abono actualizado en reparación #{reparacion.id_reparacion}',
+                referencia_tipo='reparacion',
+                referencia_id=reparacion.id_reparacion,
+                datos_anteriores={'abono': abono_anterior},
+                datos_nuevos={'abono': float(abono), 'nota': 'Verificar cobro en caja'},
+                commit=False,
+            )
         db.session.commit()
         if wants_json:
             return jsonify({
@@ -361,6 +408,11 @@ def editar(id):
     vendedor_preseleccionado_id = int(reparacion.id_usuario_vendedor) if reparacion.id_usuario_vendedor else None
 
     if request.method == 'POST':
+        abono_anterior = float(reparacion.abono or 0)
+        bloqueo = _motivo_bloqueo_financiero_reparacion(reparacion)
+        if bloqueo:
+            flash(bloqueo, 'warning')
+            return redirect(url_for('reparaciones.detalle', id=reparacion.id_reparacion))
         cliente_id_raw = (request.form.get('cliente_id') or '').strip()
         if cliente_id_raw:
             try:
@@ -415,7 +467,10 @@ def editar(id):
         reparacion.tipo_equipo = request.form.get('tipo_equipo')
         reparacion.marca_modelo = request.form.get('marca_modelo')
         reparacion.imei_serie = request.form.get('imei_serie')
-        reparacion.password_patron = request.form.get('password_patron')
+        password_patron = (request.form.get('password_patron') or '').strip()
+        if password_patron:
+            reparacion.password_patron = None
+            reparacion.password_patron_cifrado = cifrar_token(password_patron)
         patron_dibujo = request.form.get('patron_dibujo')
         if patron_dibujo:
             patron_dibujo = patron_dibujo.strip()
@@ -426,9 +481,16 @@ def editar(id):
         reparacion.falla_reportada = request.form.get('falla_reportada')
         reparacion.diagnostico_tecnico = request.form.get('diagnostico_tecnico')
         reparacion.solucion = request.form.get('solucion')
-        reparacion.costo_estimado = _a_float_seguro(request.form.get('costo_estimado'))
-        reparacion.costo_final = _a_float_seguro(request.form.get('costo_final'))
-        reparacion.abono = _a_float_seguro(request.form.get('abono'))
+        costo_estimado = _a_float_seguro(request.form.get('costo_estimado'))
+        costo_final = _a_float_seguro(request.form.get('costo_final'))
+        abono = _a_float_seguro(request.form.get('abono'))
+        mensaje_importes = _mensaje_importes_reparacion(costo_estimado, costo_final, abono)
+        if mensaje_importes:
+            flash(mensaje_importes, 'danger')
+            return redirect(url_for('reparaciones.editar', id=reparacion.id_reparacion))
+        reparacion.costo_estimado = costo_estimado
+        reparacion.costo_final = costo_final
+        reparacion.abono = abono
         reparacion.nota_cliente = request.form.get('nota_cliente')
         reparacion.mostrar_costo = 'mostrar_costo' in request.form
 
@@ -464,6 +526,17 @@ def editar(id):
         reparacion.accesorios = ", ".join(accesorios_merge)
 
         try:
+            if abono != abono_anterior:
+                registrar_auditoria(
+                    accion='actualizar_abono_reparacion',
+                    modulo='reparaciones',
+                    descripcion=f'Abono actualizado en reparación #{reparacion.id_reparacion}',
+                    referencia_tipo='reparacion',
+                    referencia_id=reparacion.id_reparacion,
+                    datos_anteriores={'abono': abono_anterior},
+                    datos_nuevos={'abono': float(abono), 'nota': 'Verificar cobro en caja'},
+                    commit=False,
+                )
             db.session.commit()
             flash('Reparación actualizada', 'success')
             return redirect(url_for('reparaciones.detalle', id=reparacion.id_reparacion))

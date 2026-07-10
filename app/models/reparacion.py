@@ -34,6 +34,7 @@ class Reparacion(db.Model):
     marca_modelo = db.Column(db.String(100), nullable=False)
     imei_serie = db.Column(db.String(100)) # Opcional pero recomendado
     password_patron = db.Column(db.String(100)) # Texto descriptivo o código
+    password_patron_cifrado = db.Column(db.String(255))
     patron_dibujo = db.Column(db.Text)
     accesorios = db.Column(db.Text) # JSON o texto separado por comas
     
