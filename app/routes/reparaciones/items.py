@@ -171,6 +171,11 @@ def generar_venta(id):
     for det in detalles_cobrables:
         if not det.es_servicio:
             prod = db.session.get(Producto, det.id_producto)
+            if not prod:
+                errores_stock.append(
+                    f"Producto no encontrado ({det.nombre_producto or 'detalle #' + str(det.id_detalle)})"
+                )
+                continue
             if prod.stock_actual < det.cantidad:
                 errores_stock.append(f"Stock insuficiente para {prod.nombre} (Stock: {prod.stock_actual}, Req: {det.cantidad})")
 

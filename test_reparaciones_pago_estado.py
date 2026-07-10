@@ -248,6 +248,116 @@ class TestReparacionesPagoEstado(ReparacionesBase):
         self.assertAlmostEqual(float(rep_db.abono or 0), 35000.0)
         self.assertAlmostEqual(float(rep_db.saldo_pendiente or 0), 125000.0)
 
+    def test_abono_en_costos_registra_ingreso_en_caja(self):
+        from app.models import MovimientoCaja
+
+        reparacion = self._crear_reparacion(costo_final=120000, abono=0)
+        total_antes = float(self.sesion.calcular_total_efectivo() or 0)
+
+        resp = self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/costos',
+            data={'costo_estimado': '0', 'costo_final': '120000', 'abono': '40000'},
+            headers={'Accept': 'application/json'},
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        mov = (
+            MovimientoCaja.query
+            .filter_by(
+                id_sesion_caja=self.sesion.id_sesion,
+                referencia_tipo='reparacion_abono',
+                referencia_id=reparacion.id_reparacion,
+            )
+            .first()
+        )
+        self.assertIsNotNone(mov, 'El abono debe generar un movimiento de caja')
+        self.assertEqual(mov.tipo, 'ingreso')
+        self.assertAlmostEqual(float(mov.monto), 40000.0)
+
+        db.session.expire_all()
+        total_despues = float(self.sesion.calcular_total_efectivo() or 0)
+        self.assertAlmostEqual(total_despues - total_antes, 40000.0)
+
+    def test_reducir_abono_registra_egreso_de_ajuste(self):
+        from app.models import MovimientoCaja
+
+        reparacion = self._crear_reparacion(costo_final=120000, abono=0)
+        self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/costos',
+            data={'costo_estimado': '0', 'costo_final': '120000', 'abono': '40000'},
+            headers={'Accept': 'application/json'},
+        )
+        # Ahora se baja el abono de 40000 a 15000 -> egreso de ajuste por 25000
+        resp = self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/costos',
+            data={'costo_estimado': '0', 'costo_final': '120000', 'abono': '15000'},
+            headers={'Accept': 'application/json'},
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        egreso = (
+            MovimientoCaja.query
+            .filter_by(
+                id_sesion_caja=self.sesion.id_sesion,
+                referencia_tipo='reparacion_abono',
+                referencia_id=reparacion.id_reparacion,
+                tipo='egreso',
+            )
+            .first()
+        )
+        self.assertIsNotNone(egreso, 'Bajar el abono debe generar un egreso de ajuste')
+        self.assertAlmostEqual(float(egreso.monto), 25000.0)
+
+    def test_abono_sin_caja_abierta_se_rechaza(self):
+        from app.models import Reparacion
+
+        rol = self._crear_rol_con_permisos(
+            'Editor sin caja', ['ver_reparaciones', 'editar_reparacion']
+        )
+        usuario = self._crear_usuario('editor_sin_caja', rol.id_rol)
+        client_usuario = self.app.test_client()
+        self._login(client_usuario, usuario)
+
+        reparacion = self._crear_reparacion(costo_final=120000, abono=0)
+        resp = client_usuario.post(
+            f'/reparaciones/{reparacion.id_reparacion}/costos',
+            data={'costo_estimado': '0', 'costo_final': '120000', 'abono': '40000'},
+            headers={'Accept': 'application/json'},
+        )
+        self.assertEqual(resp.status_code, 409)
+
+        db.session.expire_all()
+        rep_db = db.session.get(Reparacion, reparacion.id_reparacion)
+        self.assertAlmostEqual(float(rep_db.abono or 0), 0.0)
+
+    def test_enviar_a_caja_doble_no_crea_dos_pendientes(self):
+        from app.models import ColaCobro
+
+        reparacion = self._crear_reparacion(costo_final=100000, abono=0)
+
+        r1 = self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/enviar_a_caja',
+            headers={'Accept': 'application/json'},
+        )
+        r2 = self.client.post(
+            f'/reparaciones/{reparacion.id_reparacion}/enviar_a_caja',
+            headers={'Accept': 'application/json'},
+        )
+
+        self.assertEqual(r1.status_code, 200)
+        self.assertEqual(r2.status_code, 200)
+
+        activos = (
+            ColaCobro.query
+            .filter(
+                ColaCobro.tipo_origen == 'reparacion',
+                ColaCobro.id_origen == reparacion.id_reparacion,
+                ColaCobro.estado.in_(['pendiente', 'en_proceso']),
+            )
+            .count()
+        )
+        self.assertEqual(activos, 1, 'No debe existir más de un pendiente de cobro activo')
+
     def test_generar_venta_bloquea_si_abono_cubre_todo_el_saldo(self):
         reparacion = self._crear_reparacion(costo_final=65000, abono=65000)
 

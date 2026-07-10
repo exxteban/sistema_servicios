@@ -42,3 +42,6 @@ REF_GASTO_CORRIENTE_REVERSA = 'gasto_corriente_reversa'
 
 REF_AJUSTE_MANUAL = 'ajuste_manual'
 """Movimiento de ajuste manual de caja (ingreso o egreso)."""
+
+REF_ABONO_REPARACION = 'reparacion_abono'
+"""Ingreso (o egreso por ajuste) por la seña/abono cobrado al recibir una reparación."""

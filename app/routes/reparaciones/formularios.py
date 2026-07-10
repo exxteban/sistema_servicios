@@ -16,6 +16,8 @@ from .base import (
     _get_reparacion_or_404_safe,
     _mensaje_importes_reparacion,
     _motivo_bloqueo_financiero_reparacion,
+    _registrar_movimiento_abono_reparacion,
+    _sesion_caja_abierta_usuario,
     _usuarios_vendedores_cajeros_activos,
     reparaciones_bp,
 )
@@ -204,6 +206,20 @@ def nuevo():
             elif len(patron_dibujo) > 50000:
                 patron_dibujo = None
 
+        if abono and abono > 0 and not _sesion_caja_abierta_usuario(current_user):
+            flash(
+                'Para registrar una seña/abono al recibir, debe tener una caja abierta. '
+                'Abra su caja o deje el abono en 0.',
+                'danger'
+            )
+            return render_template(
+                'reparaciones/form.html',
+                clientes=clientes,
+                reparacion=reparacion_form,
+                vendedores_cajeros=vendedores_cajeros,
+                vendedor_preseleccionado_id=vendedor_preseleccionado_id
+            )
+
         try:
             reparacion = Reparacion(
                 cliente_id=cliente_id,
@@ -288,13 +304,16 @@ def nuevo():
                     db.session.add(detalle)
 
             if abono > 0:
+                ok, err = _registrar_movimiento_abono_reparacion(reparacion, abono, current_user)
+                if not ok:
+                    raise ValueError(err)
                 registrar_auditoria(
                     accion='registrar_abono_reparacion',
                     modulo='reparaciones',
                     descripcion=f'Abono inicial registrado en reparación #{reparacion.id_reparacion}',
                     referencia_tipo='reparacion',
                     referencia_id=reparacion.id_reparacion,
-                    datos_nuevos={'abono': float(abono), 'nota': 'Verificar cobro en caja'},
+                    datos_nuevos={'abono': float(abono), 'nota': 'Ingreso registrado en caja'},
                     commit=False,
                 )
 
@@ -363,6 +382,15 @@ def actualizar_costos(id):
 
     try:
         if abono != abono_anterior:
+            ok, err = _registrar_movimiento_abono_reparacion(
+                reparacion, abono - abono_anterior, current_user
+            )
+            if not ok:
+                db.session.rollback()
+                if wants_json:
+                    return jsonify({'error': err}), 409
+                flash(err, 'warning')
+                return redirect(url_for('reparaciones.detalle', id=reparacion.id_reparacion))
             registrar_auditoria(
                 accion='actualizar_abono_reparacion',
                 modulo='reparaciones',
@@ -370,7 +398,7 @@ def actualizar_costos(id):
                 referencia_tipo='reparacion',
                 referencia_id=reparacion.id_reparacion,
                 datos_anteriores={'abono': abono_anterior},
-                datos_nuevos={'abono': float(abono), 'nota': 'Verificar cobro en caja'},
+                datos_nuevos={'abono': float(abono), 'nota': 'Ajuste reflejado en caja'},
                 commit=False,
             )
         db.session.commit()
@@ -525,8 +553,24 @@ def editar(id):
             accesorios_merge.append(a)
         reparacion.accesorios = ", ".join(accesorios_merge)
 
+        if abono != abono_anterior and not _sesion_caja_abierta_usuario(current_user):
+            db.session.rollback()
+            flash(
+                'Para modificar la seña/abono debe tener una caja abierta '
+                '(el cambio se registra en caja). Abra su caja e intente de nuevo.',
+                'warning'
+            )
+            return redirect(url_for('reparaciones.detalle', id=reparacion.id_reparacion))
+
         try:
             if abono != abono_anterior:
+                ok, err = _registrar_movimiento_abono_reparacion(
+                    reparacion, abono - abono_anterior, current_user
+                )
+                if not ok:
+                    db.session.rollback()
+                    flash(err, 'warning')
+                    return redirect(url_for('reparaciones.detalle', id=reparacion.id_reparacion))
                 registrar_auditoria(
                     accion='actualizar_abono_reparacion',
                     modulo='reparaciones',
@@ -534,7 +578,7 @@ def editar(id):
                     referencia_tipo='reparacion',
                     referencia_id=reparacion.id_reparacion,
                     datos_anteriores={'abono': abono_anterior},
-                    datos_nuevos={'abono': float(abono), 'nota': 'Verificar cobro en caja'},
+                    datos_nuevos={'abono': float(abono), 'nota': 'Ajuste reflejado en caja'},
                     commit=False,
                 )
             db.session.commit()

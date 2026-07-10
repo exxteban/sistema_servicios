@@ -181,7 +181,7 @@ def cambiar_estado(id):
             flash('No tienes permisos para cambiar el estado de reparaciones.', 'danger')
         return redirect(url_for('reparaciones.detalle', id=id))
     reparacion = _get_reparacion_or_404_safe(id)
-    nuevo_estado = (request.form.get('estado') or request.args.get('estado') or '').strip().lower()
+    nuevo_estado = (request.form.get('estado') or '').strip().lower()
     estados_validos = {
         'pendiente', 'diagnostico', 'espera_presupuesto', 'espera_repuesto', 'espera_cliente',
         'en_proceso', 'listo', 'no_se_pudo', 'entregado', 'cancelado', 'antiguos'

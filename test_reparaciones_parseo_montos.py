@@ -75,5 +75,32 @@ class TestReparacionesParseoMontos(ReparacionesBase):
         self.assertAlmostEqual(float(reparacion.saldo_pendiente or 0), 125000.0)
 
 
+class TestParseoMontosFormatoBrasil(unittest.TestCase):
+    """El parser debe interpretar bien el formato brasileño (Real): punto para
+    miles y coma para decimales, sin romper el formato guaraní (miles con punto,
+    sin decimales)."""
+
+    def _f(self, valor):
+        from app.routes.reparaciones.base import _a_float_seguro
+        return _a_float_seguro(valor)
+
+    def test_real_con_miles_y_centavos(self):
+        self.assertAlmostEqual(self._f('1.234,56'), 1234.56)
+        self.assertAlmostEqual(self._f('R$ 2.350,90'), 2350.90)
+        self.assertAlmostEqual(self._f('1.000,00'), 1000.00)
+
+    def test_real_solo_centavos(self):
+        self.assertAlmostEqual(self._f('10,50'), 10.50)
+        self.assertAlmostEqual(self._f('0,50'), 0.50)
+        self.assertAlmostEqual(self._f('999,99'), 999.99)
+        self.assertAlmostEqual(self._f('1234,5'), 1234.5)
+
+    def test_guarani_miles_no_se_rompe(self):
+        self.assertAlmostEqual(self._f('50.000'), 50000.0)
+        self.assertAlmostEqual(self._f('1.500'), 1500.0)
+        self.assertAlmostEqual(self._f('2.500'), 2500.0)
+        self.assertAlmostEqual(self._f('100'), 100.0)
+
+
 if __name__ == '__main__':
     unittest.main()
