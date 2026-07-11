@@ -32,14 +32,19 @@ def _permissions_policy_value() -> str:
 
 
 def register_runtime_features(app, db):
-    from app.utils.helpers import now_local, local_strftime, normalize_for_thermal_printer, get_app_timezone_name
+    from app.utils.helpers import (
+        now_local, local_strftime, normalize_for_thermal_printer, get_app_timezone_name,
+        config_moneda, formato_moneda_local,
+    )
     from app.services.brand_logos import resolve_electronics_brand_logo
 
     app.jinja_env.globals['now'] = now_local
     app.jinja_env.globals['app_timezone_name'] = get_app_timezone_name
     app.jinja_env.globals['resolve_electronics_brand_logo'] = resolve_electronics_brand_logo
+    app.jinja_env.globals['app_moneda_config'] = config_moneda
     app.jinja_env.filters['local_strftime'] = local_strftime
     app.jinja_env.filters['thermal_safe'] = normalize_for_thermal_printer
+    app.jinja_env.filters['moneda'] = formato_moneda_local
 
     def static_url(filename: str):
         try:

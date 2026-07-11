@@ -301,7 +301,7 @@
             <div class="info-section">
                 <div class="info-label">Costo {{ 'Final' if (reparacion.costo_final_calculado or 0) > 0 else 'Estimado' }}</div>
                 <div class="info-value" style="font-size: 24px; color: #059669;">
-                    Gs {{ '{:,.0f}'.format(costo_seguimiento or 0).replace(',', '.') }}
+                    {{ (costo_seguimiento or 0)|moneda }}
                 </div>
             </div>
             {% endif %}

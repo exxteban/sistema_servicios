@@ -31,13 +31,13 @@
         <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Generado reparación</p>
             <p class="font-semibold text-gray-900 dark:text-gray-100">
-                ₲ {{ "{:,.0f}".format(reparacion.total_generado or 0).replace(",", ".") }}
+                {{ (reparacion.total_generado or 0)|moneda }}
             </p>
         </div>
         <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Mano de obra estimada</p>
             <p class="font-semibold text-gray-900 dark:text-gray-100">
-                ₲ {{ "{:,.0f}".format(reparacion.mano_obra_generada or 0).replace(",", ".") }}
+                {{ (reparacion.mano_obra_generada or 0)|moneda }}
             </p>
         </div>
     </div>

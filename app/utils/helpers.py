@@ -120,6 +120,66 @@ def formatear_moneda(valor, con_simbolo=True):
         return "₲ 0" if con_simbolo else "0"
 
 
+# ── Moneda configurable por empresa (símbolo, decimales, separadores) ─────────
+# Los defaults reproducen el formato guaraní actual, así nada cambia en Paraguay.
+# Para Brasil se configura: R$, 2 decimales, miles '.', decimal ',', locale 'pt-BR'.
+_MONEDA_DEFAULTS = {
+    'simbolo': '₲',
+    'decimales': 0,
+    'sep_miles': '.',
+    'sep_decimal': ',',
+    'locale': 'es-PY',
+}
+
+
+def config_moneda():
+    """Lee (y cachea por request) la configuración de moneda de la empresa."""
+    from flask import g, has_request_context
+
+    if has_request_context() and hasattr(g, '_config_moneda'):
+        return g._config_moneda
+
+    cfg = dict(_MONEDA_DEFAULTS)
+    try:
+        from app.models import Configuracion
+        cfg['simbolo'] = (Configuracion.obtener('moneda_simbolo') or cfg['simbolo'])
+        cfg['decimales'] = Configuracion.obtener_int('moneda_decimales', cfg['decimales'])
+        cfg['sep_miles'] = (Configuracion.obtener('moneda_sep_miles') or cfg['sep_miles'])
+        cfg['sep_decimal'] = (Configuracion.obtener('moneda_sep_decimal') or cfg['sep_decimal'])
+        cfg['locale'] = (Configuracion.obtener('moneda_locale') or cfg['locale'])
+    except Exception:
+        pass
+
+    if cfg['decimales'] < 0:
+        cfg['decimales'] = 0
+
+    if has_request_context():
+        g._config_moneda = cfg
+    return cfg
+
+
+def formato_moneda_local(valor, con_simbolo=True):
+    """Formatea un importe según la moneda configurada (símbolo/decimales/separadores)."""
+    cfg = config_moneda()
+    try:
+        valor = float(valor or 0)
+    except (ValueError, TypeError):
+        valor = 0.0
+
+    dec = cfg['decimales']
+    # Python formatea con ',' para miles y '.' para decimales; luego mapeamos a
+    # los separadores configurados usando un placeholder para no pisarlos.
+    base = "{:,.{dec}f}".format(valor, dec=dec)
+    base = (
+        base.replace(',', '\x00')
+        .replace('.', cfg['sep_decimal'])
+        .replace('\x00', cfg['sep_miles'])
+    )
+    if con_simbolo:
+        return f"{cfg['simbolo']} {base}"
+    return base
+
+
 def formatear_fecha(fecha, formato='%d/%m/%Y'):
     """Formatea una fecha"""
     if fecha:

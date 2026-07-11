@@ -20,13 +20,20 @@
         const cacheBusquedaProductos = new Map();
         let items = [];
 
+        const MONEDA = {{ app_moneda_config()|tojson }};
+
         function formatGs(value) {
             const n = Number(value || 0);
+            const dec = MONEDA.decimales || 0;
             try {
-                return new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(Math.round(n));
+                return new Intl.NumberFormat(MONEDA.locale, { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n);
             } catch (e) {
-                return String(Math.round(n));
+                return n.toFixed(dec);
             }
+        }
+
+        function formatMoneda(value) {
+            return `${MONEDA.simbolo} ${formatGs(value)}`;
         }
 
         function calcSubtotal(it) {
@@ -42,7 +49,7 @@
             for (const it of items) {
                 if (it.incluye_costo_final) extra += calcSubtotal(it);
             }
-            previewTotal.textContent = `₲ ${formatGs(base + extra)}`;
+            previewTotal.textContent = formatMoneda(base + extra);
         }
 
         function syncItemsJson() {
@@ -84,8 +91,8 @@
                         <div class="text-xs text-gray-500 dark:text-gray-400">${tipo}</div>
                     </td>
                     <td class="px-3 py-2 text-center text-gray-700 dark:text-gray-200">${it.cantidad}</td>
-                    <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-200">₲ ${formatGs(it.precio_unitario)}</td>
-                    <td class="px-3 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">₲ ${formatGs(subtotal)}</td>
+                    <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-200">${formatMoneda(it.precio_unitario)}</td>
+                    <td class="px-3 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">${formatMoneda(subtotal)}</td>
                     <td class="px-3 py-2 text-center">
                         <button type="button" class="${btnClase}" data-id-producto="${it.id_producto}" data-incluye="${incluye ? 1 : 0}">
                             ${btnTexto}
@@ -125,7 +132,7 @@
                             <div class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">${p.codigo} - ${p.nombre}</div>
                             <div class="text-xs text-gray-500 dark:text-gray-400">${tipo}</div>
                         </div>
-                        <div class="text-sm font-bold text-green-600 dark:text-green-400 whitespace-nowrap">₲ ${formatGs(p.precio)}</div>
+                        <div class="text-sm font-bold text-green-600 dark:text-green-400 whitespace-nowrap">${formatMoneda(p.precio)}</div>
                     </div>
                 `;
                 div.addEventListener('click', () => {

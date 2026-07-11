@@ -32,18 +32,25 @@
     const cacheBusquedaProductos = new Map();
     let ticketPrintEnCurso = false;
 
+    const MONEDA = {{ app_moneda_config()|tojson }};
+
     function formatGs(value) {
         const n = Number(value || 0);
+        const dec = MONEDA.decimales || 0;
         try {
-            return new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(Math.round(n));
+            return new Intl.NumberFormat(MONEDA.locale, { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n);
         } catch (e) {
-            return String(Math.round(n));
+            return n.toFixed(dec);
         }
+    }
+
+    function formatMoneda(value) {
+        return `${MONEDA.simbolo} ${formatGs(value)}`;
     }
 
     function setTotal(valor) {
         if (!totalEl) return;
-        totalEl.textContent = `₲ ${formatGs(valor)}`;
+        totalEl.textContent = formatMoneda(valor);
     }
 
     function construirUrlImpresion(url) {
@@ -179,7 +186,7 @@
                             <div class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">${p.codigo} - ${p.nombre}</div>
                             <div class="text-xs text-gray-500 dark:text-gray-400">${tipo}</div>
                         </div>
-                        <div class="text-sm font-bold text-green-600 dark:text-green-400 whitespace-nowrap">₲ ${formatGs(p.precio)}</div>
+                        <div class="text-sm font-bold text-green-600 dark:text-green-400 whitespace-nowrap">${formatMoneda(p.precio)}</div>
                     </div>
                 `;
             div.addEventListener('click', () => {
@@ -284,7 +291,7 @@
             const tdCant = trExistente.querySelector('td:nth-child(2)');
             const tdSub = trExistente.querySelector('td:nth-child(4)');
             if (tdCant) tdCant.textContent = String(det.cantidad);
-            if (tdSub) tdSub.textContent = `₲ ${formatGs(det.subtotal)}`;
+            if (tdSub) tdSub.textContent = formatMoneda(det.subtotal);
         } else {
             const tr = document.createElement('tr');
             tr.setAttribute('data-id-detalle', String(det.id));
@@ -300,8 +307,8 @@
                         <div class="text-xs text-gray-500 dark:text-gray-400">${tipo}</div>
                     </td>
                     <td class="px-3 py-2 text-center text-gray-700 dark:text-gray-200">${det.cantidad}</td>
-                    <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-200">₲ ${formatGs(det.precio)}</td>
-                    <td class="px-3 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">₲ ${formatGs(det.subtotal)}</td>
+                    <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-200">${formatMoneda(det.precio)}</td>
+                    <td class="px-3 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">${formatMoneda(det.subtotal)}</td>
                     <td class="px-3 py-2 text-center">
                         <button type="button" class="${btnClase}" data-id-detalle="${det.id}" data-incluye="${incluye ? 1 : 0}">
                             ${btnTexto}

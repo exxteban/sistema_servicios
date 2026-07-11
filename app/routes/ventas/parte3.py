@@ -1,4 +1,5 @@
 from .parte1 import *
+from .respuestas import _registrar_venta_descartada, _venta_existente_response
 from app.models import ClienteServicio
 from .parte3_helpers import (
     _construir_detalles_venta,
@@ -115,6 +116,11 @@ def _procesar_venta_payload(data):
         if cola_cobro.tipo_origen not in ('venta', 'reparacion', 'gastronomia'):
             return {'error': 'El pendiente indicado no corresponde a un origen soportado'}, 400
         if cola_cobro.estado in ('cobrado', 'cancelado'):
+            # El pendiente ya fue resuelto (por otra caja) o cancelado: una venta
+            # encolada offline contra este pendiente es un duplicado que no debe
+            # reintentarse. La registramos como descartada para que la cola local
+            # la quite sola en el próximo /ventas/sync-status.
+            _registrar_venta_descartada(client_request_id, 'pendiente_no_disponible')
             return {'error': 'Este pendiente ya no est? disponible'}, 400
         if cola_cobro.id_usuario_destino and int(cola_cobro.id_usuario_destino) != int(current_user.id_usuario):
             return {'error': 'Este pendiente est? asignado a otro cajero'}, 403

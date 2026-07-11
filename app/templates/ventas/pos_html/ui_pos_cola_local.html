@@ -33,6 +33,19 @@
                 <div x-show="venta.ultimo_error"
                     class="mt-2 rounded bg-red-50 px-2 py-1 font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-200"
                     x-text="venta.ultimo_error"></div>
+                <div class="mt-2 flex items-center justify-end gap-2" x-show="ventaPendienteEsDescartable(venta)">
+                    <button type="button" @click="reintentarVentaPendiente(venta.client_request_id)"
+                        :disabled="sincronizandoPendientes"
+                        title="Reintentar el envio de esta venta"
+                        class="inline-flex items-center gap-1 rounded-md border border-amber-600 bg-white px-2 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-60 dark:bg-gray-800 dark:text-amber-300">
+                        <i class="fas fa-rotate-right"></i> Reintentar
+                    </button>
+                    <button type="button" @click="descartarVentaPendiente(venta.client_request_id)"
+                        title="Descartar esta venta de la cola"
+                        class="inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2 py-1 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 dark:bg-gray-800 dark:text-red-300">
+                        <i class="fas fa-trash-can"></i> Descartar
+                    </button>
+                </div>
             </div>
         </template>
     </div>

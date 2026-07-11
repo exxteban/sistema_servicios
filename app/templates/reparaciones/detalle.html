@@ -252,10 +252,10 @@
                                 </td>
                                 <td class="px-3 py-2 text-center text-gray-700 dark:text-gray-200">{{ det.cantidad }}
                                 </td>
-                                <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-200">₲ {{
-                                    "{:,.0f}".format(det.precio_unitario).replace(",", ".") }}</td>
-                                <td class="px-3 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">₲ {{
-                                    "{:,.0f}".format(det.subtotal).replace(",", ".") }}</td>
+                                <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-200">{{
+                                    det.precio_unitario|moneda }}</td>
+                                <td class="px-3 py-2 text-right font-semibold text-gray-800 dark:text-gray-100">{{
+                                    det.subtotal|moneda }}</td>
                                 <td class="px-3 py-2 text-center">
                                     {% if det.incluye_costo_final %}
                                     <button type="button"
@@ -296,7 +296,7 @@
                         Costo Final
                     </div>
                     <div class="text-xl font-bold text-green-600 dark:text-green-400" id="total_reparacion">
-                        ₲ {{ "{:,.0f}".format(reparacion.costo_final_calculado or 0).replace(",", ".") }}
+                        {{ (reparacion.costo_final_calculado or 0)|moneda }}
                     </div>
                 </div>
             </div>
@@ -377,8 +377,7 @@
                         {{ venta_asociada.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
-                        Total: <span class="font-semibold">₲ {{ "{:,.0f}".format(venta_asociada.total).replace(",", ".")
-                            }}</span>
+                        Total: <span class="font-semibold">{{ venta_asociada.total|moneda }}</span>
                     </div>
                 </div>
                 <div class="mt-4 space-y-2">
@@ -448,7 +447,7 @@
                                     Venta #{{ v.id_venta }} · {{ v.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}
                                 </div>
                                 <div class="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                                    ₲ {{ "{:,.0f}".format(v.total).replace(",", ".") }}
+                                    {{ v.total|moneda }}
                                 </div>
                             </div>
                             <button type="submit" data-permiso="vincular_venta_reparacion"

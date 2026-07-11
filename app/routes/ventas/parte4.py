@@ -1,23 +1,52 @@
 from .parte1 import *
 from .parte3 import _procesar_venta_payload
+from .respuestas import _venta_descartada_response, _venta_existente_response
 from app.models import ClienteServicio
 from app.services.clientes_fidelizacion import revertir_fidelizacion_por_anulacion_venta
 from app.services.devoluciones_calculo import calculate_refund_subtotal
 from cobranzas.services.cuenta_service import anular_cuenta_por_cobrar
 
 
-def _venta_existente_response(venta):
-    total_pagado = sum(float(p.monto) for p in venta.pagos.all())
-    total = float(venta.total or 0)
-    vuelto = max(0, total_pagado - total)
-    return {
-        'success': True,
-        'id_venta': venta.id_venta,
-        'total': total,
-        'pagado': total_pagado,
-        'vuelto': float(vuelto),
-        'mensaje': f'Venta #{venta.id_venta} ya estaba registrada'
-    }
+@ventas_bp.route('/sync-status/<client_request_id>')
+@login_required
+def sync_status(client_request_id):
+    """Estado de sincronización de una venta encolada offline (por client_request_id).
+
+    Permite a la cola local del POS resolver de forma segura una venta que ya no
+    debe reintentarse: si ya fue registrada, si sigue viva como pendiente de cobro
+    o si fue descartada de forma permanente en el servidor.
+    """
+    client_request_id = (client_request_id or '').strip()
+    if not client_request_id or len(client_request_id) > 64:
+        return jsonify({'error': 'client_request_id invalido'}), 400
+
+    venta = Venta.query.filter_by(client_request_id=client_request_id).first()
+    if venta:
+        return jsonify({
+            'success': True,
+            'exists': True,
+            'source': 'venta',
+            'id_venta': int(venta.id_venta),
+            'estado': venta.estado,
+            'total': float(venta.total or 0),
+        })
+
+    pendiente = _buscar_cola_cobro_venta_activa_por_request_id(client_request_id)
+    if pendiente:
+        return jsonify({
+            'success': True,
+            'exists': True,
+            'source': 'cola_cobro',
+            'cola_id': int(pendiente.id),
+            'estado': pendiente.estado,
+            'total': float(pendiente.monto_total or 0),
+        })
+
+    descartada = _venta_descartada_response(client_request_id)
+    if descartada:
+        return jsonify(descartada)
+
+    return jsonify({'success': True, 'exists': False})
 
 @ventas_bp.route('/procesar', methods=['POST'])
 @login_required

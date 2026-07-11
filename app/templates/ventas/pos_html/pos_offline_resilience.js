@@ -13,9 +13,20 @@
     const SYNC_RETRY_MAX_MS = 60000;
     const PENDING_DB_NAME = 'pos_offline_queue_v1';
     const PENDING_STORE = 'ventas';
+    // Si una venta quedó marcada como "sincronizando" hace más de este tiempo,
+    // fue un envío interrumpido: la volvemos a dejar pendiente para reintentar.
+    const SENDING_STALE_MS = 2 * 60 * 1000;
 
     function now() {
         return Date.now();
+    }
+
+    // Errores transitorios del servidor: la venta sigue pendiente y se reintenta
+    // sola, sin marcarla como "requiere revisión".
+    // 0 = sin respuesta; 408 timeout; 429 rate limit; 5xx errores del servidor.
+    function esErrorTemporalServidor(status) {
+        const code = Number(status || 0);
+        return code === 0 || code === 408 || code === 429 || code >= 500;
     }
 
     function normalizedText(value) {
@@ -255,7 +266,16 @@
                         for (const item of this.ventasPendientes || []) {
                             if (item && item.client_request_id) merged.set(item.client_request_id, item);
                         }
-                        this.ventasPendientes = [...merged.values()].sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
+                        this.ventasPendientes = [...merged.values()]
+                            .map((venta) => {
+                                if ((venta.estado_sync || '') === 'sincronizando'
+                                    && now() - Number(venta.updated_at || venta.created_at || 0) > SENDING_STALE_MS) {
+                                    venta.estado_sync = 'pendiente';
+                                    venta.ultimo_error = venta.ultimo_error || 'Envio anterior interrumpido; pendiente de reintento';
+                                }
+                                return venta;
+                            })
+                            .sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
                         this.colaPersistencia = 'indexedDB';
                         this.guardarVentasPendientes();
                         this.programarSincronizacionPendientes(1500);
@@ -491,14 +511,34 @@
             }
 
             this.connectionStatus = 'syncing';
-            const pendientes = [...this.ventasPendientes];
+            // Solo reintentamos automáticamente las que no quedaron detenidas por
+            // un error permanente (esas esperan una acción manual: reintentar o descartar).
+            const pendientes = [...this.ventasPendientes].filter(v => (v.estado_sync || '') !== 'error');
 
             for (const venta of pendientes) {
                 const payload = { ...(venta.payload || {}), client_request_id: venta.client_request_id };
                 venta.estado_sync = 'sincronizando';
+                venta.updated_at = now();
                 venta.ultimo_error = '';
                 this.guardarVentasPendientes();
                 try {
+                    // Antes de reenviar, preguntamos al servidor si esta venta ya quedó
+                    // resuelta (registrada, aún pendiente de cobro o descartada). Así una
+                    // venta que se procesó pero cuya respuesta se perdió por timeout, o
+                    // cuyo pendiente ya fue cobrado/cancelado, sale de la cola sin quedar
+                    // trabada como "requiere revisión".
+                    const yaResuelta = await this.consultarVentaYaRegistrada(venta.client_request_id);
+                    if (yaResuelta) {
+                        this.ventasPendientes = (this.ventasPendientes || []).filter(v => v.client_request_id !== venta.client_request_id);
+                        this.guardarVentasPendientes();
+                        if (yaResuelta.source === 'descartada') {
+                            mostrarNotificacion('Una venta en cola ya no correspondia y se quito de la cola', 'info');
+                        } else {
+                            mostrarNotificacion(yaResuelta.id_venta ? `Venta ya sincronizada: #${yaResuelta.id_venta}` : 'Venta ya sincronizada', 'success');
+                        }
+                        continue;
+                    }
+
                     const { response, data } = await this.fetchJsonConTimeout('/ventas/procesar', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -515,18 +555,29 @@
                         }
                         continue;
                     }
-                    venta.estado_sync = 'error';
-                    venta.ultimo_error = (data && data.error) ? data.error : 'No se pudo sincronizar';
-                    this.ultimaSincronizacionError = venta.ultimo_error;
-                    this.guardarVentasPendientes();
-                    mostrarNotificacion(`Sincronizacion pendiente: ${venta.ultimo_error}`, 'warning');
-                    if (response.status === 408 || response.status === 429 || response.status >= 500) {
+
+                    const mensaje = (data && data.error) ? data.error : `No se pudo sincronizar (HTTP ${response.status})`;
+                    venta.ultimo_error = mensaje;
+                    this.ultimaSincronizacionError = mensaje;
+                    if (esErrorTemporalServidor(response.status)) {
+                        // Transitorio: la venta sigue pendiente y se reintenta sola.
+                        venta.estado_sync = 'pendiente';
+                        venta.updated_at = now();
+                        this.guardarVentasPendientes();
                         this.aumentarEsperaSincronizacion();
                         this.programarSincronizacionPendientes();
+                        break;
                     }
-                    break;
+                    // Permanente (payload/estado inválido, sin permisos, etc.): queda
+                    // detenida esperando revisión manual, pero no bloquea a las demás.
+                    venta.estado_sync = 'error';
+                    venta.updated_at = now();
+                    this.guardarVentasPendientes();
+                    mostrarNotificacion(`Una venta en cola necesita revision: ${mensaje}`, 'error');
+                    continue;
                 } catch (e) {
                     venta.estado_sync = 'pendiente';
+                    venta.updated_at = now();
                     venta.ultimo_error = e && e.posTimeout ? 'Servidor sin respuesta' : 'Conexion inestable';
                     this.ultimaSincronizacionError = venta.ultimo_error;
                     this.guardarVentasPendientes();
@@ -537,10 +588,75 @@
             }
 
             this.sincronizandoPendientes = false;
+            const quedanPendientes = Array.isArray(this.ventasPendientes)
+                && this.ventasPendientes.some(v => (v.estado_sync || '') !== 'error');
             if (!this.ventasPendientes || this.ventasPendientes.length === 0) {
                 this.posSyncRetryDelayMs = SYNC_RETRY_MS;
+                this.ultimaSincronizacionError = '';
+            } else if (!quedanPendientes) {
+                // Solo quedan ventas detenidas por error permanente: no hay nada que
+                // reintentar solo, así que no dejamos el aviso de "último intento".
+                this.ultimaSincronizacionError = '';
             }
             if (this.isOnline && this.connectionStatus === 'syncing') this.marcarConexionOnline();
+        };
+
+        app.consultarVentaYaRegistrada = async function consultarVentaYaRegistrada(clientRequestId) {
+            const id = String(clientRequestId || '').trim();
+            if (!id) return null;
+            try {
+                const { response, data } = await this.fetchJsonConTimeout(`/ventas/sync-status/${encodeURIComponent(id)}`, {}, {
+                    timeoutMs: 5000,
+                    slowMs: 1500,
+                    markSlow: false,
+                });
+                if (response.ok && data && data.success && data.exists) return data;
+            } catch (e) {
+            }
+            return null;
+        };
+
+        app.ventaPendienteEsDescartable = function ventaPendienteEsDescartable(venta) {
+            // Solo se puede descartar manualmente una venta detenida por error permanente,
+            // nunca una que todavia se va a reintentar sola (asi no se pierde nada por error).
+            return String((venta && venta.estado_sync) || 'pendiente') === 'error';
+        };
+
+        app.reintentarVentaPendiente = function reintentarVentaPendiente(clientRequestId) {
+            const id = String(clientRequestId || '').trim();
+            const venta = (this.ventasPendientes || []).find(v => v.client_request_id === id);
+            if (venta) {
+                venta.estado_sync = 'pendiente';
+                venta.ultimo_error = '';
+                venta.updated_at = now();
+                this.guardarVentasPendientes();
+            }
+            return this.sincronizarVentasPendientes();
+        };
+
+        app.descartarVentaPendiente = function descartarVentaPendiente(clientRequestId) {
+            const id = String(clientRequestId || '').trim();
+            if (!id) return;
+            const venta = (this.ventasPendientes || []).find(v => v.client_request_id === id);
+            if (!venta) return;
+            if (!this.ventaPendienteEsDescartable(venta)) {
+                mostrarNotificacion('Solo se pueden descartar ventas detenidas por error. Esta se reintentara sola.', 'warning');
+                return;
+            }
+            const total = (typeof this.formatNumber === 'function') ? this.formatNumber(this.totalVentaPendiente(venta)) : this.totalVentaPendiente(venta);
+            const confirmar = window.confirm(
+                '¿Descartar definitivamente esta venta en cola?\n\n' +
+                `Total: ₲ ${total}\n` +
+                `Motivo del error: ${venta.ultimo_error || 'desconocido'}\n\n` +
+                'Esta accion NO se puede deshacer. Solo hacelo si confirmaste que la venta no debe registrarse.'
+            );
+            if (!confirmar) return;
+            this.ventasPendientes = (this.ventasPendientes || []).filter(v => v.client_request_id !== id);
+            this.guardarVentasPendientes();
+            if (!this.ventasPendientes.some(v => (v.estado_sync || '') === 'error')) {
+                this.ultimaSincronizacionError = '';
+            }
+            mostrarNotificacion('Venta descartada de la cola local', 'info');
         };
 
         const originalEjecutarVenta = app.ejecutarVenta;
