@@ -568,8 +568,23 @@
                         this.programarSincronizacionPendientes();
                         break;
                     }
-                    // Permanente (payload/estado inválido, sin permisos, etc.): queda
-                    // detenida esperando revisión manual, pero no bloquea a las demás.
+                    // Antes de detenerla para revisión manual, confirmamos con el
+                    // servidor: si la marcó como descartada (p. ej. el pendiente de
+                    // cobro ya no estaba disponible) o si en realidad ya quedó
+                    // registrada, la quitamos sola en vez de dejarla trabada.
+                    const resuelta = await this.consultarVentaYaRegistrada(venta.client_request_id);
+                    if (resuelta) {
+                        this.ventasPendientes = (this.ventasPendientes || []).filter(v => v.client_request_id !== venta.client_request_id);
+                        this.guardarVentasPendientes();
+                        if (resuelta.source === 'descartada') {
+                            mostrarNotificacion('Una venta en cola ya no correspondia y se quito de la cola', 'info');
+                        } else {
+                            mostrarNotificacion(resuelta.id_venta ? `Venta ya sincronizada: #${resuelta.id_venta}` : 'Venta ya sincronizada', 'success');
+                        }
+                        continue;
+                    }
+                    // Permanente sin señal de descarte del servidor: queda detenida
+                    // esperando revisión manual, pero no bloquea a las demás.
                     venta.estado_sync = 'error';
                     venta.updated_at = now();
                     this.guardarVentasPendientes();
