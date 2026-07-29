@@ -120,26 +120,35 @@
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
-  const displayModifier = (modifier) => (
-    modifier?.tipo_grupo === 'ingrediente_removible' ? `Sin ${modifier.nombre_opcion}` : modifier?.nombre_opcion
-  );
   const modifierVisual = (modifier) => {
     if (modifier?.tipo_grupo === 'ingrediente_removible') {
-      return {className: 'kds-modifier--remove', label: 'QUITAR'};
+      return {key: 'remove', className: 'kds-modifier--remove', label: 'SIN'};
     }
     if (modifier?.tipo_grupo === 'extra') {
-      return {className: 'kds-modifier--extra', label: 'EXTRA'};
+      return {key: 'extra', className: 'kds-modifier--extra', label: 'EXTRAS'};
     }
-    return {className: 'kds-modifier--choice', label: 'OPCION'};
+    return {key: 'choice', className: 'kds-modifier--choice', label: 'OPCIONES'};
   };
-  const renderModifier = (modifier) => {
-    const visual = modifierVisual(modifier);
+  const renderModifierGroup = (visual, modifiers) => {
+    const names = modifiers.map((modifier) => escapeHtml(modifier?.nombre_opcion)).join(', ');
     return `
       <li class="kds-modifier ${visual.className}">
         <span class="kds-modifier-kind">${visual.label}</span>
-        <span class="kds-modifier-name">${escapeHtml(displayModifier(modifier))}</span>
+        <span class="kds-modifier-name">${names}</span>
       </li>
     `;
+  };
+  const renderModifiers = (modifiers = []) => {
+    const groups = {};
+    modifiers.forEach((modifier) => {
+      const visual = modifierVisual(modifier);
+      groups[visual.key] ||= {visual, modifiers: []};
+      groups[visual.key].modifiers.push(modifier);
+    });
+    return ['remove', 'extra', 'choice']
+      .filter((key) => groups[key])
+      .map((key) => renderModifierGroup(groups[key].visual, groups[key].modifiers))
+      .join('');
   };
   const displayOrigin = (order) => {
     if (order.mesa) return `Mesa ${escapeHtml(order.mesa)}`;
@@ -369,7 +378,7 @@
   `;
   const renderItemExtras = (item) => {
     const modifiers = item.modificadores?.length
-      ? `<ul class="kds-modifiers" aria-label="Cambios del producto">${item.modificadores.map(renderModifier).join('')}</ul>`
+      ? `<ul class="kds-modifiers" aria-label="Cambios del producto">${renderModifiers(item.modificadores)}</ul>`
       : '';
     const notes = item.notas
       ? renderNote(item.notas, 'rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-xs font-bold text-amber-200')

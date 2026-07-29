@@ -253,6 +253,8 @@ def _producto_tiene_opciones(producto: GastronomiaProducto) -> bool:
 
 
 def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
+    from gastronomia.services.modificadores_service import normalizar_opcion_removible_data
+
     imagenes_menu = _imagenes_publicas_menu_por_nombre(producto.cliente_id)
     grupos = (
         producto.grupos_opciones
@@ -262,7 +264,12 @@ def _grupos_opciones_producto(producto: GastronomiaProducto) -> list[dict]:
     resultado = []
     for grupo in grupos.all():
         opciones = [
-            _normalizar_opcion(opcion.to_dict(), imagenes_menu)
+            _normalizar_opcion(
+                normalizar_opcion_removible_data(opcion.to_dict())
+                if grupo.tipo == 'ingrediente_removible'
+                else opcion.to_dict(),
+                imagenes_menu,
+            )
             for opcion in grupo.opciones_ordenadas()
             if opcion.visible and opcion.disponible
         ]
