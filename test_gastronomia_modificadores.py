@@ -6,8 +6,11 @@ from gastronomia.models import (
     GastronomiaCategoria,
     GastronomiaClienteConfig,
     GastronomiaGrupoOpciones,
+    GastronomiaOpcionProducto,
     GastronomiaProducto,
 )
+from gastronomia.services.modificadores_service import sincronizar_ingredientes_removibles
+from gastronomia.services.pedido_service import crear_pedido
 
 
 def _loguear(client, app, username: str):
@@ -163,3 +166,59 @@ def test_modificadores_rechaza_requisitos_y_acceso_otro_cliente():
     )
     assert ajeno_resp.status_code == 400
     assert 'no existe para este cliente' in ajeno_resp.get_json()['mensaje']
+
+
+def test_ingrediente_removible_admite_descuento_configurable():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto_base(app, 'Resto Descuentos', 'resto_descuentos')
+
+    with app.app_context():
+        grupo = sincronizar_ingredientes_removibles(
+            cliente_id,
+            producto_id,
+            'Lechuga\nCarne | 8.000',
+        )
+        carne = GastronomiaOpcionProducto.query.filter_by(
+            grupo_id=grupo.id_grupo,
+            nombre='Carne',
+            activo=True,
+        ).one()
+        carne_id = carne.id_opcion
+        assert float(carne.precio_delta) == -8000
+
+    _loguear(client, app, 'resto_descuentos')
+    csrf = _csrf(client.get('/gastronomia/menu').get_data(as_text=True))
+    validar_resp = client.post(
+        f'/api/gastronomia/productos/{producto_id}/validar-selecciones',
+        json={'opciones': [carne_id]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert validar_resp.status_code == 200
+    assert validar_resp.get_json()['total_modificadores'] == -8000
+    assert validar_resp.get_json()['total'] == 22000
+
+    repetida_resp = client.post(
+        f'/api/gastronomia/productos/{producto_id}/validar-selecciones',
+        json={'opciones': [carne_id, carne_id]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert repetida_resp.status_code == 400
+    assert 'solo se puede quitar una vez' in repetida_resp.get_json()['mensaje']
+
+    detalle_resp = client.get(f'/api/gastronomia/productos/{producto_id}', query_string={'modificadores': '1'})
+    producto = detalle_resp.get_json()['producto']
+    assert producto['ingredientes_removibles'] == 'Lechuga\nCarne | 8000'
+
+    with app.app_context():
+        usuario = Usuario.query.filter_by(username='resto_descuentos').one()
+        pedido = crear_pedido(cliente_id, usuario.id_usuario, {
+            'tipo_pedido': 'mostrador',
+            'items': [{
+                'producto_id': producto_id,
+                'cantidad': 1,
+                'opciones': [carne_id],
+            }],
+        })
+        assert float(pedido.total) == 22000
+        assert float(pedido.items.one().precio_unitario) == 22000

@@ -109,6 +109,9 @@ def test_cocina_lista_pedidos_eventos_y_cambia_estados():
     html = page.get_data(as_text=True)
     assert 'Cocina' in html
     assert 'Delivery' in html
+    assert '.kds-modifier--extra' in html
+    assert '.kds-modifier--remove' in html
+    assert 'kds-20260728-1' in html
     csrf = _csrf(html)
     pedido_id = _crear_pedido_enviado(client, csrf, producto_id)
 

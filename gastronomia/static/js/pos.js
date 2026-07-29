@@ -276,7 +276,7 @@
                 <input type="${inputType}" name="group-${group.id_grupo}" value="${option.id_opcion}" class="pos-modifier-option-input" ${selectedOptions.includes(Number(option.id_opcion)) ? 'checked' : ''}>
                 <span class="pos-modifier-option-name">${escapeHtml(formatModifierName({...option, tipo_grupo: group.tipo}))}</span>
               </span>
-              <span class="pos-modifier-option-price">${option.precio_delta ? `+${money(option.precio_delta)}` : 'Sin costo'}</span>
+              <span class="pos-modifier-option-price">${option.precio_delta > 0 ? `+${money(option.precio_delta)}` : option.precio_delta < 0 ? `-${money(Math.abs(option.precio_delta))}` : 'Sin costo'}</span>
             </label>
           `).join('')}
         </div>

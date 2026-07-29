@@ -123,6 +123,24 @@
   const displayModifier = (modifier) => (
     modifier?.tipo_grupo === 'ingrediente_removible' ? `Sin ${modifier.nombre_opcion}` : modifier?.nombre_opcion
   );
+  const modifierVisual = (modifier) => {
+    if (modifier?.tipo_grupo === 'ingrediente_removible') {
+      return {className: 'kds-modifier--remove', icon: 'fa-minus'};
+    }
+    if (modifier?.tipo_grupo === 'extra') {
+      return {className: 'kds-modifier--extra', icon: 'fa-plus'};
+    }
+    return {className: 'kds-modifier--choice', icon: 'fa-check'};
+  };
+  const renderModifier = (modifier) => {
+    const visual = modifierVisual(modifier);
+    return `
+      <li class="kds-modifier ${visual.className}">
+        <i class="fas ${visual.icon}" aria-hidden="true"></i>
+        <span>${escapeHtml(displayModifier(modifier))}</span>
+      </li>
+    `;
+  };
   const displayOrigin = (order) => {
     if (order.mesa) return `Mesa ${escapeHtml(order.mesa)}`;
     const type = String(order.tipo_pedido || 'mostrador').replace(/_/g, ' ');
@@ -350,8 +368,9 @@
     </article>
   `;
   const renderItemExtras = (item) => {
-    const modifierText = item.modificadores?.length ? item.modificadores.map(displayModifier).join(', ') : '';
-    const modifiers = modifierText ? renderNote(modifierText, 'text-xs font-semibold text-slate-400') : '';
+    const modifiers = item.modificadores?.length
+      ? `<ul class="kds-modifiers" aria-label="Cambios del producto">${item.modificadores.map(renderModifier).join('')}</ul>`
+      : '';
     const notes = item.notas
       ? renderNote(item.notas, 'rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-xs font-bold text-amber-200')
       : '';
