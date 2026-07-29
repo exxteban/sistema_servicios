@@ -174,7 +174,7 @@
                     <td class="col-prod">
                         {{ item.nombre|thermal_safe }}<br>
                         <span class="small muted">{{ thermal_amount(item.precio_unitario) }}</span>
-                        {% for mod in item.modificadores %}<br><span class="small muted">{{ mod|thermal_safe }}</span>{% endfor %}
+                        {% for mod in item.modificadores %}<br><span class="small muted">- {{ mod|thermal_safe }}</span>{% endfor %}
                         {% if item.notas %}<br><span class="small muted">Nota: {{ item.notas|thermal_safe }}</span>{% endif %}
                     </td>
                     <td class="right col-cant">{{ item.cantidad }}</td>
@@ -219,7 +219,7 @@
 {{ thermal_pair('Producto', 'Cant    Total', thermal_width) }}
 {% for item in items %}{{ item.nombre|thermal_safe }}
 {{ thermal_amount(item.precio_unitario) }}
-{% for mod in item.modificadores %}{{ mod|thermal_safe }}
+{% for mod in item.modificadores %}- {{ mod|thermal_safe }}
 {% endfor %}{% if item.notas %}Nota: {{ item.notas|thermal_safe }}
 {% endif %}{{ thermal_pair('', item.cantidad ~ '  ' ~ thermal_amount(item.subtotal), thermal_width) }}
 {% endfor %}{{ '-' * thermal_width }}

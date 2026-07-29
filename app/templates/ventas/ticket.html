@@ -261,10 +261,12 @@
             </thead>
             <tbody>
                 {% for item in detalles %}
+                {% set item_modifiers = (gastronomia_modificadores_por_detalle|default({})).get(item.id_detalle_venta|default(0), []) %}
                 <tr>
                     <td class="col-prod">
                         {{ item.item_nombre|thermal_safe }}<br />
                         <span class="small muted">{{ thermal_amount(item.precio_unitario) }}</span>
+                        {% for modifier in item_modifiers %}<br /><span class="small muted">- {{ modifier|thermal_safe }}</span>{% endfor %}
                     </td>
                     <td class="right col-cant">{{ item.cantidad }}</td>
                     <td class="right col-total">{{ thermal_amount(item.subtotal) }}</td>
@@ -397,8 +399,10 @@ Vendedor:
 {{ vendedor_nombre }}
 {{ '-' * thermal_width }}
 {{ thermal_pair('Producto', 'Cant    Total', thermal_width) }}
-{% for item in detalles %}{{ item.item_nombre|thermal_safe }}
+{% for item in detalles %}{% set item_modifiers = (gastronomia_modificadores_por_detalle|default({})).get(item.id_detalle_venta|default(0), []) %}{{ item.item_nombre|thermal_safe }}
 {{ thermal_amount(item.precio_unitario) }}
+{% for modifier in item_modifiers %}- {{ modifier|thermal_safe }}
+{% endfor %}
 {{ thermal_pair('', item.cantidad ~ '  ' ~ thermal_amount(item.subtotal), thermal_width) }}
 {% endfor %}{{ '-' * thermal_width }}
 {{ thermal_pair('Subtotal', thermal_amount(subtotal), thermal_width) }}
