@@ -80,7 +80,11 @@ def guardar_opcion(cliente_id: int, grupo_id: int, data: dict, opcion=None) -> G
         raise ValueError('El nombre de la opcion es obligatorio.')
     opcion = opcion or GastronomiaOpcionProducto(cliente_id=int(cliente_id), grupo_id=int(grupo_id))
     opcion.nombre = nombre[:140]
-    opcion.precio_delta = parse_price(data.get('precio_delta', 0))
+    opcion.precio_delta = (
+        _parse_price_delta(data.get('precio_delta', 0))
+        if grupo.tipo == 'ingrediente_removible'
+        else parse_price(data.get('precio_delta', 0))
+    )
     if 'imagen_url' in data:
         opcion.imagen_url = (data.get('imagen_url') or '').strip()[:500] or None
     opcion.disponible = parse_bool(data.get('disponible'), True)
@@ -97,7 +101,7 @@ def sincronizar_ingredientes_removibles(cliente_id: int, producto_id: int, ingre
     if not producto:
         raise ValueError('El producto no existe para este cliente.')
 
-    nombres = _normalizar_nombres_ingredientes(ingredientes)
+    items = _normalizar_ingredientes_removibles(ingredientes)
     grupos = GastronomiaGrupoOpciones.query.filter(
         GastronomiaGrupoOpciones.cliente_id == int(cliente_id),
         GastronomiaGrupoOpciones.producto_id == int(producto_id),
@@ -110,7 +114,7 @@ def sincronizar_ingredientes_removibles(cliente_id: int, producto_id: int, ingre
         for opcion in grupo_extra.opciones.filter_by(activo=True).all():
             opcion.activo = False
 
-    if not nombres:
+    if not items:
         if grupo:
             grupo.activo = False
             for opcion in grupo.opciones.filter_by(activo=True).all():
@@ -124,7 +128,7 @@ def sincronizar_ingredientes_removibles(cliente_id: int, producto_id: int, ingre
     grupo.tipo = 'ingrediente_removible'
     grupo.obligatorio = False
     grupo.min_selecciones = 0
-    grupo.max_selecciones = max(1, len(nombres))
+    grupo.max_selecciones = max(1, len(items))
     grupo.orden = -100
     grupo.visible = True
     grupo.activo = True
@@ -135,13 +139,13 @@ def sincronizar_ingredientes_removibles(cliente_id: int, producto_id: int, ingre
         opcion.nombre.strip().lower(): opcion
         for opcion in grupo.opciones.filter_by(activo=True).all()
     }
-    nombres_activos = {nombre.lower() for nombre in nombres}
-    for orden, nombre in enumerate(nombres):
+    nombres_activos = {nombre.lower() for nombre, _descuento in items}
+    for orden, (nombre, descuento) in enumerate(items):
         opcion = opciones_activas.get(nombre.lower())
         if not opcion:
             opcion = GastronomiaOpcionProducto(cliente_id=int(cliente_id), grupo_id=grupo.id_grupo)
         opcion.nombre = nombre[:140]
-        opcion.precio_delta = 0
+        opcion.precio_delta = -descuento
         opcion.disponible = True
         opcion.visible = True
         opcion.orden = orden
@@ -249,6 +253,7 @@ def producto_con_modificadores(cliente_id: int, producto_id: int, *, canal_preci
         grupo.to_dict()
         for grupo in listar_grupos_producto(cliente_id, producto_id, incluir_ocultos=False)
     ]
+    data['ingredientes_removibles'] = _ingredientes_removibles_texto(data['grupos_opciones'])
     data['adicionales_precio'] = _adicionales_texto(data['grupos_opciones'])
     return data
 
@@ -285,6 +290,11 @@ def validar_selecciones_producto(
         total_modificadores += Decimal(str(opcion.precio_delta or 0))
 
     conteo_por_grupo = Counter(int(opcion.grupo_id) for opcion in seleccionadas)
+    conteo_por_opcion = Counter(int(opcion.id_opcion) for opcion in seleccionadas)
+    for opcion in seleccionadas:
+        grupo = grupos_por_id.get(int(opcion.grupo_id))
+        if grupo and grupo.tipo == 'ingrediente_removible' and conteo_por_opcion[int(opcion.id_opcion)] > 1:
+            raise ValueError(f'El ingrediente "{opcion.nombre}" solo se puede quitar una vez.')
     for grupo in grupos:
         cantidad = conteo_por_grupo.get(int(grupo.id_grupo), 0)
         if cantidad < int(grupo.min_selecciones or 0):
@@ -294,6 +304,8 @@ def validar_selecciones_producto(
 
     precio_base = obtener_precio_canal(producto, canal_precio)
     total = precio_base + total_modificadores
+    if total < 0:
+        raise ValueError('Los descuentos seleccionados no pueden superar el precio del producto.')
     return {
         'producto': aplicar_precio_canal(producto, producto.to_dict(), canal_precio),
         'selecciones': [_opcion_con_grupo(opcion, grupos_por_id) for opcion in seleccionadas],
@@ -310,25 +322,47 @@ def _opcion_con_grupo(opcion: GastronomiaOpcionProducto, grupos_por_id: dict[int
     return data
 
 
-def _normalizar_nombres_ingredientes(ingredientes) -> list[str]:
+def _normalizar_ingredientes_removibles(ingredientes) -> list[tuple[str, Decimal]]:
     if isinstance(ingredientes, str):
         partes = ingredientes.replace(';', '\n').replace(',', '\n').splitlines()
     elif isinstance(ingredientes, list):
-        partes = [item.get('nombre') if isinstance(item, dict) else item for item in ingredientes]
+        partes = ingredientes
     else:
         partes = []
-    nombres = []
+    items = []
     vistos = set()
     for item in partes:
-        nombre = str(item or '').strip()
+        if isinstance(item, dict):
+            nombre = str(item.get('nombre') or '').strip()
+            raw_descuento = item.get('descuento', item.get('precio_delta', 0))
+            descuento = abs(_parse_price_delta(raw_descuento))
+        else:
+            nombre, descuento = _parse_ingrediente_removible_linea(str(item or '').strip())
         if not nombre:
             continue
         clave = nombre.lower()
         if clave in vistos:
             continue
         vistos.add(clave)
-        nombres.append(nombre[:140])
-    return nombres
+        items.append((nombre[:140], descuento))
+    return items
+
+
+def _parse_ingrediente_removible_linea(texto: str) -> tuple[str, Decimal]:
+    for separador in ('|', '=', ':'):
+        if separador in texto:
+            nombre, descuento = texto.rsplit(separador, 1)
+            return nombre.strip(), parse_price(descuento.strip() or 0)
+    return texto.strip(), Decimal('0.00')
+
+
+def _parse_price_delta(value) -> Decimal:
+    raw = str(value if value is not None else '').strip()
+    if raw.startswith('-'):
+        return -parse_price(raw[1:].strip() or 0)
+    if raw.startswith('+'):
+        raw = raw[1:].strip()
+    return parse_price(raw or 0)
 
 
 def _normalizar_adicionales(adicionales) -> list[tuple[str, Decimal]]:
@@ -376,6 +410,19 @@ def _adicionales_texto(grupos: list[dict]) -> str:
                 precio = Decimal(str(opcion.get('precio_delta') or 0))
                 lineas.append(f"{opcion.get('nombre')} | {precio:.0f}")
             return '\n'.join(lineas)
+    return ''
+
+
+def _ingredientes_removibles_texto(grupos: list[dict]) -> str:
+    for grupo in grupos:
+        if grupo.get('tipo') != 'ingrediente_removible':
+            continue
+        lineas = []
+        for opcion in grupo.get('opciones') or []:
+            descuento = abs(Decimal(str(opcion.get('precio_delta') or 0)))
+            sufijo = f' | {descuento:.0f}' if descuento else ''
+            lineas.append(f"{opcion.get('nombre')}{sufijo}")
+        return '\n'.join(lineas)
     return ''
 
 

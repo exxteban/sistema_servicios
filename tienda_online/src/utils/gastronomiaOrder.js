@@ -42,8 +42,11 @@ export function buildGastronomiaOrderMessage(config, items = []) {
         const modifierTotal = Number(modifier.precio_delta || 0) * Number(modifier.cantidad || 0)
         const label = formatModifierName(modifier)
         const quantityText = isRemovableModifier(modifier) && Number(modifier.cantidad || 0) === 1 ? '' : ` x${modifier.cantidad}`
+        const priceText = modifierTotal > 0
+          ? `+ ${formatGs(modifierTotal)}`
+          : modifierTotal < 0 ? `- ${formatGs(Math.abs(modifierTotal))}` : 'sin costo'
         lines.push(
-          `  * ${label}${quantityText}: ${modifierTotal > 0 ? `+ ${formatGs(modifierTotal)}` : 'sin costo'}`
+          `  * ${label}${quantityText}: ${priceText}`
         )
       })
     }

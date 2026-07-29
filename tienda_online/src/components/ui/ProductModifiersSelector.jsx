@@ -19,7 +19,9 @@ export default function ProductModifiersSelector({ grupos = [], selections, onCh
       if (item.id_opcion === opcion.id_opcion) return total
       return total + Number(selections[item.id_opcion] || 0)
     }, 0)
-    const maxForOption = Math.max(0, maxGrupo - currentGroupCount)
+    const maxForOption = grupo.tipo === 'ingrediente_removible'
+      ? Math.min(1, Math.max(0, maxGrupo - currentGroupCount))
+      : Math.max(0, maxGrupo - currentGroupCount)
     const quantity = Math.min(maxForOption, Math.max(0, Number(nextQuantity || 0)))
     onChange({
       ...selections,
@@ -49,6 +51,7 @@ export default function ProductModifiersSelector({ grupos = [], selections, onCh
             <div className="product-modifier-options">
               {grupo.opciones.map((opcion) => {
                 const quantity = Number(selections[opcion.id_opcion] || 0)
+                const priceDelta = Number(opcion.precio_delta || 0)
                 return (
                   <article className={`product-modifier-option ${quantity > 0 ? 'is-selected' : ''}`} key={opcion.id_opcion}>
                     <div className="product-modifier-image">
@@ -56,7 +59,7 @@ export default function ProductModifiersSelector({ grupos = [], selections, onCh
                     </div>
                     <div className="product-modifier-copy">
                       <strong>{opcion.nombre}</strong>
-                      <span>{Number(opcion.precio_delta || 0) > 0 ? `+ ${formatGs(opcion.precio_delta)}` : 'Sin costo'}</span>
+                      <span>{formatModifierPrice(priceDelta, grupo.tipo)}</span>
                     </div>
                     <div className="product-modifier-stepper" aria-label={`Cantidad de ${opcion.nombre}`}>
                       <button type="button" onClick={() => setQuantity(grupo, opcion, quantity - 1)} disabled={quantity <= 0}>-</button>
@@ -87,4 +90,10 @@ export function getSelectedModifiers(grupos = [], selections = {}) {
 
 export function getModifiersTotal(selected = []) {
   return selected.reduce((total, opcion) => total + opcion.cantidad * Number(opcion.precio_delta || 0), 0)
+}
+
+function formatModifierPrice(priceDelta, groupType) {
+  if (priceDelta > 0) return `+ ${formatGs(priceDelta)}`
+  if (priceDelta < 0) return `- ${formatGs(Math.abs(priceDelta))}`
+  return groupType === 'ingrediente_removible' ? 'Sin descuento' : 'Sin costo'
 }

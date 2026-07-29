@@ -173,6 +173,64 @@
         display: grid;
         gap: 0.3rem;
     }
+    .kds-modifiers {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.32rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .kds-modifier {
+        display: inline-flex;
+        max-width: 100%;
+        align-items: center;
+        gap: 0.38rem;
+        border: 1px solid;
+        border-radius: 7px;
+        padding: 0.3rem 0.5rem;
+        font-size: clamp(0.8rem, 1.8vw, 0.9rem);
+        font-weight: 900;
+        line-height: 1.1;
+    }
+    .kds-modifier i {
+        flex: 0 0 auto;
+        font-size: 0.72rem;
+    }
+    .kds-modifier span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    .kds-modifier--extra {
+        border-color: #f59e0b;
+        background: #fef3c7;
+        color: #78350f;
+    }
+    .kds-modifier--remove {
+        border-color: #ef4444;
+        background: #fee2e2;
+        color: #7f1d1d;
+    }
+    .kds-modifier--choice {
+        border-color: #3b82f6;
+        background: #dbeafe;
+        color: #1e3a8a;
+    }
+    .dark .kds-modifier--extra {
+        border-color: #fbbf24;
+        background: rgba(120, 53, 15, 0.88);
+        color: #fef3c7;
+    }
+    .dark .kds-modifier--remove {
+        border-color: #f87171;
+        background: rgba(127, 29, 29, 0.9);
+        color: #fee2e2;
+    }
+    .dark .kds-modifier--choice {
+        border-color: #60a5fa;
+        background: rgba(30, 58, 138, 0.88);
+        color: #dbeafe;
+    }
     .kds-card p {
         overflow-wrap: break-word;
     }
@@ -411,5 +469,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260625-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='kds-20260728-1') }}"></script>
 {% endblock %}

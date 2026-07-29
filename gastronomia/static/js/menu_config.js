@@ -167,9 +167,12 @@
     return data;
   };
 
-  const ingredientesRemovibles = (producto) => (producto.grupos_opciones || [])
+  const ingredientesRemovibles = (producto) => producto.ingredientes_removibles || (producto.grupos_opciones || [])
     .find((grupo) => grupo.tipo === 'ingrediente_removible')?.opciones
-    ?.map((opcion) => opcion.nombre)
+    ?.map((opcion) => {
+      const descuento = Math.abs(Number(opcion.precio_delta || 0));
+      return descuento ? `${opcion.nombre} | ${descuento}` : opcion.nombre;
+    })
     .join('\n') || '';
 
   const clearObjectUrl = () => {
