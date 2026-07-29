@@ -20,7 +20,10 @@ def test_previsualizacion_receta_alerta_antes_de_guardar_sin_mutar_stock():
     assert 'js/pos_channel_prices.js' in pos_html
     assert pos_html.index('js/pos_channel_prices.js') < pos_html.index('js/pos.js')
     assert 'css/pos.css' in pos_html
+    assert 'css/pos_cart_modifiers.css' in pos_html
+    assert pos_html.index('js/pos_cart_modifiers.js') < pos_html.index('js/pos.js')
     assert client.get('/gastronomia/static/css/pos.css').status_code == 200
+    assert client.get('/gastronomia/static/css/pos_cart_modifiers.css').status_code == 200
     stock_script = client.get('/gastronomia/static/js/pos_stock_alerts.js')
     channel_prices_script = client.get('/gastronomia/static/js/pos_channel_prices.js')
     assert stock_script.status_code == 200
@@ -29,6 +32,9 @@ def test_previsualizacion_receta_alerta_antes_de_guardar_sin_mutar_stock():
     assert 'fetchProducts' in channel_prices_script.get_data(as_text=True)
     pos_script = client.get('/gastronomia/static/js/pos.js')
     assert 'window.GastronomiaStockAlerts?.refresh(cart);' in pos_script.get_data(as_text=True)
+    modifiers_script = client.get('/gastronomia/static/js/pos_cart_modifiers.js')
+    assert modifiers_script.status_code == 200
+    assert 'pos-cart-modifier--remove' in modifiers_script.get_data(as_text=True)
 
     assert client.put(
         f'/api/gastronomia/stock/productos/{producto_id}/receta',

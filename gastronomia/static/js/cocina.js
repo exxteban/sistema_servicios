@@ -125,19 +125,19 @@
   );
   const modifierVisual = (modifier) => {
     if (modifier?.tipo_grupo === 'ingrediente_removible') {
-      return {className: 'kds-modifier--remove', icon: 'fa-minus'};
+      return {className: 'kds-modifier--remove', label: 'QUITAR'};
     }
     if (modifier?.tipo_grupo === 'extra') {
-      return {className: 'kds-modifier--extra', icon: 'fa-plus'};
+      return {className: 'kds-modifier--extra', label: 'EXTRA'};
     }
-    return {className: 'kds-modifier--choice', icon: 'fa-check'};
+    return {className: 'kds-modifier--choice', label: 'OPCION'};
   };
   const renderModifier = (modifier) => {
     const visual = modifierVisual(modifier);
     return `
       <li class="kds-modifier ${visual.className}">
-        <i class="fas ${visual.icon}" aria-hidden="true"></i>
-        <span>${escapeHtml(displayModifier(modifier))}</span>
+        <span class="kds-modifier-kind">${visual.label}</span>
+        <span class="kds-modifier-name">${escapeHtml(displayModifier(modifier))}</span>
       </li>
     `;
   };

@@ -331,7 +331,7 @@
           <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm font-black text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white">${item.cantidad}</span>
           <div class="min-w-0">
             <h3 class="text-sm font-black leading-tight text-gray-900 dark:text-white">${escapeHtml(item.nombre)}</h3>
-            <p class="mt-0.5 text-xs text-gray-500">${escapeHtml(item.selecciones.map(formatModifierName).join(', '))}</p>
+            ${window.GastronomiaCartModifiers.render(item.selecciones, formatModifierName, escapeHtml)}
             ${item.notas ? `<p class="mt-1 rounded bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700 dark:bg-orange-500/10 dark:text-orange-200">${escapeHtml(item.notas)}</p>` : ''}
           </div>
           <div class="flex shrink-0 items-center gap-2">
