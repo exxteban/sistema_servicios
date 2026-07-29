@@ -23,8 +23,11 @@
     const qty = Math.max(0, Number(item.cantidad || 0));
     const unitPrice = number(item.precio_unitario);
     const basePrice = number(item.precio_base ?? unitPrice);
-    const extras = Math.max(0, unitPrice - basePrice);
-    return basePromotionSubtotal(basePrice, qty, item.promocion_activa) + (extras * qty);
+    const modifierDelta = unitPrice - basePrice;
+    return Math.max(
+      0,
+      basePromotionSubtotal(basePrice, qty, item.promocion_activa) + (modifierDelta * qty),
+    );
   };
 
   window.GastronomiaPromociones = {subtotal};

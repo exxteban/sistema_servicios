@@ -186,13 +186,15 @@
         grid-template-columns: auto minmax(0, 1fr);
         align-items: center;
         gap: 0.42rem;
-        border: 2px solid;
+        border: 1px solid;
         border-radius: 7px;
         padding: 0.36rem 0.52rem;
         font-size: clamp(0.86rem, 1.9vw, 0.96rem);
         font-weight: 900;
         line-height: 1.1;
-        box-shadow: 0 2px 4px rgba(15, 23, 42, 0.16);
+        box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
+        transform-origin: center;
+        animation: kdsModifierSoftPulse 3.4s ease-in-out infinite;
     }
     .kds-modifier-kind {
         flex: 0 0 auto;
@@ -210,34 +212,51 @@
         text-transform: uppercase;
     }
     .kds-modifier--extra {
-        border-color: #a16207;
-        background: #fbbf24;
-        color: #422006;
+        border-color: #f0b95d;
+        background: #fff4d6;
+        color: #7c4a03;
+        animation-delay: 0.45s;
     }
     .kds-modifier--remove {
-        border-color: #991b1b;
-        background: #dc2626;
-        color: #ffffff;
+        border-color: #f29a9a;
+        background: #ffeded;
+        color: #991b1b;
     }
     .kds-modifier--choice {
-        border-color: #1e3a8a;
-        background: #2563eb;
-        color: #ffffff;
+        border-color: #93b8ea;
+        background: #eaf3ff;
+        color: #1e4f91;
+        animation-delay: 0.9s;
     }
     .dark .kds-modifier--extra {
-        border-color: #fbbf24;
-        background: #b45309;
-        color: #ffffff;
+        border-color: #a66c18;
+        background: #4a3517;
+        color: #fde8b2;
     }
     .dark .kds-modifier--remove {
-        border-color: #f87171;
-        background: #991b1b;
-        color: #ffffff;
+        border-color: #a94f56;
+        background: #4b252b;
+        color: #ffd5d8;
     }
     .dark .kds-modifier--choice {
-        border-color: #60a5fa;
-        background: #1e40af;
-        color: #ffffff;
+        border-color: #527bb4;
+        background: #203754;
+        color: #d8e9ff;
+    }
+    @keyframes kdsModifierSoftPulse {
+        0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
+        }
+        50% {
+            transform: scale(1.006);
+            box-shadow: 0 3px 8px rgba(15, 23, 42, 0.13);
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .kds-modifier {
+            animation: none;
+        }
     }
     .kds-card p {
         overflow-wrap: break-word;
@@ -477,5 +496,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='modificadores-20260728-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/cocina.js', v='modificadores-20260728-3') }}"></script>
 {% endblock %}
