@@ -2,7 +2,7 @@
 from flask import abort, jsonify, make_response, render_template
 from flask_login import current_user
 
-from app.utils.helpers import get_app_timezone_name, utc_isoformat
+from app.utils.helpers import get_app_timezone_name, local_strftime, utc_isoformat
 from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaPedidoEvento
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
@@ -49,6 +49,7 @@ def seguimiento_pedido_estado_publico(codigo_publico):
             'estado_label': _estado_label(pedido.estado),
             'mensaje': MENSAJES_SEGUIMIENTO.get(pedido.estado, 'Tu pedido fue actualizado.'),
             'fecha_modificacion': utc_isoformat(pedido.fecha_modificacion),
+            'fecha_modificacion_label': local_strftime(pedido.fecha_modificacion),
         },
         'tracking': _tracking_delivery(pedido),
         'eventos': [_evento_dict(evento) for evento in _eventos_pedido(pedido)],
@@ -80,6 +81,9 @@ def _evento_dict(evento):
         'tipo': evento.tipo,
         'label': _estado_label((evento.tipo or '').replace('pedido_', '')),
         'fecha_evento': utc_isoformat(evento.fecha_evento),
+        # Etiqueta ya convertida a la zona de la app: el navegador no siempre
+        # soporta Intl con zonas nombradas y terminaba mostrando el UTC crudo.
+        'fecha_evento_label': local_strftime(evento.fecha_evento),
     }
 
 
@@ -118,6 +122,7 @@ def _ubicacion_dict(ubicacion):
         return None
     data = ubicacion.to_dict()
     data['fecha_registro'] = utc_isoformat(ubicacion.fecha_registro)
+    data['fecha_registro_label'] = local_strftime(ubicacion.fecha_registro)
     return data
 
 

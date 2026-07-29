@@ -131,6 +131,13 @@
                 });
             }
 
+            // Preferimos siempre la hora que ya viene formateada del servidor:
+            // el navegador puede no soportar Intl con zonas nombradas y mostraria UTC.
+            function displayDate(label, value) {
+                if (label) return label;
+                return formatDate(value);
+            }
+
             function formatDate(value) {
                 if (!value) return '';
                 var date = new Date(value);
@@ -153,7 +160,7 @@
                 }
                 eventsList.innerHTML = events.map(function (event) {
                     return '<div class="event"><strong>' + escapeHtml(event.label) + '</strong>' +
-                        '<div class="muted">' + escapeHtml(formatDate(event.fecha_evento)) + '</div></div>';
+                        '<div class="muted">' + escapeHtml(displayDate(event.fecha_evento_label, event.fecha_evento)) + '</div></div>';
                 }).join('');
             }
 
@@ -234,7 +241,7 @@
                 if (mapStatus && hasDelivery) {
                     var accM = tracking.delivery ? Number(tracking.delivery.precision_metros) : NaN;
                     var accTxt = Number.isFinite(accM) && accM > 0 ? ' - precision ~' + Math.round(accM) + ' m' : '';
-                    mapStatus.textContent = 'Ultima ubicacion del delivery: ' + formatDate(tracking.delivery.fecha_registro) + accTxt + staleSuffix(tracking.delivery.fecha_registro);
+                    mapStatus.textContent = 'Ultima ubicacion del delivery: ' + displayDate(tracking.delivery.fecha_registro_label, tracking.delivery.fecha_registro) + accTxt + staleSuffix(tracking.delivery.fecha_registro);
                 }
                 if (mapStatus && !hasDelivery && tracking.delivery_impreciso) {
                     var badAccM = Number(tracking.delivery_impreciso.precision_metros);
@@ -278,7 +285,7 @@
                         if (!data || !data.pedido) return;
                         currentStatus.textContent = data.pedido.estado_label || data.pedido.estado || '';
                         currentMessage.textContent = data.pedido.mensaje || 'Tu pedido fue actualizado.';
-                        if (lastUpdate) lastUpdate.textContent = formatDate(data.pedido.fecha_modificacion);
+                        if (lastUpdate) lastUpdate.textContent = displayDate(data.pedido.fecha_modificacion_label, data.pedido.fecha_modificacion);
                         renderTracking(data.tracking);
                         renderEvents(data.eventos);
                         if (!stopped && liveBox) setLive(true, 'Actualizacion automatica activa');
