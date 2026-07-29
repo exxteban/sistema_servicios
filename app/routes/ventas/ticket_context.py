@@ -1,7 +1,8 @@
 from app.models import Configuracion, MetodoPago
 from app.services.clientes_fidelizacion import obtener_beneficios_aplicados_venta
 from cobranzas.services.cuotas_service import obtener_plan_credito_vigente
-from gastronomia.models import GastronomiaPedidoPago
+from gastronomia.models import GastronomiaPedidoItem, GastronomiaPedidoPago
+from gastronomia.services.ticket_modifier_service import modifier_ticket_lines
 
 from .parte1 import _resolver_metodo_credito_tienda
 
@@ -105,6 +106,7 @@ def build_sales_ticket_context(
         if (item.get('resumen') or '').strip()
     )
     gastronomia_entrega = _gastronomia_entrega_venta(venta)
+    gastronomia_modificadores_por_detalle = _gastronomia_modificadores_venta(venta, detalles)
 
     return dict(
         venta=venta,
@@ -133,6 +135,7 @@ def build_sales_ticket_context(
         beneficio_fidelizacion_tipo=beneficio_fidelizacion_tipo,
         beneficio_fidelizacion_descripcion=beneficio_fidelizacion_descripcion,
         gastronomia_entrega=gastronomia_entrega,
+        gastronomia_modificadores_por_detalle=gastronomia_modificadores_por_detalle,
     )
 
 
@@ -148,3 +151,32 @@ def _gastronomia_entrega_venta(venta):
         'referencia_entrega': (pedido.referencia_entrega or '').strip(),
         'origen': origen.strip(),
     }
+
+
+def _gastronomia_modificadores_venta(venta, detalles) -> dict[int, list[str]]:
+    pago = GastronomiaPedidoPago.query.filter_by(id_venta=int(getattr(venta, 'id_venta', 0) or 0)).first()
+    pedido = getattr(pago, 'pedido', None) if pago else None
+    if not pedido:
+        return {}
+
+    sale_details = list(detalles or [])
+    available = list(range(len(sale_details)))
+    result = {}
+    order_items = pedido.items.order_by(GastronomiaPedidoItem.id_item.asc()).all()
+    for order_item in order_items:
+        expected_code = f'GASTRO-{int(order_item.cliente_id)}-{int(order_item.producto_id)}'
+        detail_index = next(
+            (
+                index
+                for index in available
+                if str(getattr(getattr(sale_details[index], 'servicio', None), 'codigo', '') or '') == expected_code
+            ),
+            None,
+        )
+        if detail_index is None:
+            continue
+        available.remove(detail_index)
+        detail_id = int(getattr(sale_details[detail_index], 'id_detalle_venta', 0) or 0)
+        if detail_id:
+            result[detail_id] = modifier_ticket_lines(order_item)
+    return result

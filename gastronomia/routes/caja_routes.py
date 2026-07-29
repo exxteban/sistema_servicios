@@ -3,11 +3,12 @@ from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.models import Configuracion, SesionCaja
-from gastronomia.models import GastronomiaPedidoItem, GastronomiaPedidoItemModificador
+from gastronomia.models import GastronomiaPedidoItem
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.access import cliente_id_actual_gastronomia, mensaje_contexto_gastronomia
 from gastronomia.services.pedido_service import obtener_pedido
 from gastronomia.services.permisos import PERMISO_CAJA, requiere_permiso_gastronomia
+from gastronomia.services.ticket_modifier_service import modifier_ticket_lines
 
 
 @gastronomia_bp.route('/caja')
@@ -63,18 +64,12 @@ def _ticket_context(pedido):
 
 
 def _ticket_item(item):
-    modificadores = []
-    for modificador in item.modificadores.order_by(GastronomiaPedidoItemModificador.id_modificador.asc()).all():
-        nombre = modificador.nombre_opcion
-        if modificador.tipo_grupo == 'ingrediente_removible':
-            nombre = f'Sin {nombre}'
-        modificadores.append(nombre)
     return {
         'nombre': item.nombre_producto,
         'cantidad': int(item.cantidad or 0),
         'precio_unitario': float(item.precio_unitario or 0),
         'subtotal': float(item.subtotal or 0),
-        'modificadores': modificadores,
+        'modificadores': modifier_ticket_lines(item),
         'notas': item.notas,
     }
 

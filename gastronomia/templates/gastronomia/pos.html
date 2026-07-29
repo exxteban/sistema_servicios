@@ -242,7 +242,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos.css', v='20260604-1') }}">
-<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos_cart_modifiers.css', v='20260728-1') }}">
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos_cart_modifiers.css', v='modificadores-20260728-2') }}">
 <style>
     @media (min-width: 768px) and (max-width: 1279px) {
         .pos-shell {
@@ -268,13 +268,13 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/promociones.js', v='20260530-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/promociones.js', v='modificadores-20260728-3') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_stock_alerts.js', v='20260531-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_channel_prices.js', v='20260531-1') }}"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_delivery_location.js', v='20260605-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_table_warnings.js', v='20260603-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/pos_cart_modifiers.js', v='20260728-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='20260728-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos_cart_modifiers.js', v='modificadores-20260728-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='modificadores-20260728-3') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

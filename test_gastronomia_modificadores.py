@@ -230,6 +230,8 @@ def test_ingrediente_removible_repara_formato_guardado_como_nombre():
     cliente_id, producto_id = _crear_producto_base(app, 'Resto Legado', 'resto_legado')
 
     with app.app_context():
+        producto = GastronomiaProducto.query.get(producto_id)
+        producto.precio = 35000
         grupo = GastronomiaGrupoOpciones(
             cliente_id=cliente_id,
             producto_id=producto_id,
@@ -246,20 +248,44 @@ def test_ingrediente_removible_repara_formato_guardado_como_nombre():
             precio_delta=0,
         )
         db.session.add(opcion)
+        grupo_extra = GastronomiaGrupoOpciones(
+            cliente_id=cliente_id,
+            producto_id=producto_id,
+            nombre='Adicionales',
+            tipo='extra',
+            max_selecciones=1,
+            orden=1,
+        )
+        db.session.add(grupo_extra)
+        db.session.flush()
+        extra = GastronomiaOpcionProducto(
+            cliente_id=cliente_id,
+            grupo_id=grupo_extra.id_grupo,
+            nombre='Lechuga Repollada Extra',
+            precio_delta=4000,
+        )
+        db.session.add(extra)
         db.session.commit()
         opcion_id = opcion.id_opcion
+        extra_id = extra.id_opcion
 
     _loguear(client, app, 'resto_legado')
     csrf = _csrf(client.get('/gastronomia/menu').get_data(as_text=True))
     detalle = client.get(f'/api/gastronomia/productos/{producto_id}', query_string={'modificadores': '1'})
-    carne = detalle.get_json()['producto']['grupos_opciones'][0]['opciones'][0]
+    grupo_carne = next(
+        grupo
+        for grupo in detalle.get_json()['producto']['grupos_opciones']
+        if grupo['tipo'] == 'ingrediente_removible'
+    )
+    carne = grupo_carne['opciones'][0]
     assert carne['nombre'] == 'Carne'
     assert carne['precio_delta'] == -8000
 
     validacion = client.post(
         f'/api/gastronomia/productos/{producto_id}/validar-selecciones',
-        json={'opciones': [opcion_id]},
+        json={'opciones': [opcion_id, extra_id]},
         headers={'X-CSRFToken': csrf},
     )
     assert validacion.status_code == 200
-    assert validacion.get_json()['total'] == 22000
+    assert validacion.get_json()['total_modificadores'] == -4000
+    assert validacion.get_json()['total'] == 31000
