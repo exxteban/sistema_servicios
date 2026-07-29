@@ -2,6 +2,7 @@
 from flask import abort, jsonify, make_response, render_template
 from flask_login import current_user
 
+from app.utils.helpers import utc_isoformat
 from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaPedidoEvento
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
@@ -46,7 +47,7 @@ def seguimiento_pedido_estado_publico(codigo_publico):
             'estado': pedido.estado,
             'estado_label': _estado_label(pedido.estado),
             'mensaje': MENSAJES_SEGUIMIENTO.get(pedido.estado, 'Tu pedido fue actualizado.'),
-            'fecha_modificacion': pedido.fecha_modificacion.isoformat() if pedido.fecha_modificacion else None,
+            'fecha_modificacion': utc_isoformat(pedido.fecha_modificacion),
         },
         'tracking': _tracking_delivery(pedido),
         'eventos': [_evento_dict(evento) for evento in _eventos_pedido(pedido)],
@@ -77,7 +78,7 @@ def _evento_dict(evento):
     return {
         'tipo': evento.tipo,
         'label': _estado_label((evento.tipo or '').replace('pedido_', '')),
-        'fecha_evento': evento.fecha_evento.isoformat() if evento.fecha_evento else None,
+        'fecha_evento': utc_isoformat(evento.fecha_evento),
     }
 
 
@@ -105,10 +106,18 @@ def _tracking_delivery(pedido):
     gps_impreciso = ultima_ubicacion and not ubicacion_publicable
     return {
         'visible': True,
-        'delivery': ubicacion_publicable.to_dict() if ubicacion_publicable else None,
-        'delivery_impreciso': ultima_ubicacion.to_dict() if gps_impreciso else None,
+        'delivery': _ubicacion_dict(ubicacion_publicable),
+        'delivery_impreciso': _ubicacion_dict(ultima_ubicacion) if gps_impreciso else None,
         'destino': destino,
     }
+
+
+def _ubicacion_dict(ubicacion):
+    if not ubicacion:
+        return None
+    data = ubicacion.to_dict()
+    data['fecha_registro'] = utc_isoformat(ubicacion.fecha_registro)
+    return data
 
 
 def _estado_label(estado):

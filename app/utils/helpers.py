@@ -221,6 +221,15 @@ def utc_naive_to_local(dt):
     return dt.astimezone(get_app_timezone())
 
 
+def utc_isoformat(dt):
+    """Serializa una fecha UTC con zona explicita para clientes JavaScript."""
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+
 def local_strftime(dt, fmt='%d/%m/%Y %H:%M'):
     local_dt = utc_naive_to_local(dt)
     if not local_dt:
