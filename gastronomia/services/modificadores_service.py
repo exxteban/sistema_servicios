@@ -250,7 +250,7 @@ def producto_con_modificadores(cliente_id: int, producto_id: int, *, canal_preci
         raise ValueError('Producto no encontrado.')
     data = aplicar_precio_canal(producto, producto.to_dict(), canal_precio)
     data['grupos_opciones'] = [
-        grupo.to_dict()
+        _grupo_con_opciones_normalizadas(grupo)
         for grupo in listar_grupos_producto(cliente_id, producto_id, incluir_ocultos=False)
     ]
     data['ingredientes_removibles'] = _ingredientes_removibles_texto(data['grupos_opciones'])
@@ -287,7 +287,11 @@ def validar_selecciones_producto(
         if not opcion.disponible or not opcion.visible:
             raise ValueError(f'La opcion "{opcion.nombre}" no esta disponible.')
         seleccionadas.append(opcion)
-        total_modificadores += Decimal(str(opcion.precio_delta or 0))
+        grupo = grupos_por_id.get(int(opcion.grupo_id))
+        opcion_data = opcion.to_dict()
+        if grupo and grupo.tipo == 'ingrediente_removible':
+            opcion_data = normalizar_opcion_removible_data(opcion_data)
+        total_modificadores += Decimal(str(opcion_data.get('precio_delta') or 0))
 
     conteo_por_grupo = Counter(int(opcion.grupo_id) for opcion in seleccionadas)
     conteo_por_opcion = Counter(int(opcion.id_opcion) for opcion in seleccionadas)
@@ -317,8 +321,35 @@ def validar_selecciones_producto(
 def _opcion_con_grupo(opcion: GastronomiaOpcionProducto, grupos_por_id: dict[int, GastronomiaGrupoOpciones]) -> dict:
     data = opcion.to_dict()
     grupo = grupos_por_id.get(int(opcion.grupo_id))
+    if grupo and grupo.tipo == 'ingrediente_removible':
+        data = normalizar_opcion_removible_data(data)
     data['nombre_grupo'] = grupo.nombre if grupo else 'Opcion'
     data['tipo_grupo'] = grupo.tipo if grupo else 'extra'
+    return data
+
+
+def _grupo_con_opciones_normalizadas(grupo: GastronomiaGrupoOpciones) -> dict:
+    data = grupo.to_dict()
+    if grupo.tipo == 'ingrediente_removible':
+        data['opciones'] = [
+            normalizar_opcion_removible_data(opcion)
+            for opcion in data.get('opciones') or []
+        ]
+    return data
+
+
+def normalizar_opcion_removible_data(opcion: dict) -> dict:
+    data = dict(opcion or {})
+    nombre_original = str(data.get('nombre') or '').strip()
+    try:
+        nombre, descuento = _parse_ingrediente_removible_linea(nombre_original)
+    except ValueError:
+        return data
+    if not nombre or nombre == nombre_original or descuento <= 0:
+        return data
+    data['nombre'] = nombre[:140]
+    if Decimal(str(data.get('precio_delta') or 0)) == 0:
+        data['precio_delta'] = float(-descuento)
     return data
 
 

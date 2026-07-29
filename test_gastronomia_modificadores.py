@@ -222,3 +222,44 @@ def test_ingrediente_removible_admite_descuento_configurable():
         })
         assert float(pedido.total) == 22000
         assert float(pedido.items.one().precio_unitario) == 22000
+
+
+def test_ingrediente_removible_repara_formato_guardado_como_nombre():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, producto_id = _crear_producto_base(app, 'Resto Legado', 'resto_legado')
+
+    with app.app_context():
+        grupo = GastronomiaGrupoOpciones(
+            cliente_id=cliente_id,
+            producto_id=producto_id,
+            nombre='Ingredientes removibles',
+            tipo='ingrediente_removible',
+            max_selecciones=1,
+        )
+        db.session.add(grupo)
+        db.session.flush()
+        opcion = GastronomiaOpcionProducto(
+            cliente_id=cliente_id,
+            grupo_id=grupo.id_grupo,
+            nombre='Carne | 8000',
+            precio_delta=0,
+        )
+        db.session.add(opcion)
+        db.session.commit()
+        opcion_id = opcion.id_opcion
+
+    _loguear(client, app, 'resto_legado')
+    csrf = _csrf(client.get('/gastronomia/menu').get_data(as_text=True))
+    detalle = client.get(f'/api/gastronomia/productos/{producto_id}', query_string={'modificadores': '1'})
+    carne = detalle.get_json()['producto']['grupos_opciones'][0]['opciones'][0]
+    assert carne['nombre'] == 'Carne'
+    assert carne['precio_delta'] == -8000
+
+    validacion = client.post(
+        f'/api/gastronomia/productos/{producto_id}/validar-selecciones',
+        json={'opciones': [opcion_id]},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert validacion.status_code == 200
+    assert validacion.get_json()['total'] == 22000
