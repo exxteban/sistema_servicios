@@ -2,7 +2,7 @@
 from flask import abort, jsonify, make_response, render_template
 from flask_login import current_user
 
-from app.utils.helpers import utc_isoformat
+from app.utils.helpers import get_app_timezone_name, utc_isoformat
 from gastronomia.models import GastronomiaDeliveryUbicacion, GastronomiaPedido, GastronomiaPedidoEvento
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
@@ -33,6 +33,7 @@ def seguimiento_pedido_publico(codigo_publico):
             eventos=eventos,
             mensajes=MENSAJES_SEGUIMIENTO,
             tracking=tracking,
+            timezone_name=get_app_timezone_name(),
         )
     )
     return _sin_cache(response)
