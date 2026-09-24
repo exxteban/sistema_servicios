@@ -11,6 +11,7 @@
   const paymentTotal = document.getElementById('payment-total');
   const chargeButton = document.getElementById('charge-order');
   const hasOpenCashSession = pageRoot?.dataset.sesionCajaAbierta === '1';
+  const factura = window.GastroCajaFactura || {payload: () => ({}), requested: () => false, reset: () => {}};
   let orders = [];
   let selectedOrderId = null;
   let lastEventId = 0;
@@ -205,12 +206,17 @@
         costo_envio: Number(shippingInput?.value || 0),
         referencia: document.getElementById('payment-reference')?.value.trim() || '',
         observacion: document.getElementById('payment-note').value.trim(),
+        ...factura.payload(),
       }),
     });
     showAlert(`Pedido #${data.pedido.id_pedido} cobrado.`, true);
     const ticketUrl = `/gastronomia/pedidos/${data.pedido.id_pedido}/ticket`;
-    if (ticketWindow) ticketWindow.location = ticketUrl;
+    const idVenta = data.pedido?.pago?.id_venta;
+    if (factura.requested() && idVenta) {
+      await factura.emitir(idVenta, ticketWindow, ticketUrl, showAlert);
+    } else if (ticketWindow) ticketWindow.location = ticketUrl;
     else window.open(ticketUrl, '_blank');
+    factura.reset();
     selectedOrderId = null;
     discountInput.value = 0;
     if (shippingInput) {

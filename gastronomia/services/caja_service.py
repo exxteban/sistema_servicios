@@ -8,6 +8,12 @@ from sqlalchemy.exc import IntegrityError
 from app import db
 from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
+from gastronomia.services.factura_electronica_service import (
+    contexto_factura_electronica_caja,
+    factura_electronica_solicitada,
+    resolver_cliente_factura,
+    validar_factura_antes_de_cobrar,
+)
 from gastronomia.services.pedido_service import obtener_pedido, registrar_evento_pedido
 from gastronomia.services.venta_integration_service import (
     cerrar_colas_activas_gastronomia_pedido,
@@ -116,6 +122,12 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     if descuento > subtotal:
         raise ValueError('El descuento no puede superar el total del pedido.')
 
+    cliente_factura = resolver_cliente_factura(data)
+    if factura_electronica_solicitada(data):
+        if not contexto_factura_electronica_caja()['lista']:
+            raise ValueError('La facturacion electronica no esta activa o su configuracion esta incompleta.')
+        validar_factura_antes_de_cobrar(cliente_factura, subtotal - descuento)
+
     pago = _reservar_pago_pedido(cliente_id, usuario_id, pedido, metodo_pago, subtotal, descuento, data)
 
     try:
@@ -124,6 +136,7 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
             usuario_id,
             data,
             descuento=descuento,
+            id_cliente_venta=cliente_factura.id_cliente if cliente_factura else None,
         )
     except ValueError:
         db.session.rollback()

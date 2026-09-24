@@ -3,6 +3,23 @@
 {% block title %}Contabilidad{% endblock %}
 
 {% block content %}
+<style>
+    /* Tarjetas KPI: tipografia fluida segun el ancho real de la tarjeta */
+    .kpi-card { container-type: inline-size; }
+    .kpi-amount {
+        /* fallback para navegadores sin container queries */
+        font-size: 1.2rem;
+        font-size: clamp(0.95rem, calc(172cqi / var(--kpi-len, 16)), 1.8rem);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+    }
+    .kpi-amount-hero { font-size: clamp(1rem, calc(178cqi / var(--kpi-len, 16)), 1.95rem); }
+    .kpi-amount .kpi-cur { font-size: 0.72em; margin-right: 0.15em; font-weight: 600; }
+    .kpi-grid-hero { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+    .kpi-grid-sec { grid-template-columns: repeat(auto-fit, minmax(min(224px, 100%), 1fr)); }
+</style>
+
 <div class="space-y-6" x-data="contabilidadReportApp()" @keydown.escape.window="cerrarDetalleModal()">
     <script id="contabilidad-detalle-modal-data" type="application/json">{{ detalle_modal|tojson }}</script>
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
@@ -69,44 +86,46 @@
             {{ desde.strftime('%d/%m/%Y') if desde else '-' }} - {{ hasta.strftime('%d/%m/%Y') if hasta else '-' }}
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-4 xl:max-w-[1180px] mx-auto">
+        {% set kpi_hero = namespace(n=0) %}
+        {% for _v in [resultado_caja_mes, ganancia_neta_mes, total_ingresos, total_egresos] %}{% set kpi_hero.n = [kpi_hero.n, ('{:,.0f}'.format(_v)|length) + 2]|max %}{% endfor %}
+        <div class="grid kpi-grid-hero gap-3 lg:gap-4 xl:max-w-[1180px] mx-auto" style="--kpi-len: {{ kpi_hero.n }}">
             <div
-                class="{% if resultado_caja_mes >= 0 %}bg-gray-900 border border-gray-800{% else %}bg-gradient-to-br from-orange-500 to-orange-600{% endif %} rounded-xl shadow-md p-4 text-white min-h-[128px]">
-                <div class="max-w-[14.5rem]">
+                class="{% if resultado_caja_mes >= 0 %}bg-gray-900 border border-gray-800{% else %}bg-gradient-to-br from-orange-500 to-orange-600{% endif %} kpi-card rounded-xl shadow-md p-4 text-white min-h-[128px]">
+                <div class="w-full min-w-0">
                     <p class="{% if resultado_caja_mes >= 0 %}text-gray-200{% else %}text-orange-100{% endif %} text-sm">Resultado Caja</p>
-                    <p class="text-[1.75rem] lg:text-[1.85rem] xl:text-[1.95rem] font-bold mt-1 leading-tight">₲ {{ "{:,.0f}".format(resultado_caja_mes).replace(",", ".") }}</p>
+                    <p class="kpi-amount kpi-amount-hero font-bold mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ "{:,.0f}".format(resultado_caja_mes).replace(",", ".") }}</p>
                     <p class="{% if resultado_caja_mes >= 0 %}text-gray-200{% else %}text-orange-100{% endif %} text-xs mt-2 leading-snug">
                         Flujo real del período, incluyendo movimientos manuales.
                     </p>
                 </div>
             </div>
             <div
-                class="bg-gradient-to-br {% if ganancia_neta_mes >= 0 %}from-blue-500 to-blue-600{% else %}from-rose-500 to-rose-600{% endif %} rounded-xl shadow-md p-4 text-white min-h-[128px]">
-                <div class="max-w-[14.5rem]">
+                class="bg-gradient-to-br {% if ganancia_neta_mes >= 0 %}from-blue-500 to-blue-600{% else %}from-rose-500 to-rose-600{% endif %} kpi-card rounded-xl shadow-md p-4 text-white min-h-[128px]">
+                <div class="w-full min-w-0">
                     <p class="{% if ganancia_neta_mes >= 0 %}text-white/90{% else %}text-rose-100{% endif %} text-sm">Ganancia Neta</p>
-                    <p class="text-[1.75rem] lg:text-[1.85rem] xl:text-[1.95rem] font-bold mt-1 leading-tight">₲ {{ "{:,.0f}".format(ganancia_neta_mes).replace(",", ".") }}</p>
+                    <p class="kpi-amount kpi-amount-hero font-bold mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ "{:,.0f}".format(ganancia_neta_mes).replace(",", ".") }}</p>
                     <p class="{% if ganancia_neta_mes >= 0 %}text-white/80{% else %}text-rose-100{% endif %} text-xs mt-2 leading-snug">
                         Excluye ingresos manuales y descuenta gastos corrientes del mes.
                     </p>
                 </div>
             </div>
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-md p-4 text-white min-h-[128px]">
+            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 kpi-card rounded-xl shadow-md p-4 text-white min-h-[128px]">
                 <button type="button" @click="abrirDetalleModal('ingresos')"
                     class="w-full h-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-white/70">
-                    <div class="max-w-[14.5rem]">
+                    <div class="w-full min-w-0">
                         <p class="text-white/90 text-sm">Ingresos Caja</p>
-                        <p class="text-[1.75rem] lg:text-[1.85rem] xl:text-[1.95rem] font-bold mt-1 leading-tight">₲ {{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</p>
+                        <p class="kpi-amount kpi-amount-hero font-bold mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</p>
                         <p class="text-white/80 text-xs mt-2 leading-snug">Ventas + cobros + ajustes + reversas.</p>
                         <p class="text-white/80 text-[11px] mt-2 font-semibold uppercase tracking-wide">Click para ver detalle</p>
                     </div>
                 </button>
             </div>
-            <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-md p-4 text-white min-h-[128px]">
+            <div class="bg-gradient-to-br from-red-500 to-red-600 kpi-card rounded-xl shadow-md p-4 text-white min-h-[128px]">
                 <button type="button" @click="abrirDetalleModal('egresos')"
                     class="w-full h-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-white/70">
-                    <div class="max-w-[14.5rem]">
+                    <div class="w-full min-w-0">
                         <p class="text-red-100 text-sm">Egresos Caja</p>
-                        <p class="text-[1.75rem] lg:text-[1.85rem] xl:text-[1.95rem] font-bold mt-1 leading-tight">₲ {{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</p>
+                        <p class="kpi-amount kpi-amount-hero font-bold mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</p>
                         <p class="text-red-100 text-xs mt-2 leading-snug">Compras + egresos + anulaciones del período.</p>
                         <p class="text-red-100 text-[11px] mt-2 font-semibold uppercase tracking-wide">Click para ver detalle</p>
                     </div>
@@ -114,56 +133,58 @@
             </div>
         </div>
 
-        <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-3 lg:gap-4 xl:max-w-[1380px] mx-auto">
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+        {% set kpi_sec = namespace(n=0) %}
+        {% for _v in [ventas_emitidas, cobrado_en_ventas, saldo_financiado_generado, total_cobros_creditos, interes_financiero_generado, total_pagos_compras, gastos_corrientes_mes, descuentos_manuales_ventas, descuentos_fidelizacion_ventas, saldo_favor_fidelizacion_aplicado] %}{% set kpi_sec.n = [kpi_sec.n, ('{:,.0f}'.format(_v)|length) + 2]|max %}{% endfor %}
+        <div class="mt-5 grid kpi-grid-sec gap-3 lg:gap-4 xl:max-w-[1380px] mx-auto" style="--kpi-len: {{ kpi_sec.n }}">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Ventas Emitidas</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(ventas_emitidas).replace(",", ".") }}</p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Cobrado en Ventas</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(cobrado_en_ventas).replace(",", ".") }}</p>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Solo incluye pagos registrados al momento de la venta.</p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Saldo Financiado</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(saldo_financiado_generado).replace(",", ".") }}</p>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Monto enviado a cuenta por cobrar en ventas a credito.</p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Cobros de Créditos</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(total_cobros_creditos).replace(",", ".") }}</p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Interés Financiero</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(interes_financiero_generado).replace(",", ".") }}</p>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Se genera solo en planes de cuotas con interes.</p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Pagos de Compras</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(total_pagos_compras).replace(",", ".") }}</p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Gastos Corrientes</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-gray-800 dark:text-white mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(gastos_corrientes_mes).replace(",", ".") }}</p>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">
                         {% if gastos_corrientes_fuera_caja > 0 %}
@@ -174,25 +195,25 @@
                     </p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Descuentos Manuales</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-amber-600 dark:text-amber-400 mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-amber-600 dark:text-amber-400 mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(descuentos_manuales_ventas).replace(",", ".") }}</p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Desc. Fidelización</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-emerald-600 dark:text-emerald-400 mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-emerald-600 dark:text-emerald-400 mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(descuentos_fidelizacion_ventas).replace(",", ".") }}</p>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Incluye saldo a favor y beneficios aplicados.</p>
                 </div>
             </div>
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="max-w-[11.5rem] pr-2">
+            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+                <div class="w-full min-w-0">
                     <p class="text-gray-500 dark:text-gray-400 text-sm">Saldo a Favor Usado</p>
-                    <p class="text-[1.7rem] lg:text-[1.8rem] font-bold text-cyan-600 dark:text-cyan-400 mt-1 leading-tight">₲ {{
+                    <p class="kpi-amount font-bold text-cyan-600 dark:text-cyan-400 mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
                         "{:,.0f}".format(saldo_favor_fidelizacion_aplicado).replace(",", ".") }}</p>
                 </div>
             </div>
@@ -452,6 +473,73 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+    /* Red de seguridad: si por metricas de fuente o falta de soporte de container
+       queries el monto no entra en la tarjeta, se reduce hasta que entre.
+       Todas las tarjetas del grupo conservan el mismo tamano. */
+    (function () {
+        const MIN_PX = 11;
+        const anchos = new WeakMap();
+
+        function ajustarGrupo(grid) {
+            const montos = Array.prototype.slice.call(grid.querySelectorAll('.kpi-amount'));
+            if (!montos.length || !grid.clientWidth) return;
+
+            montos.forEach(function (el) { el.style.fontSize = ''; });
+
+            for (let pasada = 0; pasada < 3; pasada++) {
+                let ratio = 1;
+                montos.forEach(function (el) {
+                    if (!el.clientWidth) return;
+                    if (el.scrollWidth > el.clientWidth + 0.5) {
+                        ratio = Math.min(ratio, el.clientWidth / el.scrollWidth);
+                    }
+                });
+                if (ratio >= 1) return;
+                montos.forEach(function (el) {
+                    const actual = parseFloat(getComputedStyle(el).fontSize) || 0;
+                    if (!actual) return;
+                    el.style.fontSize = Math.max(MIN_PX, Math.floor(actual * ratio * 10) / 10 - 0.2) + 'px';
+                });
+            }
+        }
+
+        function ajustarTodo(soloSiCambioAncho) {
+            document.querySelectorAll('.kpi-grid-hero, .kpi-grid-sec').forEach(function (grid) {
+                const ancho = grid.clientWidth;
+                // Solo el ancho importa: ignorar cambios de alto evita realimentar al ResizeObserver.
+                if (soloSiCambioAncho && anchos.get(grid) === ancho) return;
+                anchos.set(grid, ancho);
+                ajustarGrupo(grid);
+            });
+        }
+
+        let pendiente = null;
+        function ajustarDiferido(soloSiCambioAncho) {
+            if (pendiente) cancelAnimationFrame(pendiente);
+            pendiente = requestAnimationFrame(function () {
+                pendiente = null;
+                ajustarTodo(soloSiCambioAncho);
+            });
+        }
+
+        // Primer ajuste sincronico: requestAnimationFrame no corre si la pestana
+        // se carga en segundo plano.
+        ajustarTodo(false);
+        ajustarDiferido(false);
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(function () { ajustarDiferido(false); }).catch(function () { });
+        }
+        window.addEventListener('resize', function () { ajustarDiferido(true); });
+
+        if (window.ResizeObserver) {
+            const observer = new ResizeObserver(function () { ajustarDiferido(true); });
+            document.querySelectorAll('.kpi-grid-hero, .kpi-grid-sec').forEach(function (grid) {
+                observer.observe(grid);
+            });
+        }
+    })();
+</script>
 <script>
     function contabilidadReportApp() {
         let payload = {};

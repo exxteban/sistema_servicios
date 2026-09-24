@@ -4,6 +4,8 @@ from .respuestas import _venta_descartada_response, _venta_existente_response
 from app.models import ClienteServicio
 from app.services.clientes_fidelizacion import revertir_fidelizacion_por_anulacion_venta
 from app.services.devoluciones_calculo import calculate_refund_subtotal
+from app.services.fe_anulacion import error_anulacion_por_factura_electronica
+from app.services.fe_venta_contexto import contexto_factura_electronica_venta
 from cobranzas.services.cuenta_service import anular_cuenta_por_cobrar
 
 
@@ -123,6 +125,7 @@ def detalle(id):
         total_pagado_inmediato=total_pagado_inmediato,
         saldo_pendiente_actual=saldo_pendiente_actual,
         estado_cobro=estado_cobro,
+        **contexto_factura_electronica_venta(venta, current_user),
     )
 
 @ventas_bp.route('/<int:id>/anular', methods=['POST'])
@@ -145,6 +148,11 @@ def anular(id):
         return redirect(url_for('ventas.detalle', id=id))
 
     gastronomia_eventos_post_commit = []
+
+    error_fe = error_anulacion_por_factura_electronica(venta)
+    if error_fe:
+        flash(error_fe, 'danger')
+        return redirect(url_for('ventas.detalle', id=id))
 
     sesion_venta = getattr(venta, 'sesion_caja', None)
     if sesion_venta is not None and (sesion_venta.estado or '').strip().lower() == 'cerrada':

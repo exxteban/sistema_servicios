@@ -21,7 +21,9 @@ METODO_BUSQUEDAS = {
 }
 
 
-def crear_venta_central_desde_pedido(pedido: GastronomiaPedido, usuario_id: int, data: dict, *, descuento: Decimal):
+def crear_venta_central_desde_pedido(
+    pedido: GastronomiaPedido, usuario_id: int, data: dict, *, descuento: Decimal, id_cliente_venta: int | None = None,
+):
     sesion = _sesion_abierta_usuario(usuario_id)
     if not sesion:
         raise ValueError('Debe abrir una caja antes de cobrar pedidos gastronomicos.')
@@ -33,7 +35,7 @@ def crear_venta_central_desde_pedido(pedido: GastronomiaPedido, usuario_id: int,
         raise ValueError('El total del pedido no puede ser negativo.')
 
     venta = Venta(
-        id_cliente=_consumidor_final_id(),
+        id_cliente=id_cliente_venta or _consumidor_final_id(),
         id_sesion_caja=sesion.id_sesion,
         id_usuario_vendedor=pedido.usuario_id,
         subtotal=subtotal,

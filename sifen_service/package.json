@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "facturacionelectronicapy-qrgen": "^1.0.9",
+    "facturacionelectronicapy-setapi": "^1.0.34",
     "facturacionelectronicapy-xmlgen": "^1.0.283",
     "facturacionelectronicapy-xmlsign": "^1.0.28"
   }

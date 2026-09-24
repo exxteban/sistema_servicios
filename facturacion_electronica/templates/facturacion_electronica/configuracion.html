@@ -14,13 +14,21 @@
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6">
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Facturación Electrónica (SIFEN)</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Facturación Electrónica</h1>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-            Datos del emisor y firma digital. Esta pantalla solo guarda la configuración; todavía no emite documentos.
+            Configuración del emisor y del proveedor de facturación.
         </p>
+        {% if config.proveedor == 'api' %}
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            Emite la API externa: firma, CDC, QR y el envío a SIFEN son suyos. De este lado
+            siguen el <strong>correlativo</strong> y la impresión del comprobante.
+        </p>
+        {% endif %}
+        {# La pantalla por venta sirve con cualquier proveedor: estado, CDC,
+           consultar, KuDE, anular. Lo exclusivo del motor propio se oculta adentro. #}
         <a href="{{ url_for('facturacion_electronica.vista_previa') }}"
             class="mt-3 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700">
-            <i class="fas fa-eye mr-2"></i>Ver vista previa de una venta
+            <i class="fas fa-eye mr-2"></i>{% if capacidades.herramientas_propias %}Ver vista previa de una venta{% else %}Ver el documento de una venta{% endif %}
         </a>
     </div>
 
@@ -45,6 +53,45 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Proveedor</h2>
+            {% if hay_documentos %}
+            <input type="hidden" name="proveedor" value="{{ config.proveedor }}">
+            {% endif %}
+            <select name="proveedor" id="fe-proveedor"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                {% if hay_documentos %}disabled{% endif %}>
+                {% for valor, etiqueta in proveedores %}
+                <option value="{{ valor }}" {% if config.proveedor == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                {% endfor %}
+            </select>
+            {% if hay_documentos %}
+            <p class="text-xs text-amber-700 dark:text-amber-300">
+                Ya hay documentos transmitidos a SIFEN en producción. Sus CDC y su protocolo pertenecen a este
+                proveedor, así que el selector queda fijo.
+            </p>
+            {% else %}
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Se puede cambiar mientras ningún documento haya llegado a SIFEN en producción. Lo
+                emitido en ambiente de prueba no cuenta.
+            </p>
+            {% endif %}
+        </div>
+
+        <div data-fe-proveedor="api" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-5 space-y-4" {% if config.proveedor != 'api' %}hidden{% endif %}>
+            <h2 class="text-sm font-bold text-amber-800 dark:text-amber-300">Conexión con la API externa</h2>
+            <p class="text-xs text-amber-800 dark:text-amber-300">Credenciales de servicio que entrega el proveedor. El certificado y el CSC quedan de su lado.</p>
+            {{ campo('api_url', 'URL de la API', config.api_url, tipo='url', placeholder='https://fe.ejemplo.com') }}
+            {{ campo('api_client_id', 'Client ID', config.api_client_id) }}
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Client Secret</label>
+                <input type="password" name="api_credenciales" autocomplete="new-password"
+                    placeholder="{% if config.api_credenciales %}Guardado (sin cambios){% endif %}"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Dejá vacío para conservar el guardado. Se almacena cifrado.</p>
+            </div>
+        </div>
+
+        <div data-fe-proveedor="propio" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4" {% if config.proveedor == 'api' %}hidden{% endif %}>
             <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Ambiente</h2>
             <div>
                 <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Ambiente de trabajo</label>
@@ -59,6 +106,10 @@
 
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
             <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Datos del emisor</h2>
+            <p data-fe-proveedor-nota="api" class="text-xs text-gray-500 dark:text-gray-400" {% if config.proveedor != 'api' %}hidden{% endif %}>
+                Con la API externa estos datos son sólo para <strong>imprimir</strong> el comprobante: los fiscales
+                son los cargados en la API. Usá "Traer datos del emisor" al pie para no tener dos verdades.
+            </p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {{ campo('razon_social', 'Razón social', config.razon_social) }}
                 {{ campo('nombre_fantasia', 'Nombre de fantasía', config.nombre_fantasia) }}
@@ -86,6 +137,10 @@
                 {{ campo('establecimiento', 'Establecimiento', config.establecimiento, placeholder='001') }}
                 {{ campo('punto_expedicion', 'Punto de expedición', config.punto_expedicion, placeholder='001') }}
             </div>
+            <p data-fe-proveedor-nota="api" class="text-xs text-gray-500 dark:text-gray-400" {% if config.proveedor != 'api' %}hidden{% endif %}>
+                El establecimiento y el punto eligen cuál de los timbrados cargados en la API se usa al emitir.
+                Si no hay ninguno que coincida, la emisión falla avisando cuáles hay.
+            </p>
         </div>
 
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
@@ -123,7 +178,7 @@
             </div>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div data-fe-proveedor="propio" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4" {% if config.proveedor == 'api' %}hidden{% endif %}>
             <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Firma digital y CSC</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
@@ -154,10 +209,251 @@
             </button>
         </div>
     </form>
+
+    <div data-fe-proveedor="api" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-3" {% if config.proveedor != 'api' %}hidden{% endif %}>
+        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Datos del emisor en la API</h2>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+            Copia acá los datos fiscales y el timbrado que el proveedor tiene cargados, para que el
+            comprobante impreso diga exactamente lo mismo que la factura enviada a SIFEN.
+        </p>
+        <form method="post" action="{{ url_for('facturacion_electronica.sincronizar_proveedor') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit"
+                class="inline-flex items-center justify-center rounded-lg border border-blue-600 px-4 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-50 dark:hover:bg-blue-900/30">
+                <i class="fas fa-rotate mr-2"></i>Traer datos del emisor desde la API
+            </button>
+        </form>
+    </div>
+
+    {% if config.proveedor == 'api' %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Firma digital y CSC en la API</h2>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+            Se mandan directo a la API y no quedan guardados en este sistema. La API los valida
+            (contraseña, vencimiento y que el RUC del certificado sea el del emisor) y los guarda
+            cifrados para el ambiente en que esté la empresa. Cargar uno nuevo reemplaza al anterior.
+        </p>
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('facturacion_electronica.subir_certificado_api') }}"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Certificado digital (.p12 / .pfx)</label>
+                <input type="file" name="certificado" accept=".p12,.pfx" required
+                    class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-white">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Contraseña del certificado</label>
+                <input type="password" name="cert_password" autocomplete="new-password"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div class="sm:col-span-2 flex justify-end">
+                <button type="submit"
+                    class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
+                    <i class="fas fa-upload mr-2"></i>Subir certificado a la API
+                </button>
+            </div>
+        </form>
+        <form method="post" action="{{ url_for('facturacion_electronica.subir_csc_api') }}"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end border-t border-gray-100 dark:border-gray-700 pt-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">CSC (Código de Seguridad del Contribuyente)</label>
+                <input type="password" name="csc" autocomplete="off" required
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">ID del CSC</label>
+                <input type="text" name="csc_id" placeholder="0001" inputmode="numeric" pattern="\d{4}" maxlength="4" required
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div class="sm:col-span-2 flex justify-end">
+                <button type="submit"
+                    class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
+                    <i class="fas fa-upload mr-2"></i>Subir CSC a la API
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Timbrado en la API</h2>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+            Cada tipo de documento lleva su propio timbrado. Cargar el mismo número otra vez corrige
+            sus fechas; la API no borra timbrados. En <strong>test</strong> el número es el RUC sin
+            dígito verificador y el inicio de vigencia es la fecha de la solicitud de habilitación.
+        </p>
+        <form method="post" action="{{ url_for('facturacion_electronica.cargar_timbrado_api') }}"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tipo de documento</label>
+                <select name="tipo_documento"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                    <option value="1">Factura electrónica</option>
+                    <option value="5">Nota de crédito electrónica</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Número de timbrado</label>
+                <input type="text" name="timbrado_numero" value="{{ config.timbrado_numero or '' }}" inputmode="numeric"
+                    pattern="\d{8}" maxlength="8" required placeholder="8 dígitos"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Establecimiento</label>
+                <input type="text" name="establecimiento" value="{{ config.establecimiento or '001' }}" inputmode="numeric"
+                    pattern="\d{1,3}" maxlength="3" required
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Punto de expedición</label>
+                <input type="text" name="punto_expedicion" value="{{ config.punto_expedicion or '001' }}" inputmode="numeric"
+                    pattern="\d{1,3}" maxlength="3" required
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Inicio de vigencia</label>
+                <input type="date" name="valid_from" required
+                    value="{{ config.timbrado_fecha_inicio.isoformat() if config.timbrado_fecha_inicio else '' }}"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fin de vigencia (opcional)</label>
+                <input type="date" name="valid_to"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Número inicial (opcional)</label>
+                <input type="text" name="initial_number" inputmode="numeric" pattern="\d{1,7}" maxlength="7" placeholder="1"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                <p class="mt-1 text-xs text-gray-400">El primer número que reserva el timbrado. Vacío = el que tenga la API.</p>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit"
+                    class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
+                    <i class="fas fa-upload mr-2"></i>Cargar timbrado en la API
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <style>
+        .fe-num-wrap { margin-top: 1.5rem; }
+        .fe-num-tabla { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+        .fe-num-tabla th,
+        .fe-num-tabla td { padding: 0.5rem 0.5rem; text-align: left; border-bottom: 1px solid rgba(148, 163, 184, 0.25); }
+        .fe-num-tabla th { font-weight: 600; color: #6b7280; text-transform: uppercase; font-size: 0.6875rem; letter-spacing: 0.05em; }
+        .fe-num-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+        .fe-num-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; align-items: end; }
+        .fe-num-vacio { font-size: 0.8125rem; color: #6b7280; }
+        .fe-num-aviso { font-size: 0.75rem; color: #92400e; background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.4); border-radius: 0.5rem; padding: 0.625rem 0.75rem; }
+        .fe-num-check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: #6b7280; }
+        @media (prefers-color-scheme: dark) {
+            .fe-num-tabla th { color: #9ca3af; }
+            .fe-num-vacio, .fe-num-check { color: #9ca3af; }
+            .fe-num-aviso { color: #fbbf24; }
+        }
+    </style>
+
+    <div class="fe-num-wrap bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Numeración de documentos</h2>
+        <p class="text-xs text-gray-400">
+            El correlativo lo lleva el sistema, no SIFEN, y es independiente por tipo de documento,
+            establecimiento y punto de expedición: la factura y la nota de crédito llevan rangos
+            separados. Con un timbrado nuevo arranca en 0000001; no se continúa la numeración del talonario.
+        </p>
+
+        {% if secuencias %}
+        <table class="fe-num-tabla">
+            <thead>
+                <tr>
+                    <th>Documento</th>
+                    <th>Establecimiento - Punto</th>
+                    <th>Último usado</th>
+                    <th>Próximo</th>
+                    <th>Máximo emitido</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in secuencias %}
+                <tr>
+                    <td>{{ s.tipo_desc }}</td>
+                    <td class="fe-num-mono">{{ s.establecimiento }}-{{ s.punto }}</td>
+                    <td class="fe-num-mono">{{ '%07d' % s.ultimo_numero }}</td>
+                    <td class="fe-num-mono">{{ s.proximo }}</td>
+                    <td class="fe-num-mono">{{ '%07d' % s.max_emitido }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="fe-num-vacio">
+            Todavía no se emitió ningún documento. El primero va a salir con el número 0000001.
+        </p>
+        {% endif %}
+
+        <div class="fe-num-aviso">
+            Las emisiones de prueba en ambiente test también consumen correlativo. Antes de pasar a
+            producción, volvé el último usado a 0 para que la primera factura real salga 0000001.
+        </div>
+
+        <form method="post" action="{{ url_for('facturacion_electronica.ajustar_numeracion') }}"
+            onsubmit="return confirm('Vas a cambiar el correlativo de la numeración. ¿Confirmás?');">
+            <div class="fe-num-grid">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Documento</label>
+                    <select name="tipo_documento"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        <option value="1">Factura</option>
+                        <option value="5">Nota de crédito</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Establecimiento</label>
+                    <input type="text" name="establecimiento" value="{{ config.establecimiento or '001' }}"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Punto de expedición</label>
+                    <input type="text" name="punto" value="{{ config.punto_expedicion or '001' }}"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Último número usado</label>
+                    <input type="number" name="ultimo_numero" value="0" min="0" max="9999999"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                </div>
+                <div>
+                    <button type="submit"
+                        class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700">
+                        <i class="fas fa-hashtag mr-2"></i>Fijar correlativo
+                    </button>
+                </div>
+            </div>
+            <label class="fe-num-check" style="margin-top:0.75rem;">
+                <input type="checkbox" name="forzar" value="1">
+                Permitir bajarlo por debajo de un número ya emitido (repetiría números: sólo si sabés lo que hacés)
+            </label>
+        </form>
+    </div>
 </div>
 
 <script>
 (function () {
+    const proveedor = document.getElementById('fe-proveedor');
+    if (proveedor) {
+        function mostrarProveedor() {
+            document.querySelectorAll('[data-fe-proveedor]').forEach(function (seccion) {
+                seccion.hidden = seccion.dataset.feProveedor !== proveedor.value;
+            });
+            document.querySelectorAll('[data-fe-proveedor-nota]').forEach(function (nota) {
+                nota.hidden = nota.dataset.feProveedorNota !== proveedor.value;
+            });
+        }
+        proveedor.addEventListener('change', mostrarProveedor);
+        mostrarProveedor();
+    }
     const urlDistritos = "{{ url_for('facturacion_electronica.geo_distritos') }}";
     const urlCiudades = "{{ url_for('facturacion_electronica.geo_ciudades') }}";
     const dep = document.getElementById('fe-departamento');

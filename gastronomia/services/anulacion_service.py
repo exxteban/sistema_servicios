@@ -8,6 +8,7 @@ from app import db
 from app.models import MovimientoCaja, PagoVenta, Venta
 from app.services.caja_metodos import obtener_metodo_efectivo_id
 from app.services.clientes_fidelizacion import revertir_fidelizacion_por_anulacion_venta
+from app.services.fe_anulacion import error_anulacion_por_factura_electronica
 from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.models import GastronomiaPedido
 from gastronomia.services.pedido_service import registrar_evento_pedido
@@ -36,6 +37,9 @@ def anular_venta_gastronomica(
         raise ValueError('Venta central no encontrada.')
     if (venta.estado or '').strip().lower() == 'anulada':
         raise ValueError('La venta ya esta anulada.')
+    error_fe = error_anulacion_por_factura_electronica(venta)
+    if error_fe:
+        raise ValueError(error_fe)
     sesion = getattr(venta, 'sesion_caja', None)
     if sesion is not None and (sesion.estado or '').strip().lower() == 'cerrada':
         raise ValueError('No se puede anular una venta cuya sesion de caja ya esta cerrada.')

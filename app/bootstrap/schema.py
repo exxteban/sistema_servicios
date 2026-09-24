@@ -488,6 +488,8 @@ def _apply_mysql_migrations(db):
 def initialize_database(app, db, config_name='default'):
     with app.app_context():
         db.create_all()
+        from app.bootstrap.fe_schema import ensure_facturacion_electronica_schema
+        ensure_facturacion_electronica_schema(db, app.logger)
 
         from cobranzas.schema import ensure_cobranzas_schema
         from control_de_empleados.schema import ensure_control_empleados_schema, ensure_asistencia_schema

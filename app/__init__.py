@@ -412,6 +412,7 @@ def create_app(config_name='default'):
     from gastos_corrientes.routes import gastos_corrientes_bp
     from flujo_caja.routes import flujo_caja_bp
     from facturacion_electronica.routes import facturacion_electronica_bp
+    import facturacion_electronica.routes_api  # noqa: F401  (cuelga rutas del mismo blueprint)
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')

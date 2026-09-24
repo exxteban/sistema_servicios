@@ -4,9 +4,23 @@ Microservicio Node aislado que genera el XML de los documentos electrónicos
 SIFEN usando las librerías de TIPS. El sistema Flask sólo lo consume por HTTP;
 no comparten código.
 
-Fase actual: **2c-1** — sólo genera el XML (no firma ni envía). La firma
-(`xmlsign`) y el envío (`setapi`) se agregan más adelante, cuando exista el
-certificado `.p12`.
+Endpoints actuales:
+- `POST /generar` (`xmlgen`) — arma el XML del DE.
+- `POST /firmar` (`xmlsign`) — firma el XML con un `.p12`.
+- `POST /qr` (`qrgen`) — agrega el nodo `gCamFuFD/dCarQR` (QR) al XML firmado.
+- `POST /enviar` (`setapi`, siRecepDE) — envía el DE firmado a SIFEN (TLS mutuo).
+- `POST /consultar` (`setapi`, siConsDE) — consulta el estado de un DE por CDC.
+
+> **Probado end-to-end el 2026-09-20** contra el ambiente de TEST de SIFEN,
+> con certificado real: generar → firmar → QR → enviar terminó en
+> `0260 Autorización del DE satisfactoria`. Falta la primera emisión en
+> producción.
+>
+> `/generar` no devuelve el XML tal cual lo arma `xmlgen`: le quita el
+> elemento `<cTipReg/>` vacío, que la librería escribe siempre y SIFEN
+> rechaza. Ver `../facturacion_electronica/DIAGNOSTICO_SIFEN.md`, que junta
+> las trampas de estas librerías y los códigos de rechazo con su significado
+> real.
 
 ## Requisitos
 
@@ -20,8 +34,13 @@ npm install
 npm start
 ```
 
-Queda escuchando en `http://localhost:3010` (configurable con la variable
-`PORT`).
+Queda escuchando en `http://127.0.0.1:3010` (puerto configurable con `PORT`).
+Por defecto sólo acepta conexiones desde la misma máquina: el servicio no
+tiene autenticación propia y quien lo alcance puede firmar XML con el
+certificado del emisor (pasando `certPath`) o enviar documentos a SIFEN en su
+nombre. Si necesitás exponerlo a otra máquina, hacelo detrás de un proxy con
+autenticación y recién ahí cambiá `HOST`; no lo publiques directo con
+`HOST=0.0.0.0`.
 
 ## Probar
 

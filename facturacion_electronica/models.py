@@ -5,6 +5,8 @@ from facturacion_electronica import (
     AMBIENTE_TEST,
     ESTADO_GENERADO,
     TIPO_CONTRIBUYENTE_JURIDICA,
+    TIPO_FACTURA,
+    TIPO_NOTA_CREDITO,
 )
 
 
@@ -14,6 +16,11 @@ class FacturacionElectronicaConfig(db.Model):
     __tablename__ = 'facturacion_electronica_config'
 
     id = db.Column(db.Integer, primary_key=True)
+    proveedor = db.Column(db.String(20), nullable=False, default='propio', server_default='propio')
+    api_url = db.Column(db.String(500))
+    api_client_id = db.Column(db.String(128))
+    # client_secret cifrado con el mismo crypto.cifrar que la clave del .p12.
+    api_credenciales = db.Column(db.Text)
 
     ambiente = db.Column(db.String(12), nullable=False, default=AMBIENTE_TEST)
 
@@ -81,11 +88,12 @@ class DocumentoElectronico(db.Model):
     __tablename__ = 'facturacion_electronica_documentos'
 
     id = db.Column(db.Integer, primary_key=True)
+    # Sin unique: una venta puede tener varios DE a lo largo del tiempo (una
+    # factura cancelada + su re-emisión). El vigente es el de mayor id.
     id_venta = db.Column(
         db.Integer,
         db.ForeignKey('ventas.id_venta'),
         nullable=False,
-        unique=True,
         index=True,
     )
 
@@ -102,13 +110,51 @@ class DocumentoElectronico(db.Model):
 
     xml = db.Column(db.Text)
     xml_firmado = db.Column(db.Text)
+    xml_qr = db.Column(db.Text)
+    qr_url = db.Column(db.Text)
 
-    respuesta_codigo = db.Column(db.String(10))
+    # Cabe el codigo numerico de SIFEN (4 digitos) y tambien el estado de la
+    # API externa, que es una palabra: 'CANCELLATION_PENDING' son 20 caracteres
+    # y en MySQL estricto un VARCHAR(10) no trunca, revienta el INSERT.
+    respuesta_codigo = db.Column(db.String(40))
     respuesta_mensaje = db.Column(db.Text)
+    # JSON completo de la última respuesta de SIFEN (envío/consulta/cancelación),
+    # para diagnosticar rechazos aunque el parseo de campos conocidos falle.
+    respuesta_raw = db.Column(db.Text)
     protocolo_autorizacion = db.Column(db.String(20))
+
+    # Identificadores del lado de la API externa (vacíos con el motor propio).
+    api_documento_id = db.Column(db.String(36), index=True)
+    # Sin uso desde que el loteo lo hace el pipeline del proveedor solo. Se
+    # deja la columna: quitarla obliga a un ALTER en cada cliente y no gana nada.
+    api_lote_id = db.Column(db.String(36))
+    # Clave de idempotencia del alta: estable entre reintentos, para que un
+    # corte de red no emita dos veces el mismo número.
+    api_idempotency_key = db.Column(db.String(120))
+
+    # Nota de crédito: a qué documento corrige y de qué devolución salió.
+    # `id_devolucion` no lleva FK a propósito: el módulo de FE no depende del
+    # de devoluciones, y una instalación vieja puede no tener esa tabla.
+    id_documento_asociado = db.Column(
+        db.Integer, db.ForeignKey('facturacion_electronica_documentos.id'), index=True,
+    )
+    id_devolucion = db.Column(db.Integer, index=True)
+    nc_motivo = db.Column(db.Integer)
+    nc_motivo_desc = db.Column(db.String(60))
+
+    motivo_cancelacion = db.Column(db.Text)
+    xml_cancelacion = db.Column(db.Text)
+
+    # Momento a partir del cual el job puede volver a tocar este documento.
+    # Es el backoff de los fallos de **transporte**, que no cambian el estado
+    # fiscal: firmar con el Node caído deja el DE en 'generado', y sin esta
+    # marca el job lo reintenta en cada pasada para siempre (el backoff por
+    # `updated_at` sólo alcanza a los que quedaron en 'error').
+    reintentar_despues = db.Column(db.DateTime)
 
     fecha_generado = db.Column(db.DateTime)
     fecha_envio = db.Column(db.DateTime)
+    fecha_cancelado = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime,
@@ -118,6 +164,17 @@ class DocumentoElectronico(db.Model):
     )
 
     venta = db.relationship('Venta')
+    documento_asociado = db.relationship('DocumentoElectronico', remote_side=[id])
+
+    @property
+    def es_nota_credito(self):
+        return self.tipo_documento == TIPO_NOTA_CREDITO
+
+    @property
+    def numero_formateado(self):
+        if not (self.establecimiento and self.punto and self.numero):
+            return ''
+        return f'{self.establecimiento}-{self.punto}-{self.numero}'
 
     @property
     def cdc_formateado(self):
@@ -129,4 +186,41 @@ class DocumentoElectronico(db.Model):
         return f'<DocumentoElectronico venta={self.id_venta} estado={self.estado} cdc={self.cdc}>'
 
 
-__all__ = ['FacturacionElectronicaConfig', 'DocumentoElectronico']
+class SecuenciaNumeracionDE(db.Model):
+    """Correlativo de numeración del DE por establecimiento + punto de expedición.
+
+    SIFEN exige numeración correlativa por establecimiento y punto dentro del
+    rango del timbrado; la lleva el contribuyente, no SIFEN. La granularidad
+    (establecimiento, punto) es la que pide el estándar: hoy hay una sola fila,
+    pero si se habilita otro punto se agrega una fila sin tocar el código.
+    """
+
+    __tablename__ = 'facturacion_electronica_secuencia'
+    __table_args__ = (
+        db.UniqueConstraint(
+            'tipo_documento', 'establecimiento', 'punto',
+            name='uq_fe_secuencia_tipo_estab_punto',
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    # iTiDE: cada tipo de documento tiene su propio rango dentro del timbrado.
+    tipo_documento = db.Column(
+        db.Integer, nullable=False, default=TIPO_FACTURA, server_default='1',
+    )
+    establecimiento = db.Column(db.String(3), nullable=False)
+    punto = db.Column(db.String(3), nullable=False)
+    ultimo_numero = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    def __repr__(self):
+        return (f'<SecuenciaNumeracionDE tipo={self.tipo_documento} '
+                f'{self.establecimiento}-{self.punto}={self.ultimo_numero}>')
+
+
+__all__ = ['FacturacionElectronicaConfig', 'DocumentoElectronico', 'SecuenciaNumeracionDE']

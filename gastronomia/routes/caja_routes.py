@@ -6,6 +6,7 @@ from app.models import Configuracion, SesionCaja
 from gastronomia.models import GastronomiaPedidoItem
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.access import cliente_id_actual_gastronomia, mensaje_contexto_gastronomia
+from gastronomia.services.factura_electronica_service import contexto_factura_electronica_caja
 from gastronomia.services.pedido_service import obtener_pedido
 from gastronomia.services.permisos import PERMISO_CAJA, requiere_permiso_gastronomia
 from gastronomia.services.ticket_modifier_service import modifier_ticket_lines
@@ -24,6 +25,7 @@ def caja():
         'gastronomia/caja.html',
         sesion_caja_abierta=sesion_caja_abierta,
         pedido_preseleccionado_id=request.args.get('pedido', type=int) or '',
+        factura_electronica=contexto_factura_electronica_caja(),
     )
 
 
