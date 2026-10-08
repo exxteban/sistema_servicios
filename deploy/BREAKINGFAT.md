@@ -39,11 +39,15 @@ La regla web debe exponer `https://breakingfat.pysystems.online` y enviar el tra
 
 Usar un clon propio del repo (NO el de Lions Burguer): `logs/`, `app/static/uploads`, `app/static/tienda_uploads` y `.venv` viven dentro del directorio del repo, asi que compartirlo mezclaria archivos entre clientes.
 
+En este servidor los repos viven en `/root` (`/root/silvio`, `/root/lionsburguer`, ...), asi que Breaking Fat va en `/root/breakingfat`:
+
 ```bash
-cd /home/administrator
-git clone <url-del-repo-sistema_servicios> sistema_breakingfat
-cd sistema_breakingfat
+cd /root
+git clone https://github.com/exxteban/sistema_servicios.git breakingfat
+cd breakingfat
 ```
+
+Usar el mismo `SERVICE_USER` que Lions Burguer (ver `grep -E '^User|^WorkingDirectory' /etc/systemd/system/sistema-lionsburguer.service`). Si el servicio corre como un usuario distinto de root, ese usuario no puede leer `/root`.
 
 En el servidor, dentro de ese clon:
 
