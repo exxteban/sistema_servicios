@@ -10,6 +10,15 @@ AMBIENTE_TEST = 'test'
 AMBIENTE_PRODUCCION = 'produccion'
 AMBIENTES = (AMBIENTE_TEST, AMBIENTE_PRODUCCION)
 
+# Cómo transmite el motor propio: de a uno y con respuesta en el momento
+# (siRecepDE) o en un lote que SIFEN procesa aparte y se consulta después
+# (siRecepLoteDE + siConsLoteDE), como hace la API externa. Vive en la tabla
+# `configuracion` y no en una columna nueva de `facturacion_electronica_config`:
+# `create_all()` no agrega columnas a una tabla que ya existe en los clientes.
+CLAVE_MODO_ENVIO = 'facturacion_electronica_modo_envio'
+MODO_ENVIO_SINCRONO = 'sincrono'
+MODO_ENVIO_LOTE = 'lote'
+
 TIPO_CONTRIBUYENTE_FISICA = '1'
 TIPO_CONTRIBUYENTE_JURIDICA = '2'
 TIPOS_CONTRIBUYENTE = (
@@ -87,7 +96,7 @@ CSC_DEMO = 'ABCD0000000000000000000000000000'
 # nuevo, que obligaría a revisar cada guarda y cada pantalla que hoy mira
 # `estado`. Vive acá, igual que ESTADO_API_CANCELACION_PENDIENTE, porque lo
 # miran dos módulos que no pueden importarse entre sí: el que decide que el
-# fallo es definitivo (emision_service) y el que aplica el backoff común
+# fallo es definitivo (envio_service) y el que aplica el backoff común
 # (envio_automatico), que si no lo pisaría con sus 10 minutos.
 # Limpiarlo (ponerlo en NULL) alcanza para volver a habilitar el documento.
 SIN_REINTENTO = _datetime(9999, 12, 31)

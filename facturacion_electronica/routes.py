@@ -13,8 +13,11 @@ from facturacion_electronica import (
     TIPOS_EMITIBLES,
 )
 from facturacion_electronica.models import DocumentoElectronico
+from facturacion_electronica.services.acciones import acciones_para_venta
+from facturacion_electronica.services.kude_service import ancho_papel_kude
 from facturacion_electronica.services.nota_credito import resumen_devoluciones
 from facturacion_electronica.services.proveedores import PROVEEDORES
+from facturacion_electronica.services.reintento import emitir_o_reintentar, puede_reintentar
 from facturacion_electronica.services import (
     ajustar_secuencia,
     cancelar_documento,
@@ -124,7 +127,7 @@ def configuracion():
         # La pantalla sí espera: es el único lugar donde el usuario puede
         # hacer algo con "falta el certificado en la API".
         faltantes=validar_readiness(config),
-        departamentos=geo.departamentos(),
+        departamentos=geo.departamentos(config.proveedor),
         secuencias=listar_secuencias(),
         hay_documentos=hay_documentos_transmitidos(),
         proveedores=PROVEEDORES,
@@ -190,18 +193,6 @@ def ajustar_numeracion():
     return redirect(url_for('facturacion_electronica.configuracion'))
 
 
-@facturacion_electronica_bp.route('/geo/distritos')
-@login_required
-def geo_distritos():
-    return jsonify(geo.distritos_de(request.args.get('departamento')))
-
-
-@facturacion_electronica_bp.route('/geo/ciudades')
-@login_required
-def geo_ciudades():
-    return jsonify(geo.ciudades_de(request.args.get('distrito')))
-
-
 @facturacion_electronica_bp.route('/vista-previa')
 @login_required
 def vista_previa():
@@ -241,6 +232,10 @@ def vista_previa():
         xml_generado=xml_generado,
         xml_error=xml_error,
         documento=obtener_documento(venta.id_venta) if venta is not None else None,
+        puede_reintentar=puede_reintentar(obtener_documento(venta.id_venta), venta) if venta else False,
+        # La misma regla que la pantalla de la venta: un DE firmado o rechazado a
+        # tiempo todavía sale; ofrecer quemar su número acá era la trampa.
+        acciones=acciones_para_venta(venta, puede_operar=True) if venta is not None else None,
         capacidades=capacidades_fe,
         notas=notas_credito(venta.id_venta) if venta is not None else [],
         devoluciones=(
@@ -329,11 +324,11 @@ def emitir_completo(venta_id):
         flash(f'No se encontró la venta {venta_id}.', 'warning')
         return redirect(url_for('facturacion_electronica.vista_previa'))
 
-    _documento, error = emitir_para_pos(venta)
+    _documento, error = emitir_o_reintentar(venta)
     if error:
         flash(f'No se pudo emitir: {error}', 'danger')
     else:
-        flash('Documento electrónico emitido.', 'success')
+        flash(f'Documento electrónico emitido. Estado: {_documento.estado}.', 'success')
     return redirect(url_for('facturacion_electronica.vista_previa', venta=venta_id))
 
 
@@ -533,7 +528,7 @@ def kude(venta_id):
     if contexto is None:
         flash('El KuDE del proveedor seleccionado aún no está disponible.', 'warning')
         return redirect(url_for('facturacion_electronica.configuracion'))
-    contexto['preview'] = request.args.get('preview') is not None
+    contexto.update(preview=request.args.get('preview') is not None, paper_width_mm=ancho_papel_kude())
     return render_template('facturacion_electronica/kude.html', **contexto)
 
 

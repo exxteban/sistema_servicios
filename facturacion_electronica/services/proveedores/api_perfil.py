@@ -120,11 +120,67 @@ def _clave_eleccion(timbrado):
     return (inicio, _numero_timbrado(timbrado.get('number')), str(timbrado.get('id') or ''))
 
 
+AMBIENTES_API = ('test', 'prod')
+
+
+def ambiente_perfil(perfil):
+    """'test' | 'prod' del modo actual de la empresa; None si el perfil no lo dice.
+
+    SANDBOX y TEST comparten 'test' del lado de la API.
+    """
+    valor = str(perfil.get('environment') or '').strip().lower()
+    if valor in AMBIENTES_API:
+        return valor
+    modo = str(perfil.get('sifen_mode') or '').strip().lower()
+    if modo == 'production':
+        return 'prod'
+    if modo in ('test', 'sandbox'):
+        return 'test'
+    return None
+
+
+def _es_timbrado_de_prueba(timbrado, perfil):
+    """En test el número de timbrado es el RUC sin dígito verificador."""
+    ruc = str(perfil.get('ruc') or '').strip()
+    return bool(ruc) and str(timbrado.get('number') or '').strip() == ruc
+
+
+def _timbrado_aplica(timbrado, perfil):
+    """Si el timbrado sirve para el ambiente en que está hoy la empresa.
+
+    La API valida `Stamp.environment` contra el modo al emitir (422
+    `stamp_environment_mismatch`) y nunca borra timbrados: el de prueba sigue
+    ahí después de pasar a producción, con la misma fecha de inicio que el
+    real si se cargó así, y en el desempate por número ganaba el de prueba.
+    """
+    if timbrado.get('is_active') is False:
+        return False
+    ambiente = ambiente_perfil(perfil)
+    propio = str(timbrado.get('environment') or '').strip().lower()
+    if ambiente and propio and propio != ambiente:
+        return False
+    return not (ambiente == 'prod' and _es_timbrado_de_prueba(timbrado, perfil))
+
+
+def _timbrados_otro_ambiente(perfil, establecimiento, punto, tipo_documento):
+    """Números de timbrado de nuestro punto que existen pero no para este ambiente."""
+    return sorted({
+        str(t.get('number') or '')
+        for t in perfil.get('stamps') or []
+        if int(t.get('document_type') or 0) == tipo_documento
+        and (normalizar_codigo(t.get('establishment')),
+             normalizar_codigo(t.get('expedition_point'))) == (establecimiento, punto)
+        and not _timbrado_aplica(t, perfil)
+    })
+
+
 def _candidatos_timbrado(perfil, establecimiento, punto, tipo_documento):
     del_punto = []
     otros = []
     for timbrado in perfil.get('stamps') or []:
         if int(timbrado.get('document_type') or 0) != tipo_documento:
+            continue
+        if not _timbrado_aplica(timbrado, perfil):
             continue
         estab = normalizar_codigo(timbrado.get('establishment'))
         pto = normalizar_codigo(timbrado.get('expedition_point'))
@@ -160,10 +216,19 @@ def resolver_timbrado(config, perfil, tipo_documento=TIPO_FACTURA, hoy=None):
     )
     if elegido is not None:
         return elegido.get('id'), None
+    otro_ambiente = _timbrados_otro_ambiente(perfil, establecimiento, punto, tipo_documento)
+    if not del_punto and otro_ambiente:
+        en_prod = ambiente_perfil(perfil) == 'prod'
+        return None, (
+            f'La empresa está en {"producción" if en_prod else "prueba"} y la API no tiene '
+            f'timbrado de {nombre} de ese ambiente para {establecimiento}-{punto} (los cargados, '
+            f'{", ".join(otro_ambiente)}, son del otro ambiente o el de prueba). Cargalo en '
+            f'"Timbrado en la API" con ambiente {"Producción" if en_prod else "Prueba"}.'
+        )
     if not del_punto and not otros:
         return None, (
             f'La API no tiene ningún timbrado de {nombre} cargado para esta empresa. '
-            'Hay que cargarlo del lado del proveedor antes de emitir.'
+            'Cargalo en "Timbrado en la API" antes de emitir.'
         )
     if del_punto:
         return None, (
@@ -172,7 +237,9 @@ def resolver_timbrado(config, perfil, tipo_documento=TIPO_FACTURA, hoy=None):
         )
     return None, (
         f'La API no tiene timbrado de {nombre} para {establecimiento}-{punto}. '
-        f'Los cargados para ese tipo son: {", ".join(sorted(set(otros)))}.'
+        f'Los cargados para ese tipo son: {", ".join(sorted(set(otros)))}. Si este local '
+        f'emite como {establecimiento}-{punto}, cargá ese timbrado en "Timbrado en la API" '
+        '(mismo número, con este establecimiento y punto).'
     )
 
 
@@ -236,23 +303,48 @@ def faltantes_readiness_api(config):
     if error:
         faltantes.append(f'Perfil del emisor en la API: {error}')
         return faltantes
-    return faltantes_sifen_config(perfil)
+    faltantes = faltantes_sifen_config(perfil) + faltantes_emision(perfil)
+    if not (perfil.get('address') or '').strip():
+        # La API no lo exige, pero sin dirección el XML no se arma (dDirEmi) y
+        # su ubicación por defecto no es la del emisor.
+        faltantes.append('Dirección y ubicación del emisor en la API (subilas con '
+                         '"Subir datos del emisor a la API")')
+    return faltantes
+
+
+# `emission_readiness.missing` (API 1.4.0): lo que le falta a la empresa del
+# lado de ellos para emitir. Es lo mismo que después rebota el alta con 400
+# `company_missing_data`, pero acá sale antes de reservar un número.
+_FALTANTES_EMISION = {
+    'legal_name': 'Razón social en la API',
+    'economic_activities': 'Actividad económica en la API (subila con "Subir datos del emisor a la API")',
+    'phone': 'Teléfono en la API (subilo con "Subir datos del emisor a la API")',
+    'email': 'Email en la API (subilo con "Subir datos del emisor a la API")',
+    'stamps': 'Timbrado en la API',
+}
+
+
+def faltantes_emision(perfil):
+    readiness = perfil.get('emission_readiness') if isinstance(perfil, dict) else None
+    if not isinstance(readiness, dict) or readiness.get('ready', True):
+        return []
+    return [_FALTANTES_EMISION.get(clave, f'{clave} en la API')
+            for clave in readiness.get('missing') or []]
 
 
 def _adoptar_timbrado_config(config, perfil):
-    """El timbrado vigente de factura para nuestro punto, o el único que haya."""
+    """El timbrado vigente de factura para nuestro establecimiento y punto.
+
+    Nunca cambia el establecimiento ni el punto de esta instalación. Antes, si
+    la API tenía un único timbrado, se adoptaba su 001-001: el local 2 de un
+    cliente con dos locales (002) se pasaba solo a 001 al sincronizar, y las
+    dos instalaciones numeraban el mismo 001-001 con contadores separados
+    (409 `fiscal_number_conflict`). Sin timbrado para nuestro punto, el
+    resumen lo dice y se carga en "Timbrado en la API".
+    """
     estab = normalizar_codigo(config.establecimiento)
     punto = normalizar_codigo(config.punto_expedicion)
     propio, _del_punto, _otros = seleccionar_timbrado(perfil, estab, punto, TIPO_FACTURA)
-    if propio is None:
-        timbrados = [
-            t for t in (perfil.get('stamps') or [])
-            if int(t.get('document_type') or 0) == TIPO_FACTURA
-        ]
-        if len(timbrados) == 1:
-            propio = timbrados[0]
-            config.establecimiento = normalizar_codigo(propio.get('establishment'))
-            config.punto_expedicion = normalizar_codigo(propio.get('expedition_point'))
     if propio is None:
         return None
     config.timbrado_numero = str(propio.get('number') or '') or config.timbrado_numero
@@ -276,7 +368,7 @@ def sembrar_correlativos(config, perfil):
     sembrados = []
     for timbrado in perfil.get('stamps') or []:
         tipo = int(timbrado.get('document_type') or 0)
-        if tipo not in TIPOS_EMITIBLES:
+        if tipo not in TIPOS_EMITIBLES or not _timbrado_aplica(timbrado, perfil):
             continue
         if (normalizar_codigo(timbrado.get('establishment')),
                 normalizar_codigo(timbrado.get('expedition_point'))) != (estab, punto):
@@ -294,18 +386,27 @@ def aplicar_perfil_al_config(config, perfil):
     config.ruc = str(perfil.get('ruc') or '').strip() or config.ruc
     dv = perfil.get('dv')
     config.dv_ruc = str(dv) if dv is not None else config.dv_ruc
-    tipo = perfil.get('taxpayer_type')
-    config.tipo_contribuyente = str(tipo) if tipo else config.tipo_contribuyente
-    config.direccion = perfil.get('address') or config.direccion
-    config.numero_casa = str(perfil.get('house_number') or '') or config.numero_casa
     config.telefono = perfil.get('phone') or config.telefono
     config.email = perfil.get('email') or config.email
-    config.departamento_codigo = str(perfil.get('department_code') or '') or config.departamento_codigo
-    config.departamento_desc = perfil.get('department_name') or config.departamento_desc
-    config.distrito_codigo = str(perfil.get('district_code') or '') or config.distrito_codigo
-    config.distrito_desc = perfil.get('district_name') or config.distrito_desc
-    config.ciudad_codigo = str(perfil.get('city_code') or '') or config.ciudad_codigo
-    config.ciudad_desc = perfil.get('city_name') or config.ciudad_desc
+    if (perfil.get('address') or '').strip():
+        # Sin dirección, el tipo de contribuyente y la ubicación de la API son
+        # sus valores por defecto (física, Asunción, departamento 11), no datos
+        # del emisor: copiarlos pisaba los reales que ya estaban acá. Se toman
+        # recién cuando alguien los cargó allá ("Subir datos del emisor").
+        tipo = perfil.get('taxpayer_type')
+        config.tipo_contribuyente = str(tipo) if tipo else config.tipo_contribuyente
+        regimen = perfil.get('regime_type')
+        config.tipo_regimen = str(regimen) if regimen else config.tipo_regimen
+        config.direccion = perfil.get('address') or config.direccion
+        config.numero_casa = str(perfil.get('house_number') or '') or config.numero_casa
+        config.departamento_codigo = (
+            str(perfil.get('department_code') or '') or config.departamento_codigo
+        )
+        config.departamento_desc = perfil.get('department_name') or config.departamento_desc
+        config.distrito_codigo = str(perfil.get('district_code') or '') or config.distrito_codigo
+        config.distrito_desc = perfil.get('district_name') or config.distrito_desc
+        config.ciudad_codigo = str(perfil.get('city_code') or '') or config.ciudad_codigo
+        config.ciudad_desc = perfil.get('city_name') or config.ciudad_desc
 
     actividades = perfil.get('economic_activities') or []
     if actividades:
@@ -341,6 +442,8 @@ def aplicar_perfil_al_config(config, perfil):
 __all__ = [
     'NOMBRE_TIPO',
     'TIPO_FACTURA',
+    'AMBIENTES_API',
+    'ambiente_perfil',
     'aplicar_perfil_al_config',
     'congelar_identidad',
     'faltantes_locales',

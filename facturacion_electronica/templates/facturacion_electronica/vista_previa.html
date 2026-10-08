@@ -46,6 +46,11 @@
                     Documento electrónico — venta #{{ venta.id_venta }}
                 </h2>
                 {% if documento %}
+                {% if documento.numero %}
+                <p class="mt-1 text-sm text-gray-700 dark:text-gray-200">
+                    Factura: <span class="font-mono font-semibold">{{ documento.numero_formateado }}</span>
+                </p>
+                {% endif %}
                 <p class="mt-1 text-sm text-gray-700 dark:text-gray-200">
                     Estado: <span class="font-semibold">{{ documento.estado }}</span>
                     {% if documento.ambiente %}· Ambiente: {{ documento.ambiente }}{% endif %}
@@ -58,12 +63,27 @@
                 {% endif %}
             </div>
             <div class="flex flex-wrap gap-2">
-                {% if not capacidades.herramientas_propias %}
+                {# En la API sólo se ofrece donde hace algo: sin factura, con un fallo, o
+                   cancelada (y ahí emite otra con número nuevo, así que lo dice). Sobre
+                   una aprobada o en camino el servicio igual se niega. #}
+                {% if not capacidades.herramientas_propias and (venta.estado or '')|lower != 'anulada'
+                    and (not documento or documento.estado in ['error', 'rechazado', 'cancelado']) %}
+                <form method="post" action="{{ url_for('facturacion_electronica.emitir_completo', venta_id=venta.id_venta) }}"
+                    {% if documento and documento.estado == 'cancelado' %}onsubmit="return confirm('Se va a emitir una factura nueva, con otro número. ¿Seguir?');"{% endif %}>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit"
+                        class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700">
+                        <i class="fas fa-file-circle-check mr-2"></i>{% if not documento %}Emitir factura electrónica{% elif documento.estado == 'cancelado' %}Volver a facturar{% else %}Reintentar emisión{% endif %}
+                    </button>
+                </form>
+                {% endif %}
+                {% if capacidades.herramientas_propias and puede_reintentar %}
+                {# Regenera con el mismo número, firma, QR y envía en un solo paso. #}
                 <form method="post" action="{{ url_for('facturacion_electronica.emitir_completo', venta_id=venta.id_venta) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit"
                         class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700">
-                        <i class="fas fa-file-circle-check mr-2"></i>{{ 'Reintentar emisión' if documento else 'Emitir factura electrónica' }}
+                        <i class="fas fa-rotate-right mr-2"></i>Reintentar emisión
                     </button>
                 </form>
                 {% endif %}
@@ -110,7 +130,7 @@
                 </form>
                 {% endif %}
                 {% if documento and (documento.xml_firmado or documento.api_documento_id) %}
-                <a href="{{ url_for('facturacion_electronica.descargar_xml', venta_id=venta.id_venta) }}"
+                <a href="{{ url_for('facturacion_electronica.descargar_xml', venta_id=venta.id_venta) }}" download
                     class="inline-flex items-center rounded-lg border border-gray-400 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700">
                     <i class="fas fa-file-code mr-2"></i>Descargar XML
                 </a>
@@ -185,8 +205,7 @@
                 </div>
             </form>
             {% endif %}
-            {% if capacidades.inutilizacion and documento and documento.numero
-                  and documento.estado in ['generado', 'firmado', 'rechazado', 'error'] %}
+            {% if acciones and acciones.puede_inutilizar %}
             <form method="post" action="{{ url_for('facturacion_electronica.inutilizar', venta_id=venta.id_venta) }}"
                   class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"
                   onsubmit="return confirm('¿Informar a SIFEN que el número {{ documento.numero_formateado }} no se va a usar? El número queda quemado para siempre y la venta se factura con uno nuevo.');">
@@ -219,7 +238,7 @@
             {% if documento and documento.estado == 'cancelado' %}
             <p class="mt-3 text-xs text-red-600 dark:text-red-400">
                 <i class="fas fa-ban mr-1"></i>Factura cancelada en SIFEN{% if documento.motivo_cancelacion %} — {{ documento.motivo_cancelacion }}{% endif %}.
-                Volvé a generar el documento para re-facturar esta venta.
+                {% if (venta.estado or '')|lower == 'anulada' %}La venta también está anulada.{% else %}Si la venta sigue en pie, se puede volver a facturar con un número nuevo.{% endif %}
             </p>
             {% endif %}
         </div>
@@ -228,6 +247,7 @@
             {% if documento.respuesta_codigo %}<div><span class="font-semibold">Código SIFEN:</span> {{ documento.respuesta_codigo }}</div>{% endif %}
             {% if documento.respuesta_mensaje %}<div><span class="font-semibold">Mensaje:</span> {{ documento.respuesta_mensaje }}</div>{% endif %}
             {% if documento.protocolo_autorizacion %}<div><span class="font-semibold">Protocolo:</span> {{ documento.protocolo_autorizacion }}</div>{% endif %}
+            {% if documento.api_lote_id and not documento.api_documento_id %}<div><span class="font-semibold">Lote SIFEN:</span> {{ documento.api_lote_id }}</div>{% endif %}
             {% if documento.fecha_envio %}<div><span class="font-semibold">Enviado:</span> {{ documento.fecha_envio.strftime('%d/%m/%Y %H:%M') }} UTC</div>{% endif %}
             {# El código y el mensaje de SIFEN casi nunca nombran la causa real
                (un "timbrado inválido" que era otra cosa, un elemento vacío que
@@ -296,7 +316,7 @@
                 {% endif %}
                 <span class="flex items-center gap-3">
                     {% if nota.api_documento_id or nota.xml_firmado %}
-                    <a href="{{ url_for('facturacion_electronica.descargar_xml', venta_id=venta.id_venta, documento=nota.id) }}"
+                    <a href="{{ url_for('facturacion_electronica.descargar_xml', venta_id=venta.id_venta, documento=nota.id) }}" download
                         class="text-xs font-medium text-blue-600 hover:text-blue-700">
                         <i class="fas fa-file-code mr-1"></i>XML
                     </a>

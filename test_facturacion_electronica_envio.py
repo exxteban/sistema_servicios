@@ -104,11 +104,11 @@ def test_la_consulta_0420_destraba_el_documento():
     )
     config = SimpleNamespace(cert_path='/fake/cert.p12', cert_password='x', ambiente=AMBIENTE_TEST)
 
-    with patch('facturacion_electronica.services.emision_service.obtener_configuracion',
+    with patch('facturacion_electronica.services.envio_service.obtener_configuracion',
                return_value=config), \
-         patch('facturacion_electronica.services.emision_service.consultar_de',
+         patch('facturacion_electronica.services.envio_service.consultar_de',
                return_value=(respuesta, None)), \
-         patch('facturacion_electronica.services.emision_service.db'):
+         patch('facturacion_electronica.services.retransmision.db'):
         _respuesta, error = consultar_documento(documento)
 
     assert error is None

@@ -184,7 +184,7 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
             'rProtDe': {'dEstRes': 'Aprobado', 'dCodRes': '0260', 'dMsgRes': 'ok', 'dProtAut': '999'}
         }
         with patch(
-            'facturacion_electronica.services.emision_service.enviar_de',
+            'facturacion_electronica.services.envio_service.enviar_de',
             return_value=(respuesta_aprobada, None),
         ) as mock_enviar:
             resumen = procesar_pendientes()
@@ -196,14 +196,14 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
         self.assertEqual(doc.protocolo_autorizacion, '999')
 
     def test_documento_de_venta_vieja_no_se_envia_y_queda_en_error(self):
-        # Más de 72h desde la emisión: SIFEN lo rechazaría, así que el job no
+        # Más de 720h desde la emisión: SIFEN lo rechazaría, así que el job no
         # debe ni intentar la llamada de red.
         from facturacion_electronica import ESTADO_ERROR, ESTADO_FIRMADO
         from facturacion_electronica.models import DocumentoElectronico
         from facturacion_electronica.services.envio_automatico import procesar_pendientes
 
         self._config_completa()
-        venta_vieja = self._venta(datetime.utcnow() - timedelta(hours=100))
+        venta_vieja = self._venta(datetime.utcnow() - timedelta(hours=750))
         doc = DocumentoElectronico(
             id_venta=venta_vieja.id_venta,
             estado=ESTADO_FIRMADO,
@@ -215,7 +215,7 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
         db.session.add(doc)
         db.session.commit()
 
-        with patch('facturacion_electronica.services.emision_service.enviar_de') as mock_enviar:
+        with patch('facturacion_electronica.services.envio_service.enviar_de') as mock_enviar:
             resumen = procesar_pendientes()
 
         mock_enviar.assert_not_called()
@@ -235,7 +235,7 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
         from facturacion_electronica.services.envio_automatico import procesar_pendientes
 
         self._config_completa()
-        venta_vieja = self._venta(datetime.utcnow() - timedelta(hours=100))
+        venta_vieja = self._venta(datetime.utcnow() - timedelta(hours=750))
         doc = DocumentoElectronico(
             id_venta=venta_vieja.id_venta,
             estado=ESTADO_FIRMADO,
@@ -247,7 +247,7 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
         db.session.add(doc)
         db.session.commit()
 
-        with patch('facturacion_electronica.services.emision_service.enviar_de'):
+        with patch('facturacion_electronica.services.envio_service.enviar_de'):
             primera = procesar_pendientes()
 
         self.assertEqual(primera['procesados'], 1)
@@ -257,7 +257,7 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
 
         # La pasada siguiente ya ni lo mira: ni procesado, ni sumando al
         # contador de errores.
-        with patch('facturacion_electronica.services.emision_service.enviar_de') as mock_enviar:
+        with patch('facturacion_electronica.services.envio_service.enviar_de') as mock_enviar:
             segunda = procesar_pendientes()
 
         mock_enviar.assert_not_called()
@@ -295,7 +295,7 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
         doc.updated_at = datetime.utcnow() - timedelta(hours=1)
         db.session.commit()
 
-        with patch('facturacion_electronica.services.emision_service.enviar_de',
+        with patch('facturacion_electronica.services.envio_service.enviar_de',
                    return_value=({'ns2:dCodRes': '0260', 'ns2:dEstRes': 'Aprobado'}, None)):
             self.assertEqual(procesar_pendientes()['procesados'], 1)
 
@@ -329,7 +329,7 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
         db.session.add(doc)
         db.session.commit()  # updated_at queda en 'ahora' por el default onupdate
 
-        with patch('facturacion_electronica.services.emision_service.enviar_de') as mock_enviar:
+        with patch('facturacion_electronica.services.envio_service.enviar_de') as mock_enviar:
             resumen = procesar_pendientes()
 
         mock_enviar.assert_not_called()
@@ -479,7 +479,7 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
         db.session.commit()
 
         fallo = 'PKCS#12 MAC could not be verified. Invalid password?'
-        with patch('facturacion_electronica.services.emision_service.firmar_xml',
+        with patch('facturacion_electronica.services.generacion_service.firmar_xml',
                    return_value=(None, fallo)) as mock_firmar:
             primera = procesar_pendientes()
             segunda = procesar_pendientes()
@@ -513,11 +513,11 @@ class TestFacturacionElectronicaEnvioAutomatico(unittest.TestCase):
         db.session.add(doc)
         db.session.commit()
 
-        with patch('facturacion_electronica.services.emision_service.firmar_xml',
+        with patch('facturacion_electronica.services.generacion_service.firmar_xml',
                    return_value=('<rDE Signature=1/>', None)), \
-             patch('facturacion_electronica.services.emision_service.generar_qr',
+             patch('facturacion_electronica.services.generacion_service.generar_qr',
                    return_value=('<rDE gCamFuFD=1/>', None)), \
-             patch('facturacion_electronica.services.emision_service.enviar_de',
+             patch('facturacion_electronica.services.envio_service.enviar_de',
                    return_value=({'rProtDe': {'dEstRes': 'Aprobado'}}, None)):
             resumen = procesar_pendientes()
 

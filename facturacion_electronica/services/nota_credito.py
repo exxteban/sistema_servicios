@@ -42,9 +42,34 @@ def motivo_o_defecto(codigo):
     return valor, descripcion
 
 
-def _precio_unitario_facturado(detalle_original, detalle_devolucion):
+def precios_facturados(venta):
+    """{id_detalle_venta: precio unitario neto} tal como lo declaró la factura.
+
+    Sale de la **misma** función que armó los ítems de la factura, con el mismo
+    `total_objetivo`. El `subtotal` del detalle no alcanza: el descuento global
+    de la venta (manual o de fidelización) no está en ninguna línea, la factura
+    lo repartió sobre los precios, y una NC armada con el subtotal acreditaba
+    más de lo facturado — la venta #123 de Janelipy: factura por 613.076, NC por
+    645.343.
+    """
+    from facturacion_electronica.services.data_builder import construir_items
+
+    detalles = list(venta.detalles)
+    items = construir_items(detalles, total_objetivo=venta.total)
+    return {
+        detalle.id_detalle_venta: float(item['precioUnitario'] or 0) - float(item['descuento'] or 0)
+        for detalle, item in zip(detalles, items)
+    }
+
+
+def _precio_unitario_facturado(detalle_original, detalle_devolucion, precios=None):
     """Precio unitario neto tal como quedó en la factura."""
     if detalle_original is not None:
+        venta = getattr(detalle_original, 'venta', None)
+        if precios is None and venta is not None:
+            precios = precios_facturados(venta)
+        if precios and detalle_original.id_detalle_venta in precios:
+            return precios[detalle_original.id_detalle_venta]
         cantidad = float(detalle_original.cantidad or 0)
         if cantidad:
             return float(detalle_original.subtotal or 0) / cantidad
@@ -65,6 +90,8 @@ def lineas_de_devolucion(devolucion):
     arma los de la nota de crédito.
     """
     lineas = []
+    venta = getattr(devolucion, 'venta', None)
+    precios = precios_facturados(venta) if venta is not None else None
     for detalle in devolucion.detalles:
         original = detalle.detalle_venta_original
         lineas.append(SimpleNamespace(
@@ -72,7 +99,7 @@ def lineas_de_devolucion(devolucion):
             servicio=getattr(detalle, 'servicio', None),
             id_producto=detalle.id_producto,
             cantidad=float(detalle.cantidad or 0),
-            precio_unitario=_precio_unitario_facturado(original, detalle),
+            precio_unitario=_precio_unitario_facturado(original, detalle, precios),
             # El descuento ya está dentro del precio facturado.
             descuento_linea=0,
             porcentaje_iva=_iva_de_la_linea(original),
@@ -87,11 +114,12 @@ def lineas_de_venta(venta):
     la venta facturada dos veces. No vuelve mercadería y no se mueve stock;
     lo único que hay que corregir es el comprobante ante SIFEN.
 
-    Se acredita **exactamente lo que declaró la factura**, así que el precio
-    sale del subtotal de cada línea (que ya tiene el descuento adentro), por el
-    mismo motivo que en una devolución: acreditar más sería declarar menos IVA
-    del que se cobró.
+    Se acredita **exactamente lo que declaró la factura**: el precio de cada
+    línea con su descuento y su parte del descuento global (ver
+    `precios_facturados`), por el mismo motivo que en una devolución:
+    acreditar más sería declarar menos IVA del que se cobró.
     """
+    precios = precios_facturados(venta)
     lineas = []
     for detalle in venta.detalles:
         cantidad = float(detalle.cantidad or 0)
@@ -102,7 +130,9 @@ def lineas_de_venta(venta):
             servicio=getattr(detalle, 'servicio', None),
             id_producto=detalle.id_producto,
             cantidad=cantidad,
-            precio_unitario=float(detalle.subtotal or 0) / cantidad,
+            precio_unitario=precios.get(
+                detalle.id_detalle_venta, float(detalle.subtotal or 0) / cantidad,
+            ),
             descuento_linea=0,
             porcentaje_iva=int(detalle.porcentaje_iva or IVA_POR_DEFECTO),
         ))

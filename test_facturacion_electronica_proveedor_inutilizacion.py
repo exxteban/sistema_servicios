@@ -226,8 +226,14 @@ class TestProveedorApiInutilizacion(BaseProveedorApi):
         from facturacion_electronica.services.acciones import acciones_para_venta
         from facturacion_electronica.services.proveedores.fachada import capacidades
 
+        from datetime import datetime, timedelta
+
         self._activar_api()
         documento = self._documento_quemado(estado=ESTADO_RECHAZADO)
+        # Rechazado y fuera de las 720h: ya no se puede reenviar. Dentro del
+        # plazo se ofrece corregir, no inutilizar (ver ..._correccion.py).
+        documento.venta.fecha_venta = datetime.utcnow() - timedelta(days=31)
+        db.session.commit()
 
         self.assertTrue(capacidades()['inutilizacion'])
         acciones = acciones_para_venta(documento.venta, puede_operar=True)

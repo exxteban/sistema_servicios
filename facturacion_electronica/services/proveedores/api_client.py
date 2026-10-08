@@ -8,7 +8,14 @@ y un único reintento (el token pudo vencer entre que se leyó y se usó).
 
 Como `sifen_client`, nada de acá lanza: todo devuelve (datos, error) y el
 error ya viene en castellano, listo para mostrar.
+
+Cada llamada deja una línea `[FE-API]` en el log (método, ruta, estado,
+tiempo). El error del documento sólo guarda el último intento y los errores de
+configuración no quedan en ningún documento: sin esto, diagnosticar pedía
+capturas de pantalla. Nunca se loguea el cuerpo: ahí viajan el .p12, su
+contraseña, el CSC y el token.
 """
+import logging
 import threading
 import time
 from urllib.parse import urlsplit, urlunsplit
@@ -32,6 +39,8 @@ MARGEN_VENCIMIENTO_SEGUNDOS = 60
 
 _TOKENS = {}
 _CANDADO = threading.Lock()
+
+_log = logging.getLogger(__name__)
 
 ERROR_SIN_CONFIG = 'Falta configurar la URL y las credenciales de la API de facturación electrónica.'
 
@@ -79,6 +88,27 @@ def olvidar_token(config=None):
             _TOKENS.pop(_clave_cache(config), None)
 
 
+def _detalle_envelope(error):
+    """Mensaje del envelope `{"error": {"code", "detail", "extra"}}` de la API.
+
+    Es la forma de todo error desde su 1.4.0. Sin esto el mensaje salía como
+    el repr del dict ("error: {'code': ...}"). En un 400 de validación los
+    campos que fallaron van en `extra.issues`: se listan todos con su campo,
+    porque `detail` sólo repite el primero y sin el campo.
+    """
+    extra = error.get('extra') if isinstance(error.get('extra'), dict) else {}
+    issues = [i for i in extra.get('issues') or [] if isinstance(i, dict)]
+    partes = [
+        ': '.join(str(p).strip() for p in (i.get('field'), i.get('detail')) if p)
+        for i in issues
+    ]
+    texto = '; '.join(p for p in partes if p) or str(error.get('detail') or '').strip()
+    codigo = str(error.get('code') or '').strip()
+    if codigo:
+        texto = f'{texto} ({codigo})' if texto else codigo
+    return texto[:500]
+
+
 def _detalle_error(respuesta):
     """Mensaje legible a partir del cuerpo de error de la API (DRF)."""
     try:
@@ -86,6 +116,10 @@ def _detalle_error(respuesta):
     except ValueError:
         return (respuesta.text or '').strip()[:300] or f'HTTP {respuesta.status_code}'
 
+    if isinstance(cuerpo, dict) and isinstance(cuerpo.get('error'), dict):
+        texto = _detalle_envelope(cuerpo['error'])
+        if texto:
+            return texto
     if isinstance(cuerpo, dict):
         for clave in ('detail', 'error', 'message'):
             valor = cuerpo.get(clave)
@@ -103,6 +137,15 @@ def _detalle_error(respuesta):
     return str(cuerpo)[:300]
 
 
+def _registrar(metodo, ruta, inicio, estado, error=None):
+    """Una línea por llamada: info si salió bien, warning si no."""
+    segundos = time.monotonic() - inicio
+    if error:
+        _log.warning('[FE-API] %s %s -> %s (%.2fs) %s', metodo, ruta, estado, segundos, error)
+    else:
+        _log.info('[FE-API] %s %s -> %s (%.2fs)', metodo, ruta, estado, segundos)
+
+
 def obtener_token(config, forzar=False):
     """Devuelve (token, error). Cachea por (url, client_id) hasta su vencimiento."""
     url = base_url(config)
@@ -118,6 +161,7 @@ def obtener_token(config, forzar=False):
         if cacheado and cacheado[1] > ahora:
             return cacheado[0], None
 
+    inicio = time.monotonic()
     try:
         respuesta = requests.post(
             f'{url}/auth/token/',
@@ -125,13 +169,20 @@ def obtener_token(config, forzar=False):
             timeout=TIMEOUT_SEGUNDOS,
         )
     except requests.exceptions.ConnectionError:
+        _registrar('POST', '/auth/token/', inicio, 'sin conexión', 'ConnectionError')
         return None, ('No se pudo conectar con la API de facturación electrónica. '
                       'Verificá la URL y la conexión a internet.')
     except requests.exceptions.Timeout:
+        _registrar('POST', '/auth/token/', inicio, 'timeout', 'Timeout')
         return None, 'La API de facturación electrónica tardó demasiado en responder al autenticar.'
     except requests.exceptions.RequestException as exc:
+        _registrar('POST', '/auth/token/', inicio, 'error', repr(exc))
         return None, f'Error al conectar con la API de facturación electrónica: {exc}'
 
+    _registrar(
+        'POST', '/auth/token/', inicio, respuesta.status_code,
+        _detalle_error(respuesta) if respuesta.status_code != 200 else None,
+    )
     if respuesta.status_code == 401:
         return None, ('La API rechazó las credenciales (client_id / client_secret). '
                       'Revisalas en la configuración.')
@@ -182,24 +233,32 @@ def solicitar(config, metodo, ruta, json=None, headers=None, timeout=None, binar
             cabeceras.update(headers)
         return requests.request(metodo, destino, json=json, headers=cabeceras, timeout=espera)
 
+    inicio = time.monotonic()
     try:
         respuesta = _llamar(token)
         if respuesta.status_code == 401:
             # El token pudo vencer entre el cache y el envío: se renueva una vez.
             token, error = obtener_token(config, forzar=True)
             if error:
+                _registrar(metodo, ruta, inicio, 401, error)
                 return None, error
             respuesta = _llamar(token)
     except requests.exceptions.ConnectionError:
+        _registrar(metodo, ruta, inicio, 'sin conexión', 'ConnectionError')
         return None, ('No se pudo conectar con la API de facturación electrónica. '
                       'Verificá la URL y la conexión a internet.')
     except requests.exceptions.Timeout:
+        _registrar(metodo, ruta, inicio, 'timeout', f'Timeout ({espera}s)')
         return None, 'La API de facturación electrónica tardó demasiado en responder.'
     except requests.exceptions.RequestException as exc:
+        _registrar(metodo, ruta, inicio, 'error', repr(exc))
         return None, f'Error al conectar con la API de facturación electrónica: {exc}'
 
     if respuesta.status_code >= 400:
-        return None, f'La API respondió {respuesta.status_code}: {_detalle_error(respuesta)}'
+        detalle = _detalle_error(respuesta)
+        _registrar(metodo, ruta, inicio, respuesta.status_code, detalle)
+        return None, f'La API respondió {respuesta.status_code}: {detalle}'
+    _registrar(metodo, ruta, inicio, respuesta.status_code)
 
     if binario:
         return respuesta.content, None

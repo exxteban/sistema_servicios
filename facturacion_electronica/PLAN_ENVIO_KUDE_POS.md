@@ -130,8 +130,9 @@ Todo lo demás se puede construir y probar ahora:
 - **No probado end-to-end**: el TLS mutuo necesita el certificado real habilitado.
   La estructura exacta del SOAP de respuesta se confirma recién contra el ambiente
   real (por eso `_interpretar_respuesta` es defensivo).
-- PENDIENTE opcional: lote async (`recibeLote`/`consultaLote`) y eventos
-  (cancelación/inutilización) — el `setapi` ya los expone.
+- Lote async (`recibeLote`/`consultaLote`): HECHO el 2026-10-03 como opción
+  "Modo de envío" de la configuración (síncrono por defecto). Un DE por lote;
+  el job consulta el lote en cada pasada. Ver `services/envio_lote.py`.
 
 ### Fase 5 — Integración con el POS — ✅ HECHA (hasta KuDE; el envío a SIFEN queda para Fase 4)
 - Checkbox **"Emitir factura electrónica"** en el modal de vista previa del cobro,
@@ -224,7 +225,7 @@ Todo lo demás se puede construir y probar ahora:
       (`tipoDocumento=1`).
 - [ ] **Detalle de cuotas** en venta a crédito: hoy va como "plazo 30 días" fijo.
 - [ ] **KuDE formato carta** (A4) opcional, además del térmico.
-- [ ] Lote async (`recibeLote`/`consultaLote`) e **inutilización** de números
+- [x] Lote async (`recibeLote`/`consultaLote`) e **inutilización** de números
       reservados nunca emitidos (huecos de numeración). La **cancelación** ya está
       cableada (Fase 8); inutilización sigue pendiente.
 - [ ] `unidadMedida` para bolsa/caja/rollo cae a Unidad (SIFEN no las tipifica) —

@@ -56,6 +56,7 @@ def test_validacion_api_completa_no_falta_nada():
     )
     perfil = {
         'ruc': '',
+        'address': 'Avda. Mcal. López 1234',
         'sifen_config': {
             'certificate': {'fingerprint_sha256': 'abc'},
             'csc': 'configured',
@@ -312,7 +313,7 @@ class TestProveedorApi(BaseProveedorApi):
             raise AssertionError(f'ruta inesperada: {ruta}')
 
         with patch('facturacion_electronica.services.proveedores.api_client.solicitar', _solicitar), \
-                patch('facturacion_electronica.services.emision_service.enviar_de') as mock_enviar:
+                patch('facturacion_electronica.services.envio_service.enviar_de') as mock_enviar:
             resumen = procesar_pendientes()
 
         mock_enviar.assert_not_called()

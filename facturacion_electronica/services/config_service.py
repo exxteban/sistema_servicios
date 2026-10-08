@@ -199,9 +199,11 @@ def guardar_configuracion(form, archivo_cert=None):
         db.session.rollback()
         return obtener_configuracion(), _mensaje_de_largo(errores_largo)
 
-    config.departamento_desc = geo.descripcion_departamento(config.departamento_codigo)
-    config.distrito_desc = geo.descripcion_distrito(config.distrito_codigo)
-    config.ciudad_desc = geo.descripcion_ciudad(config.ciudad_codigo)
+    # La tabla del proveedor elegido en este mismo guardado: la del modo API
+    # tiene distritos y ciudades que la de TIPS no conoce.
+    config.departamento_desc = geo.descripcion_departamento(config.departamento_codigo, proveedor)
+    config.distrito_desc = geo.descripcion_distrito(config.distrito_codigo, proveedor)
+    config.ciudad_desc = geo.descripcion_ciudad(config.ciudad_codigo, proveedor)
 
     if proveedor == 'propio':
         ambiente = (form.get('ambiente') or '').strip().lower()
@@ -242,4 +244,10 @@ def guardar_configuracion(form, archivo_cert=None):
         _ok, error_cert = guardar_certificado(config, archivo_cert)
 
     db.session.commit()
+    if proveedor == 'propio' and form.get('modo_envio') is not None:
+        # Después del commit: `Configuracion.establecer` commitea por su cuenta
+        # y no puede llevarse puesta media configuración sin validar.
+        from facturacion_electronica.services.envio_lote import guardar_modo_envio
+
+        guardar_modo_envio(form.get('modo_envio'))
     return config, error_cert

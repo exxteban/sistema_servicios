@@ -123,10 +123,12 @@ class TestProveedorApiDocumentos(BaseProveedorApi):
         self.assertEqual(documento.estado, ESTADO_ERROR)
         self.assertIsNone(documento.numero)
 
+    @patch('facturacion_electronica.services.proveedores.api.ProveedorApi.emite_notas_credito', False)
+    @patch('facturacion_electronica.services.proveedores.api.API_EMITE_NOTAS_CREDITO', False)
     def test_la_nota_de_credito_no_se_intenta_mientras_este_bloqueada(self):
-        """La API rechaza en el borde todo `document_type` que no sea 1. El
-        circuito de NC está entero, pero intentarlo quema un correlativo de NC
-        y devuelve un 400 crudo: se corta acá y se dice por qué."""
+        """Encendida desde el 2026-09-26, pero la bandera sigue siendo la llave
+        para apagarla si la API la vuelve a rechazar: apagada, no se quema un
+        correlativo de NC contra un 400 y la pantalla no ofrece el botón."""
         from facturacion_electronica import TIPO_FACTURA
         from facturacion_electronica.models import DocumentoElectronico
         from facturacion_electronica.services.proveedores.fachada import (
@@ -305,12 +307,13 @@ class TestProveedorApiDocumentos(BaseProveedorApi):
 
         self.assertIsNone(error)
 
-    # -- fecha del documento asociado en la NC ------------------------------
+    # -- documento asociado de la NC ------------------------------------------
 
-    def test_la_nc_declara_la_fecha_local_de_la_factura(self):
-        """`fecha_generado` está en UTC: una factura de las 23:30 de Paraguay
-        quedó guardada con la fecha del día siguiente. Declarar esa fecha como
-        la del documento asociado es declarar una que SIFEN no tiene."""
+    def test_el_asociado_electronico_lleva_solo_el_cdc(self):
+        """Timbrado, establecimiento, punto, número y fecha son del asociado
+        **impreso**. Con uno electrónico SIFEN rechaza: `2419 Número de
+        timbrado no requerido para el tipo de documento asociado` (NC de la
+        venta #123 de Janelipy, 2026-09-29). La API los pasa al XML tal cual."""
         from facturacion_electronica import TIPO_NOTA_CREDITO
         from facturacion_electronica.services.proveedores.api_payload import (
             construir_nota_credito_api,
@@ -322,15 +325,15 @@ class TestProveedorApiDocumentos(BaseProveedorApi):
         )
         original = SimpleNamespace(
             cdc='0' * 44, timbrado='12345678', establecimiento='001', punto='001',
-            numero='0000042',
-            # 02:30 UTC del día 10 = 23:30 del día 9 en Paraguay.
-            fecha_generado=datetime(2026, 3, 10, 2, 30),
+            numero='0000042', fecha_generado=datetime(2026, 3, 10, 2, 30),
         )
         venta = SimpleNamespace(cliente=self.cliente)
 
         cuerpo = construir_nota_credito_api(documento, original, venta, [], 'timbrado-uuid')
 
-        self.assertEqual(cuerpo['associated']['issue_date'], '2026-03-09')
+        self.assertEqual(cuerpo['associated'], {
+            'doc_type': 1, 'doc_type_desc': 'Electrónico', 'cdc': '0' * 44,
+        })
 
     # -- descarga del comprobante de la nota de crédito ---------------------
 
@@ -370,37 +373,6 @@ class TestProveedorApiDocumentos(BaseProveedorApi):
         with self.app.test_request_context('/?documento=%d' % documento.id):
             self.assertIsNone(_documento_descargable(otra.id_venta))
 
-    # -- la NC contra la factura correcta, en la fecha correcta -------------
-
-    def test_la_nc_declara_la_fecha_de_la_venta_no_la_de_generacion(self):
-        """`dFeEmiDoAso` tiene que ser **el mismo `dFeEmiDE` que se declaró en
-        la factura**, y ése salió de la fecha de la venta, no de cuándo se armó
-        el documento. Una venta de las 23:50 cuya emisión reintentó el job al
-        otro día tiene `fecha_generado` de otra fecha, y la NC declaraba del
-        documento original una que SIFEN no tiene."""
-        from facturacion_electronica import TIPO_NOTA_CREDITO
-        from facturacion_electronica.services.proveedores.api_payload import (
-            construir_nota_credito_api,
-        )
-
-        documento = SimpleNamespace(
-            numero='0000001', nc_motivo=2, nc_motivo_desc='Devolución',
-            tipo_documento=TIPO_NOTA_CREDITO, id_devolucion=7,
-        )
-        original = SimpleNamespace(
-            cdc='0' * 44, timbrado='12345678', establecimiento='001', punto='001',
-            numero='0000042',
-            # 02:50 UTC del 10 = 23:50 del 9 en Paraguay: ésa es la fecha del DE.
-            venta=SimpleNamespace(fecha_venta=datetime(2026, 3, 10, 2, 50)),
-            # El job lo dio de alta recién al día siguiente.
-            fecha_generado=datetime(2026, 3, 11, 14, 0),
-        )
-        venta = SimpleNamespace(cliente=self.cliente)
-
-        cuerpo = construir_nota_credito_api(documento, original, venta, [], 'timbrado-uuid')
-
-        self.assertEqual(cuerpo['associated']['issue_date'], '2026-03-09')
-
     def test_no_se_emite_nc_de_una_factura_que_se_esta_anulando(self):
         """CANCELLATION_PENDING mapea a 'aprobado' (el DE vale hasta que la baja
         esté firme), así que el chequeo de estado la dejaba pasar. Una factura
@@ -426,6 +398,30 @@ class TestProveedorApiDocumentos(BaseProveedorApi):
         nunca.assert_not_called()
         self.assertIsNone(documento)
         self.assertIn('cancelación', error)
+
+    def test_volver_a_facturar_una_cancelada_usa_otra_referencia(self):
+        """Visto con la venta #141: la API reserva `external_ref` también para
+        los cancelados, y la re-factura con la misma referencia daba 409
+        `external_ref_conflict` con el número nuevo ya reservado."""
+        from facturacion_electronica import ESTADO_CANCELADO, TIPO_FACTURA
+        from facturacion_electronica.models import DocumentoElectronico
+        from facturacion_electronica.services.proveedores.api_payload import referencia_externa
+
+        venta = self._venta()
+        cancelada = DocumentoElectronico(
+            id_venta=venta.id_venta, tipo_documento=TIPO_FACTURA, numero='0000052',
+            estado=ESTADO_CANCELADO,
+        )
+        db.session.add(cancelada)
+        db.session.commit()
+        nueva = DocumentoElectronico(
+            id_venta=venta.id_venta, tipo_documento=TIPO_FACTURA, numero='0000053',
+        )
+        db.session.add(nueva)
+        db.session.commit()
+
+        self.assertEqual(referencia_externa(cancelada), str(venta.id_venta))
+        self.assertEqual(referencia_externa(nueva), f'{venta.id_venta}-2')
 
 
 def test_referencia_externa_distingue_factura_de_nota_de_credito():

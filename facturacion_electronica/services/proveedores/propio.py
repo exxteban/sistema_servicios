@@ -14,6 +14,7 @@ from facturacion_electronica.services.emision_service import (
     generar_nota_credito,
     generar_qr_documento,
 )
+from facturacion_electronica.services.envio_lote import lote_recien_enviado
 from facturacion_electronica.services.kude_service import construir_contexto_kude
 from facturacion_electronica.services.proveedores.contrato import ProveedorFE
 
@@ -85,6 +86,9 @@ class ProveedorPropio(ProveedorFE):
                 return error
 
         if documento.estado == ESTADO_ENVIADO:
+            if lote_recien_enviado(documento):
+                # Sin error: no es un fallo, es esperar lo que pide la DNIT.
+                return None
             _respuesta, error = self.consultar(documento)
             return error
 

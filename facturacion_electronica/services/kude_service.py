@@ -9,6 +9,8 @@ global de la venta se prorratea sobre las líneas (igual que el XML y el POST
 a la API). Sin eso el papel lista 100.000, un TOTAL de 90.000, y liquida IVA
 sobre 100.000 mientras el documento declara 90.000.
 """
+import json
+
 from facturacion_electronica import AMBIENTE_PRODUCCION, TIPO_NOTA_CREDITO
 from facturacion_electronica.services.config_service import obtener_configuracion
 from facturacion_electronica.services.data_builder import (
@@ -23,6 +25,19 @@ from facturacion_electronica.services.qr import qr_png_data_uri
 # a mano durante las pruebas consulta el ambiente equivocado y no lo encuentra.
 URL_CONSULTA_PRODUCCION = 'https://ekuatia.set.gov.py/consultas/'
 URL_CONSULTA_TEST = 'https://ekuatia.set.gov.py/consultas-test/'
+
+ANCHOS_PAPEL_MM = (48, 58, 80)
+
+
+def ancho_papel_kude():
+    """El KuDE sale por la misma térmica que el ticket: usa su ancho.
+
+    Fijo en 80mm, en una caja de 58mm se cortaban las columnas de Total e IVA.
+    """
+    from app.models import Configuracion
+
+    ancho = Configuracion.obtener_int('ticket_paper_width_mm', 58)
+    return ancho if ancho in ANCHOS_PAPEL_MM else 58
 
 
 def _iva_de_linea(subtotal, porcentaje):
@@ -98,6 +113,24 @@ def _lineas_nota_credito(documento):
     return _items_kude(construir_items(lineas_de_devolucion(devolucion)))
 
 
+def _redondeo_informado_por_api(documento):
+    """`totals.rounding` de la última respuesta de la API; 0 si no lo trae.
+
+    Lo traen el alta y el detalle (`GET {id}/`); no el listado, pero la
+    siguiente consulta del job lo completa. Sin el dato se imprime crudo, que
+    es lo que declararon todos los DE de la API anteriores a su 1.20.0.
+    """
+    try:
+        remoto = json.loads(documento.respuesta_raw or '{}')
+    except (TypeError, ValueError):
+        return 0
+    totales = remoto.get('totals') if isinstance(remoto, dict) else None
+    try:
+        return float((totales or {}).get('rounding') or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def construir_contexto_kude(venta, documento, paper_width_mm=80):
     """Devuelve el contexto para renderizar el template del KuDE.
 
@@ -125,6 +158,15 @@ def construir_contexto_kude(venta, documento, paper_width_mm=80):
     # el total crudo, el comprobante que se lleva el cliente no coincidiría
     # con el documento que quedó en SIFEN.
     total_redondeado, redondeo = redondeo_sedeco(bruto)
+    if getattr(documento, 'api_documento_id', None):
+        # En la API el redondeo es por documento (`sedeco_rounding`, 1.20.0):
+        # los de antes salieron crudos y los de ahora redondeados. Se imprime
+        # el que la API declaró (`totals.rounding`), no uno calculado acá: el
+        # papel decía 993.300 con un DE en SIFEN por 993.343. Se mira el
+        # documento y no el proveedor de hoy: un DE del motor propio se
+        # reimprime con su redondeo aunque después se haya pasado a la API.
+        redondeo = _redondeo_informado_por_api(documento)
+        total_redondeado = bruto - redondeo
 
     # Identidad histórica del DE: reimprimir no debe leer el ambiente actual.
     es_produccion = (
@@ -168,8 +210,8 @@ def construir_contexto_kude(venta, documento, paper_width_mm=80):
         'timbrado_fecha_inicio': config.timbrado_fecha_inicio,
         'es_produccion': es_produccion,
         'url_consulta': URL_CONSULTA_PRODUCCION if es_produccion else URL_CONSULTA_TEST,
-        'paper_width_mm': paper_width_mm if paper_width_mm in (58, 80) else 80,
+        'paper_width_mm': paper_width_mm if paper_width_mm in ANCHOS_PAPEL_MM else 80,
     }
 
 
-__all__ = ['construir_contexto_kude']
+__all__ = ['ancho_papel_kude', 'construir_contexto_kude']

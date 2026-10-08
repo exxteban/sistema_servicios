@@ -413,6 +413,8 @@ def create_app(config_name='default'):
     from flujo_caja.routes import flujo_caja_bp
     from facturacion_electronica.routes import facturacion_electronica_bp
     import facturacion_electronica.routes_api  # noqa: F401  (cuelga rutas del mismo blueprint)
+    import facturacion_electronica.routes_documentos  # noqa: F401  (idem)
+    import facturacion_electronica.routes_geo  # noqa: F401  (idem)
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')

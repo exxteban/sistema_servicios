@@ -84,6 +84,24 @@ class TestSubirSecretosApi(BaseProveedorApi):
         self.assertIn('CSC', resumen)
         self.assertEqual(mock.call_args.kwargs['json'], {'csc_id': '0001', 'csc': 'ABCD'})
 
+    def test_csc_y_certificado_mandan_el_ambiente_elegido(self):
+        config = self._activar_api()
+        with patch(SOLICITAR, return_value=({'environment': 'prod'}, None)) as mock:
+            resumen, error = subir_csc(config, '0001', 'ABCD', 'prod')
+        self.assertIsNone(error)
+        self.assertEqual(mock.call_args.kwargs['json']['environment'], 'prod')
+        self.assertIn('de producción', resumen)
+
+        with patch(SOLICITAR, return_value=({'environment': 'prod', 'certificate': {}}, None)) as mock:
+            resumen, error = subir_certificado(config, _archivo(), 'clave', 'prod')
+        self.assertIsNone(error)
+        self.assertEqual(mock.call_args.kwargs['json']['environment'], 'prod')
+        self.assertIn('de producción', resumen)
+
+        with patch(SOLICITAR, side_effect=AssertionError('no debe llamar')):
+            _r, error = subir_csc(config, '0001', 'ABCD', 'otro')
+        self.assertIn('inválido', error)
+
     def test_la_ruta_sube_el_certificado(self):
         self._activar_api()
         with patch(SOLICITAR, return_value=({'certificate': {}}, None)) as mock:

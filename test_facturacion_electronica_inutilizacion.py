@@ -141,12 +141,12 @@ class TestInutilizacionContraElServicio(unittest.TestCase):
         inutilizaría sin que nadie lo pida. El timbrado es el del documento,
         no el de hoy: un timbrado nuevo no puede inutilizar números del viejo.
         """
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, eventos_service
 
         self.documento.timbrado = '19128252'
         db.session.commit()
 
-        with patch.object(emision_service, 'inutilizar_de',
+        with patch.object(eventos_service, 'inutilizar_de',
                           return_value=(APROBACION_SIFEN, '<rEve/>', None)) as mock:
             _doc_, error = emision_service.inutilizar_documento(
                 self.documento, 'Corte de energia antes de transmitir',
@@ -164,10 +164,10 @@ class TestInutilizacionContraElServicio(unittest.TestCase):
     def test_la_fecha_de_firma_va_en_hora_de_paraguay(self):
         """Mismo problema de zona horaria que la cancelación: el Node escribe
         `dFecFirma` con la hora de su proceso y sin offset."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, eventos_service
         from app.utils.helpers import now_local
 
-        with patch.object(emision_service, 'inutilizar_de',
+        with patch.object(eventos_service, 'inutilizar_de',
                           return_value=(APROBACION_SIFEN, '<rEve/>', None)) as mock:
             emision_service.inutilizar_documento(self.documento, 'Numero quemado')
 
@@ -178,12 +178,12 @@ class TestInutilizacionContraElServicio(unittest.TestCase):
     def test_timbrado_invalido_se_frena_antes_de_llamar(self):
         """xmlgen exige 8 caracteres y tira un Error genérico; el emisor tiene
         que leer cuál es el problema."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, eventos_service
 
         self.documento.timbrado = '123'
         db.session.commit()
 
-        with patch.object(emision_service, 'inutilizar_de') as mock:
+        with patch.object(eventos_service, 'inutilizar_de') as mock:
             _doc_, error = emision_service.inutilizar_documento(
                 self.documento, 'Numero quemado',
             )
@@ -192,9 +192,9 @@ class TestInutilizacionContraElServicio(unittest.TestCase):
         mock.assert_not_called()
 
     def test_el_rechazo_no_marca_el_numero_como_inutilizado(self):
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, eventos_service
 
-        with patch.object(emision_service, 'inutilizar_de',
+        with patch.object(eventos_service, 'inutilizar_de',
                           return_value=(RECHAZO_SIFEN, '<rEve>firmado</rEve>', None)):
             _doc_, error = emision_service.inutilizar_documento(
                 self.documento, 'Numero quemado',
@@ -210,9 +210,9 @@ class TestInutilizacionContraElServicio(unittest.TestCase):
         """El número viejo queda inutilizado como historial y la venta arranca
         un DE nuevo. Sin esto la venta quedaba trabada para siempre, porque
         `inutilizado` es un estado no regenerable."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, eventos_service, generacion_service
 
-        with patch.object(emision_service, 'inutilizar_de',
+        with patch.object(eventos_service, 'inutilizar_de',
                           return_value=(APROBACION_SIFEN, '<rEve/>', None)):
             _doc_, error = emision_service.inutilizar_documento(
                 self.documento, 'Corte de energia antes de transmitir',
@@ -222,7 +222,7 @@ class TestInutilizacionContraElServicio(unittest.TestCase):
         self.assertEqual(self.documento.estado, ESTADO_INUTILIZADO)
         self.assertIsNotNone(self.documento.fecha_cancelado)
 
-        with patch.object(emision_service, 'generar_xml',
+        with patch.object(generacion_service, 'generar_xml',
                           return_value=('<DE Id="01801781050010010000008"/>', None)):
             nuevo, error = emision_service.generar_documento(self.venta)
 

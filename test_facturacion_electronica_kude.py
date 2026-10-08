@@ -227,3 +227,85 @@ def test_kude_imprime_fecha_en_hora_local():
     assert '12345678' in html
     assert '99999999' not in html
 
+
+
+def _render_kude(paper_width_mm, detalles):
+    """Renderiza el KuDE en una app de prueba con el ancho de papel dado."""
+    from datetime import datetime
+    from flask import render_template
+    from unittest.mock import patch
+
+    from app import create_app, db
+    from facturacion_electronica import AMBIENTE_TEST
+    from facturacion_electronica.services.kude_service import construir_contexto_kude
+
+    app = create_app('testing')
+    ctx_app = app.app_context()
+    ctx_app.push()
+    try:
+        venta = SimpleNamespace(
+            total=sum(d.subtotal for d in detalles), tipo_venta='contado',
+            cliente=SimpleNamespace(nombre='Ana', ruc_ci='123'),
+            fecha_venta=datetime(2026, 10, 5, 15, 0), detalles=detalles,
+        )
+        documento = SimpleNamespace(
+            establecimiento='001', punto='001', numero='0000001',
+            ambiente=AMBIENTE_TEST, timbrado='12345678', qr_url=None,
+            cdc_formateado='0000',
+        )
+        config = SimpleNamespace(
+            ambiente=AMBIENTE_TEST, timbrado_numero='12345678',
+            timbrado_fecha_inicio=None, razon_social='Ejemplo SA',
+            nombre_fantasia=None, actividad_economica_desc=None,
+            direccion=None, numero_casa=None, ciudad_desc=None,
+            telefono=None, ruc='80012345', dv_ruc='6',
+        )
+        with patch(
+            'facturacion_electronica.services.kude_service.obtener_configuracion',
+            return_value=config,
+        ):
+            contexto = construir_contexto_kude(venta, documento, paper_width_mm)
+        contexto['preview'] = True
+        return render_template('facturacion_electronica/kude.html', **contexto)
+    finally:
+        db.session.remove()
+        db.drop_all()
+        ctx_app.pop()
+
+
+def test_kude_en_58mm_pone_cada_item_en_dos_renglones():
+    """En 58mm las cuatro columnas no entran: el total se partía o se cortaba."""
+    detalles = [_detalle_kude('A-1', 'Cartera de cuero', 2, 625000, 10)]
+    html = _render_kude(58, detalles)
+    assert 'size: 58mm auto' in html
+    assert 'class="item-monto"' in html
+    assert '2 x 625.000 · IVA 10%' in html
+    assert '1.250.000' in html
+    assert 'class="col-iva"' not in html
+
+
+def test_kude_en_80mm_conserva_las_cuatro_columnas():
+    detalles = [_detalle_kude('A-1', 'Cartera de cuero', 2, 625000, 10)]
+    html = _render_kude(80, detalles)
+    assert 'size: 80mm auto' in html
+    assert '<td class="col-iva">10%</td>' in html
+    assert 'class="item-monto"' not in html
+
+
+def test_ancho_papel_kude_sigue_al_del_ticket():
+    from app import create_app, db
+    from app.models import Configuracion
+    from facturacion_electronica.services.kude_service import ancho_papel_kude
+
+    app = create_app('testing')
+    with app.app_context():
+        try:
+            db.create_all()
+            assert ancho_papel_kude() == 58
+            Configuracion.establecer('ticket_paper_width_mm', '80')
+            assert ancho_papel_kude() == 80
+            Configuracion.establecer('ticket_paper_width_mm', '72')
+            assert ancho_papel_kude() == 58
+        finally:
+            db.session.remove()
+            db.drop_all()

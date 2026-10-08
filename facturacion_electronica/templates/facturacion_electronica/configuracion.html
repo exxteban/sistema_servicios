@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Facturación Electrónica{% endblock %}
+{% from "facturacion_electronica/_ambiente_api.html" import selector_ambiente_api %}
 
 {% macro campo(nombre, etiqueta, valor, tipo='text', placeholder='', ayuda='') %}
 <div>
@@ -29,6 +30,10 @@
         <a href="{{ url_for('facturacion_electronica.vista_previa') }}"
             class="mt-3 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700">
             <i class="fas fa-eye mr-2"></i>{% if capacidades.herramientas_propias %}Ver vista previa de una venta{% else %}Ver el documento de una venta{% endif %}
+        </a>
+        <a href="{{ url_for('facturacion_electronica.documentos') }}"
+            class="mt-3 ml-4 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700">
+            <i class="fas fa-list mr-2"></i>Ver todas las facturas emitidas
         </a>
     </div>
 
@@ -101,6 +106,21 @@
                     <option value="produccion" {% if config.ambiente == 'produccion' %}selected{% endif %}>Producción</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-400">Empezá siempre en Prueba hasta validar la emisión.</p>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Modo de envío a SIFEN</label>
+                <select name="modo_envio"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                    <option value="sincrono" {% if config.modo_envio != 'lote' %}selected{% endif %}>Síncrono (sólo prueba: uno por uno, respuesta en el momento)</option>
+                    <option value="lote" {% if config.modo_envio == 'lote' %}selected{% endif %}>Por lotes (asíncrono, el resultado se consulta después)</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-400">
+                    <strong>En producción se envía siempre por lotes</strong>: SIFEN no acepta el envío
+                    síncrono fuera del ambiente de prueba, así que ahí esta opción no se usa.
+                    Por lotes, SIFEN primero sólo confirma que recibió el lote y la factura queda en
+                    <strong>enviado</strong>; el sistema consulta el resultado cada pocos minutos. Cambiarlo
+                    afecta a los envíos nuevos: lo que ya salió en un lote se sigue consultando por lote.
+                </p>
             </div>
         </div>
 
@@ -231,7 +251,8 @@
         <p class="text-xs text-gray-500 dark:text-gray-400">
             Se mandan directo a la API y no quedan guardados en este sistema. La API los valida
             (contraseña, vencimiento y que el RUC del certificado sea el del emisor) y los guarda
-            cifrados para el ambiente en que esté la empresa. Cargar uno nuevo reemplaza al anterior.
+            cifrados para el ambiente elegido. Cargar uno nuevo reemplaza al anterior. El paso de prueba a
+            producción lo hace el proveedor: cargá antes certificado, CSC y timbrado con ambiente Producción.
         </p>
         <form method="post" enctype="multipart/form-data" action="{{ url_for('facturacion_electronica.subir_certificado_api') }}"
             class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
@@ -246,7 +267,8 @@
                 <input type="password" name="cert_password" autocomplete="new-password"
                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
             </div>
-            <div class="sm:col-span-2 flex justify-end">
+            {{ selector_ambiente_api(config) }}
+            <div class="flex justify-end">
                 <button type="submit"
                     class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
                     <i class="fas fa-upload mr-2"></i>Subir certificado a la API
@@ -266,7 +288,8 @@
                 <input type="text" name="csc_id" placeholder="0001" inputmode="numeric" pattern="\d{4}" maxlength="4" required
                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
             </div>
-            <div class="sm:col-span-2 flex justify-end">
+            {{ selector_ambiente_api(config) }}
+            <div class="flex justify-end">
                 <button type="submit"
                     class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
                     <i class="fas fa-upload mr-2"></i>Subir CSC a la API
@@ -278,7 +301,8 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
         <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Timbrado en la API</h2>
         <p class="text-xs text-gray-500 dark:text-gray-400">
-            Cada tipo de documento lleva su propio timbrado. Cargar el mismo número otra vez corrige
+            La API guarda un registro por tipo de documento; con "Factura y nota de crédito" se cargan
+            los dos de una vez, y si falta el de la nota de crédito se copia solo al emitirla. Cargar el mismo número otra vez corrige
             sus fechas; la API no borra timbrados. En <strong>test</strong> el número es el RUC sin
             dígito verificador y el inicio de vigencia es la fecha de la solicitud de habilitación.
         </p>
@@ -289,8 +313,9 @@
                 <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tipo de documento</label>
                 <select name="tipo_documento"
                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
-                    <option value="1">Factura electrónica</option>
-                    <option value="5">Nota de crédito electrónica</option>
+                    <option value="ambos" selected>Factura y nota de crédito</option>
+                    <option value="1">Sólo factura electrónica</option>
+                    <option value="5">Sólo nota de crédito electrónica</option>
                 </select>
             </div>
             <div>
@@ -326,14 +351,39 @@
                 <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Número inicial (opcional)</label>
                 <input type="text" name="initial_number" inputmode="numeric" pattern="\d{1,7}" maxlength="7" placeholder="1"
                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
-                <p class="mt-1 text-xs text-gray-400">El primer número que reserva el timbrado. Vacío = el que tenga la API.</p>
+                <p class="mt-1 text-xs text-gray-400">El primer número de facturas que reserva el timbrado. Vacío = el que tenga la API.</p>
             </div>
-            <div class="flex justify-end">
+            {{ selector_ambiente_api(config) }}
+            <div class="sm:col-span-2 flex justify-end">
                 <button type="submit"
                     class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
                     <i class="fas fa-upload mr-2"></i>Cargar timbrado en la API
                 </button>
             </div>
+        </form>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Datos del emisor en la API</h2>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+            Lo que va en la factura sale de la API, no de lo que está guardado acá. Corregí arriba
+            (tipo de contribuyente, ubicación, dirección, teléfono, email, actividad), <strong>guardá</strong>
+            y después subilo. El RUC y el DV los cambia sólo el proveedor.
+        </p>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700 dark:text-gray-200">
+            <div><dt class="inline text-gray-500 dark:text-gray-400">Razón social:</dt> <dd class="inline">{{ config.razon_social or '—' }}</dd></div>
+            <div><dt class="inline text-gray-500 dark:text-gray-400">Tipo:</dt> <dd class="inline">{{ dict(tipos_contribuyente).get(config.tipo_contribuyente, config.tipo_contribuyente) }}</dd></div>
+            <div><dt class="inline text-gray-500 dark:text-gray-400">Dirección:</dt> <dd class="inline">{{ config.direccion or '—' }} {{ config.numero_casa or '' }}</dd></div>
+            <div><dt class="inline text-gray-500 dark:text-gray-400">Ubicación:</dt> <dd class="inline">{{ config.ciudad_desc or '—' }}, {{ config.departamento_desc or '—' }}</dd></div>
+            <div><dt class="inline text-gray-500 dark:text-gray-400">Contacto:</dt> <dd class="inline">{{ config.telefono or '—' }} · {{ config.email or '—' }}</dd></div>
+            <div><dt class="inline text-gray-500 dark:text-gray-400">Actividad:</dt> <dd class="inline">{{ config.actividad_economica_codigo or '—' }} {{ config.actividad_economica_desc or '' }}</dd></div>
+        </dl>
+        <form method="post" action="{{ url_for('facturacion_electronica.cargar_datos_fiscales_api') }}" class="flex justify-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit"
+                class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
+                <i class="fas fa-upload mr-2"></i>Subir datos del emisor a la API
+            </button>
         </form>
     </div>
     {% endif %}
@@ -476,9 +526,17 @@
         });
     }
 
+    // Cada modo tiene su tabla (el de API conoce distritos que TIPS no): se
+    // manda el proveedor elegido en el formulario, guardado o no.
+    function proveedorElegido() {
+        const campo = document.getElementById('fe-proveedor') || document.querySelector('[name="proveedor"]');
+        return campo ? campo.value : '';
+    }
+
     function cargarCiudades(distrito, current) {
         if (!distrito) { fill(ciu, [], '— Elegí distrito —'); return; }
-        fetch(urlCiudades + '?distrito=' + encodeURIComponent(distrito))
+        fetch(urlCiudades + '?distrito=' + encodeURIComponent(distrito)
+              + '&proveedor=' + encodeURIComponent(proveedorElegido()))
             .then(function (r) { return r.json(); })
             .then(function (items) { fill(ciu, items, '— Elegí ciudad —', current); });
     }
@@ -489,7 +547,8 @@
             fill(ciu, [], '— Elegí distrito —');
             return;
         }
-        fetch(urlDistritos + '?departamento=' + encodeURIComponent(departamento))
+        fetch(urlDistritos + '?departamento=' + encodeURIComponent(departamento)
+              + '&proveedor=' + encodeURIComponent(proveedorElegido()))
             .then(function (r) { return r.json(); })
             .then(function (items) {
                 fill(dis, items, '— Elegí distrito —', currentDis);
@@ -500,6 +559,13 @@
 
     dep.addEventListener('change', function () { cargarDistritos(dep.value, null, null); });
     dis.addEventListener('change', function () { cargarCiudades(dis.value, null); });
+    const selectorProveedor = document.getElementById('fe-proveedor');
+    if (selectorProveedor) {
+        // Se conserva lo elegido: si el código existe en la otra tabla, queda.
+        selectorProveedor.addEventListener('change', function () {
+            cargarDistritos(dep.value, dis.value, ciu.value);
+        });
+    }
 
     cargarDistritos(dep.value, dis.dataset.current, ciu.dataset.current);
 })();

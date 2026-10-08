@@ -30,6 +30,40 @@ def respuesta_api(estado='PENDING_BATCH', **extra):
     return base
 
 
+def xml_factura(ruc_ci='4281292', nombre='Alfio Oviedo'):
+    """XML mínimo de una factura: sólo el `gDatRec`, que es lo que lee la NC."""
+    if '-' in ruc_ci:
+        ruc, dv = ruc_ci.split('-')
+        identidad = (f'<iNatRec>1</iNatRec><iTiOpe>1</iTiOpe><iTiContRec>1</iTiContRec>'
+                     f'<dRucRec>{ruc}</dRucRec><dDVRec>{dv}</dDVRec>')
+    else:
+        identidad = (f'<iNatRec>2</iNatRec><iTiOpe>2</iTiOpe><iTipIDRec>1</iTipIDRec>'
+                     f'<dNumIDRec>{ruc_ci}</dNumIDRec>')
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<rDE xmlns="http://ekuatia.set.gov.py/sifen/xsd"><DE><gDatGralOpe><gDatRec>'
+        f'{identidad}<cPaisRec>PRY</cPaisRec><dDesPaisRe>Paraguay</dDesPaisRe>'
+        f'<dNomRec>{nombre}</dNomRec></gDatRec></gDatGralOpe></DE></rDE>'
+    )
+
+
+def simular_xml_de_factura(prueba, xml=None):
+    """La NC baja el XML de la factura para leer el receptor: acá se simula.
+
+    Aparte del `solicitar` de cada prueba para no tocar todos los fakes, que
+    responden JSON y no bytes.
+    """
+    from unittest.mock import patch
+
+    parche = patch(
+        'facturacion_electronica.services.proveedores.api_nota_credito.descargar_xml',
+        return_value=(xml or xml_factura(), None),
+    )
+    simulado = parche.start()
+    prueba.addCleanup(parche.stop)
+    return simulado
+
+
 class BaseProveedorApi(unittest.TestCase):
     def setUp(self):
         self.app = create_app('testing')
@@ -87,6 +121,7 @@ class BaseProveedorApi(unittest.TestCase):
         return {
             'ruc': '80012345',
             'sifen_mode': 'test',
+            'address': 'Avda. Mcal. López 1234',
             'stamps': [{
                 'id': 'aaaaaaaa-0000-4000-8000-000000000001',
                 'number': '12345678',
@@ -145,4 +180,4 @@ class BaseProveedorApi(unittest.TestCase):
         return cliente
 
 
-__all__ = ['BaseProveedorApi', 'respuesta_api']
+__all__ = ['BaseProveedorApi', 'respuesta_api', 'simular_xml_de_factura', 'xml_factura']

@@ -11,15 +11,13 @@ Reparto de trabajo, tal como lo define su OpenAPI:
 
 El circuito de un documento es asíncrono: `emitir` da de alta y el job mira
 el estado. Nada acá lanza: todo devuelve (…, error) como el resto del módulo.
-
 Perfil/timbrado: `api_perfil`. Copia del DE remoto: `api_documento`.
 """
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app import db
 from facturacion_electronica import (
-    ESTADO_API_CANCELACION_PENDIENTE,
     ESTADO_APROBADO,
     ESTADO_CANCELADO,
     ESTADO_ERROR,
@@ -32,7 +30,6 @@ from facturacion_electronica.models import DocumentoElectronico
 from facturacion_electronica.services.config_service import obtener_configuracion
 from facturacion_electronica.services.emision_service import (
     HORAS_LIMITE_CANCELACION,
-    fecha_emision,
     nota_credito_de_correccion,
     obtener_documento,
 )
@@ -49,6 +46,8 @@ from facturacion_electronica.services.nota_credito import (
 )
 from facturacion_electronica.services.numeracion_service import reservar_numero
 from facturacion_electronica.services.proveedores import api_client
+from facturacion_electronica.services.proveedores.api_cancelacion import cancelar_documento
+from facturacion_electronica.services.proveedores.api_correccion import corregir_rechazado
 from facturacion_electronica.services.proveedores.api_documento import (
     ESTADOS_API,
     adoptar_remoto,
@@ -57,13 +56,16 @@ from facturacion_electronica.services.proveedores.api_documento import (
     buscar_remoto,
     clave_idempotencia,
     completar_protocolo,
-    serializar,
+    descargar_kude_pdf,
+    liberar_numero_tomado,
+    descargar_xml,
+    MENSAJE_SANDBOX,
+    transmite,
 )
 from facturacion_electronica.services.proveedores.api_inutilizacion import inutilizar_numero
-from facturacion_electronica.services.proveedores.api_payload import (
-    construir_emision_api,
-    construir_nota_credito_api,
-)
+from facturacion_electronica.services.proveedores.api_timbrado import resolver_timbrado_nc
+from facturacion_electronica.services.proveedores.api_nota_credito import armar_cuerpo_nc, reabrir_nc_rechazada
+from facturacion_electronica.services.proveedores.api_payload import construir_emision_api
 from facturacion_electronica.services.proveedores.api_perfil import (
     aplicar_perfil_al_config,
     congelar_identidad,
@@ -76,23 +78,24 @@ from facturacion_electronica.services.proveedores.api_perfil import (
     sincronizar_ambiente,
 )
 from facturacion_electronica.services.proveedores.contrato import ProveedorFE
-from facturacion_electronica.services.validacion import validar_cliente, validar_monto_innominado
+from facturacion_electronica.services.validacion import (
+    validar_cliente,
+    validar_monto_innominado,
+    validar_receptor_api,
+)
 
 TIPO_FACTURA = TIPO_DOC_FACTURA
 
-# La API rechaza en el borde todo `document_type` que no sea 1: la nota de
-# crédito la tiene implementada y probada, pero **nunca la transmitió a SIFEN**
-# y no la habilita hasta tener una emisión real confirmada (su changelog,
-# 1.1.0, "Sigue bloqueado a propósito"). Todo nuestro circuito de NC está
-# escrito y probado contra el contrato; el día que la habiliten, esto pasa a
-# True y no hay nada más que tocar.
-API_EMITE_NOTAS_CREDITO = False
+# La API acepta la nota de crédito (`document_type=5`) desde su 1.5.0; se
+# encendió el 2026-09-26. Necesita un timbrado de tipo 5 cargado en la API. La
+# NC a un receptor innominado la frena antes `error_original_no_acreditable`.
+API_EMITE_NOTAS_CREDITO = True
 
 NC_NO_HABILITADA = (
-    'La API de facturación electrónica todavía no emite notas de crédito: sólo tiene '
-    'habilitada la factura. Mientras tanto, si la factura tiene menos de '
-    f'{HORAS_LIMITE_CANCELACION}h se la puede anular en SIFEN; si ya pasaron, hay que '
-    'pedirle al proveedor que habilite el tipo de documento 5.'
+    'Las notas de crédito por la API de facturación electrónica todavía no están '
+    'habilitadas: el proveedor aún no transmitió ninguna a SIFEN. Mientras tanto, si la '
+    f'factura tiene menos de {HORAS_LIMITE_CANCELACION}h se la puede anular en SIFEN; si ya '
+    'pasaron, hay que esperar a que se habiliten.'
 )
 
 
@@ -154,8 +157,10 @@ class ProveedorApi(ProveedorFE):
             )
             db.session.add(documento)
 
-        error_cliente = validar_cliente(venta.cliente) or validar_monto_innominado(
-            venta.cliente, venta.total,
+        error_cliente = (
+            validar_cliente(venta.cliente)
+            or validar_receptor_api(venta.cliente)
+            or validar_monto_innominado(venta.cliente, venta.total)
         )
         if error_cliente:
             documento.estado = ESTADO_ERROR
@@ -332,7 +337,7 @@ class ProveedorApi(ProveedorFE):
         """
         if not API_EMITE_NOTAS_CREDITO:
             return self._fallar(documento, NC_NO_HABILITADA)
-        if documento.api_documento_id:
+        if documento.api_documento_id and not reabrir_nc_rechazada(documento):
             return self._refrescar(config, documento)
 
         perfil, error = obtener_perfil(config)
@@ -340,7 +345,7 @@ class ProveedorApi(ProveedorFE):
             return self._fallar(documento, error)
         sincronizar_ambiente(config, perfil)
 
-        timbrado_id, error = resolver_timbrado(config, perfil, TIPO_NOTA_CREDITO)
+        timbrado_id, error = resolver_timbrado_nc(config, perfil)
         if error:
             return self._fallar(documento, error)
         congelar_identidad(documento, config, perfil, timbrado_id)
@@ -349,7 +354,9 @@ class ProveedorApi(ProveedorFE):
         if venta is None:
             return self._fallar(documento, 'La venta asociada ya no existe.')
 
-        cuerpo = construir_nota_credito_api(documento, original, venta, lineas, timbrado_id)
+        cuerpo, error = armar_cuerpo_nc(config, documento, original, venta, lineas, timbrado_id)
+        if error:
+            return self._fallar(documento, error)
         remoto, error = api_client.solicitar(
             config, 'POST', '/sifen/electronic-documents/',
             json=cuerpo,
@@ -361,14 +368,19 @@ class ProveedorApi(ProveedorFE):
             if existente:
                 adoptar_remoto(config, documento, existente)
                 return documento, None
-            return self._fallar(documento, error)
+            return self._fallar(documento, liberar_numero_tomado(documento, error))
 
         aplicar_remoto(documento, remoto)
         return documento, None
 
     def _alta_remota(self, config, documento, venta):
-        """POST del documento, con recuperación si ya existía del otro lado."""
-        if documento.api_documento_id:
+        """POST del documento, con recuperación si ya existía del otro lado.
+
+        Una factura que SIFEN rechazó no se refresca y nada más: se corrige y
+        se reenvía con el mismo número y CDC (ver `api_correccion`).
+        """
+        corrige = documento.estado == ESTADO_RECHAZADO and documento.tipo_documento == TIPO_FACTURA
+        if documento.api_documento_id and not corrige:
             return self._refrescar(config, documento)
 
         perfil, error = obtener_perfil(config)
@@ -382,6 +394,8 @@ class ProveedorApi(ProveedorFE):
         congelar_identidad(documento, config, perfil, timbrado_id)
 
         cuerpo = construir_emision_api(venta, documento, timbrado_id)
+        if corrige:
+            return self._corregir(config, documento, cuerpo)
         remoto, error = api_client.solicitar(
             config, 'POST', '/sifen/electronic-documents/',
             json=cuerpo,
@@ -393,8 +407,28 @@ class ProveedorApi(ProveedorFE):
             if existente:
                 adoptar_remoto(config, documento, existente)
                 return documento, None
-            return self._fallar(documento, error)
+            return self._fallar(documento, liberar_numero_tomado(documento, error))
 
+        aplicar_remoto(documento, remoto)
+        return documento, None
+
+    def _corregir(self, config, documento, cuerpo):
+        """Reenvía la factura rechazada. Si falla, sigue rechazada.
+
+        No pasa por `_fallar`: el documento está `REJECTED` del otro lado y
+        marcarlo 'error' acá lo metería en la rueda del job sin nada que hacer.
+        Si la API dice que ya no se puede corregir (alguien lo corrigió por
+        otro lado, o no está más rechazado) se relee para quedar en su estado.
+        """
+        remoto, error = corregir_rechazado(config, documento, cuerpo)
+        if error:
+            if 'document_not_correctable' in error:
+                self._refrescar(config, documento)
+            documento.respuesta_mensaje = f'No se pudo corregir y reenviar: {error}'[:2000]
+            db.session.commit()
+            return documento, error
+        # El lote viejo es el del rechazo; el nuevo lo informa la API al procesarlo.
+        documento.api_lote_id = None
         aplicar_remoto(documento, remoto)
         return documento, None
 
@@ -497,50 +531,11 @@ class ProveedorApi(ProveedorFE):
         return json.loads(documento.respuesta_raw or '{}'), None
 
     def cancelar(self, documento, motivo):
-        if documento is None:
-            return documento, 'No hay documento para cancelar.'
-        if documento.estado == ESTADO_CANCELADO:
-            return documento, 'El documento ya está cancelado.'
-        if documento.estado != ESTADO_APROBADO:
-            return documento, 'Sólo se puede cancelar en SIFEN un documento aprobado.'
-        if not documento.api_documento_id:
-            return documento, 'El documento no tiene identificador en la API; no se puede cancelar.'
-
-        motivo = (motivo or '').strip()
-        if not 5 <= len(motivo) <= 500:
-            return documento, 'El motivo de cancelación debe tener entre 5 y 500 caracteres.'
-
-        referencia = fecha_emision(documento)
-        if referencia and datetime.utcnow() - referencia > timedelta(hours=HORAS_LIMITE_CANCELACION):
-            return documento, (
-                f'Pasaron más de {HORAS_LIMITE_CANCELACION}h desde la emisión; SIFEN ya no '
-                'permite cancelar. Corresponde emitir una nota de crédito.'
-            )
-
         config = obtener_configuracion()
-        evento, error = api_client.solicitar(
-            config, 'POST',
-            f'/sifen/electronic-documents/{documento.api_documento_id}/cancel/',
-            json={'motive': motivo},
-            timeout=api_client.TIMEOUT_EMISION_SEGUNDOS,
+        return cancelar_documento(
+            config, documento, motivo,
+            refrescar=lambda doc: self._refrescar(config, doc),
         )
-        if error:
-            return documento, error
-
-        documento.motivo_cancelacion = motivo
-        documento.respuesta_raw = serializar(evento)
-        documento.respuesta_codigo = ESTADO_API_CANCELACION_PENDIENTE
-        db.session.commit()
-
-        _documento, error_refresco = self._refrescar(config, documento)
-        if error_refresco and documento.estado != ESTADO_CANCELADO:
-            documento.respuesta_codigo = ESTADO_API_CANCELACION_PENDIENTE
-            documento.motivo_cancelacion = motivo
-            db.session.commit()
-        elif documento.estado != ESTADO_CANCELADO:
-            documento.motivo_cancelacion = motivo
-            db.session.commit()
-        return documento, None
 
     def inutilizar(self, documento, motivo):
         """Informa el número quemado con el evento de inutilización de la API."""
@@ -558,31 +553,16 @@ class ProveedorApi(ProveedorFE):
         return construir_contexto_kude(venta, documento)
 
     def kude_pdf(self, documento):
-        if documento is None or not documento.api_documento_id:
-            return None, 'El documento todavía no fue dado de alta en la API.'
-        config = obtener_configuracion()
-        return api_client.solicitar(
-            config, 'GET', f'/sifen/electronic-documents/{documento.api_documento_id}/kude/',
-            binario=True, timeout=api_client.TIMEOUT_EMISION_SEGUNDOS,
-        )
+        return descargar_kude_pdf(obtener_configuracion(), documento)
 
     def xml_documento(self, documento):
-        if documento is None or not documento.api_documento_id:
-            return None, 'El documento todavía no fue dado de alta en la API.'
-        config = obtener_configuracion()
-        contenido, error = api_client.solicitar(
-            config, 'GET', f'/sifen/electronic-documents/{documento.api_documento_id}/xml/',
-            binario=True, timeout=api_client.TIMEOUT_EMISION_SEGUNDOS,
-        )
-        if error:
-            return None, error
-        return contenido.decode('utf-8', errors='replace'), None
+        return descargar_xml(obtener_configuracion(), documento)
 
     def avanzar(self, documento):
         """Un paso del circuito asíncrono. Devuelve el error, o None si avanzó."""
         config = obtener_configuracion()
 
-        if not documento.api_documento_id:
+        if not documento.api_documento_id or documento.estado == ESTADO_RECHAZADO:  # corrección
             venta = documento.venta
             if venta is None:
                 return 'La venta asociada ya no existe.'
@@ -605,29 +585,14 @@ class ProveedorApi(ProveedorFE):
             )
             return error
 
-        if estado_api == 'PENDING_BATCH' and not self._transmite(documento):
-            _documento, error = self._fallar(documento, (
-                'La empresa está en modo sandbox en la API: el documento se firmó y quedó '
-                'con CDC, pero no se transmite a SIFEN. Pedile al proveedor que pase la '
-                'empresa a test o producción. Ojo: ese cambio no destraba a los documentos '
-                'que ya se dieron de alta en sandbox —el modo queda fijado al crearlos—, '
-                'así que hay que volver a emitirlos después.'
-            ))
+        if estado_api == 'PENDING_BATCH' and not transmite(documento):
+            _documento, error = self._fallar(documento, MENSAJE_SANDBOX)
             return error
 
         if estado_api == 'RETRYABLE_ERROR':
             return documento.respuesta_mensaje or 'La API marcó el documento como error reintentable.'
 
         return None
-
-    @staticmethod
-    def _transmite(documento):
-        """`transmits` de la última respuesta: False = la API no lo va a enviar."""
-        try:
-            remoto = json.loads(documento.respuesta_raw or '{}')
-        except (TypeError, ValueError):
-            return True
-        return remoto.get('transmits') is not False
 
 
 __all__ = ['ProveedorApi', 'obtener_perfil', 'resolver_timbrado', 'olvidar_perfil', 'ESTADOS_API']

@@ -82,6 +82,50 @@ def test_seleccionar_timbrado_desempata_por_numero():
     assert elegido['id'] == 'b'
 
 
+def test_en_produccion_ignora_el_timbrado_de_prueba_aunque_empate():
+    """Janelipy: el de prueba (RUC sin DV) y el real con el mismo inicio; ganaba el de prueba."""
+    perfil = {
+        'ruc': '80178105', 'sifen_mode': 'production', 'environment': 'prod',
+        'stamps': [
+            _stamp(id='prueba', number='80178105', valid_from='2026-09-15', environment='prod'),
+            _stamp(id='real', number='19128252', valid_from='2026-09-15', environment='prod'),
+        ],
+    }
+    stamp_id, error = resolver_timbrado(_config_punto(), perfil, hoy=date(2026, 10, 5))
+    assert error is None
+    assert stamp_id == 'real'
+
+
+def test_elige_solo_timbrados_del_ambiente_de_la_empresa():
+    stamps = [
+        _stamp(id='de-test', number='80178105', valid_from='2026-09-01', environment='test'),
+        _stamp(id='de-prod', number='19128252', valid_from='2026-09-15', environment='prod'),
+    ]
+    en_test = {'ruc': '80178105', 'environment': 'test', 'stamps': stamps}
+    en_prod = {'ruc': '80178105', 'environment': 'prod', 'stamps': stamps}
+    hoy = date(2026, 10, 5)
+    assert resolver_timbrado(_config_punto(), en_test, hoy=hoy)[0] == 'de-test'
+    assert resolver_timbrado(_config_punto(), en_prod, hoy=hoy)[0] == 'de-prod'
+
+
+def test_en_produccion_sin_timbrado_prod_explica_que_falta_cargarlo():
+    perfil = {
+        'ruc': '80178105', 'environment': 'prod',
+        'stamps': [_stamp(number='19128252', valid_from='2026-09-15', environment='test')],
+    }
+    stamp_id, error = resolver_timbrado(_config_punto(), perfil, hoy=date(2026, 10, 5))
+    assert stamp_id is None
+    assert 'Producción' in error and '19128252' in error
+
+
+def test_ignora_timbrados_inactivos():
+    perfil = {'stamps': [
+        _stamp(id='activo', number='11111111', valid_from='2024-01-01'),
+        _stamp(id='inactivo', number='22222222', valid_from='2026-01-01', is_active=False),
+    ]}
+    assert resolver_timbrado(_config_punto(), perfil, hoy=date(2026, 6, 1))[0] == 'activo'
+
+
 def _config_api():
     return FacturacionElectronicaConfig(
         id=1, proveedor='api', establecimiento='001', punto_expedicion='001',

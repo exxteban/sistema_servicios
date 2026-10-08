@@ -180,13 +180,13 @@ class TestNotaCreditoMotorPropio(unittest.TestCase):
 
     def _emitir(self, devolucion, motivo=2):
         """Emite la NC con el microservicio Node simulado."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, generacion_service, nota_credito_service
 
-        with patch.object(emision_service, 'generar_xml',
+        with patch.object(nota_credito_service, 'generar_xml',
                           return_value=(_xml_con_cdc(CDC_NOTA), None)) as gen, \
-             patch.object(emision_service, 'firmar_xml',
+             patch.object(generacion_service, 'firmar_xml',
                           return_value=('<rDE firmado="1"/>', None)), \
-             patch.object(emision_service, 'generar_qr',
+             patch.object(generacion_service, 'generar_qr',
                           return_value=('<rDE qr="1"/>', None)):
             documento, error = emision_service.emitir_nota_credito(devolucion, motivo)
         self.ultimo_payload = gen.call_args[0][1] if gen.call_args else None
@@ -252,8 +252,8 @@ class TestNotaCreditoMotorPropio(unittest.TestCase):
         from facturacion_electronica.services.emision_service import generar_documento
 
         venta = self._venta()
-        from facturacion_electronica.services import emision_service
-        with patch.object(emision_service, 'generar_xml',
+        from facturacion_electronica.services import generacion_service
+        with patch.object(generacion_service, 'generar_xml',
                           return_value=(_xml_con_cdc(CDC_FACTURA), None)):
             factura, error = generar_documento(venta)
         self.assertIsNone(error)
@@ -393,7 +393,7 @@ class TestNotaCreditoMotorPropio(unittest.TestCase):
         """La ventana de 72h se cuenta desde la emisión de la NC. Contra la
         fecha de la venta, acreditar una factura de la semana pasada era
         imposible: el envío se negaba antes de intentar."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, envio_service
 
         venta = self._venta(fecha=datetime.utcnow() - timedelta(days=7))
         self._facturar(venta)
@@ -404,7 +404,7 @@ class TestNotaCreditoMotorPropio(unittest.TestCase):
         respuesta = {'ns2:dEstRes': 'Aprobado', 'ns2:dCodRes': '0260',
                      'ns2:dMsgRes': 'Autorización del DE satisfactoria',
                      'ns2:dProtAut': '50094059'}
-        with patch.object(emision_service, 'enviar_de', return_value=(respuesta, None)):
+        with patch.object(envio_service, 'enviar_de', return_value=(respuesta, None)):
             nota, error = emision_service.enviar_documento(nota)
 
         self.assertIsNone(error)
@@ -413,7 +413,7 @@ class TestNotaCreditoMotorPropio(unittest.TestCase):
     def test_el_job_regenera_la_nc_como_nc_y_no_toca_la_factura(self):
         """`generar_documento` mira la factura de la venta: si el job pasara
         por ahí, la NC se quedaba sin XML y se reintentaba para siempre."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import envio_service, generacion_service, nota_credito_service
         from facturacion_electronica.services.proveedores.propio import ProveedorPropio
 
         venta = self._venta()
@@ -430,13 +430,13 @@ class TestNotaCreditoMotorPropio(unittest.TestCase):
         db.session.commit()
 
         respuesta = {'ns2:dEstRes': 'Aprobado', 'ns2:dCodRes': '0260'}
-        with patch.object(emision_service, 'generar_xml',
+        with patch.object(nota_credito_service, 'generar_xml',
                           return_value=(_xml_con_cdc(CDC_NOTA), None)), \
-             patch.object(emision_service, 'firmar_xml',
+             patch.object(generacion_service, 'firmar_xml',
                           return_value=('<rDE firmado="1"/>', None)), \
-             patch.object(emision_service, 'generar_qr',
+             patch.object(generacion_service, 'generar_qr',
                           return_value=('<rDE qr="1"/>', None)), \
-             patch.object(emision_service, 'enviar_de', return_value=(respuesta, None)):
+             patch.object(envio_service, 'enviar_de', return_value=(respuesta, None)):
             error = ProveedorPropio().avanzar(nota)
 
         self.assertIsNone(error)

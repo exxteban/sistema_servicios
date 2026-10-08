@@ -1,7 +1,10 @@
 """Motivo de rechazo de un DE: no está en los eventos SIFEN del documento.
 
+Desde la 1.6.0 de la API el detalle del documento trae `sifen_result`, con el
+código y los mensajes que SIFEN devolvió para ese DE: es la primera fuente.
+Lo de abajo queda para un rechazo sin ese campo (anterior a la 1.6.0):
 `GET /sifen/electronic-documents/{id}/events/` lista cancelación, inutilización
-y nominación (`SifenEventReadEventTypeEnum`). El resultado de la emisión vive
+y nominación (`SifenEventReadEventTypeEnum`); el resultado de la emisión vive
 en `SifenBatchRead.items[].result`, y el log `GET /events/` apunta al lote
 con `batch.processed`.
 """
@@ -151,13 +154,48 @@ def _motivo_desde_lotes_recientes(config, documento):
     return None, None
 
 
-def completar_motivo_rechazo(config, documento):
+def motivo_de_sifen_result(sifen_result):
+    """(lote_id, detalle) del `sifen_result` del documento, o (None, None).
+
+    `messages` es una lista de `{code, message}`: SIFEN puede devolver más de
+    un motivo por DE y se muestran todos, no sólo el primero.
+    """
+    if not isinstance(sifen_result, dict):
+        return None, None
+    partes = []
+    for mensaje in sifen_result.get('messages') or []:
+        if not isinstance(mensaje, dict):
+            continue
+        parte = ' - '.join(
+            str(valor).strip() for valor in (mensaje.get('code'), mensaje.get('message'))
+            if valor not in (None, '')
+        )
+        if parte:
+            partes.append(parte)
+    if not partes and sifen_result.get('codes'):
+        partes.append(str(sifen_result['codes']).strip())
+    detalle = ' | '.join(partes) or None
+    return sifen_result.get('batch_id') or None, detalle
+
+
+def completar_motivo_rechazo(config, documento, remoto=None):
     """Trae el porqué del rechazo. Silencioso si falla, como el protocolo y el QR.
+
+    `remoto` es el documento que ya se leyó de la API: si trae `sifen_result`
+    no hace falta ninguna llamada más.
 
     No toca `respuesta_codigo`: ahí va el estado de la API y es lo que lee el
     job para decidir el próximo paso. El código de SIFEN va dentro del mensaje.
     """
     if not documento.api_documento_id:
+        return
+
+    lote_result, detalle = motivo_de_sifen_result((remoto or {}).get('sifen_result'))
+    if detalle:
+        if lote_result:
+            documento.api_lote_id = str(lote_result)[:36]
+        documento.respuesta_mensaje = f'Rechazado por SIFEN: {detalle}'[:2000]
+        db.session.commit()
         return
 
     resultado = None
@@ -191,4 +229,4 @@ def completar_motivo_rechazo(config, documento):
     db.session.commit()
 
 
-__all__ = ['completar_motivo_rechazo', 'texto_resultado']
+__all__ = ['completar_motivo_rechazo', 'motivo_de_sifen_result', 'texto_resultado']

@@ -165,6 +165,47 @@ app.post('/enviar', async (req, res) => {
   }
 });
 
+// Envío por lote (siRecepLoteDE, asíncrono). La librería arma el rLoteDE, lo
+// comprime en zip y lo manda en base64; SIFEN sólo contesta que lo recibió
+// (0300) y el número de lote (`dProtConsLote`). El resultado de cada DE se
+// pide después con /consultar-lote. Como en /enviar, cada XML tiene que traer
+// la declaración `<?xml ...?>` en su primera línea: la librería la corta.
+app.post('/enviar-lote', async (req, res) => {
+  const { xmls, certPath, password, env, id } = req.body || {};
+  if (!Array.isArray(xmls) || !xmls.length || !certPath) {
+    return res.status(400).json({ error: 'Se requieren "xmls" (lista de DE firmados) y "certPath".' });
+  }
+  try {
+    const respuesta = await setapi.recibeLote(
+      id || Date.now(), xmls, env || 'test', certPath, password || '',
+      { timeout: 90000, debug: process.env.SIFEN_DEBUG === '1' }
+    );
+    res.json({ respuesta });
+  } catch (err) {
+    const mensaje = err && err.message ? err.message : String(err);
+    res.status(502).json({ error: mensaje });
+  }
+});
+
+// Resultado de un lote (siConsLoteDE): 0361 sigue en proceso, 0362 concluido
+// con el resultado de cada DE, 0364 consulta fuera de las 48h.
+app.post('/consultar-lote', async (req, res) => {
+  const { numeroLote, certPath, password, env, id } = req.body || {};
+  if (!numeroLote || !certPath) {
+    return res.status(400).json({ error: 'Se requieren "numeroLote" y "certPath".' });
+  }
+  try {
+    const respuesta = await setapi.consultaLote(
+      id || Date.now(), numeroLote, env || 'test', certPath, password || '',
+      { timeout: 90000, debug: process.env.SIFEN_DEBUG === '1' }
+    );
+    res.json({ respuesta });
+  } catch (err) {
+    const mensaje = err && err.message ? err.message : String(err);
+    res.status(502).json({ error: mensaje });
+  }
+});
+
 // Cancelación de un DE aprobado (evento siRecepEvento, tipoEvento=1). Genera el
 // XML del evento, lo firma como evento (rEve) y lo envía. Requiere cert real.
 app.post('/cancelar', async (req, res) => {

@@ -35,6 +35,8 @@ from facturacion_electronica import (
 from facturacion_electronica.models import DocumentoElectronico, FacturacionElectronicaConfig
 from facturacion_electronica.services.proveedores import api_client
 
+from test_facturacion_electronica_proveedor_base import simular_xml_de_factura
+
 
 class TestNotaCredito(unittest.TestCase):
     def setUp(self):
@@ -53,6 +55,7 @@ class TestNotaCredito(unittest.TestCase):
         )
         nc_habilitada.start()
         self.addCleanup(nc_habilitada.stop)
+        simular_xml_de_factura(self)
 
         self.admin = Usuario.query.filter_by(username='admin').first()
         # Cliente **identificado**: SIFEN rechaza una nota de crédito cuyo
@@ -165,6 +168,7 @@ class TestNotaCredito(unittest.TestCase):
         return {
             'ruc': '80012345',
             'sifen_mode': 'test',
+            'address': 'Avda. Mcal. López 1234',
             'stamps': [
                 {
                     'id': 'aaaaaaaa-0000-4000-8000-000000000001',
@@ -224,7 +228,7 @@ class TestNotaCredito(unittest.TestCase):
         self.assertEqual(cuerpo['document_type'], TIPO_NOTA_CREDITO)
         self.assertEqual(cuerpo['stamp'], 'bbbbbbbb-0000-4000-8000-000000000005')
         self.assertEqual(cuerpo['associated']['cdc'], '1' * 44)
-        self.assertEqual(cuerpo['associated']['document_number'], '0000001')
+        self.assertNotIn('document_number', cuerpo['associated'])  # sólo en asociados impresos
         self.assertEqual(cuerpo['credit_debit'], {'motive': 2, 'motive_desc': 'Devolución'})
         self.assertEqual(cuerpo['lines'][0]['unit_price'], '100000')
 
@@ -475,7 +479,7 @@ class TestNotaCredito(unittest.TestCase):
         `..._nota_credito_propio`); lo que acá importa es que la fachada no lo
         mande al mensaje de "operación no disponible" del contrato."""
         from facturacion_electronica.services import capacidades, emitir_nota_credito
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import generacion_service, nota_credito_service
 
         config = FacturacionElectronicaConfig.obtener()
         config.proveedor = 'propio'
@@ -493,7 +497,7 @@ class TestNotaCredito(unittest.TestCase):
         xml = ('<rDE xmlns="http://ekuatia.set.gov.py/sifen/xsd">'
                '<DE Id="05042812925001001000000112026022419853987481"><dDVId>0</dDVId>'
                '</DE></rDE>')
-        with patch.object(emision_service, 'generar_xml', return_value=(xml, None)),              patch.object(emision_service, 'firmar_xml', return_value=('<rDE/>', None)),              patch.object(emision_service, 'generar_qr', return_value=('<rDE/>', None)):
+        with patch.object(nota_credito_service, 'generar_xml', return_value=(xml, None)),              patch.object(generacion_service, 'firmar_xml', return_value=('<rDE/>', None)),              patch.object(generacion_service, 'generar_qr', return_value=('<rDE/>', None)):
             nota, error = emitir_nota_credito(devolucion, 2)
 
         self.assertIsNone(error)

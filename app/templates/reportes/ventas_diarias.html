@@ -259,6 +259,9 @@
                         <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                             <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
                                 Detalle de Venta #<span x-text="venta?.id"></span>
+                                <span class="text-sm font-normal text-gray-500 dark:text-gray-400" x-show="venta?.fe?.numero">
+                                    · Factura <span class="font-mono" x-text="venta?.fe?.numero"></span>
+                                </span>
                             </h3>
                             <div class="mt-2" x-show="loading">
                                 <p class="text-gray-500 dark:text-gray-400 text-center py-4">Cargando detalles...</p>
@@ -268,6 +271,7 @@
                                         x-text="venta?.cliente"></span></p>
                                 <p class="text-sm text-gray-600 dark:text-gray-300 mb-4"><strong>Fecha:</strong> <span
                                         x-text="venta?.fecha"></span></p>
+                                {% include 'ventas/_modal_fe_resumen.html' %}
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                     <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
                                         <p class="text-xs text-gray-500 dark:text-gray-400">Tipo de venta</p>
@@ -357,6 +361,12 @@
                         class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
                         @click="window.open('/ventas/' + venta.id + '/ticket', '_blank')">
                         <i class="fas fa-print mr-2"></i> Reimprimir Ticket
+                    </button>
+                    <button type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-base font-medium text-white focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        x-show="venta?.fe?.url_kude"
+                        @click="window.open(venta.fe.url_kude, '_blank')">
+                        <i class="fas fa-receipt mr-2"></i> Reimprimir factura
                     </button>
                     <button type="button"
                         class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"

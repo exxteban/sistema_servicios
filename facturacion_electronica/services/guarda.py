@@ -5,6 +5,8 @@ de venta no se desincronicen: un literal distinto en cada uno es exactamente
 cómo se emitió la factura de una venta anulada y cómo se dejó anular una
 venta con el DE ya vivo del otro lado.
 """
+from datetime import datetime, timedelta
+
 from facturacion_electronica import (
     AMBIENTE_TEST,
     ESTADO_API_CANCELACION_PENDIENTE,
@@ -27,6 +29,33 @@ MENSAJE_DEVOLUCION_ANULADA = (
 
 def venta_anulada(venta):
     return (getattr(venta, 'estado', None) or '').strip().lower() == 'anulada'
+
+
+def fuera_de_plazo_de_envio(venta):
+    """True si ya pasaron las 72h para **facturar** esta venta.
+
+    La factura declara la fecha de la venta (`dFeEmiDE`), no la de hoy. Es el
+    límite para emitir una factura nueva ("facturar después"); para reenviar
+    una ya emitida va `fuera_de_plazo_de_transmision`.
+    """
+    from facturacion_electronica.services.emision_service import HORAS_LIMITE_ENVIO
+
+    fecha = getattr(venta, 'fecha_venta', None)
+    return fecha is None or datetime.utcnow() - fecha > timedelta(hours=HORAS_LIMITE_ENVIO)
+
+
+def fuera_de_plazo_de_transmision(venta):
+    """True si SIFEN ya no acepta un DE con la fecha de esta venta (720h, rechazo 1150).
+
+    Entre 72h y 720h un DE ya emitido —rechazado y corregido, o que no se pudo
+    transmitir— todavía sale: SIFEN lo aprueba con observación (1005). Darlo
+    por perdido a las 72h dejaba para inutilizar un número cuyo KuDE el
+    cliente ya tenía en la mano.
+    """
+    from facturacion_electronica.services.retransmision import HORAS_MAXIMO_TRANSMISION
+
+    fecha = getattr(venta, 'fecha_venta', None)
+    return fecha is None or datetime.utcnow() - fecha > timedelta(hours=HORAS_MAXIMO_TRANSMISION)
 
 
 def error_venta_no_facturable(venta):

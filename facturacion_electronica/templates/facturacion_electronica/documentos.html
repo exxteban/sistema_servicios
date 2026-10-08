@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Facturas electrónicas{% endblock %}
+
+{% macro badge(estado) -%}
+<span class="rounded px-2 py-0.5 text-xs font-semibold
+    {% if estado == 'aprobado' %}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200
+    {% elif estado in ['rechazado', 'error'] %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
+    {% elif estado == 'cancelado' %}bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200
+    {% elif estado == 'inutilizado' %}bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200
+    {% else %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200{% endif %}">{{ estado }}</span>
+{%- endmacro %}
+
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 space-y-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Facturas electrónicas</h1>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                Facturas y notas de crédito emitidas, por fecha de emisión. Tocá una fila para abrir la
+                venta: ahí están el KuDE, el XML y lo que se puede hacer con la factura.
+            </p>
+        </div>
+
+        <form method="get" class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+            <div>
+                <label for="fe-desde" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Desde</label>
+                <input type="date" id="fe-desde" name="desde" value="{{ desde.isoformat() }}"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label for="fe-hasta" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Hasta</label>
+                <input type="date" id="fe-hasta" name="hasta" value="{{ hasta.isoformat() }}"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            </div>
+            <div>
+                <label for="fe-estado" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Estado</label>
+                <select id="fe-estado" name="estado"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                    {% for valor, etiqueta in etiquetas_filtro %}
+                    <option value="{{ valor }}" {% if estado == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="fe-tipo" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tipo</label>
+                <select id="fe-tipo" name="tipo"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                    <option value="" {% if not tipo %}selected{% endif %}>Todos</option>
+                    <option value="factura" {% if tipo == 'factura' %}selected{% endif %}>Facturas</option>
+                    <option value="nota_credito" {% if tipo == 'nota_credito' %}selected{% endif %}>Notas de crédito</option>
+                </select>
+            </div>
+            <div class="col-span-2 md:col-span-4 flex flex-wrap gap-2 justify-end">
+                <a href="{{ url_for('facturacion_electronica.documentos_csv', desde=desde.isoformat(), hasta=hasta.isoformat(), estado=estado, tipo=tipo) }}"
+                    class="inline-flex items-center rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <i class="fas fa-file-csv mr-2"></i>Exportar CSV
+                </a>
+                <button type="submit"
+                    class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
+                    <i class="fas fa-filter mr-2"></i>Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {# Resumen del período, sin el filtro de estado: cuánto hay de cada cosa. #}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Documentos del período</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white" style="font-variant-numeric: tabular-nums">{{ resumen.total }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Facturado aprobado</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white" style="font-variant-numeric: tabular-nums">₲ {{ "{:,.0f}".format(resumen.facturado_aprobado).replace(",", ".") }}</p>
+        </div>
+        <a href="{{ url_for('facturacion_electronica.documentos', desde=desde.isoformat(), hasta=hasta.isoformat(), estado='sin_enviar', tipo=tipo) }}"
+            class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Sin respuesta de SIFEN</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white" style="font-variant-numeric: tabular-nums">{{ resumen.sin_enviar }}</p>
+        </a>
+        <a href="{{ url_for('facturacion_electronica.documentos', desde=desde.isoformat(), hasta=hasta.isoformat(), estado='rechazado', tipo=tipo) }}"
+            class="rounded-xl border p-4 {% if resumen.atencion %}bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-900{% else %}bg-white border-gray-100 dark:bg-gray-800 dark:border-gray-700{% endif %}">
+            <p class="text-xs {% if resumen.atencion %}text-red-700 dark:text-red-300{% else %}text-gray-500 dark:text-gray-400{% endif %}">Rechazados o con error</p>
+            <p class="text-2xl font-bold {% if resumen.atencion %}text-red-700 dark:text-red-300{% else %}text-gray-900 dark:text-white{% endif %}" style="font-variant-numeric: tabular-nums">{{ resumen.atencion }}</p>
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
+        {% if filas %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr class="text-left text-xs font-semibold text-gray-600 dark:text-gray-300">
+                        <th class="px-4 py-3">Fecha</th>
+                        <th class="px-4 py-3">Número</th>
+                        <th class="px-4 py-3">Venta</th>
+                        <th class="px-4 py-3">Cliente</th>
+                        <th class="px-4 py-3">RUC/CI</th>
+                        <th class="px-4 py-3 text-right">Total</th>
+                        <th class="px-4 py-3">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for f in filas %}
+                    <tr class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 {% if f.atencion %}bg-red-50 dark:bg-red-900/20{% endif %}"
+                        onclick="window.location.href='{{ url_for('ventas.detalle', id=f.id_venta) }}'">
+                        <td class="px-4 py-3 whitespace-nowrap text-gray-800 dark:text-gray-100">{{ f.fecha.strftime('%d/%m/%Y %H:%M') if f.fecha else '—' }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <a href="{{ url_for('ventas.detalle', id=f.id_venta) }}" class="font-mono text-gray-900 dark:text-white hover:underline">{{ f.numero }}</a>
+                            {% if f.tipo != 'Factura' %}<span class="ml-1 text-xs text-gray-500 dark:text-gray-400">NC</span>{% endif %}
+                        </td>
+                        <td class="px-4 py-3 font-mono text-gray-800 dark:text-gray-100">#{{ f.id_venta }}</td>
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ f.cliente }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-300">{{ f.ruc_ci }}</td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap text-gray-800 dark:text-gray-100" style="font-variant-numeric: tabular-nums">₲ {{ "{:,.0f}".format(f.total).replace(",", ".") }}</td>
+                        <td class="px-4 py-3">
+                            {{ badge(f.estado) }}
+                            {% if f.ambiente == 'test' %}<span class="ml-1 text-xs text-gray-500 dark:text-gray-400">test</span>{% endif %}
+                            {% if f.atencion and f.mensaje %}
+                            <p class="mt-1 max-w-xs truncate text-xs text-red-700 dark:text-red-300" title="{{ f.mensaje }}">{{ f.mensaje }}</p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if paginas > 1 %}
+        <div class="flex items-center justify-between px-4 py-3 text-sm text-gray-600 dark:text-gray-300 border-t border-gray-100 dark:border-gray-700">
+            <span>Página {{ pagina }} de {{ paginas }} · {{ cantidad }} documentos</span>
+            <div class="flex gap-2">
+                {% if pagina > 1 %}
+                <a class="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    href="{{ url_for('facturacion_electronica.documentos', desde=desde.isoformat(), hasta=hasta.isoformat(), estado=estado, tipo=tipo, pagina=pagina - 1) }}">Anterior</a>
+                {% endif %}
+                {% if pagina < paginas %}
+                <a class="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    href="{{ url_for('facturacion_electronica.documentos', desde=desde.isoformat(), hasta=hasta.isoformat(), estado=estado, tipo=tipo, pagina=pagina + 1) }}">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+            No hay documentos electrónicos con esos filtros entre el {{ desde.strftime('%d/%m/%Y') }} y el {{ hasta.strftime('%d/%m/%Y') }}.
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

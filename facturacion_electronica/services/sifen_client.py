@@ -88,6 +88,26 @@ def enviar_de(xml_firmado, cert_path, password, env, request_id=None):
     })
 
 
+def enviar_lote(xmls, cert_path, password, env, request_id=None):
+    """Envía uno o más DE en un lote (siRecepLoteDE). Devuelve (respuesta, error).
+
+    SIFEN contesta sólo que recibió el lote y su número (`dProtConsLote`); el
+    resultado de cada DE se pide después con `consultar_lote`.
+    """
+    return _post_json('/enviar-lote', {
+        'xmls': list(xmls), 'certPath': cert_path, 'password': password,
+        'env': env, 'id': request_id,
+    })
+
+
+def consultar_lote(numero_lote, cert_path, password, env, request_id=None):
+    """Resultado de un lote enviado (siConsLoteDE). Devuelve (respuesta, error)."""
+    return _post_json('/consultar-lote', {
+        'numeroLote': numero_lote, 'certPath': cert_path, 'password': password,
+        'env': env, 'id': request_id,
+    })
+
+
 def consultar_de(cdc, cert_path, password, env, request_id=None):
     """Consulta el estado de un DE por CDC (siConsDE). Devuelve (respuesta, error)."""
     return _post_json('/consultar', {
@@ -137,4 +157,4 @@ def inutilizar_de(params, data, cert_path, password, env, request_id=None,
 
 
 __all__ = ['generar_xml', 'firmar_xml', 'generar_qr', 'enviar_de', 'consultar_de',
-           'cancelar_de', 'inutilizar_de']
+           'enviar_lote', 'consultar_lote', 'cancelar_de', 'inutilizar_de']

@@ -1,7 +1,8 @@
 """Job de envio automatico de facturacion electronica (igual que en el sistema padre).
 
 Avanza los documentos pendientes (firmar -> QR -> enviar -> consultar) sin que
-nadie tenga que entrar a una pantalla. Si la configuracion de FE esta
+nadie tenga que entrar a una pantalla, y renueva la tabla geografica del modo
+API cuando vence (ver `facturacion_electronica.services.tareas_periodicas`). Si la configuracion de FE esta
 incompleta, `procesar_pendientes` no hace nada.
 """
 import os
@@ -36,9 +37,9 @@ def iniciar_scheduler_facturacion_electronica(app, habilitado):
             while True:
                 try:
                     with app.app_context():
-                        from facturacion_electronica.services.envio_automatico import procesar_pendientes
+                        from facturacion_electronica.services.tareas_periodicas import ejecutar
 
-                        resumen = procesar_pendientes()
+                        resumen = ejecutar()
                         if resumen['procesados']:
                             app.logger.info(f"[facturacion_electronica] pendientes procesados: {resumen}")
                 except Exception:

@@ -128,7 +128,7 @@ def adoptar_remoto(config, documento, remoto):
     estado = aplicar_remoto(documento, remoto)
     completar_qr(config, documento)
     if estado == ESTADO_RECHAZADO:
-        completar_motivo_rechazo(config, documento)
+        completar_motivo_rechazo(config, documento, remoto)
     return estado
 
 
@@ -150,9 +150,46 @@ def buscar_remoto(config, documento):
         return None, error
     clave = clave_idempotencia(documento)
     for remoto in (datos or {}).get('results') or []:
-        if (remoto.get('idempotency_key') or '') == clave:
+        if (remoto.get('idempotency_key') or '') == clave or _mismo_numero(remoto, documento):
             return remoto, None
     return None, None
+
+
+def _mismo_numero(remoto, documento):
+    """True si el DE remoto es este mismo número fiscal (tipo, local, punto, número).
+
+    El listado no trae el número, pero el CDC sí (posiciones 1-2 tipo, 12-14
+    establecimiento, 15-17 punto, 18-24 número). Con el filtro por
+    `external_ref`, un DE de esta venta con este número es este documento
+    aunque lo hayan dado de alta con otra clave (el proveedor, a mano).
+    """
+    cdc = str(remoto.get('cdc') or '')
+    if len(cdc) != 44 or not documento.numero:
+        return False
+    return (
+        int(cdc[0:2]) == int(documento.tipo_documento or 1)
+        and cdc[11:14] == (documento.establecimiento or '')
+        and cdc[14:17] == (documento.punto or '')
+        and cdc[17:24] == documento.numero
+    )
+
+
+def liberar_numero_tomado(documento, error):
+    """Ante `fiscal_number_conflict`, suelta el número para tomar el siguiente.
+
+    El número ya lo tiene OTRO documento en la API (si fuera de esta venta,
+    `buscar_remoto` lo habría adoptado antes). Como existe allá, dejarlo no
+    abre un hueco en el timbrado, y reintentar con él falla para siempre.
+    Sin número ni clave, el próximo intento —el botón o el job— reserva el
+    siguiente. Devuelve el mensaje que queda a la vista.
+    """
+    if 'fiscal_number_conflict' not in (error or '') or documento.api_documento_id:
+        return error
+    tomado = documento.numero
+    documento.numero = None
+    documento.api_idempotency_key = None
+    return (f'El número {tomado} ya lo tiene otro documento en la API (emitido desde otro '
+            'sistema o por el proveedor). El próximo intento usa el número siguiente.')
 
 
 def bloqueo_entrega_inicial(venta):
@@ -194,13 +231,59 @@ def clave_idempotencia(documento):
     return documento.api_idempotency_key
 
 
+def transmite(documento):
+    """`transmits` de la última respuesta: False = la API no lo va a enviar."""
+    try:
+        remoto = json.loads(documento.respuesta_raw or '{}')
+    except (TypeError, ValueError):
+        return True
+    return remoto.get('transmits') is not False
+
+
+MENSAJE_SANDBOX = (
+    'La empresa está en modo sandbox en la API: el documento se firmó y quedó '
+    'con CDC, pero no se transmite a SIFEN. Pedile al proveedor que pase la '
+    'empresa a test o producción. Ojo: ese cambio no destraba a los documentos '
+    'que ya se dieron de alta en sandbox —el modo queda fijado al crearlos—, '
+    'así que hay que volver a emitirlos después.'
+)
+
+
+def descargar_kude_pdf(config, documento):
+    """PDF A4 oficial del proveedor. Devuelve (bytes, error)."""
+    if documento is None or not documento.api_documento_id:
+        return None, 'El documento todavía no fue dado de alta en la API.'
+    return api_client.solicitar(
+        config, 'GET', f'/sifen/electronic-documents/{documento.api_documento_id}/kude/',
+        binario=True, timeout=api_client.TIMEOUT_EMISION_SEGUNDOS,
+    )
+
+
+def descargar_xml(config, documento):
+    """XML firmado del documento, como texto. Devuelve (xml, error)."""
+    if documento is None or not documento.api_documento_id:
+        return None, 'El documento todavía no fue dado de alta en la API.'
+    contenido, error = api_client.solicitar(
+        config, 'GET', f'/sifen/electronic-documents/{documento.api_documento_id}/xml/',
+        binario=True, timeout=api_client.TIMEOUT_EMISION_SEGUNDOS,
+    )
+    if error:
+        return None, error
+    return contenido.decode('utf-8', errors='replace'), None
+
+
 __all__ = [
     'ESTADOS_API',
+    'descargar_kude_pdf',
+    'descargar_xml',
+    'MENSAJE_SANDBOX',
+    'transmite',
     'adoptar_remoto',
     'aplicar_remoto',
     'bloqueo_entrega_inicial',
     'buscar_remoto',
     'clave_idempotencia',
+    'liberar_numero_tomado',
     'completar_protocolo',
     'serializar',
 ]

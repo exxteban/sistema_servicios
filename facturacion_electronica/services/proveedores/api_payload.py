@@ -21,10 +21,16 @@ from facturacion_electronica.services.data_builder import (
     construir_condicion,
     construir_entregas_con_origen,
     construir_items,
+    redondeo_sedeco,
 )
-from facturacion_electronica.services.emision_service import fecha_emision
+from facturacion_electronica.services.validacion import email_valido
 
 MONEDA_PYG = 'PYG'
+
+# Redondeo SEDECO (Res. 347/2014) en las facturas de la API, desde su 1.20.0.
+# El motor propio ya lo aplicaba siempre (xmlgen, PYG). Apagarlo acá vuelve a
+# declarar el total crudo, como hasta el 2026-09-29.
+API_REDONDEO_SEDECO = True
 PAIS_PY = 'PRY'
 PAIS_PY_DESC = 'Paraguay'
 
@@ -41,6 +47,9 @@ OPERACION_B2C = 2
 
 DOCUMENTO_TIPO_CEDULA = 1
 DOCUMENTO_TIPO_INNOMINADO = 5
+NOMBRE_INNOMINADO = 'Sin Nombre'
+# tdNombre: de 4 a 255 caracteres.
+NOMBRE_RECEPTOR_MIN = 4
 
 # Medios de pago (iTiPago) que la API valida distinto a partir de su 1.1.0:
 # el cheque y la tarjeta traen su propio bloque obligatorio, y el 99 ("otro")
@@ -72,11 +81,6 @@ CHEQUE_BANCO_MAX = 20
 PLAZO_MAX = 15
 PLAZO_DEFAULT = '30 dias'
 
-# Nombre corto de la unidad (dDesUniMed, máximo 4 caracteres) por código DNCP.
-NOMBRE_UNIDAD = {77: 'UNI', 83: 'kg', 87: 'm', 89: 'l', 109: 'm2'}
-NOMBRE_UNIDAD_DEFAULT = 'UNI'
-
-
 def _solo_digitos(valor):
     return re.sub(r'\D', '', valor or '')
 
@@ -101,7 +105,7 @@ def construir_receptor(cliente):
     """gDatRec: mismo criterio que el motor propio (ver data_builder.construir_cliente)."""
     ruc_ci = (getattr(cliente, 'ruc_ci', '') or '').strip()
     es_consumidor_final = getattr(cliente, 'id_cliente', None) == 1 or not ruc_ci
-    nombre = (getattr(cliente, 'nombre', '') or '').strip() or 'Sin Nombre'
+    nombre = (getattr(cliente, 'nombre', '') or '').strip() or NOMBRE_INNOMINADO
 
     # Sin `address` a propósito: SIFEN exige, junto con la dirección del
     # receptor, el número de casa y los códigos de departamento, distrito y
@@ -114,8 +118,12 @@ def construir_receptor(cliente):
         'name': nombre[:255],
         'country_code': PAIS_PY,
         'country_name': PAIS_PY_DESC,
-        'email': (getattr(cliente, 'email', '') or '').strip() or None,
     }
+    email = (getattr(cliente, 'email', '') or '').strip()
+    if email_valido(email):
+        # Opcional: un email mal cargado en la ficha ("no tiene", "juan@") la
+        # API lo rechaza con 400 y la venta queda sin factura. Mejor sin email.
+        receptor['email'] = email
 
     if not es_consumidor_final and '-' in ruc_ci:
         raiz, _sep, dv = ruc_ci.partition('-')
@@ -142,6 +150,11 @@ def construir_receptor(cliente):
         'id_type': DOCUMENTO_TIPO_INNOMINADO if innominado else DOCUMENTO_TIPO_CEDULA,
         'id_number': '0' if innominado else documento[:20],
     })
+    if innominado and len(receptor['name']) < NOMBRE_RECEPTOR_MIN:
+        # tdNombre exige 4 caracteres y la API lo valida desde su 1.3.0. Al
+        # innominado no se lo identifica por el nombre, así que va el literal
+        # de SIFEN (D211) en vez de frenar la venta de "Ana" sin cédula.
+        receptor['name'] = NOMBRE_INNOMINADO
     return receptor
 
 
@@ -163,8 +176,11 @@ def construir_lineas(detalles, total_objetivo=None):
         lineas.append({
             'internal_code': codigo[:50],
             'description': ((item.get('descripcion') or '').strip() or codigo)[:500],
+            # Sin `unit_name`: desde la 1.8.0 la API arma dDesUniMed desde su
+            # catálogo DNCP por `unit_code` y lo ignora. Un código que no esté
+            # en ese catálogo es 400 `invalid_line`; los de UNIDAD_MEDIDA_POR_VENTA
+            # (77, 83, 87, 89, 109) están todos.
             'unit_code': item['unidadMedida'],
-            'unit_name': NOMBRE_UNIDAD.get(item['unidadMedida'], NOMBRE_UNIDAD_DEFAULT),
             'quantity': _decimal(item['cantidad']),
             'unit_price': _decimal(precio_neto),
             'tax': {
@@ -256,16 +272,36 @@ def _pago_a_credito(condicion):
     }
 
 
+def aplica_redondeo_sedeco(total):
+    """True si el documento sale con `sedeco_rounding` (API 1.20.0).
+
+    Igual que el motor propio, donde xmlgen lo aplica siempre en PYG: el total
+    general baja al múltiplo de 50 inferior y la diferencia va en `dRedon`.
+    No aplica cuando el redondeo dejaría el total en cero (una venta de 30 Gs).
+    """
+    if not API_REDONDEO_SEDECO:
+        return False
+    total_redondeado, _redondeo = redondeo_sedeco(total)
+    return total_redondeado > 0
+
+
 def construir_pago(venta, pagos):
-    """Condición y entregas, reusando el cuadre contra el total del motor propio."""
+    """Condición y entregas, reusando el cuadre contra el total del motor propio.
+
+    Con redondeo SEDECO las entregas cuadran contra el total **redondeado**: la
+    API rechaza (`400`) un pago por el total sin redondear.
+    """
     condicion = construir_condicion(venta, pagos)
     if condicion['tipo'] == CONDICION_CREDITO:
         # Sin `entries`: el crédito con entrega inicial la API lo rechaza, y
         # por eso la emisión de esa venta se corta antes (ver api.py).
         return _pago_a_credito(condicion)
+    total = venta.total
+    if aplica_redondeo_sedeco(total):
+        total, _redondeo = redondeo_sedeco(total)
     entries = [
         _entrada_de_pago(entrega, pago)
-        for entrega, pago in construir_entregas_con_origen(pagos, venta.total)
+        for entrega, pago in construir_entregas_con_origen(pagos, total)
     ]
     return {'condition': 'contado', 'entries': entries}
 
@@ -282,12 +318,40 @@ def referencia_externa(documento):
     La NC de anulacion no tiene devolucion detras, asi que lleva su propio
     prefijo: sin esto se referenciaba `devolucion-None`, y todas las NC de
     anulacion de todos los clientes compartian la misma referencia.
+
+    La factura que reemplaza a una cancelada lleva sufijo (`141-2`). La API
+    reserva la referencia para todo documento no rechazado, cancelados
+    incluidos, asi que volver a facturar con `141` daba `409
+    external_ref_conflict` y dejaba el numero nuevo colgado. Un rechazado no
+    abre fila nueva (se corrige con `correct/`), asi que las filas anteriores
+    de la venta son justamente las que ocupan una referencia; la primera
+    factura sigue siendo `141`, como las ya emitidas.
     """
     if documento.tipo_documento == TIPO_NOTA_CREDITO:
         if documento.id_devolucion is None:
             return f'anulacion-{documento.id_venta}'
         return f'devolucion-{documento.id_devolucion}'
-    return str(documento.id_venta)
+    anteriores = _facturas_anteriores(documento)
+    return str(documento.id_venta) if not anteriores else f'{documento.id_venta}-{anteriores + 1}'
+
+
+def _facturas_anteriores(documento):
+    """Facturas de la misma venta dadas de alta antes que esta (menor id)."""
+    from app import db
+    from facturacion_electronica import TIPO_FACTURA
+    from facturacion_electronica.models import DocumentoElectronico
+
+    if getattr(documento, 'id', None) is None:
+        return 0
+    return DocumentoElectronico.query.filter(
+        DocumentoElectronico.id_venta == documento.id_venta,
+        # El tipo nulo es de los documentos viejos: son facturas.
+        db.or_(
+            DocumentoElectronico.tipo_documento.is_(None),
+            DocumentoElectronico.tipo_documento == TIPO_FACTURA,
+        ),
+        DocumentoElectronico.id < documento.id,
+    ).count()
 
 
 def construir_emision_api(venta, documento, timbrado_id, detalles=None, pagos=None):
@@ -309,6 +373,8 @@ def construir_emision_api(venta, documento, timbrado_id, detalles=None, pagos=No
         'payment': construir_pago(venta, pagos),
         'external_ref': referencia_externa(documento),
     }
+    if aplica_redondeo_sedeco(venta.total):
+        cuerpo['sedeco_rounding'] = True
     if fecha_local:
         # Con offset explicito ('...T14:30:00-03:00'). Sin el, la fecha queda a
         # merced del TIME_ZONE del servidor de ellos: hoy es America/Asuncion y
@@ -318,28 +384,34 @@ def construir_emision_api(venta, documento, timbrado_id, detalles=None, pagos=No
     return cuerpo
 
 
-def construir_nota_credito_api(documento, documento_original, venta, lineas, timbrado_id):
+def construir_nota_credito_api(documento, documento_original, venta, lineas, timbrado_id,
+                               receptor=None, redondear=False):
     """Cuerpo de `POST /sifen/electronic-documents/` con document_type 5.
 
     `associated` es lo que ata la NC a la factura que corrige: sin el CDC
     original, SIFEN no sabe qué documento se está acreditando. `credit_debit`
     lleva el motivo del catálogo (ver services/nota_credito.py).
+
+    `receptor` es el que declaró la factura (ver `api_nota_credito`); la ficha
+    del cliente queda sólo como respaldo para quien llame sin él.
     """
     cuerpo = {
         'stamp': timbrado_id,
         'document_type': TIPO_NOTA_CREDITO,
         'document_number': documento.numero,
-        'receiver': construir_receptor(venta.cliente),
+        'receiver': receptor or construir_receptor(venta.cliente),
         'operation': {'currency': MONEDA_PYG, 'tax_type': TIPO_IMPUESTO_IVA},
         'lines': construir_lineas(lineas),
+        # Asociado electrónico: sólo el CDC. Timbrado, establecimiento, punto,
+        # número y fecha (dNTimDI, dEstDocAso, dPExpDocAso, dNumDocAso,
+        # dFecEmiDI) son del documento **impreso** (iTipDocAso=2): informarlos
+        # con un electrónico es rechazo `2419 Número de timbrado no requerido
+        # para el tipo de documento asociado` (NC de la venta #123, 2026-09-29).
+        # La API los pasa al XML tal cual lleguen, así que no hay que mandarlos.
         'associated': {
             'doc_type': 1,
             'doc_type_desc': 'Electrónico',
             'cdc': documento_original.cdc,
-            'stamp_number': documento_original.timbrado or None,
-            'establishment': documento_original.establecimiento or None,
-            'expedition_point': documento_original.punto or None,
-            'document_number': documento_original.numero or None,
         },
         'credit_debit': {
             'motive': documento.nc_motivo,
@@ -347,19 +419,10 @@ def construir_nota_credito_api(documento, documento_original, venta, lineas, tim
         },
         'external_ref': referencia_externa(documento),
     }
-    # `dFeEmiDoAso` tiene que ser **el mismo dFeEmiDE que se declaró en la
-    # factura**, y ése salió de la fecha de la venta (`fecha_emision`), no de
-    # cuándo se armó el documento: una venta de las 23:50 cuya emisión la
-    # reintentó el job a las 00:05 tiene `fecha_generado` de otro día, y la NC
-    # declararía del documento original una fecha que SIFEN no tiene.
-    #
-    # Misma conversión que `issued_at`: la fecha se guarda en UTC y SIFEN
-    # cuenta en hora local de Paraguay.
-    fecha_original = fecha_emision(documento_original)
-    if fecha_original:
-        cuerpo['associated']['issue_date'] = (
-            utc_naive_to_local(fecha_original).strftime('%Y-%m-%d')
-        )
+    if redondear:
+        # Sólo si la factura salió redondeada (lo decide `api_nota_credito`
+        # leyendo su dRedon): la NC acredita el mismo total que se declaró.
+        cuerpo['sedeco_rounding'] = True
     return cuerpo
 
 

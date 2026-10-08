@@ -72,7 +72,7 @@ def validar_cliente(cliente):
         return (
             f'El cliente "{(cliente.nombre or "").strip()}" parece ser una empresa pero su '
             f'RUC ({ruc_ci}) no tiene dígito verificador. Cargalo con el formato RUC-DV '
-            '(ej. 80012345-6) en la ficha del cliente y volvé a emitir; sin eso la factura '
+            '(ej. 80012345-0) en la ficha del cliente y volvé a emitir; sin eso la factura '
             'no saldría a su nombre y perdería el crédito de IVA.'
         )
     return None
@@ -120,7 +120,74 @@ def validar_monto_innominado(cliente, total):
             'automático la reintenta sola.')
 
 
+# tEmail del XSD de SIFEN: el mismo patrón que valida la API.
+_EMAIL_SIFEN = re.compile(
+    r'^([0-9a-zA-Z]([0-9a-zA-Z\.\-_])*@([0-9a-zA-Z][0-9a-zA-Z\-_]*\.)+[a-zA-Z]{2,9})$'
+)
+
+
+def email_valido(texto):
+    return bool(_EMAIL_SIFEN.match((texto or '').strip()))
+
+
+def digito_verificador_ruc(raiz):
+    """DV del RUC por módulo 11 con factores cíclicos 2..11 (algoritmo de la SET).
+
+    Es el mismo cálculo que hace la API externa (`Mod11.digit` en fe_django)
+    para validar `receiver.dv`.
+    """
+    total = 0
+    factor = 2
+    for caracter in reversed(raiz):
+        total += int(caracter) * factor
+        factor = 2 if factor == 11 else factor + 1
+    resto = total % 11
+    return 11 - resto if resto > 1 else 0
+
+
+def validar_receptor_api(cliente):
+    """Error si el receptor no pasa el borde de la API externa; sino None.
+
+    Desde su 1.3.0/1.4.0 la API rechaza con 400 un receptor identificado cuyo
+    nombre tiene menos de 4 caracteres, y un contribuyente cuyo DV no es el
+    del RUC. Antes pasaban y los rechazaba SIFEN. Se chequea antes de reservar
+    número, con el mismo receptor que se va a mandar (`construir_receptor`),
+    para que la pantalla diga qué corregir en la ficha y no muestre el 400.
+
+    Sólo para el proveedor API: el motor propio no se toca con esto.
+    """
+    from facturacion_electronica.services.proveedores.api_payload import (
+        DOCUMENTO_TIPO_INNOMINADO,
+        NATURALEZA_CONTRIBUYENTE,
+        NOMBRE_RECEPTOR_MIN,
+        construir_receptor,
+    )
+
+    if cliente is None:
+        return None
+    receptor = construir_receptor(cliente)
+    nombre = receptor.get('name') or ''
+    ficha = 'Corregilo en la ficha del cliente y volvé a emitir.'
+
+    if receptor.get('id_type') != DOCUMENTO_TIPO_INNOMINADO and len(nombre) < NOMBRE_RECEPTOR_MIN:
+        return (f'El nombre del cliente ("{nombre}") tiene menos de {NOMBRE_RECEPTOR_MIN} '
+                f'caracteres y SIFEN no lo acepta en la factura. {ficha}')
+
+    if receptor.get('nature') == NATURALEZA_CONTRIBUYENTE:
+        ruc = receptor.get('ruc') or ''
+        ruc_ci = (getattr(cliente, 'ruc_ci', '') or '').strip()
+        dv_cargado = re.sub(r'\D', '', ruc_ci.partition('-')[2])
+        if not ruc.isdigit():
+            return f'El RUC del cliente ({ruc_ci}) no es válido. {ficha}'
+        esperado = digito_verificador_ruc(ruc)
+        if not dv_cargado or int(dv_cargado) != esperado:
+            return (f'El dígito verificador del RUC del cliente ({ruc_ci}) no corresponde: '
+                    f'para el RUC {ruc} es {esperado}. {ficha}')
+    return None
+
+
 __all__ = [
     'validar_configuracion', 'validar_readiness', 'validar_cliente',
-    'validar_monto_innominado', 'TOPE_INNOMINADO',
+    'validar_monto_innominado', 'validar_receptor_api', 'digito_verificador_ruc', 'email_valido',
+    'TOPE_INNOMINADO',
 ]

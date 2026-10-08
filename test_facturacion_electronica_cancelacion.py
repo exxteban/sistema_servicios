@@ -118,9 +118,9 @@ class TestCancelacionContraElServicio(unittest.TestCase):
         """`dFecFirma` la escribe el Node con la hora de su proceso y sin
         offset: en un servidor en UTC el evento sale firmado tres horas en el
         futuro y SIFEN lo rechaza sin decir por qué."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, eventos_service
 
-        with patch.object(emision_service, 'cancelar_de',
+        with patch.object(eventos_service, 'cancelar_de',
                           return_value=(RECHAZO_SIFEN, '<rEve/>', None)) as mock:
             emision_service.cancelar_documento(self.documento, 'Prueba de cancelacion')
 
@@ -133,9 +133,9 @@ class TestCancelacionContraElServicio(unittest.TestCase):
     def test_el_evento_rechazado_queda_guardado(self):
         """Sin esto, un rechazo dejaba el mensaje genérico de SIFEN y nada del
         XML que se firmó, que es lo único que dice qué se mandó."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, eventos_service
 
-        with patch.object(emision_service, 'cancelar_de',
+        with patch.object(eventos_service, 'cancelar_de',
                           return_value=(RECHAZO_SIFEN, '<rEve>firmado</rEve>', None)):
             _doc_, error = emision_service.cancelar_documento(
                 self.documento, 'Prueba de cancelacion',

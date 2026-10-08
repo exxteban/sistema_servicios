@@ -110,6 +110,27 @@ def test_empresa_sin_dv_frena_el_cobro_antes_de_crear_la_venta(entorno):
         assert db.session.get(GastronomiaPedido, pedido_id).pago is None
 
 
+def test_modo_api_frena_el_cobro_si_el_dv_del_ruc_no_corresponde(entorno):
+    app, client, csrf, producto_id = entorno
+    from facturacion_electronica.services import obtener_configuracion
+    with app.app_context():
+        config = obtener_configuracion()
+        config.proveedor = 'api'
+        receptor = Cliente(nombre='Empresa SA', ruc_ci='80012345-6', tipo='minorista', activo=True)
+        db.session.add(receptor)
+        db.session.commit()
+        receptor_id = receptor.id_cliente
+        ventas_antes = Venta.query.count()
+    pedido_id = _crear_pedido_listo(client, csrf, producto_id)
+
+    resp = _cobrar(client, csrf, pedido_id, factura_electronica=True, id_cliente_factura=receptor_id)
+
+    assert resp.status_code == 400
+    assert 'para el RUC 80012345 es 0' in resp.get_json()['mensaje']
+    with app.app_context():
+        assert Venta.query.count() == ventas_antes
+
+
 def test_consumidor_final_sobre_el_tope_no_se_puede_facturar(entorno, monkeypatch):
     app, client, csrf, producto_id = entorno
     from facturacion_electronica.services import validacion

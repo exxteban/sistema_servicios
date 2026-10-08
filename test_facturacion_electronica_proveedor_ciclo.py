@@ -346,6 +346,66 @@ class TestProveedorApiCiclo(BaseProveedorApi):
         db.session.refresh(venta)
         self.assertNotEqual(venta.estado, 'anulada')
 
+    def test_el_kude_de_la_api_imprime_el_redondeo_que_informo(self):
+        """Desde la API 1.20.0 el DE sale con dRedon y la API lo informa en
+        `totals.rounding`: el papel imprime ése, no uno calculado acá."""
+        import json
+
+        from facturacion_electronica.services.kude_service import construir_contexto_kude
+
+        self._activar_api()
+        documento = self._documento_en_lote(1)
+        documento.respuesta_raw = json.dumps({'totals': {'rounding': '43'}})
+        venta = documento.venta
+        venta.total = 993343
+        db.session.commit()
+
+        contexto = construir_contexto_kude(venta, documento)
+        self.assertEqual(contexto['total'], 993300)
+        self.assertEqual(contexto['redondeo'], 43)
+
+    def test_el_kude_de_la_api_no_imprime_redondeo(self):
+        """Un DE de la API sin `totals.rounding` (los anteriores a su 1.20.0)
+        salió crudo. El papel decía 993.300 y el documento en SIFEN 993.343
+        (venta #112 de Janelipy)."""
+        from facturacion_electronica.services.kude_service import construir_contexto_kude
+
+        self._activar_api()
+        documento = self._documento_en_lote(1)
+        venta = documento.venta
+        venta.total = 993343
+        db.session.commit()
+
+        contexto = construir_contexto_kude(venta, documento)
+        self.assertEqual(contexto['total'], 993343)
+        self.assertEqual(contexto['redondeo'], 0)
+
+        # Un DE del motor propio (sin id en la API) conserva su redondeo.
+        documento.api_documento_id = None
+        contexto = construir_contexto_kude(venta, documento)
+        self.assertEqual(contexto['total'], 993300)
+        self.assertEqual(contexto['redondeo'], 43)
+
+    def test_la_sincro_no_cambia_el_establecimiento_del_local(self):
+        """Local 2 (002) de un cliente con dos locales, y en la API sólo está el
+        timbrado de 001-001. Antes la sincro lo pasaba a 001-001 y los dos
+        locales numeraban lo mismo (409 fiscal_number_conflict)."""
+        from facturacion_electronica.models import FacturacionElectronicaConfig
+        from facturacion_electronica.services.proveedores.fachada import sincronizar_emisor
+
+        config = self._activar_api()
+        config.establecimiento = '002'
+        db.session.commit()
+
+        with patch('facturacion_electronica.services.proveedores.api_client.solicitar',
+                   lambda *a, **k: (self._perfil(), None)):
+            resumen, _error = sincronizar_emisor(config)
+
+        config = FacturacionElectronicaConfig.obtener()
+        self.assertEqual((config.establecimiento, config.punto_expedicion), ('002', '001'))
+        self.assertIn('002-001', resumen)
+        self.assertIn('Timbrado en la API', resumen)
+
 
 if __name__ == '__main__':
     unittest.main()

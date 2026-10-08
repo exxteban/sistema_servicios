@@ -509,7 +509,8 @@ def construir_data_venta(venta, config, detalles=None, pagos=None, codigo_seguri
 
 
 def construir_data_nota_credito(devolucion, config, original, motivo, venta=None,
-                                lineas=None, codigo_seguridad=None, numero=None, fecha=None):
+                                lineas=None, codigo_seguridad=None, numero=None, fecha=None,
+                                cliente=None):
     """El `data` de una nota de crédito electrónica (iTiDE 5).
 
     Tres diferencias con la factura, y las tres son del estándar, no nuestras:
@@ -550,15 +551,18 @@ def construir_data_nota_credito(devolucion, config, original, motivo, venta=None
         'tipoTransaccion': TIPO_TRANSACCION_VENTA,
         'tipoImpuesto': TIPO_IMPUESTO_IVA,
         'moneda': MONEDA_PYG,
-        'cliente': construir_cliente(venta.cliente),
+        # `cliente`: el receptor que declaró la factura (ver receptor_facturado);
+        # la ficha de hoy puede haber cambiado desde que se facturó.
+        'cliente': cliente if cliente is not None else construir_cliente(venta.cliente),
         'notaCreditoDebito': {'motivo': codigo_motivo},
         'documentoAsociado': {
             'formato': FORMATO_ASOCIADO_ELECTRONICO,
             'cdc': original.cdc,
         },
         # Sin `total_objetivo`: las líneas ya vienen con el precio que la
-        # factura cobró (ver `nota_credito.lineas_de_devolucion`). Prorratear
-        # de nuevo bajaría el crédito por un descuento que ya está adentro.
+        # factura declaró, descuento global incluido (ver
+        # `nota_credito.precios_facturados`). Prorratear de nuevo bajaría el
+        # crédito por un descuento que ya está adentro.
         'items': construir_items(lineas),
     }
 

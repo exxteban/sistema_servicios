@@ -41,7 +41,7 @@ def test_regenerar_qr_si_el_documento_aprobado_se_quedo_sin_el():
     # para no necesitar ni base ni el servicio Node.
     centinela = RuntimeError('pasó la guarda')
     with patch(
-        'facturacion_electronica.services.emision_service.obtener_configuracion',
+        'facturacion_electronica.services.generacion_service.obtener_configuracion',
         side_effect=centinela,
     ):
         try:

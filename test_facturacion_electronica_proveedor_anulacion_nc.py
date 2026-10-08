@@ -16,11 +16,17 @@ from app import db
 from facturacion_electronica import (
     ESTADO_APROBADO,
     ESTADO_ERROR,
+    ESTADO_RECHAZADO,
     TIPO_FACTURA,
     TIPO_NOTA_CREDITO,
 )
 
-from test_facturacion_electronica_proveedor_base import BaseProveedorApi, respuesta_api
+from test_facturacion_electronica_proveedor_base import (
+    BaseProveedorApi,
+    respuesta_api,
+    simular_xml_de_factura,
+    xml_factura,
+)
 
 NC_HABILITADA = 'facturacion_electronica.services.proveedores.api.API_EMITE_NOTAS_CREDITO'
 
@@ -32,6 +38,7 @@ class TestProveedorApiAnulacionConNc(BaseProveedorApi):
         habilitada = patch(NC_HABILITADA, True)
         habilitada.start()
         self.addCleanup(habilitada.stop)
+        self.xml_de_factura = simular_xml_de_factura(self)
 
     def _perfil_con_timbrado_de_nc(self):
         perfil = self._perfil()
@@ -189,6 +196,114 @@ class TestProveedorApiAnulacionConNc(BaseProveedorApi):
         self.assertEqual(len(altas), 1)
         self.assertEqual(altas[0]['document_type'], TIPO_NOTA_CREDITO)
 
+    def _api_que_captura(self, altas, claves=None):
+        def _solicitar(config, metodo, ruta, **kwargs):
+            if ruta == '/sifen/me/':
+                return self._perfil_con_timbrado_de_nc(), None
+            if ruta == '/sifen/electronic-documents/':
+                altas.append(kwargs.get('json'))
+                if claves is not None:
+                    claves.append((kwargs.get('headers') or {}).get('Idempotency-Key'))
+                return respuesta_api(document_type=TIPO_NOTA_CREDITO), None
+            if metodo == 'GET':
+                return respuesta_api(document_type=TIPO_NOTA_CREDITO), None
+            raise AssertionError(f'ruta inesperada: {ruta}')
+        return _solicitar
+
+    def test_acredita_lo_facturado_con_el_descuento_global(self):
+        """Venta #123 de Janelipy: 5% de descuento sobre el total. La factura
+        lo repartió en los precios y la NC acreditaba a precio lleno
+        (613.076 contra 645.343)."""
+        from facturacion_electronica.services.proveedores.fachada import (
+            emitir_nota_credito_correccion,
+        )
+
+        self._activar_api()
+        venta, _factura = self._venta_facturada(precio=100000)
+        venta.total = 95000
+        db.session.commit()
+        altas = []
+
+        with patch('facturacion_electronica.services.proveedores.api_client.solicitar',
+                   self._api_que_captura(altas)):
+            _documento, error = emitir_nota_credito_correccion(venta, 1)
+
+        self.assertIsNone(error)
+        acreditado = sum(float(l['unit_price']) * float(l['quantity']) for l in altas[0]['lines'])
+        self.assertAlmostEqual(acreditado, 95000, places=2)
+
+    def test_el_receptor_es_el_de_la_factura_no_el_de_la_ficha(self):
+        """La factura salió a una cédula; después la ficha pasó a tener RUC.
+        La NC tiene que hablar del mismo comprador que la factura."""
+        from facturacion_electronica.services.proveedores.fachada import (
+            emitir_nota_credito_correccion,
+        )
+
+        self._activar_api()
+        venta, _factura = self._venta_facturada()
+        self.cliente.ruc_ci = '4281292-5'
+        db.session.commit()
+        self.xml_de_factura.return_value = (xml_factura('4281292', 'Esteban Lezcano'), None)
+        altas = []
+
+        with patch('facturacion_electronica.services.proveedores.api_client.solicitar',
+                   self._api_que_captura(altas)):
+            _documento, error = emitir_nota_credito_correccion(venta, 1)
+
+        self.assertIsNone(error)
+        receptor = altas[0]['receiver']
+        self.assertEqual(receptor['nature'], 2)
+        self.assertEqual(receptor['id_number'], '4281292')
+        self.assertEqual(receptor['name'], 'Esteban Lezcano')
+        self.assertNotIn('ruc', receptor)
+
+    def test_sin_el_xml_de_la_factura_no_se_emite(self):
+        """Caer a la ficha es el error que se corrige: mejor frenar y reintentar."""
+        from facturacion_electronica.services.proveedores.fachada import (
+            emitir_nota_credito_correccion,
+        )
+
+        self._activar_api()
+        venta, _factura = self._venta_facturada()
+        self.xml_de_factura.return_value = (None, 'La API tardó demasiado en responder.')
+        altas = []
+
+        with patch('facturacion_electronica.services.proveedores.api_client.solicitar',
+                   self._api_que_captura(altas)):
+            documento, error = emitir_nota_credito_correccion(venta, 1)
+
+        self.assertIn('receptor de la factura', error)
+        self.assertEqual(altas, [])
+        self.assertEqual(documento.estado, ESTADO_ERROR)
+
+    def test_una_nc_rechazada_se_vuelve_a_dar_de_alta_con_el_mismo_numero(self):
+        """Antes el botón sólo refrescaba la NC rechazada y decía "emitida".
+        El rechazo libera el número en la API: alta nueva, mismo número, clave nueva."""
+        from facturacion_electronica.services.proveedores.fachada import (
+            emitir_nota_credito_correccion,
+        )
+
+        self._activar_api()
+        venta, _factura = self._venta_facturada()
+        altas, claves = [], []
+
+        with patch('facturacion_electronica.services.proveedores.api_client.solicitar',
+                   self._api_que_captura(altas, claves)):
+            documento, error = emitir_nota_credito_correccion(venta, 1)
+            self.assertIsNone(error)
+            documento.estado = ESTADO_RECHAZADO
+            documento.respuesta_codigo = 'REJECTED'
+            db.session.commit()
+
+            reemitida, error = emitir_nota_credito_correccion(venta, 1)
+
+        self.assertIsNone(error)
+        self.assertEqual(reemitida.id, documento.id)
+        self.assertEqual(len(altas), 2)
+        self.assertEqual(altas[0]['document_number'], altas[1]['document_number'])
+        self.assertNotEqual(claves[0], claves[1])
+        self.assertNotEqual(reemitida.estado, ESTADO_RECHAZADO)
+
     def test_con_la_nc_bloqueada_el_mensaje_explica_por_que(self):
         """Estado real de hoy. Antes caía en el 'no disponible' genérico del
         contrato, que no le dice nada a nadie."""
@@ -206,7 +321,7 @@ class TestProveedorApiAnulacionConNc(BaseProveedorApi):
 
         nunca.assert_not_called()
         self.assertIn('notas de crédito', error)
-        self.assertIn('tipo de documento 5', error)
+        self.assertIn('no transmitió ninguna a SIFEN', error)
 
 
 def test_external_ref_de_la_nc_de_anulacion_no_es_devolucion_none():

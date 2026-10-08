@@ -110,9 +110,9 @@ class TestNotaCreditoDeAnulacion(unittest.TestCase):
     def test_acredita_el_total_facturado_y_no_el_precio_de_lista(self):
         """El subtotal de la línea ya tiene el descuento adentro. Acreditar el
         precio de lista sería declarar menos IVA del que se cobró."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, nota_credito_service
 
-        with patch.object(emision_service, 'generar_xml',
+        with patch.object(nota_credito_service, 'generar_xml',
                           return_value=(XML_NC, None)) as mock:
             doc, error = emision_service.generar_nota_credito_correccion(
                 self.venta, motivo=2, descripcion='Facturado al cliente equivocado',
@@ -133,9 +133,9 @@ class TestNotaCreditoDeAnulacion(unittest.TestCase):
     def test_la_nc_lleva_su_propio_correlativo(self):
         """Factura 001-001-0000001 y NC 001-001-0000001 conviven en el mismo
         timbrado: si comiera el rango de facturas, SIFEN rechaza."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, nota_credito_service
 
-        with patch.object(emision_service, 'generar_xml', return_value=(XML_NC, None)):
+        with patch.object(nota_credito_service, 'generar_xml', return_value=(XML_NC, None)):
             doc, error = emision_service.generar_nota_credito_correccion(
                 self.venta, motivo=2,
             )
@@ -157,9 +157,9 @@ class TestNotaCreditoDeAnulacion(unittest.TestCase):
 
     def test_no_se_emite_dos_veces(self):
         """Dos NC por el total acreditarían el doble de lo facturado."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, nota_credito_service
 
-        with patch.object(emision_service, 'generar_xml', return_value=(XML_NC, None)):
+        with patch.object(nota_credito_service, 'generar_xml', return_value=(XML_NC, None)):
             doc, error = emision_service.generar_nota_credito_correccion(
                 self.venta, motivo=2,
             )
@@ -186,14 +186,14 @@ class TestNotaCreditoDeAnulacion(unittest.TestCase):
     def test_aprobada_la_nc_la_venta_se_puede_anular(self):
         """La factura sigue 'aprobado' para siempre —una NC no cambia el estado
         del DE que corrige— pero fiscalmente ya no queda nada en pie."""
-        from facturacion_electronica.services import emision_service
+        from facturacion_electronica.services import emision_service, nota_credito_service
         from facturacion_electronica.services.guarda import (
             documento_impide_anular_venta,
         )
 
         self.assertTrue(documento_impide_anular_venta(self.factura))
 
-        with patch.object(emision_service, 'generar_xml', return_value=(XML_NC, None)):
+        with patch.object(nota_credito_service, 'generar_xml', return_value=(XML_NC, None)):
             doc, error = emision_service.generar_nota_credito_correccion(
                 self.venta, motivo=2,
             )

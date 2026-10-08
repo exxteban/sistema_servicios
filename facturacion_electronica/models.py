@@ -78,6 +78,13 @@ class FacturacionElectronicaConfig(db.Model):
     def certificado_cargado(self):
         return bool(self.cert_path)
 
+    @property
+    def modo_envio(self):
+        """Síncrono o por lotes (motor propio). No es columna: ver CLAVE_MODO_ENVIO."""
+        from facturacion_electronica.services.envio_lote import modo_envio
+
+        return modo_envio()
+
     def __repr__(self):
         return f'<FacturacionElectronicaConfig ruc={self.ruc} ambiente={self.ambiente}>'
 

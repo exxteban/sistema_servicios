@@ -1,0 +1,16 @@
+{# Ambiente en que la API guarda el timbrado, el CSC o el certificado. El modo de
+   la empresa (prueba/producción) no se cambia desde acá: lo pasa el proveedor.
+   Elegir "Producción" estando en prueba deja el dato listo para ese momento. #}
+{% macro selector_ambiente_api(config) %}
+<div>
+    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Ambiente</label>
+    <select name="ambiente_api"
+        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+        <option value="test" {% if config.ambiente != 'produccion' %}selected{% endif %}>Prueba (test)</option>
+        <option value="prod" {% if config.ambiente == 'produccion' %}selected{% endif %}>Producción</option>
+    </select>
+    <p class="mt-1 text-xs text-gray-400">
+        La empresa está hoy en {{ 'producción' if config.ambiente == 'produccion' else 'prueba' }}.
+    </p>
+</div>
+{% endmacro %}

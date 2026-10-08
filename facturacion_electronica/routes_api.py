@@ -8,6 +8,7 @@ from flask_login import login_required
 from facturacion_electronica.routes import _puede_configurar, facturacion_electronica_bp
 from facturacion_electronica.services import obtener_configuracion
 from facturacion_electronica.services.proveedores import PROVEEDOR_API
+from facturacion_electronica.services.proveedores.api_emisor import cargar_datos_fiscales
 from facturacion_electronica.services.proveedores.api_secretos import subir_certificado, subir_csc
 from facturacion_electronica.services.proveedores.api_timbrado import cargar_timbrado
 
@@ -37,6 +38,7 @@ def subir_certificado_api():
         return salida
     return _responder(*subir_certificado(
         config, request.files.get('certificado'), request.form.get('cert_password'),
+        request.form.get('ambiente_api'),
     ))
 
 
@@ -46,7 +48,9 @@ def subir_csc_api():
     config, salida = _config_api_o_redireccion()
     if salida:
         return salida
-    return _responder(*subir_csc(config, request.form.get('csc_id'), request.form.get('csc')))
+    return _responder(*subir_csc(
+        config, request.form.get('csc_id'), request.form.get('csc'), request.form.get('ambiente_api'),
+    ))
 
 
 @facturacion_electronica_bp.route('/proveedor/timbrado', methods=['POST'])
@@ -56,3 +60,12 @@ def cargar_timbrado_api():
     if salida:
         return salida
     return _responder(*cargar_timbrado(config, request.form))
+
+
+@facturacion_electronica_bp.route('/proveedor/datos-fiscales', methods=['POST'])
+@login_required
+def cargar_datos_fiscales_api():
+    config, salida = _config_api_o_redireccion()
+    if salida:
+        return salida
+    return _responder(*cargar_datos_fiscales(config))

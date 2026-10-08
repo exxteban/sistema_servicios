@@ -11,18 +11,26 @@ Contrato del lado de la API:
 
 Después de cargarlo se trae el perfil de nuevo, así el timbrado, el ambiente y
 el piso de numeración quedan copiados igual que con "Traer datos del emisor".
+
+La API pide un registro por tipo de documento aunque el número sea el mismo.
+En el motor propio el timbrado es uno solo para todo, así que por defecto se
+cargan juntos factura y nota de crédito, y si igual falta el de la NC se copia
+del de factura al emitirla (ver `resolver_timbrado_nc`).
 """
 import re
 from datetime import datetime
 
-from facturacion_electronica import TIPO_FACTURA, TIPO_NOTA_CREDITO
-from facturacion_electronica.services.proveedores import api_client
+from facturacion_electronica import AMBIENTE_PRODUCCION, TIPO_FACTURA, TIPO_NOTA_CREDITO
+from facturacion_electronica.services.proveedores.api_emisor import actualizar_perfil_remoto
 from facturacion_electronica.services.proveedores.api_perfil import (
-    aplicar_perfil_al_config,
+    AMBIENTES_API,
+    normalizar_codigo,
     obtener_perfil,
-    olvidar_perfil,
+    resolver_timbrado,
+    seleccionar_timbrado,
 )
 
+TIPO_AMBOS = 'ambos'
 TIPOS_TIMBRADO = (
     (TIPO_FACTURA, 'Factura electrónica'),
     (TIPO_NOTA_CREDITO, 'Nota de crédito electrónica'),
@@ -56,8 +64,9 @@ def armar_timbrado(form):
             return None, f'El {etiqueta} son hasta 3 dígitos (por ejemplo 001).'
         codigos[campo] = valor.zfill(3)
 
+    valor_tipo = (form.get('tipo_documento') or '').strip()
     try:
-        tipo = int(form.get('tipo_documento') or TIPO_FACTURA)
+        tipo = TIPO_FACTURA if valor_tipo in ('', TIPO_AMBOS) else int(valor_tipo)
     except (TypeError, ValueError):
         tipo = 0
     if tipo not in dict(TIPOS_TIMBRADO):
@@ -82,6 +91,15 @@ def armar_timbrado(form):
     if hasta:
         item['valid_to'] = hasta.isoformat()
 
+    # Sin ambiente la API lo guarda en el del modo actual: un timbrado de
+    # producción cargado estando en test quedaba como de test y, al pasar a
+    # producción, la emisión respondía 422 `stamp_environment_mismatch`.
+    ambiente = (form.get('ambiente_api') or '').strip().lower()
+    if ambiente:
+        if ambiente not in AMBIENTES_API:
+            return None, 'Ambiente del timbrado inválido.'
+        item['environment'] = ambiente
+
     inicial = (form.get('initial_number') or '').strip()
     if inicial:
         if not re.fullmatch(r'\d{1,7}', inicial) or int(inicial) < 1:
@@ -90,33 +108,89 @@ def armar_timbrado(form):
     return item, None
 
 
-def cargar_timbrado(config, form):
-    """Sube el timbrado a la API y resincroniza. Devuelve (resumen, error)."""
+def copia_para_nota_credito(timbrado):
+    """El mismo timbrado como registro de NC.
+
+    Sin `initial_number`: el de la factura es el piso de *su* rango, y la NC
+    numera aparte. Vacío, la API usa el suyo.
+    """
+    item = {
+        'number': str(timbrado.get('number') or '').strip(),
+        'establishment': normalizar_codigo(timbrado.get('establishment')),
+        'expedition_point': normalizar_codigo(timbrado.get('expedition_point')),
+        'document_type': TIPO_NOTA_CREDITO,
+        'valid_from': str(timbrado.get('valid_from') or '')[:10],
+    }
+    if timbrado.get('environment'):
+        item['environment'] = timbrado['environment']
+    if timbrado.get('valid_to'):
+        item['valid_to'] = str(timbrado['valid_to'])[:10]
+    return item
+
+
+def armar_timbrados(form):
+    """Los items a subir: el elegido, o factura + NC si se eligió "ambos"."""
     item, error = armar_timbrado(form)
     if error:
         return None, error
+    if (form.get('tipo_documento') or TIPO_AMBOS).strip() != TIPO_AMBOS:
+        return [item], None
+    return [item, copia_para_nota_credito(item)], None
 
-    perfil, error = obtener_perfil(config, refrescar=True)
+
+def resolver_timbrado_nc(config, perfil):
+    """`resolver_timbrado` de NC, copiando el de factura si la API no tiene ninguno.
+
+    Sólo cuando para nuestro punto no hay *ningún* timbrado de NC y sí uno de
+    factura vigente: si hay uno de NC con fecha a futuro, eso es un dato
+    cargado a propósito y no se pisa. Devuelve (timbrado_id, error).
+    """
+    timbrado_id, error = resolver_timbrado(config, perfil, TIPO_NOTA_CREDITO)
+    if not error:
+        return timbrado_id, None
+    estab = normalizar_codigo(config.establecimiento)
+    punto = normalizar_codigo(config.punto_expedicion)
+    factura, _del_punto, _otros = seleccionar_timbrado(perfil, estab, punto, TIPO_FACTURA)
+    _nc, nc_del_punto, _otros_nc = seleccionar_timbrado(perfil, estab, punto, TIPO_NOTA_CREDITO)
+    if factura is None or nc_del_punto:
+        return None, error
+
+    _resumen, error_carga = actualizar_perfil_remoto(
+        config, {'stamps': [copia_para_nota_credito(factura)]},
+    )
+    if error_carga:
+        return None, f'{error} (No se pudo copiar el de factura: {error_carga})'
+    perfil, error_perfil = obtener_perfil(config)
+    if error_perfil:
+        return None, error_perfil
+    return resolver_timbrado(config, perfil, TIPO_NOTA_CREDITO)
+
+
+def cargar_timbrado(config, form):
+    """Sube el timbrado a la API y resincroniza. Devuelve (resumen, error)."""
+    items, error = armar_timbrados(form)
     if error:
         return None, error
-    version = perfil.get('version')
-    if version is None:
-        return None, 'La API no informó la versión del perfil; no se puede cargar el timbrado.'
 
-    _respuesta, error = api_client.solicitar(
-        config, 'PUT', '/sifen/me/',
-        json={'stamps': [item]},
-        headers={'If-Match': str(version)},
-    )
+    item = items[0]
+    if item.get('environment') == 'prod' and item['number'] == (config.ruc or '').strip():
+        return None, (
+            f'{item["number"]} es el RUC sin dígito verificador: es el timbrado de prueba y '
+            'SIFEN lo rechaza en producción. Cargá el número de timbrado real.'
+        )
+    resumen, error = actualizar_perfil_remoto(config, {'stamps': items})
     if error:
         return None, f'La API no aceptó el timbrado. {error}'
-
-    olvidar_perfil()
-    perfil, error = obtener_perfil(config, refrescar=True)
-    if error:
-        return None, f'El timbrado se cargó, pero no se pudo releer el perfil: {error}'
-    resumen = aplicar_perfil_al_config(config, perfil)
+    tipos = ' (factura y nota de crédito)' if len(items) > 1 else ''
+    ambiente = {'prod': ' de producción', 'test': ' de prueba'}.get(item.get('environment'), '')
+    # `resumen` nombra el timbrado que se usa hoy, que no es el recién cargado
+    # si se cargó el de producción estando todavía en prueba.
+    en_prod = config.ambiente == AMBIENTE_PRODUCCION
+    espera = ''
+    if item.get('environment') == 'prod' and not en_prod:
+        espera = (' Se va a usar cuando el proveedor pase la empresa a producción; '
+                  'mientras tanto se sigue con el de prueba.')
     return (
-        f'Timbrado {item["number"]} cargado en la API para '
-        f'{item["establishment"]}-{item["expedition_point"]}. {resumen}'
+        f'Timbrado {item["number"]}{tipos}{ambiente} cargado en la API para '
+        f'{item["establishment"]}-{item["expedition_point"]}.{espera} {resumen}'
     ), None

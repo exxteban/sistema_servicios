@@ -98,10 +98,20 @@ def validar_factura_antes_de_cobrar(cliente: Cliente | None, total) -> None:
     Son las mismas reglas que aplica la emision, pero corridas antes de crear
     la venta: una vez cobrada, la venta queda a nombre de ese cliente.
     """
+    from facturacion_electronica.services import obtener_configuracion
     from facturacion_electronica.services.data_builder import receptor_innominado, redondeo_sedeco
-    from facturacion_electronica.services.validacion import TOPE_INNOMINADO, validar_cliente
+    from facturacion_electronica.services.proveedores import PROVEEDOR_API
+    from facturacion_electronica.services.validacion import (
+        TOPE_INNOMINADO,
+        validar_cliente,
+        validar_receptor_api,
+    )
 
     error = validar_cliente(cliente)
+    if not error and obtener_configuracion().proveedor == PROVEEDOR_API:
+        # La API rechaza con 400 un nombre corto o un RUC con DV que no
+        # corresponde; mejor decirlo antes de cobrar.
+        error = validar_receptor_api(cliente)
     if error:
         raise ValueError(error)
     receptor = cliente if cliente is not None else db.session.get(Cliente, 1)
