@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 app_dir="$(cd "$script_dir/.." && pwd)"
-local_env="$script_dir/brakingfat.env"
+local_env="$script_dir/breakingfat.env"
 
 if [ -f "$local_env" ]; then
   set -a
@@ -37,13 +37,13 @@ detect_service_user() {
   printf '%s\n' "$(id -un)"
 }
 
-export DOMAIN="${DOMAIN:-brakingfat.pysystems.online}"
+export DOMAIN="${DOMAIN:-breakingfat.pysystems.online}"
 export EXPECTED_PUBLIC_IP="${EXPECTED_PUBLIC_IP:-151.243.137.190}"
-export SERVICE_NAME="${SERVICE_NAME:-sistema-brakingfat}"
-export APP_PORT="${APP_PORT:-3119}"
-export ENV_FILE_PATH="${ENV_FILE_PATH:-/etc/sistema_brakingfat.env}"
-export DB_NAME="${DB_NAME:-brakingfat}"
-export DB_USER="${DB_USER:-brakingfat_user}"
+export SERVICE_NAME="${SERVICE_NAME:-sistema-breakingfat}"
+export APP_PORT="${APP_PORT:-3120}"
+export ENV_FILE_PATH="${ENV_FILE_PATH:-/etc/sistema_breakingfat.env}"
+export DB_NAME="${DB_NAME:-breakingfat}"
+export DB_USER="${DB_USER:-breakingfat_user}"
 export DB_HOST="${DB_HOST:-localhost}"
 export DB_PORT="${DB_PORT:-3306}"
 export APP_CONFIG="${APP_CONFIG:-production}"
@@ -55,7 +55,7 @@ export CADDY_SITES_DIR="${CADDY_SITES_DIR:-/etc/caddy/sites.d}"
 export SERVER_TIMEZONE="${SERVER_TIMEZONE:-America/Asuncion}"
 export SERVICE_USER="$(detect_service_user)"
 export SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
-export BACKUP_DIR="${BACKUP_DIR:-/home/$SERVICE_USER/backups/brakingfat}"
+export BACKUP_DIR="${BACKUP_DIR:-/home/$SERVICE_USER/backups/breakingfat}"
 export IMPORT_LEGACY_CSV="${IMPORT_LEGACY_CSV:-0}"
 export RUN_TIENDA_BUILD="${RUN_TIENDA_BUILD:-1}"
 export RUN_TIENDA_MIGRATIONS="${RUN_TIENDA_MIGRATIONS:-1}"
@@ -67,7 +67,7 @@ if [ "${CHECK_DNS:-1}" = "1" ] && have_cmd getent; then
   resolved_ips="$(getent ahostsv4 "$DOMAIN" | awk '{print $1}' | sort -u | tr '\n' ' ')"
   if [ -z "$resolved_ips" ]; then
     echo "Aviso: $DOMAIN todavia no resuelve por DNS."
-    echo "En Namecheap configura A brakingfat -> $EXPECTED_PUBLIC_IP."
+    echo "En Namecheap configura A breakingfat -> $EXPECTED_PUBLIC_IP."
   elif ! printf ' %s ' "$resolved_ips" | grep -q " $EXPECTED_PUBLIC_IP "; then
     echo "Aviso: $DOMAIN resuelve a: $resolved_ips"
     echo "IP esperada: $EXPECTED_PUBLIC_IP"
