@@ -220,6 +220,27 @@ class TestCorreccionApi(BaseProveedorApi):
         self.assertEqual(documento.estado, ESTADO_RECHAZADO)
         self.assertIn('No se pudo corregir', documento.respuesta_mensaje)
 
+    def test_si_frena_la_ficha_sigue_rechazada_con_el_motivo_de_sifen(self):
+        """Antes pasaba a 'error' y el motivo del rechazo —lo que hay que
+        corregir— quedaba tapado hasta que el job la volvía a releer."""
+        from facturacion_electronica.services.proveedores.fachada import emitir_para_pos
+
+        self._activar_api()
+        self._cliente_con_dv_equivocado()
+        documento = self._rechazada()
+        documento.respuesta_mensaje = 'Rechazado por SIFEN: 1311 - DV del receptor inválido'
+        db.session.commit()
+
+        def _solicitar(config, metodo, ruta, **kwargs):
+            raise AssertionError(f'no se debe llamar a la API: {ruta}')
+
+        with patch(SOLICITAR, _solicitar):
+            documento, error = emitir_para_pos(documento.venta)
+
+        self.assertIn('dígito verificador', error)
+        self.assertEqual(documento.estado, ESTADO_RECHAZADO)
+        self.assertIn('1311', documento.respuesta_mensaje)
+
     def test_una_nota_de_credito_rechazada_no_se_corrige(self):
         """`correct/` es sólo para facturas: la NC rechazada se relee y nada más."""
         from facturacion_electronica import TIPO_NOTA_CREDITO

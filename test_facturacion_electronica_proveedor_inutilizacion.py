@@ -220,6 +220,49 @@ class TestProveedorApiInutilizacion(BaseProveedorApi):
         self.assertNotEqual(documento.estado, ESTADO_INUTILIZADO)
         self.assertIsNone(documento.fecha_cancelado)
 
+    def _inutilizar_con_evento(self, evento):
+        from facturacion_electronica.services.proveedores.fachada import inutilizar_documento
+
+        self._activar_api()
+        documento = self._documento_quemado()
+
+        def _solicitar(config, metodo, ruta, **kwargs):
+            if ruta == '/sifen/me/':
+                return self._perfil(), None
+            if ruta == '/sifen/inutilizations/':
+                return evento, None
+            raise AssertionError(f'ruta inesperada: {ruta}')
+
+        with patch('facturacion_electronica.services.proveedores.api_client.solicitar', _solicitar):
+            return inutilizar_documento(documento, 'Corte de energía antes de emitir')
+
+    def test_el_veredicto_sale_de_dEstRes_y_no_de_las_palabras(self):
+        """Un rechazo cuyo mensaje no dice "rechazado" se daba por bueno: el
+        número figuraba inutilizado sin que SIFEN lo hubiera aceptado."""
+        documento, error = self._inutilizar_con_evento(evento_inutilizacion(
+            dEstRes='Rechazado', dCodRes='4004', dMsgRes='Timbrado no vigente',
+        ))
+
+        self.assertIn('4004', error)
+        self.assertNotEqual(documento.estado, ESTADO_INUTILIZADO)
+
+    def test_sin_dEstRes_manda_el_status_del_evento(self):
+        evento = evento_inutilizacion()
+        evento.update({'status': 'REJECTED', 'result': {'dMsgRes': 'Procesado'}})
+
+        documento, error = self._inutilizar_con_evento(evento)
+
+        self.assertIsNotNone(error)
+        self.assertNotEqual(documento.estado, ESTADO_INUTILIZADO)
+
+    def test_aprobado_por_dEstRes_queda_inutilizado(self):
+        documento, error = self._inutilizar_con_evento(evento_inutilizacion(
+            dEstRes='Aprobado', dCodRes='0600', dMsgRes='Evento registrado correctamente',
+        ))
+
+        self.assertIsNone(error)
+        self.assertEqual(documento.estado, ESTADO_INUTILIZADO)
+
     def test_la_pantalla_ofrece_el_boton_en_modo_api(self):
         """La capacidad es propia y no `herramientas_propias`: con la API
         activa el botón tiene que existir, que es lo que faltaba."""

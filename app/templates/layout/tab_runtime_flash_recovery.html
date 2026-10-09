@@ -1,0 +1,21 @@
+        // Se incluye dentro del <script> del runtime de tabs, antes de part1.
+        //
+        // Cuando fetch sigue un redirect, ese primer GET de la pagina destino es el
+        // que se lleva los flash de la sesion. Si despues la pestana destino se
+        // vuelve a pedir (loadContent o el loader de una pestana ya abierta), llega
+        // sin ellos y el "Guardado" o el error de la API no se ven nunca: se
+        // recuperan del HTML ya descargado. Vive aparte porque los archivos del
+        // runtime ya pasan el limite de 600 lineas.
+        window.appInjectFlashesFromHtml = function (targetPanel, rawHtml) {
+            try {
+                const flashHost = targetPanel && targetPanel.querySelector('[data-app-tab-content]');
+                if (!flashHost || !rawHtml) return;
+                const flashDoc = new DOMParser().parseFromString(rawHtml, 'text/html');
+                const flashes = flashDoc.querySelectorAll('.flash-message');
+                if (!flashes.length) return;
+                const frag = document.createDocumentFragment();
+                flashes.forEach((f) => frag.appendChild(f.cloneNode(true)));
+                flashHost.insertBefore(frag, flashHost.firstChild);
+                targetPanel.scrollTop = 0;
+            } catch { }
+        };

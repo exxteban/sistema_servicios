@@ -70,6 +70,7 @@
                                                 if (existingLoader) {
                                                     setActiveTab(existingId);
                                                     await existingLoader(response.url);
+                                                    window.appInjectFlashesFromHtml(tabPanelsById.get(existingId), rawHtml);
                                                     closeTab(tabId);
                                                     saveState();
                                                     return;

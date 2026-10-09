@@ -68,11 +68,13 @@
                 window.__appBaseTitle = sepIdx > 0 ? fullTitle.slice(sepIdx + 3) : fullTitle || 'Sistema de Gestión Gastronómica';
             } catch { window.__appBaseTitle = 'Sistema de Gestión Gastronómica'; }
         })();
+{% include 'layout/tab_runtime_flash_recovery.html' %}
 {% include 'layout/tab_runtime_js_part1.html' %}
 {% include 'layout/tab_runtime_js_part2.html' %}
     </script>
     {% endif %}
 
+    {% include 'layout/flash_overlay_script.html' %}
     {% include 'layout/server_clock_script.html' %}
 </body>
 </html>

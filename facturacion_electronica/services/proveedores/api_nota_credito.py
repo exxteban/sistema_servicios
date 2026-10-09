@@ -16,6 +16,11 @@ from datetime import datetime
 
 from facturacion_electronica import ESTADO_GENERADO, ESTADO_RECHAZADO
 from facturacion_electronica.services.data_builder import generar_codigo_seguridad
+from facturacion_electronica.services.emision_service import HORAS_LIMITE_CANCELACION
+from facturacion_electronica.services.guarda import (
+    error_estado_original,
+    error_receptor_original,
+)
 from facturacion_electronica.services.proveedores.api_documento import (
     clave_idempotencia,
     descargar_xml,
@@ -27,17 +32,54 @@ from facturacion_electronica.services.receptor_facturado import (
     redondeo_declarado,
 )
 
+NC_NO_HABILITADA = (
+    'Las notas de crédito por la API de facturación electrónica todavía no están '
+    'habilitadas: el proveedor aún no transmitió ninguna a SIFEN. Mientras tanto, si la '
+    f'factura tiene menos de {HORAS_LIMITE_CANCELACION}h se la puede anular en SIFEN; si ya '
+    'pasaron, hay que esperar a que se habiliten.'
+)
 
-def armar_cuerpo_nc(config, documento, original, venta, lineas, timbrado_id):
+
+def _xml_de_factura(config, original):
+    """XML de la factura en la API. (xml, error) con el error ya redactado."""
+    xml, error = descargar_xml(config, original)
+    if error:
+        return None, f'No se pudo leer el receptor de la factura que se acredita: {error}'
+    return xml, None
+
+
+def verificar_original(config, original):
+    """`error_original_no_acreditable` con el receptor del XML de la API. (xml, error).
+
+    Va antes de reservar el número de la NC: decidir con la ficha del cliente
+    dejaba pasar la NC de una factura innominada si después se cargó la
+    cédula, y SIFEN la rechazaba con el correlativo ya consumido. El XML que
+    se baja acá se reusa al armar el cuerpo, así no se pide dos veces.
+    """
+    error = error_estado_original(original)
+    if error:
+        return None, error
+    xml, error = _xml_de_factura(config, original)
+    if error:
+        return None, error
+    error = error_receptor_original(original, xml)
+    if error:
+        return None, error
+    return xml, None
+
+
+def armar_cuerpo_nc(config, documento, original, venta, lineas, timbrado_id, xml=None):
     """Cuerpo del alta de la NC con el receptor de la factura. (cuerpo, error).
 
     Sin el XML de la factura no se emite: caer a la ficha del cliente es
     justamente el error que esto corrige, y un fallo al bajarlo es pasajero
-    (el próximo intento lo vuelve a pedir).
+    (el próximo intento lo vuelve a pedir). `xml` es el que ya bajó
+    `verificar_original`; sin él se baja acá.
     """
-    xml, error = descargar_xml(config, original)
-    if error:
-        return None, f'No se pudo leer el receptor de la factura que se acredita: {error}'
+    if xml is None:
+        xml, error = _xml_de_factura(config, original)
+        if error:
+            return None, error
     campos = leer_receptor(xml)
     if not campos:
         return None, ('El XML de la factura no trae el receptor (gDatRec): no se puede '
@@ -78,4 +120,4 @@ def reabrir_nc_rechazada(documento):
     return True
 
 
-__all__ = ['armar_cuerpo_nc', 'reabrir_nc_rechazada']
+__all__ = ['NC_NO_HABILITADA', 'armar_cuerpo_nc', 'reabrir_nc_rechazada', 'verificar_original']

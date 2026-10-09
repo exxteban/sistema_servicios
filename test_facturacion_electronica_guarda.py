@@ -93,6 +93,38 @@ def test_no_se_acredita_una_factura_con_receptor_innominado():
     assert error_original_no_acreditable(_factura_aprobada(todo_ceros))
 
 
+_XML_INNOMINADO = (
+    '<rDE xmlns="http://ekuatia.set.gov.py/sifen/xsd"><DE><gDatRec>'
+    '<iNatRec>2</iNatRec><iTipIDRec>5</iTipIDRec><dNumIDRec>0</dNumIDRec>'
+    '<dNomRec>Sin Nombre</dNomRec></gDatRec></DE></rDE>'
+)
+_XML_CON_CEDULA = _XML_INNOMINADO.replace(
+    '<iTipIDRec>5</iTipIDRec><dNumIDRec>0</dNumIDRec>',
+    '<iTipIDRec>1</iTipIDRec><dNumIDRec>4281292</dNumIDRec>',
+)
+
+
+def test_decide_el_receptor_que_declaro_la_factura_no_la_ficha():
+    """La NC lleva el receptor del XML de la factura. Con la ficha completada
+    después, mirar la ficha dejaba pasar una NC condenada al rechazo."""
+    con_cedula_hoy = SimpleNamespace(id_cliente=7, ruc_ci='4281292')
+    factura = _factura_aprobada(con_cedula_hoy)
+
+    error = error_original_no_acreditable(factura, xml_factura=_XML_INNOMINADO)
+    assert error and 'sin identificar' in error
+    assert 'cancelarla' in error
+
+    # Motor propio: el XML guardado en el documento alcanza, sin pasarlo.
+    factura.xml_firmado = _XML_INNOMINADO
+    assert error_original_no_acreditable(factura)
+
+
+def test_factura_identificada_se_acredita_aunque_la_ficha_ya_no_lo_este():
+    consumidor_final = SimpleNamespace(id_cliente=1, ruc_ci=None)
+    factura = _factura_aprobada(consumidor_final)
+    assert error_original_no_acreditable(factura, xml_factura=_XML_CON_CEDULA) is None
+
+
 def test_un_cliente_identificado_si_se_puede_acreditar():
     con_cedula = SimpleNamespace(id_cliente=7, ruc_ci='4281292')
     assert error_original_no_acreditable(_factura_aprobada(con_cedula)) is None
