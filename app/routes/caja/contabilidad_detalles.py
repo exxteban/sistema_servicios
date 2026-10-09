@@ -32,6 +32,24 @@ def _datetime_from_date(value) -> datetime:
     return datetime.min
 
 
+def _cliente_venta_texto(venta) -> str:
+    return f'Cliente: {getattr(getattr(venta, "cliente", None), "nombre", "") or "Consumidor Final"}'
+
+
+def _descuentos_venta_partes(venta) -> list[str]:
+    partes = []
+    descuento_manual = _money(getattr(venta, 'descuento_manual_monto', 0))
+    descuento_fidelizacion = _money(getattr(venta, 'descuento_fidelizacion_monto', 0))
+    beneficio_texto = (getattr(venta, 'beneficio_fidelizacion_descripcion', '') or '').strip()
+    if descuento_manual > 0:
+        partes.append(f'Descuento manual: Gs. {descuento_manual:,.0f}'.replace(',', '.'))
+    if descuento_fidelizacion > 0:
+        partes.append(f'Fidelización aplicada: Gs. {descuento_fidelizacion:,.0f}'.replace(',', '.'))
+        if beneficio_texto:
+            partes.append(f'Beneficio: {beneficio_texto}')
+    return partes
+
+
 def _format_categoria(nombre: str | None) -> str:
     texto = (nombre or '').strip().replace('_', ' ')
     return texto.title() if texto else 'Sin categoría'
@@ -96,27 +114,25 @@ def construir_detalles_contables(
         venta_id = int(venta.id_venta)
         cobrado_en_venta_por_id[venta_id] = cobrado_en_venta_por_id.get(venta_id, 0.0) + _money(pago.monto)
 
+    # Ventas contado sin saldo: la fila "Venta Emitida" solo repetiría el cobro,
+    # así que sus datos (cliente, descuentos) se integran en la fila de cobro.
+    ventas_fusionadas = set()
     for venta in ventas_emitidas_rows:
         venta_id = int(venta.id_venta)
         tipo_venta = (venta.tipo_venta or 'contado').strip().lower()
         saldo_venta = _money(getattr(venta, 'saldo_pendiente', 0))
+        if tipo_venta != 'credito' and saldo_venta <= 0 and venta_id in cobrado_en_venta_por_id:
+            ventas_fusionadas.add(venta_id)
+            continue
         cobrado_venta = cobrado_en_venta_por_id.get(venta_id, 0.0)
         detalle_partes = [
-            f'Cliente: {getattr(getattr(venta, "cliente", None), "nombre", "") or "Consumidor Final"}',
+            _cliente_venta_texto(venta),
             f'Tipo: {"Credito" if tipo_venta == "credito" else "Contado"}',
             f'Cobrado al momento: Gs. {cobrado_venta:,.0f}'.replace(',', '.'),
         ]
         if saldo_venta > 0:
             detalle_partes.append(f'Saldo financiado: Gs. {saldo_venta:,.0f}'.replace(',', '.'))
-        descuento_manual = _money(getattr(venta, 'descuento_manual_monto', 0))
-        descuento_fidelizacion = _money(getattr(venta, 'descuento_fidelizacion_monto', 0))
-        beneficio_texto = (getattr(venta, 'beneficio_fidelizacion_descripcion', '') or '').strip()
-        if descuento_manual > 0:
-            detalle_partes.append(f'Descuento manual: Gs. {descuento_manual:,.0f}'.replace(',', '.'))
-        if descuento_fidelizacion > 0:
-            detalle_partes.append(f'Fidelización aplicada: Gs. {descuento_fidelizacion:,.0f}'.replace(',', '.'))
-            if beneficio_texto:
-                detalle_partes.append(f'Beneficio: {beneficio_texto}')
+        detalle_partes.extend(_descuentos_venta_partes(venta))
         detalles.append(
             {
                 'fecha': venta.fecha_venta,
@@ -129,13 +145,21 @@ def construir_detalles_contables(
             }
         )
 
+    descuentos_ya_mostrados = set()
     for pago, venta, metodo in pagos_ventas_detalle:
+        venta_id = int(venta.id_venta)
         tipo_venta = (venta.tipo_venta or 'contado').strip().lower()
         saldo_venta = _money(getattr(venta, 'saldo_pendiente', 0))
-        detalle_partes = [resumenes_ventas.get(int(venta.id_venta), '')]
+        detalle_partes = []
+        if venta_id in ventas_fusionadas:
+            detalle_partes.append(_cliente_venta_texto(venta))
+        detalle_partes.append(resumenes_ventas.get(venta_id, ''))
         detalle_partes.append(f'Tipo: {"Credito" if tipo_venta == "credito" else "Contado"}')
         if saldo_venta > 0:
             detalle_partes.append(f'Saldo financiado: Gs. {saldo_venta:,.0f}'.replace(',', '.'))
+        if venta_id in ventas_fusionadas and venta_id not in descuentos_ya_mostrados:
+            descuentos_ya_mostrados.add(venta_id)
+            detalle_partes.extend(_descuentos_venta_partes(venta))
         forma_pago = metodo.nombre if metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
         detalles.append(
             {
