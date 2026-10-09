@@ -1,0 +1,261 @@
+{# Acciones del documento electrónico, a mano en el detalle de la venta.
+
+   Antes vivían sólo en Facturación electrónica → Vista previa, que además pide
+   permiso de configuración: quien anula ventas no necesariamente lo tiene.
+
+   Qué se puede hacer lo decide `acciones_para_venta`, no estos `{% if %}`: la
+   ventana de 48h de la cancelación se resuelve ahí, así el botón no aparece
+   cuando ya no corresponde. Sin `fe.puede_operar` se ve el estado y nada más. #}
+
+{% if fe %}
+<div class="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="flex flex-wrap items-center justify-between gap-2 bg-gray-50 dark:bg-gray-900/40 px-4 py-3">
+        <h3 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <i class="fas fa-file-invoice mr-2"></i>Factura electrónica
+        </h3>
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+            {% if fe.documento %}
+            <span class="text-gray-700 dark:text-gray-200">{{ fe.documento.numero_formateado }}</span>
+            {% set estado = fe.documento.estado %}
+            <span class="rounded-full px-3 py-0.5 text-xs font-semibold
+                {% if estado == 'aprobado' %}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200
+                {% elif estado in ['cancelado', 'rechazado', 'error'] %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
+                {% elif estado == 'inutilizado' %}bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200
+                {% else %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200{% endif %}">
+                {{ estado }}
+            </span>
+            {% else %}
+            <span class="rounded-full bg-gray-100 px-3 py-0.5 text-xs font-semibold text-gray-600
+                dark:bg-gray-700 dark:text-gray-300">sin factura</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="px-4 py-3 space-y-4">
+        {# --- Facturar una venta que se hizo sin factura -------------------- #}
+        {% if fe.puede_emitir %}
+        <form method="post" action="{{ url_for('facturacion_electronica.emitir_completo', venta_id=venta.id_venta) }}"
+              class="rounded-lg border border-emerald-200 dark:border-emerald-900 p-3 space-y-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs text-gray-600 dark:text-gray-300">
+                Esta venta se cobró sin factura electrónica. Si el cliente la pide ahora, se
+                emite desde acá con los datos de la venta y el cliente que ya tiene cargados.
+            </p>
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700">
+                <i class="fas fa-file-circle-check mr-2"></i>Emitir factura electrónica
+            </button>
+        </form>
+        {% endif %}
+
+        {% if fe.documento and fe.documento.cdc %}
+        <p class="text-xs font-mono text-gray-500 dark:text-gray-400 break-all">CDC: {{ fe.documento.cdc_formateado }}</p>
+        {% endif %}
+
+        {# --- Comprobantes: lo que se le entrega al comprador --------------- #}
+        {% if fe.tiene_kude or fe.tiene_xml or fe.notas %}
+        <div class="flex flex-wrap gap-2">
+            {% if fe.tiene_kude %}
+            <a href="{{ url_for('facturacion_electronica.kude', venta_id=venta.id_venta, preview=1) }}" target="_blank"
+                class="inline-flex items-center rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700">
+                <i class="fas fa-receipt mr-2"></i>Ver KuDE
+            </a>
+            {% endif %}
+            {% if fe.tiene_xml %}
+            <a href="{{ url_for('facturacion_electronica.descargar_xml', venta_id=venta.id_venta) }}" download
+                class="inline-flex items-center rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700">
+                <i class="fas fa-file-code mr-2"></i>Descargar XML
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {# --- Notas de crédito ya emitidas ---------------------------------- #}
+        {% if fe.notas %}
+        <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 p-3">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">Notas de crédito</p>
+            <ul class="space-y-1">
+                {% for nota in fe.notas %}
+                <li class="flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-gray-200">
+                    <span class="font-mono">{{ nota.numero_formateado }}</span>
+                    <span class="rounded px-2 py-0.5 {% if nota.estado == 'aprobado' %}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200{% else %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200{% endif %}">{{ nota.estado }}</span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                        {% if nota.id_devolucion %}por devolución #{{ nota.id_devolucion }}{% else %}anulación de la factura{% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {# Dos situaciones distintas y no se pueden contar igual: firmada es un
+           comprobante que el comprador ya se puede llevar; en 'generado' o
+           'error' todavía no hay nada que entregar, y decir que sí manda al
+           cajero a entregar un papel que no existe. #}
+        {% if fe.envio_en_curso and fe.documento.estado == 'firmado' %}
+        <p class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 text-xs text-blue-800 dark:text-blue-200">
+            <i class="fas fa-clock mr-1"></i>La factura ya está firmada y el comprobante se puede
+            entregar. El envío a SIFEN se hace solo en unos minutos; no hay nada que hacer.
+        </p>
+        {% elif fe.envio_en_curso %}
+        <p class="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-xs text-amber-800 dark:text-amber-200">
+            <i class="fas fa-clock mr-1"></i>La factura todavía no se pudo emitir, así que no hay
+            comprobante para entregar. El sistema lo reintenta solo cada unos minutos; el número
+            ya quedó reservado y se usa cuando salga.
+            {% if fe.documento.respuesta_mensaje %}
+            <span class="mt-1 block text-amber-900 dark:text-amber-200/80">
+                Último intento: {{ fe.documento.respuesta_mensaje }}
+            </span>
+            {% endif %}
+        </p>
+        {% endif %}
+
+        {# --- Rechazada por SIFEN, todavía a tiempo de reenviar -------------- #}
+        {% if fe.puede_corregir_rechazo %}
+        <form method="post" action="{{ url_for('facturacion_electronica.emitir_completo', venta_id=venta.id_venta) }}"
+              class="rounded-lg border border-red-200 dark:border-red-900 p-3 space-y-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-red-700 dark:text-red-300">
+                <i class="fas fa-triangle-exclamation mr-1"></i>SIFEN rechazó la factura
+            </p>
+            {% if fe.documento.respuesta_mensaje %}
+            <p class="text-xs text-gray-700 dark:text-gray-200">{{ fe.documento.respuesta_mensaje }}</p>
+            {% endif %}
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Corregí lo que indica (casi siempre la ficha del cliente) y reenviala. Sale con el
+                mismo número {{ fe.documento.numero_formateado }}; no hace falta inutilizarlo.
+            </p>
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700">
+                <i class="fas fa-rotate-right mr-2"></i>Corregir y reenviar
+            </button>
+        </form>
+        {% endif %}
+
+        {% if not fe.puede_operar %}
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+            <i class="fas fa-lock mr-1"></i>Para anular o acreditar esta factura hacen falta
+            permisos de facturación electrónica.
+        </p>
+        {% endif %}
+
+        {# --- Acreditar una devolución ya registrada ------------------------ #}
+        {% if fe.puede_acreditar_devolucion %}
+        {% for fila in fe.devoluciones_pendientes %}
+        <form method="post" action="{{ url_for('facturacion_electronica.nota_credito', devolucion_id=fila.devolucion.id_devolucion) }}"
+              class="rounded-lg border border-purple-200 dark:border-purple-900 p-3 space-y-2"
+              onsubmit="return confirm('¿Emitir la nota de crédito de esta devolución? Se envía a SIFEN y no se puede deshacer.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                <i class="fas fa-file-invoice-dollar mr-1"></i>Devolución #{{ fila.devolucion.id_devolucion }} sin acreditar
+                — ₲ {{ "{:,.0f}".format(fila.total).replace(",", ".") }}
+            </p>
+            {% for aviso in fila.avisos %}
+            <p class="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-2 text-xs text-amber-800 dark:text-amber-300">
+                <i class="fas fa-triangle-exclamation mr-1"></i>{{ aviso }}
+            </p>
+            {% endfor %}
+            <div class="space-y-2">
+                <select name="motivo"
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+                    {% for codigo, texto in fe_motivos_nc %}
+                    <option value="{{ codigo }}" {% if codigo == 2 %}selected{% endif %}>{{ texto }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit"
+                    class="inline-flex items-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-700">
+                    <i class="fas fa-file-invoice-dollar mr-2"></i>Emitir nota de crédito
+                </button>
+            </div>
+        </form>
+        {% endfor %}
+        {% endif %}
+
+        {# --- Dejar sin efecto la factura ----------------------------------- #}
+        {% if fe.puede_cancelar %}
+        <form method="post" action="{{ url_for('facturacion_electronica.cancelar', venta_id=venta.id_venta) }}"
+              class="rounded-lg border border-red-200 dark:border-red-900 p-3 space-y-2"
+              onsubmit="return confirm('¿Cancelar esta factura electrónica en SIFEN? Esta acción es definitiva.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-red-700 dark:text-red-300">
+                <i class="fas fa-ban mr-1"></i>Cancelar la factura en SIFEN
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Para el mismo día. Después de 48h SIFEN ya no la acepta y hay que acreditarla
+                con una nota de crédito.
+            </p>
+            <input type="text" name="motivo" required minlength="5" maxlength="500"
+                placeholder="Motivo (5 a 500 caracteres)"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700">
+                <i class="fas fa-ban mr-2"></i>Cancelar factura
+            </button>
+        </form>
+        {% endif %}
+
+        {% if fe.puede_anular_con_nc %}
+        <form method="post" action="{{ url_for('facturacion_electronica.anular_con_nota_credito', venta_id=venta.id_venta) }}"
+              class="rounded-lg border border-orange-200 dark:border-orange-900 p-3 space-y-2"
+              onsubmit="return confirm('¿Emitir una nota de crédito por el TOTAL de esta factura? Acredita todo lo facturado ante SIFEN. No mueve plata ni stock: para revertir el cobro hay que anular la venta después.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-orange-700 dark:text-orange-300">
+                <i class="fas fa-file-circle-xmark mr-1"></i>Anular la factura con una nota de crédito
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                {% if fe.plazo_cancelacion_vencido %}
+                Pasaron más de 48h desde la emisión: SIFEN ya no permite cancelarla, así que
+                esta es la única salida.
+                {% else %}
+                Para cuando la factura está mal emitida y no hay devolución de mercadería.
+                {% endif %}
+            </p>
+            <select name="motivo" required
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+                {% for codigo, texto in fe_motivos_nc %}
+                <option value="{{ codigo }}">{{ texto }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="descripcion" maxlength="255"
+                placeholder="Detalle (opcional, va en el documento)"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-700">
+                <i class="fas fa-file-circle-xmark mr-2"></i>Anular con NC
+            </button>
+        </form>
+        {% endif %}
+
+        {% if fe.puede_inutilizar %}
+        <form method="post" action="{{ url_for('facturacion_electronica.inutilizar', venta_id=venta.id_venta) }}"
+              class="rounded-lg border border-amber-200 dark:border-amber-900 p-3 space-y-2"
+              onsubmit="return confirm('¿Informar a SIFEN que el número {{ fe.documento.numero_formateado }} no se va a usar? El número queda quemado para siempre y la venta se factura con uno nuevo.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                <i class="fas fa-eraser mr-1"></i>Este número quedó sin usar: hay que informarlo
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                La factura {{ fe.documento.numero_formateado }} nunca llegó a SIFEN y ya no va a
+                poder enviarse. El número salió igual de la numeración del timbrado, así que
+                queda un salto que hay que justificar ante la DNIT. Esto se lo informa.
+                No se puede deshacer: el número no se reutiliza.
+            </p>
+            <input type="text" name="motivo" required minlength="5" maxlength="500"
+                placeholder="Motivo (5 a 500 caracteres)"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-800">
+                <i class="fas fa-eraser mr-2"></i>Inutilizar número
+            </button>
+        </form>
+        {% endif %}
+
+        {% if fe.puede_operar %}
+        <a href="{{ url_for('facturacion_electronica.vista_previa', venta=venta.id_venta) }}"
+            class="inline-flex items-center text-xs text-blue-600 dark:text-blue-400 hover:underline">
+            <i class="fas fa-arrow-up-right-from-square mr-1"></i>Ver el documento completo y la respuesta de SIFEN
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

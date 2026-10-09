@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload, aliased
 from app import db
 from app.models import Venta, DetalleVenta, Producto, Categoria, SesionCaja, Reparacion, Usuario, Rol, Cliente, PagoCuentaCobrar, Servicio
 from app.routes.reportes_ventas_diarias import construir_contexto_ventas_diarias
+from app.services.fe_venta_contexto import datos_fe_modal
 from app.utils.helpers import today_local, parse_iso_date, utc_bounds_for_local_dates, local_strftime
 
 reportes_bp = Blueprint('reportes', __name__)
@@ -424,6 +425,7 @@ def detalle_venta(id_venta):
 
     return jsonify({
         'id': venta.id_venta,
+        'fe': datos_fe_modal(venta, current_user),
         'fecha': local_strftime(venta.fecha_venta, '%d/%m/%Y %H:%M'),
         'cliente': venta.cliente.nombre,
         'vendedor': vendedor,

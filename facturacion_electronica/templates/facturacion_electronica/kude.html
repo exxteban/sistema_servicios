@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KuDE {{ titulo_documento|default('Factura Electrónica')|title }} {{ numero_documento }}</title>
+    {% set w = paper_width_mm if paper_width_mm in [48, 58, 80] else 80 %}
+    {# En 58mm quedan ~12mm para el total: cuatro columnas no entran y el
+       monto se parte. En papel angosto cada ítem va en dos renglones. #}
+    {% set angosto = w < 80 %}
+    <style>
+        @page { size: {{ w }}mm auto; margin: 0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: {{ w }}mm; max-width: {{ w }}mm; margin: 0;
+            background: #fff !important; color: #000 !important;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: {{ 11 if not angosto else 10 }}px; line-height: 1.35;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+        body { padding: 2mm {{ 4 if w == 80 else 3 }}mm; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        td, th { padding: 1px 0; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .bold { font-weight: bold; }
+        .small { font-size: 9px; }
+        .big { font-size: 13px; font-weight: bold; }
+        .sep { border: none; border-top: 1px dashed #000; margin: 4px 0; height: 0; }
+        .header { text-align: center; margin-bottom: 4px; }
+        .cdc { font-family: 'Lucida Console', monospace; font-size: 9px; word-break: break-all; }
+        .qr { text-align: center; margin: 6px 0; }
+        .qr img { width: {{ 45 if w == 80 else 35 if w == 58 else 30 }}mm; height: auto; }
+        .leyenda { text-align: center; font-size: 9px; margin-top: 4px; }
+        .col-desc { width: 52%; }
+        .col-cant { width: 14%; text-align: right; }
+        .col-iva { width: 10%; text-align: right; }
+        .col-tot { width: 24%; text-align: right; }
+        .item-desc td { padding-top: 2px; }
+        .item-monto td { padding-bottom: 2px; }
+        .item-monto .right { white-space: nowrap; }
+    </style>
+</head>
+
+<body>
+    {% macro g(value) -%}{{ "{:,.0f}".format(value or 0).replace(",", ".") }}{%- endmacro %}
+    {% macro c(value) -%}{{ ("%g"|format(value or 0)) }}{%- endmacro %}
+
+    <div class="header">
+        {% if config.razon_social %}<div class="bold" style="font-size:12px;">{{ config.razon_social }}</div>{% endif %}
+        {% if config.nombre_fantasia %}<div class="small">{{ config.nombre_fantasia }}</div>{% endif %}
+        {% if config.actividad_economica_desc %}<div class="small">{{ config.actividad_economica_desc }}</div>{% endif %}
+        {% set dir = [config.direccion, config.numero_casa] | select | join(' ') %}
+        {% if dir %}<div class="small">{{ dir }}{% if config.ciudad_desc %} - {{ config.ciudad_desc }}{% endif %}</div>{% endif %}
+        {% if config.telefono %}<div class="small">Tel: {{ config.telefono }}</div>{% endif %}
+        <div class="small">RUC: {{ config.ruc }}{% if config.dv_ruc %}-{{ config.dv_ruc }}{% endif %}</div>
+    </div>
+
+    <hr class="sep" />
+
+    <div class="center bold">{{ titulo_documento|default('FACTURA ELECTRÓNICA') }}</div>
+    <div class="center small">Timbrado N° {{ timbrado_numero }}{% if timbrado_fecha_inicio %} · Inicio vigencia {{ timbrado_fecha_inicio.strftime('%d/%m/%Y') }}{% endif %}</div>
+    <div class="center big">{{ numero_documento }}</div>
+
+    <hr class="sep" />
+
+    <table>
+        <tr><td style="width:32%;">Fecha:</td><td>{{ (fecha_documento or venta.fecha_venta)|local_strftime('%d/%m/%Y %H:%M') }}</td></tr>
+        {% if not es_nota_credito %}
+        <tr><td>Condición:</td><td>{{ condicion_venta }}</td></tr>
+        {% endif %}
+        <tr><td>Cliente:</td><td>{{ cliente.nombre if cliente else 'Sin Nombre' }}</td></tr>
+        <tr><td>RUC/CI:</td><td>{{ cliente.ruc_ci if cliente and cliente.ruc_ci else 'Sin identificar' }}</td></tr>
+    </table>
+
+    {% if es_nota_credito %}
+    <table>
+        {% if motivo_nc %}<tr><td style="width:32%;">Motivo:</td><td>{{ motivo_nc }}</td></tr>{% endif %}
+        {% if factura_asociada %}
+        <tr><td>Factura:</td><td>{{ factura_asociada.numero_formateado }}</td></tr>
+        <tr><td colspan="2" class="small">Documento asociado (CDC):<br /><span class="cdc">{{ factura_asociada.cdc }}</span></td></tr>
+        {% endif %}
+    </table>
+    {% endif %}
+
+    <hr class="sep" />
+
+    {% if angosto %}
+    <table>
+        <thead>
+            <tr class="small bold">
+                <th style="text-align:left;">Descripción</th>
+                <th class="right" style="width:40%;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr class="item-desc"><td colspan="2">{{ item.descripcion }}</td></tr>
+            <tr class="item-monto">
+                <td class="small">{{ c(item.cantidad) }} x {{ g(item.precio_unitario) }} · IVA {{ item.iva_pct }}%</td>
+                <td class="right">{{ g(item.subtotal) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <table>
+        <thead>
+            <tr class="small bold">
+                <th class="col-desc" style="text-align:left;">Descripción</th>
+                <th class="col-cant">Cant</th>
+                <th class="col-iva">IVA</th>
+                <th class="col-tot">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td class="col-desc">{{ item.descripcion }}<br /><span class="small">{{ g(item.precio_unitario) }} c/u</span></td>
+                <td class="col-cant">{{ c(item.cantidad) }}</td>
+                <td class="col-iva">{{ item.iva_pct }}%</td>
+                <td class="col-tot">{{ g(item.subtotal) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <hr class="sep" />
+
+    <table>
+        {% if redondeo %}
+        <tr><td>Subtotal</td><td class="right">Gs. {{ g(subtotal) }}</td></tr>
+        <tr><td>Redondeo SEDECO</td><td class="right">- Gs. {{ g(redondeo) }}</td></tr>
+        {% endif %}
+        <tr class="bold"><td>TOTAL</td><td class="right">Gs. {{ g(total) }}</td></tr>
+    </table>
+
+    <hr class="sep" />
+
+    <table class="small">
+        {% if liquidacion.exentas %}<tr><td>Exentas</td><td class="right">{{ g(liquidacion.exentas) }}</td></tr>{% endif %}
+        {% if liquidacion.gravado_5 %}<tr><td>Gravado 5%</td><td class="right">{{ g(liquidacion.gravado_5) }}</td></tr>{% endif %}
+        {% if liquidacion.gravado_10 %}<tr><td>Gravado 10%</td><td class="right">{{ g(liquidacion.gravado_10) }}</td></tr>{% endif %}
+        <tr><td>IVA 5%</td><td class="right">{{ g(liquidacion.iva_5) }}</td></tr>
+        <tr><td>IVA 10%</td><td class="right">{{ g(liquidacion.iva_10) }}</td></tr>
+        <tr class="bold"><td>Total IVA</td><td class="right">{{ g(liquidacion.total_iva) }}</td></tr>
+    </table>
+
+    <hr class="sep" />
+
+    <div class="small bold center">CDC</div>
+    <div class="cdc center">{{ documento.cdc_formateado }}</div>
+
+    {% if qr_img %}
+    <div class="qr"><img src="{{ qr_img }}" alt="QR" /></div>
+    {% endif %}
+
+    <div class="leyenda">
+        Consulte la validez de {{ 'esta Nota de Crédito Electrónica' if es_nota_credito else 'esta Factura Electrónica' }} con el número de CDC en:<br />
+        {{ url_consulta }}
+    </div>
+    {% if not es_produccion %}
+    <div class="leyenda bold" style="margin-top:6px;">*** AMBIENTE DE PRUEBAS — SIN VALIDEZ FISCAL ***</div>
+    {% endif %}
+
+    <div style="height: 15mm;"></div>
+
+    {% if not preview %}
+    <script>
+        window.onload = function () { setTimeout(function () { window.print(); }, 500); };
+        window.onafterprint = function () { window.close(); };
+    </script>
+    {% endif %}
+</body>
+
+</html>

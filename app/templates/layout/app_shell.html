@@ -36,7 +36,7 @@
                                     Sistema de Gestión
                                 </span>
                                 <span class="crm-topnav__title-secondary hidden sm:inline font-light text-sm text-blue-200/80 tracking-widest uppercase truncate leading-tight">
-                                    Comercial
+                                    Gastronomía
                                 </span>
                             </div>
                             {% if app_brand_name %}
@@ -178,8 +178,9 @@
             {% set p_ticket = current_user.es_admin() or current_user.tiene_permiso('editar_configuracion') %}
             {% set p_flujo_caja = modulo_flujo_caja_activo and (current_user.es_admin() or current_user.tiene_permiso('ver_flujo_caja')) %}
             {% set p_gastos_corrientes = current_user.tiene_permiso('ver_gastos_corrientes') %}
+            {% set p_facturas_fe = modulo_facturacion_electronica_activo and (p_ticket or current_user.tiene_permiso('ver_reportes')) %}
 
-            {% if p_pos or p_registro_vendedor or p_pedidos or p_caja or p_cajas or p_ticket or p_flujo_caja or p_gastos_corrientes %}
+            {% if p_pos or p_registro_vendedor or p_pedidos or p_caja or p_cajas or p_ticket or p_flujo_caja or p_gastos_corrientes or p_facturas_fe %}
             <div class="relative group w-12" @mouseenter="$dispatch('sidebar-menu-open', { name: 'ventas' })" @mouseleave="$dispatch('sidebar-menu-close', { name: 'ventas' })"
                 {% if p_cola_cobro %}x-data="cajaNotification()"{% endif %}>
                 <button
@@ -349,18 +350,7 @@
                     </a>
                     {% endif %}
 
-                    {% if modulo_facturacion_electronica_activo and p_ticket %}
-                    <a href="{{ url_for('facturacion_electronica.configuracion') }}" data-permiso="editar_configuracion"
-                        data-tab-url="{{ url_for('facturacion_electronica.configuracion') }}" data-tab-title="Facturación Electrónica"
-                        data-tab-icon="fas fa-file-invoice"
-                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
-                        <div
-                            class="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center text-teal-400 group-hover/item:bg-teal-500 group-hover/item:text-white transition-colors">
-                            <i class="fas fa-file-invoice text-sm"></i>
-                        </div>
-                        <span class="text-sm font-medium">Facturación Electrónica</span>
-                    </a>
-                    {% endif %}
+                    {% include 'layout/_fe_menu_links.html' %}
                 </div>
                 </template>
             </div>

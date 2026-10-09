@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     {% set browser_title %}{% block title %}{% endblock %}{% endset %}
-    <title>{% set browser_title = browser_title | striptags | trim %}{% if browser_title %}{{ browser_title }} - {% endif %}Sistema de Gestión Comercial</title>
+    <title>{% set browser_title = browser_title | striptags | trim %}{% if browser_title %}{{ browser_title }} - {% endif %}Sistema de Gestión Gastronómica</title>
     {% include 'layout/head_assets.html' %}
     {% block extra_css %}{% endblock %}
 </head>

@@ -9,6 +9,7 @@
 #
 # Variables (todas opcionales):
 #   SERVICE_NAME   Nombre del servicio systemd        (default: sifen-service)
+#   SERVICE_TZ     Zona horaria del proceso            (default: America/Asuncion)
 #   SERVICE_USER   Usuario que corre el servicio       (default: www-data)
 #   SERVICE_GROUP  Grupo del servicio                  (default: = SERVICE_USER)
 #   PORT           Puerto donde escucha                (default: 3010)
@@ -16,6 +17,7 @@
 set -euo pipefail
 
 SERVICE_NAME="${SERVICE_NAME:-sifen-service}"
+SERVICE_TZ="${SERVICE_TZ:-America/Asuncion}"
 SERVICE_USER="${SERVICE_USER:-www-data}"
 SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
 PORT="${PORT:-3010}"
@@ -59,6 +61,11 @@ Group=$SERVICE_GROUP
 WorkingDirectory=$SERVICE_DIR
 Environment=NODE_ENV=production
 Environment=PORT=$PORT
+# Las librerias de TIPS escriben dFecFirma con la hora local DEL PROCESO y sin
+# offset. Flask se la manda resuelta, pero cualquier fecha que la libreria
+# ponga por su cuenta sale con esta zona: en un servidor en UTC serian tres
+# horas en el futuro, dentro de un documento firmado.
+Environment=TZ=${SERVICE_TZ}
 ExecStart=$NODE_BIN $SERVICE_DIR/index.js
 Restart=always
 RestartSec=3

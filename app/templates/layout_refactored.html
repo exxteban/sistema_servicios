@@ -8,7 +8,7 @@
     {% set browser_title %}{% block title %}{% endblock %}{% endset %}
     {% set username_actual = ((current_user.username if current_user.is_authenticated else '') or '') | trim | lower %}
     {% set usuario_demo = (current_user.is_authenticated and (current_user.modo_demo or username_actual in ['demo', 'demostracion', 'demostración'])) %}
-    {% set app_title_default = 'Sistema de Gestión Comercial' %}
+    {% set app_title_default = 'Sistema de Gestión Gastronómica' %}
     {% if usuario_demo %}
     {% set app_title_default = app_title_default ~ ' | Te interesa este sistema, contacta al 0961862624 Esteban Lezcano' %}
     {% endif %}
@@ -65,8 +65,8 @@
             try {
                 const fullTitle = document.title || '';
                 const sepIdx = fullTitle.indexOf(' - ');
-                window.__appBaseTitle = sepIdx > 0 ? fullTitle.slice(sepIdx + 3) : fullTitle || 'Sistema de Gestión Comercial';
-            } catch { window.__appBaseTitle = 'Sistema de Gestión Comercial'; }
+                window.__appBaseTitle = sepIdx > 0 ? fullTitle.slice(sepIdx + 3) : fullTitle || 'Sistema de Gestión Gastronómica';
+            } catch { window.__appBaseTitle = 'Sistema de Gestión Gastronómica'; }
         })();
 {% include 'layout/tab_runtime_js_part1.html' %}
 {% include 'layout/tab_runtime_js_part2.html' %}

@@ -351,3 +351,9 @@ def register_runtime_features(app, db):
                     worker.start()
                     _wa_scheduler_started = True
                     app.logger.info(f"Scheduler timeouts WhatsApp iniciado cada {interval}s")
+
+    from app.bootstrap.fe_scheduler import iniciar_scheduler_facturacion_electronica
+
+    iniciar_scheduler_facturacion_electronica(
+        app, _is_truthy_env('FACTURACION_ELECTRONICA_SCHEDULER', '1'),
+    )

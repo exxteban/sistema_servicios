@@ -4,6 +4,11 @@ from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.caja_service import cobrar_pedido, listar_pedidos_caja
+from gastronomia.services.factura_electronica_service import (
+    buscar_clientes_factura,
+    obtener_o_crear_cliente_factura,
+    serializar_cliente_factura,
+)
 from gastronomia.services.delivery_privacy import (
     ocultar_localizacion_eventos,
     ocultar_localizacion_pedido,
@@ -74,3 +79,23 @@ def caja_cobrar(pedido_id):
             return jsonify({'error': 'not_found'}), 404
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'pedido': ocultar_localizacion_pedido(pedido.to_dict(), current_user)})
+
+
+@gastronomia_caja_api_bp.route('/caja/clientes-factura', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_CAJA)
+def caja_buscar_clientes_factura():
+    clientes = buscar_clientes_factura(request.args.get('q', ''))
+    return jsonify({'ok': True, 'clientes': [serializar_cliente_factura(c) for c in clientes]})
+
+
+@gastronomia_caja_api_bp.route('/caja/clientes-factura', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_CAJA)
+def caja_crear_cliente_factura():
+    data = _payload()
+    try:
+        cliente = obtener_o_crear_cliente_factura(data.get('nombre'), data.get('ruc_ci'))
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'cliente': serializar_cliente_factura(cliente)})

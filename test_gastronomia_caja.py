@@ -510,14 +510,14 @@ def test_caja_reserva_pago_antes_de_crear_venta_central(monkeypatch):
     original = caja_service.crear_venta_central_desde_pedido
     reserva_observada = {'ok': False}
 
-    def _crear_venta_verificando_reserva(pedido, usuario_id, data, *, descuento):
+    def _crear_venta_verificando_reserva(pedido, usuario_id, data, *, descuento, id_cliente_venta=None):
         pago_reservado = GastronomiaPedidoPago.query.filter_by(
             cliente_id=cliente_id,
             pedido_id=pedido_id,
         ).one()
         assert pago_reservado.id_venta is None
         reserva_observada['ok'] = True
-        return original(pedido, usuario_id, data, descuento=descuento)
+        return original(pedido, usuario_id, data, descuento=descuento, id_cliente_venta=id_cliente_venta)
 
     monkeypatch.setattr(caja_service, 'crear_venta_central_desde_pedido', _crear_venta_verificando_reserva)
 
