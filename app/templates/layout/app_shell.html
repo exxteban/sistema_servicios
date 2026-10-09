@@ -111,6 +111,8 @@
                         <i class="fas text-sm" :class="darkMode ? 'fa-sun text-yellow-300' : 'fa-moon text-blue-200'"></i>
                     </button>
 
+                    {% include 'layout/_topnav_color_picker.html' %}
+
                     {# Reloj #}
                     <span data-app-clock data-app-clock-format="datetime"
                         class="crm-nav-pill crm-topnav__clock hidden sm:inline-flex items-center gap-1.5 font-mono"

@@ -1,0 +1,53 @@
+{# Color de la barra (se guarda en este navegador; doble clic = color original) #}
+<label class="crm-nav-icon-btn relative cursor-pointer opacity-40 transition-opacity"
+    onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=''"
+    title="Cambiar color de la barra (doble clic: restaurar)"
+    ondblclick="event.preventDefault(); window.appTopnavColor && window.appTopnavColor.reset();">
+    <i class="fas fa-palette text-xs text-white/80"></i>
+    <input type="color" data-app-topnav-color
+        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        aria-label="Color de la barra superior">
+</label>
+<script>
+    (function () {
+        var KEY = 'app_topnav_color';
+        var nav = document.querySelector('[data-app-topnav]');
+        var input = document.querySelector('[data-app-topnav-color]');
+        if (!nav) return;
+        function shade(hex, f) {
+            var n = parseInt(hex.slice(1), 16);
+            var c = [n >> 16, (n >> 8) & 255, n & 255].map(function (v) {
+                return Math.max(0, Math.min(255, Math.round(v * f)));
+            });
+            return 'rgb(' + c.join(',') + ')';
+        }
+        function apply(hex) {
+            if (!/^#[0-9a-f]{6}$/i.test(hex || '')) {
+                nav.style.background = '';
+                nav.style.boxShadow = '';
+                nav.style.borderBottomColor = '';
+                return;
+            }
+            nav.style.background = 'linear-gradient(180deg, ' + hex + ' 0%, ' + shade(hex, 0.85) + ' 100%)';
+            nav.style.borderBottomColor = shade(hex, 0.6);
+            nav.style.boxShadow = '0 1px 0 rgba(255,255,255,0.08) inset, 0 4px 24px ' + shade(hex, 0.85).replace('rgb', 'rgba').replace(')', ',0.45)') + ', 0 1px 3px rgba(0,0,0,0.3)';
+        }
+        var saved = null;
+        try { saved = localStorage.getItem(KEY); } catch (e) {}
+        apply(saved);
+        if (input) {
+            input.value = saved || '#2563eb';
+            input.addEventListener('input', function () { apply(input.value); });
+            input.addEventListener('change', function () {
+                try { localStorage.setItem(KEY, input.value); } catch (e) {}
+            });
+        }
+        window.appTopnavColor = {
+            reset: function () {
+                try { localStorage.removeItem(KEY); } catch (e) {}
+                if (input) input.value = '#2563eb';
+                apply(null);
+            }
+        };
+    })();
+</script>
