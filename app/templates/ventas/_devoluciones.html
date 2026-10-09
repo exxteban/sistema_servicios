@@ -1,0 +1,146 @@
+{# Registrar una devolución de esta venta.
+
+   El endpoint (`ventas.crear_devolucion`) valida todo de nuevo del lado del
+   servidor; acá sólo se arma el pedido. Los máximos por línea salen de
+   `app.services.devoluciones_lineas`, el mismo servicio que usa la validación, para
+   que la pantalla no ofrezca devolver algo que después se rechaza. #}
+
+{% if devoluciones %}
+<div class="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+        <i class="fas fa-rotate-left mr-2"></i>Devoluciones de esta venta
+    </h3>
+    <ul class="space-y-2">
+        {% for dev in devoluciones %}
+        <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2 text-sm">
+            <span class="text-gray-800 dark:text-gray-100">
+                #{{ dev.id_devolucion }} — {{ dev.motivo }}
+                {% if dev.estado == 'anulada' %}
+                <span class="ml-2 rounded bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs text-red-700 dark:text-red-300">anulada</span>
+                {% endif %}
+            </span>
+            <span class="font-semibold text-gray-800 dark:text-gray-100">
+                ₲ {{ "{:,.0f}".format(dev.monto_total or 0).replace(",", ".") }}
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if puede_devolver and lineas_devolucion %}
+<div class="mb-6">
+    <button type="button" onclick="abrirDevolucion()" data-permiso="anular_venta"
+        class="inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-700">
+        <i class="fas fa-rotate-left mr-2"></i>Registrar devolución
+    </button>
+    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        El cliente trae la mercadería. Si en cambio la factura está mal emitida y no
+        vuelve nada, no es una devolución: hay que anular la factura electrónica.
+    </p>
+</div>
+
+<div id="devolucionModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50 p-4">
+    <div class="w-full max-w-2xl max-h-full overflow-y-auto rounded-xl bg-white dark:bg-gray-800 p-6 shadow-xl">
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-1">
+            Devolución de la venta #{{ venta.id_venta }}
+        </h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Elegí qué vuelve y cuánto. El máximo por línea ya descuenta lo devuelto antes.
+        </p>
+
+        <table class="w-full mb-4 text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-700/60">
+                <tr>
+                    <th class="px-2 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Producto</th>
+                    <th class="px-2 py-2 text-center font-semibold text-gray-600 dark:text-gray-300">Disponible</th>
+                    <th class="px-2 py-2 text-center font-semibold text-gray-600 dark:text-gray-300">A devolver</th>
+                    <th class="px-2 py-2 text-right font-semibold text-gray-600 dark:text-gray-300">Reembolso c/u</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for linea in lineas_devolucion %}
+                <tr class="{% if linea.disponible <= 0 %}opacity-50{% endif %}">
+                    <td class="px-2 py-2 text-gray-800 dark:text-gray-100">
+                        {{ linea.nombre }}
+                        {% if linea.devuelto > 0 %}
+                        <span class="block text-xs text-gray-500 dark:text-gray-400">
+                            ya devuelto: {{ linea.devuelto }} de {{ linea.cantidad }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-2 py-2 text-center text-gray-800 dark:text-gray-100">{{ linea.disponible }}</td>
+                    <td class="px-2 py-2 text-center">
+                        <input type="number" min="0" step="1" value="0"
+                            max="{{ linea.disponible }}"
+                            data-devolucion-item="{{ linea.id_detalle_venta }}"
+                            data-precio="{{ linea.precio_unitario }}"
+                            oninput="recalcularDevolucion()"
+                            {% if linea.disponible <= 0 %}disabled{% endif %}
+                            class="w-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-center text-sm">
+                    </td>
+                    <td class="px-2 py-2 text-right text-gray-800 dark:text-gray-100">
+                        ₲ {{ "{:,.0f}".format(linea.precio_unitario).replace(",", ".") }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="bg-gray-50 dark:bg-gray-800/80">
+                    <td colspan="3" class="px-2 py-2 text-right font-bold text-gray-800 dark:text-gray-100">A reembolsar:</td>
+                    <td class="px-2 py-2 text-right font-bold text-orange-600 dark:text-orange-400" id="devolucionTotal">₲ 0</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="space-y-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Motivo (obligatorio)</label>
+                <input type="text" id="devolucionMotivo" maxlength="255"
+                    placeholder="Ej: el producto vino fallado"
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Qué hacer con el stock</label>
+                <select id="devolucionStock"
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+                    <option value="retorno_stock">Vuelve al stock</option>
+                    <option value="descarte">Se descarta (no vuelve al stock)</option>
+                    <option value="ninguna">No tocar el stock</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Cómo se reembolsa</label>
+                <select id="devolucionReembolso"
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+                    <option value="efectivo">Efectivo (sale de la caja)</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="nota_credito">Queda como crédito del cliente</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Sólo el efectivo descuenta de la caja abierta.
+                </p>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Observaciones (opcional)</label>
+                <input type="text" id="devolucionObs" maxlength="255"
+                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            </div>
+        </div>
+
+        <p id="devolucionError" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>
+
+        <div class="mt-5 flex justify-end gap-2">
+            <button type="button" onclick="cerrarDevolucion()"
+                class="rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                Cancelar
+            </button>
+            <button type="button" id="devolucionConfirmar" onclick="confirmarDevolucion({{ venta.id_venta }})"
+                class="inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-700">
+                <i class="fas fa-rotate-left mr-2"></i>Registrar devolución
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}

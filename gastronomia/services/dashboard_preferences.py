@@ -83,6 +83,16 @@ _DASHBOARD_CARD_DEFINITIONS = (
         'hover_class': 'hover:border-amber-300',
     },
     {
+        'id': 'ventas',
+        'permission': 'ventas',
+        'title': 'Ventas',
+        'description': 'Historial del dia: anular, facturar y emitir notas de credito.',
+        'endpoint': 'ventas.listar',
+        'icon': 'fas fa-receipt',
+        'icon_class': 'text-green-600',
+        'hover_class': 'hover:border-green-300',
+    },
+    {
         'id': 'entregas',
         'permission': 'entregas',
         'title': 'Entregas',

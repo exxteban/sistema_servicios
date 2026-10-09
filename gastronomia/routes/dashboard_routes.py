@@ -44,6 +44,8 @@ def dashboard():
         'delivery': tiene_permiso_gastronomia(PERMISO_DELIVERY),
         'entregas': tiene_permiso_gastronomia(PERMISO_CAJA, PERMISO_COCINA, PERMISO_SALON),
         'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
+        # Historial de ventas del sistema (/ventas/): anular, factura, NC.
+        'ventas': bool(current_user.tiene_permiso('ver_ventas')),
     }
     pedidos_pendientes_caja = contar_pedidos_caja(cliente_id) if cliente_id and permisos['caja'] else 0
     pedidos_pendientes_tienda = contar_pedidos_tienda_pendientes(cliente_id) if cliente_id and permisos['pos'] else 0

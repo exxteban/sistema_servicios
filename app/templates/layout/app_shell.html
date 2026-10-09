@@ -180,7 +180,7 @@
             {% set p_gastos_corrientes = current_user.tiene_permiso('ver_gastos_corrientes') %}
             {% set p_facturas_fe = modulo_facturacion_electronica_activo and (p_ticket or current_user.tiene_permiso('ver_reportes')) %}
 
-            {% if p_pos or p_registro_vendedor or p_pedidos or p_caja or p_cajas or p_ticket or p_flujo_caja or p_gastos_corrientes or p_facturas_fe %}
+            {% if p_pos or p_registro_vendedor or p_pedidos or p_ticket %}
             <div class="relative group w-12" @mouseenter="$dispatch('sidebar-menu-open', { name: 'ventas' })" @mouseleave="$dispatch('sidebar-menu-close', { name: 'ventas' })"
                 {% if p_cola_cobro %}x-data="cajaNotification()"{% endif %}>
                 <button
@@ -262,81 +262,6 @@
                     </a>
                     {% endif %}
 
-                    {% if p_caja %}
-                    <a href="{{ url_for('caja.estado') }}" data-permiso="ver_caja"
-                        data-tab-url="{{ url_for('caja.estado') }}" data-tab-title="Caja" data-tab-icon="fas fa-wallet"
-                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
-                        <div
-                            class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover/item:bg-purple-500 group-hover/item:text-white transition-colors">
-                            <i class="fas fa-wallet text-sm"></i>
-                        </div>
-                        <span class="text-sm font-medium">Caja Actual</span>
-                        {% if p_cola_cobro %}
-                        <span x-show="pendingCount > 0" x-cloak x-text="pendingCount"
-                            class="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full"></span>
-                        {% endif %}
-                    </a>
-                    <a href="{{ url_for('caja.cierres_listar') }}" data-permiso="ver_caja"
-                        data-tab-url="{{ url_for('caja.cierres_listar') }}" data-tab-title="Cierres de Caja"
-                        data-tab-icon="fas fa-file-invoice-dollar"
-                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
-                        <div
-                            class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover/item:bg-purple-500 group-hover/item:text-white transition-colors">
-                            <i class="fas fa-file-invoice-dollar text-sm"></i>
-                        </div>
-                        <span class="text-sm font-medium">Cierres</span>
-                    </a>
-                    <a href="{{ url_for('caja.contabilidad') }}" data-permiso="ver_caja"
-                        data-tab-url="{{ url_for('caja.contabilidad') }}" data-tab-title="Contabilidad"
-                        data-tab-icon="fas fa-calculator"
-                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
-                        <div
-                            class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover/item:bg-emerald-500 group-hover/item:text-white transition-colors">
-                            <i class="fas fa-calculator text-sm"></i>
-                        </div>
-                        <span class="text-sm font-medium">Contabilidad</span>
-                    </a>
-                    {% endif %}
-
-                    {% if p_flujo_caja %}
-                    <a href="{{ url_for('flujo_caja.index') }}" data-permiso="ver_flujo_caja"
-                        data-tab-url="{{ url_for('flujo_caja.index') }}" data-tab-title="Flujo proyectado"
-                        data-tab-icon="fas fa-chart-line"
-                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
-                        <div
-                            class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover/item:bg-cyan-500 group-hover/item:text-white transition-colors">
-                            <i class="fas fa-chart-line text-sm"></i>
-                        </div>
-                        <span class="text-sm font-medium">Flujo proyectado</span>
-                    </a>
-                    {% endif %}
-
-                    {% if p_gastos_corrientes %}
-                    <a href="{{ url_for('gastos_corrientes.index') }}" data-permiso="ver_gastos_corrientes"
-                        data-tab-url="{{ url_for('gastos_corrientes.index') }}" data-tab-title="Gastos corrientes"
-                        data-tab-icon="fas fa-file-invoice-dollar"
-                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
-                        <div
-                            class="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center text-rose-400 group-hover/item:bg-rose-500 group-hover/item:text-white transition-colors">
-                            <i class="fas fa-file-invoice-dollar text-sm"></i>
-                        </div>
-                        <span class="text-sm font-medium">Gastos corrientes</span>
-                    </a>
-                    {% endif %}
-
-                    {% if p_cajas %}
-                    <a href="{{ url_for('caja.cajas_listar') }}" data-permiso="gestionar_cajas"
-                        data-tab-url="{{ url_for('caja.cajas_listar') }}" data-tab-title="Cajas"
-                        data-tab-icon="fas fa-layer-group"
-                        class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
-                        <div
-                            class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover/item:bg-indigo-500 group-hover/item:text-white transition-colors">
-                            <i class="fas fa-layer-group text-sm"></i>
-                        </div>
-                        <span class="text-sm font-medium">Gestión Cajas</span>
-                    </a>
-                    {% endif %}
-
                     {% if p_ticket %}
                     <a href="{{ url_for('ventas.config_ticket') }}" data-permiso="editar_configuracion"
                         data-tab-url="{{ url_for('ventas.config_ticket') }}" data-tab-title="Ticket"
@@ -355,6 +280,8 @@
                 </template>
             </div>
             {% endif %}
+
+            {% include 'layout/_financial_menu.html' %}
 
             {% if modulo_servicio_tecnico_activo %}
             <a href="{{ url_for('reparaciones.listar') }}" data-tab-url="{{ url_for('reparaciones.listar') }}"

@@ -12,9 +12,16 @@ from app.models import (
     PagoCompra,
     PagoCuentaCobrar,
     PagoVenta,
+    PedidoCliente,
+    PedidoClientePago,
     Venta,
 )
 from app.routes.caja.common import _resumenes_compras_por_ids, _resumenes_ventas_por_ids
+
+
+# Una venta anulada sigue siendo un hecho del periodo en que se emitio; su
+# reversa se reconoce aparte, en la fecha de la anulacion (auditoria).
+ESTADOS_VENTA_CONTABLES = ('completada', 'anulada')
 
 
 def _money(value) -> float:
@@ -99,7 +106,7 @@ def construir_detalles_contables(
         .outerjoin(MetodoPago, PagoVenta.id_metodo_pago == MetodoPago.id_metodo_pago)
         .options(joinedload(Venta.cliente))
         .filter(
-            Venta.estado == 'completada',
+            Venta.estado.in_(ESTADOS_VENTA_CONTABLES),
             Venta.fecha_venta >= start_utc,
             Venta.fecha_venta < end_utc,
         )
@@ -220,6 +227,32 @@ def construir_detalles_contables(
             }
         )
 
+    pagos_pedidos_detalle = (
+        db.session.query(PedidoClientePago, PedidoCliente, MetodoPago)
+        .join(PedidoCliente, PedidoClientePago.id_pedido == PedidoCliente.id_pedido)
+        .outerjoin(MetodoPago, PedidoClientePago.id_metodo_pago == MetodoPago.id_metodo_pago)
+        .filter(
+            PedidoClientePago.fecha_pago >= start_utc,
+            PedidoClientePago.fecha_pago < end_utc,
+            PedidoClientePago.estado == 'activo',
+        )
+        .order_by(PedidoClientePago.fecha_pago.asc(), PedidoClientePago.id_pago_pedido.asc())
+        .all()
+    )
+    for pago, pedido, metodo in pagos_pedidos_detalle:
+        forma_pago = metodo.nombre if metodo else f'Método #{int(getattr(pago, "id_metodo_pago", 0) or 0)}'
+        detalles.append(
+            {
+                'fecha': pago.fecha_pago,
+                'concepto': 'Cobro de Pedido',
+                'referencia': f'Pedido {pedido.numero_pedido_display}',
+                'forma_pago': forma_pago,
+                'entrada': _money(pago.monto),
+                'salida': 0.0,
+                'detalle': (pago.tipo_pago or '').replace('_', ' ').capitalize(),
+            }
+        )
+
     pagos_compras_detalle = (
         db.session.query(PagoCompra, Compra, MetodoPago)
         .join(Compra, PagoCompra.id_compra == Compra.id_compra)
@@ -252,7 +285,7 @@ def construir_detalles_contables(
             continue
         if mov.tipo == 'egreso' and referencia_tipo == 'anulacion_venta':
             continue
-        if mov.tipo == 'ingreso' and referencia_tipo in {'venta', 'cobro_credito'}:
+        if mov.tipo == 'ingreso' and referencia_tipo in {'venta', 'cobro_credito', 'pago_pedido'}:
             continue
         if referencia_tipo == 'gasto_corriente':
             continue
@@ -260,7 +293,11 @@ def construir_detalles_contables(
         detalles.append(
             {
                 'fecha': mov.fecha_movimiento,
-                'concepto': 'Reversa Gasto Corriente' if referencia_tipo == 'gasto_corriente_reversa' else 'Movimiento de Caja',
+                'concepto': (
+                    'Reversa Gasto Corriente' if referencia_tipo == 'gasto_corriente_reversa'
+                    else 'Reversa de Vuelto' if referencia_tipo == 'anulacion_venta'
+                    else 'Movimiento de Caja'
+                ),
                 'referencia': getattr(mov, 'motivo_detallado', None) or mov.motivo,
                 'forma_pago': 'Efectivo',
                 'entrada': _money(mov.monto) if mov.tipo == 'ingreso' else 0.0,

@@ -160,6 +160,8 @@ def _permisos_dashboard() -> dict[str, bool]:
         'delivery': tiene_permiso_gastronomia(PERMISO_DELIVERY),
         'entregas': tiene_permiso_gastronomia(PERMISO_CAJA, PERMISO_COCINA, PERMISO_SALON),
         'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
+        # Historial de ventas del sistema (/ventas/): anular, factura, NC.
+        'ventas': bool(current_user.tiene_permiso('ver_ventas')),
     }
 
 

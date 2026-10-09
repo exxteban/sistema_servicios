@@ -1,6 +1,6 @@
-{# Enlaces de facturacion electronica del menu de ventas (ver app_shell.html).
-   Configuracion: admin o editar_configuracion. Listado de facturas: tambien
-   ver_reportes (es de consulta, lo que necesita el contador). #}
+{# Enlace de configuracion de facturacion electronica del menu de ventas
+   (ver app_shell.html). Solo admin o editar_configuracion. El listado de
+   facturas emitidas esta en el menu Finanzas (layout/_financial_menu.html). #}
 {% if modulo_facturacion_electronica_activo and p_ticket %}
 <a href="{{ url_for('facturacion_electronica.configuracion') }}" data-permiso="editar_configuracion"
     data-tab-url="{{ url_for('facturacion_electronica.configuracion') }}" data-tab-title="Facturación Electrónica"
@@ -11,17 +11,5 @@
         <i class="fas fa-file-invoice text-sm"></i>
     </div>
     <span class="text-sm font-medium">Facturación Electrónica</span>
-</a>
-{% endif %}
-{% if p_facturas_fe %}
-<a href="{{ url_for('facturacion_electronica.documentos') }}"
-    data-tab-url="{{ url_for('facturacion_electronica.documentos') }}" data-tab-title="Facturas electrónicas"
-    data-tab-icon="fas fa-file-invoice-dollar"
-    class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
-    <div
-        class="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center text-teal-400 group-hover/item:bg-teal-500 group-hover/item:text-white transition-colors">
-        <i class="fas fa-file-invoice-dollar text-sm"></i>
-    </div>
-    <span class="text-sm font-medium">Facturas electrónicas</span>
 </a>
 {% endif %}

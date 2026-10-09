@@ -1,9 +1,11 @@
 from .parte1 import *
 from .parte3 import _procesar_venta_payload
+from .anulacion_caja import revertir_caja_de_venta
 from .respuestas import _venta_descartada_response, _venta_existente_response
 from app.models import ClienteServicio
 from app.services.clientes_fidelizacion import revertir_fidelizacion_por_anulacion_venta
 from app.services.devoluciones_calculo import calculate_refund_subtotal
+from app.services.devoluciones_lineas import lineas_devolubles
 from app.services.fe_anulacion import error_anulacion_por_factura_electronica
 from app.services.fe_venta_contexto import contexto_factura_electronica_venta
 from cobranzas.services.cuenta_service import anular_cuenta_por_cobrar
@@ -125,6 +127,10 @@ def detalle(id):
         total_pagado_inmediato=total_pagado_inmediato,
         saldo_pendiente_actual=saldo_pendiente_actual,
         estado_cobro=estado_cobro,
+        # Devolucion parcial: lo que vuelve y su nota de credito.
+        devoluciones=venta.devoluciones.order_by(Devolucion.id_devolucion.desc()).all(),
+        lineas_devolucion=lineas_devolubles(venta) if venta.estado == 'completada' else [],
+        puede_devolver=venta.estado == 'completada',
         **contexto_factura_electronica_venta(venta, current_user),
     )
 
@@ -262,66 +268,8 @@ def anular(id):
         )
         db.session.add(movimiento)
 
-    movimientos_caja_venta = (
-        MovimientoCaja.query.filter_by(
-            id_sesion_caja=venta.id_sesion_caja,
-            referencia_tipo='venta',
-            referencia_id=venta.id_venta,
-        )
-        .order_by(MovimientoCaja.id_movimiento_caja.asc())
-        .all()
-    )
-    from datetime import datetime
+    revertir_caja_de_venta(venta, current_user.id_usuario)
 
-    if movimientos_caja_venta:
-        for mov in movimientos_caja_venta:
-            tipo_original = (mov.tipo or '').strip().lower()
-            if tipo_original not in {'ingreso', 'egreso'}:
-                continue
-            tipo_reverso = 'egreso' if tipo_original == 'ingreso' else 'ingreso'
-            motivo_base = (mov.motivo or '').strip()
-            motivo_reverso = f'Anulación venta #{venta.id_venta}: {motivo_base}'.strip()
-            if len(motivo_reverso) > 200:
-                motivo_reverso = motivo_reverso[:200]
-            db.session.add(
-                MovimientoCaja(
-                    id_sesion_caja=mov.id_sesion_caja,
-                    id_usuario=current_user.id_usuario,
-                    tipo=tipo_reverso,
-                    monto=mov.monto,
-                    motivo=motivo_reverso or f'Anulación venta #{venta.id_venta}',
-                    referencia_tipo='anulacion_venta',
-                    referencia_id=venta.id_venta,
-                    fecha_movimiento=datetime.utcnow(),
-                )
-            )
-    else:
-        from app.services.caja_metodos import obtener_metodo_efectivo_id
-
-        efectivo_id = obtener_metodo_efectivo_id(solo_activos=False)
-        if efectivo_id is not None:
-            total_efectivo_pagado = (
-                db.session.query(func.sum(PagoVenta.monto))
-                .filter(PagoVenta.id_venta == venta.id_venta, PagoVenta.id_metodo_pago == efectivo_id)
-                .scalar()
-            )
-            if total_efectivo_pagado and Decimal(str(total_efectivo_pagado)) > 0:
-                motivo_reverso = f'Anulación venta #{venta.id_venta}: ajuste efectivo'.strip()
-                if len(motivo_reverso) > 200:
-                    motivo_reverso = motivo_reverso[:200]
-                db.session.add(
-                    MovimientoCaja(
-                        id_sesion_caja=venta.id_sesion_caja,
-                        id_usuario=current_user.id_usuario,
-                        tipo='egreso',
-                        monto=total_efectivo_pagado,
-                        motivo=motivo_reverso,
-                        referencia_tipo='anulacion_venta',
-                        referencia_id=venta.id_venta,
-                        fecha_movimiento=datetime.utcnow(),
-                    )
-                )
-    
     revertir_fidelizacion_por_anulacion_venta(
         venta,
         id_usuario=getattr(current_user, 'id_usuario', None),
@@ -341,6 +289,33 @@ def anular(id):
         flash('No se pudo anular el pedido gastronomico asociado. Intenta nuevamente.', 'danger')
         return redirect(url_for('ventas.detalle', id=id))
 
+    # La auditoria va en el MISMO commit que la anulacion: de esa fila sale la
+    # fecha de la reversa en Contabilidad (`contabilidad_report`). Sin ella la
+    # venta queda anulada pero su cobro sumado para siempre, y nada lo avisa.
+    # Si no se puede escribir, la anulacion no se hace.
+    id_aut = int(getattr(autorizacion, 'id_autorizacion', 0) or 0) if autorizacion else None
+    registro = registrar_auditoria(
+        accion='anular_venta',
+        modulo='ventas',
+        descripcion=f'Anulación de venta #{venta.id_venta}',
+        referencia_tipo='venta',
+        referencia_id=venta.id_venta,
+        id_autorizacion=id_aut or None,
+        commit=False,
+    )
+    if registro is None:
+        db.session.rollback()
+        current_app.logger.error(
+            'Anulacion venta abortada venta_id=%s usuario_id=%s motivo=auditoria_no_registrada',
+            id, getattr(current_user, 'id_usuario', None),
+        )
+        flash(
+            'No se pudo registrar la auditoría de la anulación, así que la venta NO se anuló. '
+            'Probá de nuevo; si vuelve a pasar, avisá a soporte antes de insistir.',
+            'danger',
+        )
+        return redirect(url_for('ventas.detalle', id=id))
+
     db.session.commit()
 
     if gastronomia_eventos_post_commit:
@@ -349,21 +324,6 @@ def anular(id):
         for evento in gastronomia_eventos_post_commit:
             registrar_evento_pedido(evento['pedido'], evento['tipo'])
 
-    try:
-        id_aut = int(getattr(autorizacion, 'id_autorizacion', 0) or 0) if autorizacion else None
-        if not id_aut:
-            id_aut = None
-        registrar_auditoria(
-            accion='anular_venta',
-            modulo='ventas',
-            descripcion=f'Anulación de venta #{venta.id_venta}',
-            referencia_tipo='venta',
-            referencia_id=venta.id_venta,
-            id_autorizacion=id_aut
-        )
-    except Exception:
-        pass
-    
     if reparacion_reabierta_id and cliente_servicio_reabiertos:
         flash(
             f'Venta #{id} anulada. Stock restaurado. Reparación #{reparacion_reabierta_id} y {len(cliente_servicio_reabiertos)} servicio(s) del cliente reabiertos para cobrar nuevamente.',

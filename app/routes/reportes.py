@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload, aliased
 from app import db
 from app.models import Venta, DetalleVenta, Producto, Categoria, SesionCaja, Reparacion, Usuario, Rol, Cliente, PagoCuentaCobrar, Servicio
 from app.routes.reportes_ventas_diarias import construir_contexto_ventas_diarias
-from app.services.fe_venta_contexto import datos_fe_modal
+from app.services.fe_venta_contexto import datos_fe_modal, datos_venta_modal, puede_ver_detalle_venta
 from app.utils.helpers import today_local, parse_iso_date, utc_bounds_for_local_dates, local_strftime
 
 reportes_bp = Blueprint('reportes', __name__)
@@ -355,7 +355,7 @@ def ventas_diarias():
 @login_required
 def detalle_venta(id_venta):
     """Obtener detalles de una venta"""
-    if not current_user.tiene_permiso('ver_reporte_ventas'):
+    if not puede_ver_detalle_venta(current_user):
         if getattr(current_user, 'modo_demo', False):
             return jsonify({'error': 'Sin permisos', 'mensaje': 'Modo demo: esta acción está deshabilitada', 'modo_demo': True}), 403
         return jsonify({'error': 'Sin permisos', 'modo_demo': False}), 403
@@ -379,7 +379,6 @@ def detalle_venta(id_venta):
             'subtotal': float(detalle.subtotal),
             'descuento': float(detalle.descuento_linea)
         })
-        
     pagos = []
     for pago in venta.pagos:
         pagos.append({
@@ -426,6 +425,7 @@ def detalle_venta(id_venta):
     return jsonify({
         'id': venta.id_venta,
         'fe': datos_fe_modal(venta, current_user),
+        **datos_venta_modal(venta, current_user),
         'fecha': local_strftime(venta.fecha_venta, '%d/%m/%Y %H:%M'),
         'cliente': venta.cliente.nombre,
         'vendedor': vendedor,

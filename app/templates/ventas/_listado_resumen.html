@@ -1,0 +1,81 @@
+{# Cabecera del Historial de ventas: rangos rapidos, filtros y totales del
+   periodo filtrado. Espera `resumen`, `rangos_rapidos`, `rango`, `desde`,
+   `hasta`, `estado`, `q` y `todas` (ver app/routes/ventas/listado.py). #}
+{% macro gs(valor) %}₲&nbsp;{{ "{:,.0f}".format(valor or 0).replace(",", ".") }}{% endmacro %}
+
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 space-y-4 transition-colors duration-300">
+    <div class="flex flex-wrap gap-2">
+        {% for clave, etiqueta in rangos_rapidos %}
+        <a href="{{ url_for('ventas.listar', rango=clave, estado=estado or none, q=q or none) }}"
+            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+            {% if rango == clave %}bg-green-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600{% endif %}">
+            {{ etiqueta }}
+        </a>
+        {% endfor %}
+        <a href="{{ url_for('ventas.listar', todas=1, estado=estado or none, q=q or none) }}"
+            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+            {% if todas %}bg-green-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600{% endif %}">
+            Todas
+        </a>
+    </div>
+
+    <form method="GET" action="{{ url_for('ventas.listar') }}" class="flex flex-wrap gap-3 items-end">
+        <div class="flex-1 min-w-[12rem]">
+            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Buscar</label>
+            <input type="search" name="q" value="{{ q }}" placeholder="# venta, cliente o Nº de factura"
+                class="w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Desde</label>
+            <input type="date" name="desde" value="{{ desde }}"
+                class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Hasta</label>
+            <input type="date" name="hasta" value="{{ hasta }}"
+                class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Estado</label>
+            <select name="estado"
+                class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
+                <option value="" {% if not estado %}selected{% endif %}>Todos</option>
+                <option value="completada" {% if estado == 'completada' %}selected{% endif %}>Completadas</option>
+                <option value="anulada" {% if estado == 'anulada' %}selected{% endif %}>Anuladas</option>
+            </select>
+        </div>
+        <button type="submit"
+            class="bg-gray-800 dark:bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition">
+            Filtrar
+        </button>
+        {% if q or estado or not rango %}
+        <a href="{{ url_for('ventas.listar') }}"
+            class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+            Limpiar
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Vendido</p>
+        <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white whitespace-nowrap">{{ gs(resumen.total) }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">{{ resumen.cantidad }} venta{{ '' if resumen.cantidad == 1 else 's' }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Cobrado</p>
+        <p class="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{{ gs(resumen.cobrado) }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Al momento de la venta, sin vuelto</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">A crédito</p>
+        <p class="mt-1 text-xl font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">{{ gs(resumen.financiado) }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Pendiente hoy: {{ gs(resumen.pendiente_credito) }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Anuladas</p>
+        <p class="mt-1 text-xl font-bold text-red-600 dark:text-red-400 whitespace-nowrap">{{ gs(resumen.total_anulado) }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">{{ resumen.anuladas }} venta{{ '' if resumen.anuladas == 1 else 's' }}</p>
+    </div>
+</div>
