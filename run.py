@@ -14,7 +14,7 @@ def _is_truthy(value: str | None) -> bool:
 
 def main():
     host = os.environ.get("HOST") or "127.0.0.1"
-    port = int(os.environ.get("PORT") or 5003)
+    port = int(os.environ.get("PORT") or 5002)
 
     config_name = os.environ.get("APP_CONFIG") or "default"
     if host in {"127.0.0.1", "localhost"} and config_name == "production" and not _is_truthy(os.environ.get("FORCE_PRODUCTION_CONFIG")):

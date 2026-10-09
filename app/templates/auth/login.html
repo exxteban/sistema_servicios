@@ -15,17 +15,17 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 @keyframes floatDown{0%,100%{transform:translateY(0) scale(1.04)}50%{transform:translateY(22px) scale(1)}}
 @keyframes fadeInUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideInLeft{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:translateX(0)}}
-@keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.55)}50%{box-shadow:0 0 0 14px rgba(99,102,241,0)}}
+@keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 rgba(217,119,6,.55)}50%{box-shadow:0 0 0 14px rgba(217,119,6,0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes iconFloat1{0%,100%{transform:translateY(0) rotate(0deg)}33%{transform:translateY(-14px) rotate(5deg)}66%{transform:translateY(7px) rotate(-3deg)}}
 @keyframes iconFloat2{0%,100%{transform:translateY(0) rotate(0deg)}40%{transform:translateY(12px) rotate(-6deg)}70%{transform:translateY(-9px) rotate(4deg)}}
 @keyframes iconFloat3{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-16px) scale(1.1)}}
 @keyframes iconFloat4{0%,100%{transform:translateY(0) rotate(0deg)}45%{transform:translateY(9px) rotate(7deg)}80%{transform:translateY(-11px) rotate(-5deg)}}
-@keyframes titleGlow{0%,100%{text-shadow:0 0 20px rgba(165,180,252,.3)}50%{text-shadow:0 0 40px rgba(165,180,252,.65),0 0 80px rgba(99,102,241,.25)}}
+@keyframes titleGlow{0%,100%{text-shadow:0 0 20px rgba(253,186,116,.3)}50%{text-shadow:0 0 40px rgba(253,186,116,.65),0 0 80px rgba(217,119,6,.25)}}
 @keyframes featureIn{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
 
 body{
-  background:linear-gradient(-45deg,#0f172a,#1e1b4b,#1a2f5e,#0f172a);
+  background:linear-gradient(-45deg,#16120f,#1d1713,#241b15,#16120f);
   background-size:400% 400%;
   animation:gradientShift 16s ease infinite;
   min-height:100vh;
@@ -40,9 +40,9 @@ body{
 
 /* Orbes */
 .orb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0}
-.orb-1{width:520px;height:520px;background:radial-gradient(circle,rgba(99,102,241,.22) 0%,transparent 70%);top:-130px;left:-130px;animation:floatUp 10s ease-in-out infinite}
-.orb-2{width:420px;height:420px;background:radial-gradient(circle,rgba(139,92,246,.18) 0%,transparent 70%);bottom:-100px;right:-100px;animation:floatDown 12s ease-in-out infinite}
-.orb-3{width:280px;height:280px;background:radial-gradient(circle,rgba(59,130,246,.14) 0%,transparent 70%);top:45%;left:45%;animation:floatUp 15s ease-in-out infinite 3s}
+.orb-1{width:520px;height:520px;background:radial-gradient(circle,rgba(217,119,6,.22) 0%,transparent 70%);top:-130px;left:-130px;animation:floatUp 10s ease-in-out infinite}
+.orb-2{width:420px;height:420px;background:radial-gradient(circle,rgba(180,110,50,.12) 0%,transparent 70%);bottom:-100px;right:-100px;animation:floatDown 12s ease-in-out infinite}
+.orb-3{width:280px;height:280px;background:radial-gradient(circle,rgba(234,179,8,.14) 0%,transparent 70%);top:45%;left:45%;animation:floatUp 15s ease-in-out infinite 3s}
 
 /* Topbar nombre */
 .topbar{
@@ -52,15 +52,15 @@ body{
   margin-bottom:1.25rem;
   animation:fadeInUp .5s ease both;
 }
-.topbar-sub{font-size:.7rem;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:rgba(129,140,248,.7);margin-bottom:.35rem}
+.topbar-sub{font-size:.7rem;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:rgba(251,146,60,.7);margin-bottom:.35rem}
 .topbar-title{
   font-size:1.6rem;font-weight:800;color:#fff;letter-spacing:-.02em;
   animation:titleGlow 3s ease-in-out infinite;
 }
 .topbar-divider{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-top:.5rem}
-.topbar-divider span.line{height:1px;width:60px;background:linear-gradient(to right,transparent,rgba(99,102,241,.55))}
-.topbar-divider span.line.rev{background:linear-gradient(to left,transparent,rgba(99,102,241,.55))}
-.topbar-divider span.dot{color:rgba(99,102,241,.5);font-size:.5rem}
+.topbar-divider span.line{height:1px;width:60px;background:linear-gradient(to right,transparent,rgba(217,119,6,.55))}
+.topbar-divider span.line.rev{background:linear-gradient(to left,transparent,rgba(217,119,6,.55))}
+.topbar-divider span.dot{color:rgba(217,119,6,.5);font-size:.5rem}
 
 /* Contenedor principal */
 .main-card{
@@ -82,7 +82,7 @@ body{
   justify-content:space-between;
   position:relative;
   overflow:hidden;
-  background:linear-gradient(150deg,rgba(79,70,229,.42) 0%,rgba(109,40,217,.28) 60%,rgba(30,27,75,.5) 100%);
+  background:linear-gradient(150deg,rgba(180,100,50,.28) 0%,rgba(120,70,40,.22) 60%,rgba(30,22,16,.5) 100%);
   border-right:1px solid rgba(255,255,255,.09);
   animation:slideInLeft .7s cubic-bezier(.22,1,.36,1) both;
 }
@@ -101,23 +101,23 @@ body{
   border:1px solid rgba(255,255,255,.15);
   color:#fff;
 }
-.fi-1{width:50px;height:50px;background:rgba(99,102,241,.38);top:17%;right:10%;font-size:1.2rem;animation:iconFloat1 6s ease-in-out infinite}
+.fi-1{width:50px;height:50px;background:rgba(217,119,6,.38);top:17%;right:10%;font-size:1.2rem;animation:iconFloat1 6s ease-in-out infinite}
 .fi-2{width:42px;height:42px;background:rgba(16,185,129,.32);top:36%;right:22%;font-size:1rem;animation:iconFloat2 7.5s ease-in-out infinite 1s}
 .fi-3{width:46px;height:46px;background:rgba(245,158,11,.32);bottom:30%;right:7%;font-size:1.1rem;animation:iconFloat3 8s ease-in-out infinite .5s}
-.fi-4{width:38px;height:38px;background:rgba(236,72,153,.3);bottom:17%;right:27%;font-size:.9rem;animation:iconFloat4 6.5s ease-in-out infinite 2s}
-.fi-5{width:34px;height:34px;background:rgba(59,130,246,.34);top:54%;right:4%;font-size:.85rem;animation:iconFloat1 9s ease-in-out infinite 1.5s}
+.fi-4{width:38px;height:38px;background:rgba(190,80,70,.3);bottom:17%;right:27%;font-size:.9rem;animation:iconFloat4 6.5s ease-in-out infinite 2s}
+.fi-5{width:34px;height:34px;background:rgba(234,179,8,.34);top:54%;right:4%;font-size:.85rem;animation:iconFloat1 9s ease-in-out infinite 1.5s}
 
 /* Logo */
 .logo-wrap{
   display:inline-flex;align-items:center;justify-content:center;
   width:60px;height:60px;border-radius:16px;
-  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  background:linear-gradient(135deg,#d97706,#b45309);
   margin-bottom:1.25rem;
   animation:pulseGlow 2.6s ease-out infinite;
   font-size:1.5rem;color:#fff;
 }
 .brand-title{color:#fff;font-size:1.15rem;font-weight:700;line-height:1.35;margin-bottom:.6rem}
-.brand-desc{color:rgba(199,210,254,.75);font-size:.8rem;line-height:1.55}
+.brand-desc{color:rgba(254,215,170,.75);font-size:.8rem;line-height:1.55}
 
 /* Features */
 .features{list-style:none;margin:1.5rem 0}
@@ -138,9 +138,9 @@ body{
   font-size:.8rem;
 }
 .feature-text p{color:#fff;font-size:.75rem;font-weight:600;line-height:1.2}
-.feature-text small{color:rgba(165,180,252,.65);font-size:.7rem}
+.feature-text small{color:rgba(253,186,116,.65);font-size:.7rem}
 
-.brand-footer{color:rgba(129,140,248,.45);font-size:.7rem}
+.brand-footer{color:rgba(251,146,60,.45);font-size:.7rem}
 
 /* Panel derecho */
 .form-panel{
@@ -184,7 +184,7 @@ body{
   font-size:.8rem;margin-bottom:.4rem;
 }
 .flash-msg.success{background:rgba(16,185,129,.12);color:rgba(167,243,208,.9);border:1px solid rgba(16,185,129,.3)}
-.flash-msg.danger{background:rgba(239,68,68,.12);color:rgba(252,165,165,.9);border:1px solid rgba(239,68,68,.3)}
+.flash-msg.danger{background:rgba(239,68,68,.12);color:rgba(252,165,165,.9);border:1px solid rgba(190,80,70,.3)}
 .flash-msg.warning{background:rgba(245,158,11,.12);color:rgba(253,230,138,.9);border:1px solid rgba(245,158,11,.3)}
 .flash-msg i{margin-top:1px;flex-shrink:0}
 
@@ -214,11 +214,11 @@ body{
 }
 .login-input::placeholder{color:rgba(148,163,184,.45)}
 .login-input:focus{
-  border-color:rgba(99,102,241,.65);
+  border-color:rgba(217,119,6,.65);
   background:rgba(255,255,255,.1);
-  box-shadow:0 0 0 3px rgba(99,102,241,.16);
+  box-shadow:0 0 0 3px rgba(217,119,6,.16);
 }
-.input-wrap:focus-within .input-icon{color:#a5b4fc}
+.input-wrap:focus-within .input-icon{color:#fdba74}
 .login-input.has-toggle{padding-right:2.8rem}
 .toggle-btn{
   position:absolute;top:50%;right:.75rem;
@@ -229,24 +229,24 @@ body{
   transition:color .2s;line-height:1;
 }
 .toggle-btn:hover{color:#e2e8f0}
-.toggle-btn:focus-visible{outline:2px solid rgba(99,102,241,.7);outline-offset:2px}
+.toggle-btn:focus-visible{outline:2px solid rgba(217,119,6,.7);outline-offset:2px}
 
 /* Checkbox */
 .check-row{display:flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;cursor:pointer}
-.check-row input{accent-color:#6366f1;width:15px;height:15px;cursor:pointer}
+.check-row input{accent-color:#d97706;width:15px;height:15px;cursor:pointer}
 .check-row span{color:rgba(203,213,225,.8);font-size:.82rem}
 
 /* Botón */
 .btn-login{
   width:100%;display:flex;align-items:center;justify-content:center;gap:.5rem;
   padding:.9rem 1rem;border-radius:.75rem;
-  background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);
+  background:linear-gradient(135deg,#d97706 0%,#b45309 100%);
   color:#fff;font-size:.875rem;font-weight:600;
   border:none;cursor:pointer;
-  box-shadow:0 4px 22px rgba(99,102,241,.38);
+  box-shadow:0 4px 22px rgba(217,119,6,.38);
   transition:filter .2s,transform .15s,box-shadow .2s;
 }
-.btn-login:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 7px 30px rgba(99,102,241,.52)}
+.btn-login:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 7px 30px rgba(217,119,6,.52)}
 .btn-login:active:not(:disabled){transform:translateY(0)}
 .btn-login:disabled{opacity:.65;cursor:not-allowed}
 .btn-spinner{
@@ -323,11 +323,11 @@ body{
       <!-- Features -->
       <ul class="features" style="position:relative;z-index:1">
         <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(99,102,241,.35)"><i class="fas fa-cash-register" style="color:#c7d2fe"></i></span>
+          <span class="fi-badge" style="background:rgba(217,119,6,.35)"><i class="fas fa-cash-register" style="color:#fed7aa"></i></span>
           <div class="feature-text"><p>Pedidos y Caja</p><small>Ventas r&#225;pidas con caja integrada</small></div>
         </li>
         <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(16,185,129,.3)"><i class="fas fa-boxes" style="color:#6ee7b7"></i></span>
+          <span class="fi-badge" style="background:rgba(16,185,129,.3)"><i class="fas fa-boxes" style="color:#86efac"></i></span>
           <div class="feature-text"><p>Insumos y Stock</p><small>Control de ingredientes con alertas</small></div>
         </li>
         <li class="feature-item">
@@ -335,11 +335,11 @@ body{
           <div class="feature-text"><p>Personal y Turnos</p><small>Asistencia, turnos y rendimiento</small></div>
         </li>
         <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(236,72,153,.28)"><i class="fas fa-chart-line" style="color:#f9a8d4"></i></span>
+          <span class="fi-badge" style="background:rgba(239,68,68,.28)"><i class="fas fa-chart-line" style="color:#fca5a5"></i></span>
           <div class="feature-text"><p>Reportes y An&#225;lisis</p><small>Estad&#237;sticas y gr&#225;ficos al instante</small></div>
         </li>
         <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(59,130,246,.3)"><i class="fas fa-robot" style="color:#93c5fd"></i></span>
+          <span class="fi-badge" style="background:rgba(234,179,8,.3)"><i class="fas fa-robot" style="color:#fde047"></i></span>
           <div class="feature-text"><p>Asistente IA</p><small>Insights inteligentes de tu local</small></div>
         </li>
       </ul>
