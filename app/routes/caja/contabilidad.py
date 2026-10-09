@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from app.routes.caja import caja_bp
 from app.routes.caja.common import _calcular_informe_contable_rango
 from app.utils.pdf_runtime import import_pisa, is_arm_machine
-from app.utils.helpers import now_local, parse_iso_date, today_local, utc_bounds_for_local_dates
+from app.utils.helpers import local_strftime, now_local, parse_iso_date, today_local, utc_bounds_for_local_dates
 
 
 def _build_modal_payload(detalles: list[dict] | None):
@@ -19,7 +19,7 @@ def _build_modal_payload(detalles: list[dict] | None):
                 continue
 
             fecha = (detalle or {}).get('fecha')
-            fecha_label = fecha.strftime('%d/%m/%Y %H:%M') if hasattr(fecha, 'strftime') else ''
+            fecha_label = local_strftime(fecha, '%d/%m/%Y %H:%M') if hasattr(fecha, 'strftime') else ''
             rows.append(
                 {
                     'fecha': fecha_label,

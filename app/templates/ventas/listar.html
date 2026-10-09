@@ -14,37 +14,17 @@
         </a>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 transition-colors duration-300">
-        <form method="GET" action="{{ url_for('ventas.listar') }}" class="flex flex-wrap gap-3 items-end">
-            <div>
-                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Desde</label>
-                <input type="date" name="desde" value="{{ desde }}"
-                    class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
-            </div>
-            <div>
-                <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Hasta</label>
-                <input type="date" name="hasta" value="{{ hasta }}"
-                    class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700">
-            </div>
-            <button type="submit"
-                class="bg-gray-800 dark:bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 transition">
-                Filtrar
-            </button>
-            {% if desde or hasta %}
-            <a href="{{ url_for('ventas.listar') }}"
-                class="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                Limpiar
-            </a>
-            {% endif %}
-        </form>
-    </div>
+    {% include 'ventas/_listado_resumen.html' %}
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden transition-colors duration-300">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-x-auto transition-colors duration-300">
         <table class="w-full">
             <thead class="bg-gray-50 dark:bg-gray-700/60">
                 <tr>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300"># Venta</th>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                    {% if modulo_facturacion_electronica_activo %}
+                    <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Factura</th>
+                    {% endif %}
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Cliente</th>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Vendedor</th>
                     <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600 dark:text-gray-300">Detalle</th>
@@ -59,6 +39,9 @@
                     @click="verDetalle({{ venta.id_venta }})">
                     <td class="px-4 py-3 font-mono text-gray-800 dark:text-gray-100">{{ venta.id_venta }}</td>
                     <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">{{ venta.fecha_venta|local_strftime('%d/%m/%Y %H:%M') }}</td>
+                    {% if modulo_facturacion_electronica_activo %}
+                    <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-100 whitespace-nowrap">{% include "ventas/_celda_factura.html" %}</td>
+                    {% endif %}
                     <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ venta.cliente.nombre }}</td>
                     <td class="px-4 py-3 text-gray-800 dark:text-gray-100">
                         {{ venta.vendedor.nombre_completo if venta.vendedor else (venta.sesion_caja.usuario.nombre_completo if venta.sesion_caja and venta.sesion_caja.usuario else 'Desconocido') }}
@@ -100,6 +83,12 @@
                         </a>
                     </td>
                 </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                        No hay ventas para este filtro.
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -108,7 +97,7 @@
     {% if ventas.pages > 1 %}
     <div class="flex justify-center space-x-2">
         {% if ventas.has_prev %}
-        <a href="{{ url_for('ventas.listar', page=ventas.prev_num, desde=desde or none, hasta=hasta or none) }}"
+        <a href="{{ url_for('ventas.listar', page=ventas.prev_num, desde=desde or none, hasta=hasta or none, estado=estado or none, q=q or none, todas=1 if todas else none) }}"
             class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
             <i class="fas fa-chevron-left"></i>
         </a>
@@ -119,7 +108,7 @@
         </span>
 
         {% if ventas.has_next %}
-        <a href="{{ url_for('ventas.listar', page=ventas.next_num, desde=desde or none, hasta=hasta or none) }}"
+        <a href="{{ url_for('ventas.listar', page=ventas.next_num, desde=desde or none, hasta=hasta or none, estado=estado or none, q=q or none, todas=1 if todas else none) }}"
             class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
             <i class="fas fa-chevron-right"></i>
         </a>
@@ -155,7 +144,6 @@
                                         x-text="venta?.cliente"></span></p>
                                 <p class="text-sm text-gray-600 dark:text-gray-300 mb-4"><strong>Fecha:</strong> <span
                                         x-text="venta?.fecha"></span></p>
-                                {% include 'ventas/_modal_fe_resumen.html' %}
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                     <div class="rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
                                         <p class="text-xs text-gray-500 dark:text-gray-400">Tipo de venta</p>
@@ -265,9 +253,13 @@
                         </div>
                     </div>
                 </div>
+                {% if modulo_facturacion_electronica_activo %}
+                {% include 'ventas/_modal_fe_acciones.html' %}
+                {% endif %}
                 <div class="bg-gray-50 dark:bg-gray-800/90 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                     <button type="button"
                         class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                        x-show="venta && venta.id"
                         @click="window.open('/ventas/' + venta.id + '/ticket', '_blank')">
                         <i class="fas fa-print mr-2"></i> Reimprimir Ticket
                     </button>
@@ -276,6 +268,13 @@
                         x-show="venta?.fe?.url_kude"
                         @click="window.open(venta.fe.url_kude, '_blank')">
                         <i class="fas fa-receipt mr-2"></i> Reimprimir factura
+                    </button>
+                    <button type="button"
+                        class="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 hover:bg-red-700 focus:ring-red-500 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        x-show="venta && venta.estado === 'completada' && venta.puede_anular
+                                && !(venta.fe && ['enviado','aprobado'].includes(venta.fe.estado))"
+                        @click="anularVentaActual()">
+                        <i class="fas fa-times mr-2"></i> Anular Venta
                     </button>
                     <button type="button"
                         class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
@@ -306,15 +305,54 @@
                 async verDetalle(id) {
                     this.loading = true;
                     this.modalOpen = true;
+                    this.venta = null;
                     try {
                         const response = await fetch(`/reportes/ventas/${id}/detalle`);
-                        this.venta = await response.json();
+                        const data = await response.json();
+                        if (!response.ok) {
+                            throw new Error(data.mensaje || data.error || 'Error al cargar detalles');
+                        }
+                        this.venta = data;
                     } catch (error) {
                         console.error('Error:', error);
-                        mostrarNotificacion('Error al cargar detalles', 'error');
+                        mostrarNotificacion(error.message || 'Error al cargar detalles', 'error');
+                        this.modalOpen = false;
                     } finally {
                         this.loading = false;
                     }
+                },
+                async anularVentaActual() {
+                    if (!this.venta || !this.venta.id) return;
+                    if (!confirm('¿Anular esta venta? Se restaurará el stock.')) return;
+
+                    await ejecutarConAutorizacion(
+                        'anular_venta',
+                        `Anular venta #${this.venta.id}`,
+                        async (idAutorizacion) => {
+                            const formData = new FormData();
+                            formData.append('csrf_token', '{{ csrf_token() }}');
+                            formData.append('id_autorizacion', idAutorizacion || '');
+
+                            const response = await fetch(`/ventas/${this.venta.id}/anular`, {
+                                method: 'POST',
+                                body: formData,
+                                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                                redirect: 'follow'
+                            });
+                            const html = await response.text();
+                            const doc = new DOMParser().parseFromString(html, 'text/html');
+                            const flash = doc.querySelector('.flash-message');
+                            const category = flash ? (flash.dataset.flashCategory || 'info') : 'error';
+                            const message = flash ? flash.textContent.replace('×', '').trim() : 'No se pudo anular la venta.';
+                            const type = category === 'danger' ? 'error' : category;
+                            mostrarNotificacion(message, type, { persistent: type === 'error' || type === 'warning' });
+                            if (type === 'success') {
+                                window.location.reload();
+                            }
+                        },
+                        'venta',
+                        this.venta.id
+                    );
                 },
                 openDetalle(id) {
                     return this.verDetalle(id);

@@ -3,24 +3,11 @@
 {% block title %}Contabilidad{% endblock %}
 
 {% block content %}
-<style>
-    /* Tarjetas KPI: tipografia fluida segun el ancho real de la tarjeta */
-    .kpi-card { container-type: inline-size; }
-    .kpi-amount {
-        /* fallback para navegadores sin container queries */
-        font-size: 1.2rem;
-        font-size: clamp(0.95rem, calc(172cqi / var(--kpi-len, 16)), 1.8rem);
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
-        letter-spacing: -0.02em;
-    }
-    .kpi-amount-hero { font-size: clamp(1rem, calc(178cqi / var(--kpi-len, 16)), 1.95rem); }
-    .kpi-amount .kpi-cur { font-size: 0.72em; margin-right: 0.15em; font-weight: 600; }
-    .kpi-grid-hero { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
-    .kpi-grid-sec { grid-template-columns: repeat(auto-fit, minmax(min(224px, 100%), 1fr)); }
-</style>
-
-<div class="space-y-6" x-data="contabilidadReportApp()" @keydown.escape.window="cerrarDetalleModal()">
+{% set vista_inicial = request.args.get('vista', 'resumen') %}
+{% if vista_inicial not in ['resumen', 'flujo', 'detalle'] %}
+{% set vista_inicial = 'resumen' %}
+{% endif %}
+<div class="space-y-6" x-data="contabilidadReportApp('{{ vista_inicial }}')" @keydown.escape.window="cerrarModales()">
     <script id="contabilidad-detalle-modal-data" type="application/json">{{ detalle_modal|tojson }}</script>
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div>
@@ -52,6 +39,7 @@
     <div id="pdf-report-content">
         <form method="GET" action="{{ url_for('caja.contabilidad') }}" data-html2canvas-ignore="true"
             class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-4">
+            <input type="hidden" name="vista" :value="vista">
             <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Desde</label>
@@ -86,303 +74,67 @@
             {{ desde.strftime('%d/%m/%Y') if desde else '-' }} - {{ hasta.strftime('%d/%m/%Y') if hasta else '-' }}
         </div>
 
-        {% set kpi_hero = namespace(n=0) %}
-        {% for _v in [resultado_caja_mes, ganancia_neta_mes, total_ingresos, total_egresos] %}{% set kpi_hero.n = [kpi_hero.n, ('{:,.0f}'.format(_v)|length) + 2]|max %}{% endfor %}
-        <div class="grid kpi-grid-hero gap-3 lg:gap-4 xl:max-w-[1180px] mx-auto" style="--kpi-len: {{ kpi_hero.n }}">
-            <div
-                class="{% if resultado_caja_mes >= 0 %}bg-gray-900 border border-gray-800{% else %}bg-gradient-to-br from-orange-500 to-orange-600{% endif %} kpi-card rounded-xl shadow-md p-4 text-white min-h-[128px]">
-                <div class="w-full min-w-0">
-                    <p class="{% if resultado_caja_mes >= 0 %}text-gray-200{% else %}text-orange-100{% endif %} text-sm">Resultado Caja</p>
-                    <p class="kpi-amount kpi-amount-hero font-bold mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ "{:,.0f}".format(resultado_caja_mes).replace(",", ".") }}</p>
-                    <p class="{% if resultado_caja_mes >= 0 %}text-gray-200{% else %}text-orange-100{% endif %} text-xs mt-2 leading-snug">
-                        Flujo real del período, incluyendo movimientos manuales.
-                    </p>
-                </div>
-            </div>
-            <div
-                class="bg-gradient-to-br {% if ganancia_neta_mes >= 0 %}from-blue-500 to-blue-600{% else %}from-rose-500 to-rose-600{% endif %} kpi-card rounded-xl shadow-md p-4 text-white min-h-[128px]">
-                <div class="w-full min-w-0">
-                    <p class="{% if ganancia_neta_mes >= 0 %}text-white/90{% else %}text-rose-100{% endif %} text-sm">Ganancia Neta</p>
-                    <p class="kpi-amount kpi-amount-hero font-bold mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ "{:,.0f}".format(ganancia_neta_mes).replace(",", ".") }}</p>
-                    <p class="{% if ganancia_neta_mes >= 0 %}text-white/80{% else %}text-rose-100{% endif %} text-xs mt-2 leading-snug">
-                        Excluye ingresos manuales y descuenta gastos corrientes del mes.
-                    </p>
-                </div>
-            </div>
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 kpi-card rounded-xl shadow-md p-4 text-white min-h-[128px]">
-                <button type="button" @click="abrirDetalleModal('ingresos')"
-                    class="w-full h-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-white/70">
-                    <div class="w-full min-w-0">
-                        <p class="text-white/90 text-sm">Ingresos Caja</p>
-                        <p class="kpi-amount kpi-amount-hero font-bold mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</p>
-                        <p class="text-white/80 text-xs mt-2 leading-snug">Ventas + cobros + ajustes + reversas.</p>
-                        <p class="text-white/80 text-[11px] mt-2 font-semibold uppercase tracking-wide">Click para ver detalle</p>
-                    </div>
+        <div class="mb-5 overflow-x-auto pb-1" data-html2canvas-ignore="true">
+            <div class="inline-flex min-w-full gap-2 rounded-2xl border border-slate-300 bg-slate-200/80 p-1.5 shadow-inner dark:border-slate-600 dark:bg-slate-800"
+                role="tablist" aria-label="Vistas de contabilidad">
+                <button type="button" id="contabilidad-tab-resumen" role="tab" x-ref="tabResumen"
+                    @click="vista = 'resumen'"
+                    @keydown.right.prevent="vista = 'flujo'; $refs.tabFlujo.focus()"
+                    @keydown.left.prevent="vista = 'detalle'; $refs.tabDetalle.focus()"
+                    :aria-selected="vista === 'resumen'" :tabindex="vista === 'resumen' ? 0 : -1"
+                    aria-controls="contabilidad-panel-resumen"
+                    :class="vista === 'resumen'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25 ring-1 ring-emerald-700 dark:bg-emerald-500 dark:text-slate-950 dark:ring-emerald-400'
+                        : 'bg-white/75 text-slate-600 ring-1 ring-inset ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300'"
+                    class="inline-flex min-w-max flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
+                    <i class="fas fa-chart-pie text-xs"></i>
+                    Resumen
+                </button>
+                <button type="button" id="contabilidad-tab-flujo" role="tab" x-ref="tabFlujo"
+                    @click="vista = 'flujo'"
+                    @keydown.right.prevent="vista = 'detalle'; $refs.tabDetalle.focus()"
+                    @keydown.left.prevent="vista = 'resumen'; $refs.tabResumen.focus()"
+                    :aria-selected="vista === 'flujo'" :tabindex="vista === 'flujo' ? 0 : -1"
+                    aria-controls="contabilidad-panel-flujo"
+                    :class="vista === 'flujo'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-700 dark:bg-blue-500 dark:text-white dark:ring-blue-400'
+                        : 'bg-white/75 text-slate-600 ring-1 ring-inset ring-slate-200 hover:bg-blue-50 hover:text-blue-700 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-300'"
+                    class="inline-flex min-w-max flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
+                    <i class="fas fa-money-bill-transfer text-xs"></i>
+                    Flujo de caja
+                </button>
+                <button type="button" id="contabilidad-tab-detalle" role="tab" x-ref="tabDetalle"
+                    @click="vista = 'detalle'"
+                    @keydown.right.prevent="vista = 'resumen'; $refs.tabResumen.focus()"
+                    @keydown.left.prevent="vista = 'flujo'; $refs.tabFlujo.focus()"
+                    :aria-selected="vista === 'detalle'" :tabindex="vista === 'detalle' ? 0 : -1"
+                    aria-controls="contabilidad-panel-detalle"
+                    :class="vista === 'detalle'
+                        ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/25 ring-1 ring-cyan-700 dark:bg-cyan-500 dark:text-slate-950 dark:ring-cyan-400'
+                        : 'bg-white/75 text-slate-600 ring-1 ring-inset ring-slate-200 hover:bg-cyan-50 hover:text-cyan-700 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-300'"
+                    class="inline-flex min-w-max flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/60 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
+                    <i class="fas fa-list-ul text-xs"></i>
+                    Detalle de movimientos
                 </button>
             </div>
-            <div class="bg-gradient-to-br from-red-500 to-red-600 kpi-card rounded-xl shadow-md p-4 text-white min-h-[128px]">
-                <button type="button" @click="abrirDetalleModal('egresos')"
-                    class="w-full h-full text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-white/70">
-                    <div class="w-full min-w-0">
-                        <p class="text-red-100 text-sm">Egresos Caja</p>
-                        <p class="kpi-amount kpi-amount-hero font-bold mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</p>
-                        <p class="text-red-100 text-xs mt-2 leading-snug">Compras + egresos + anulaciones del período.</p>
-                        <p class="text-red-100 text-[11px] mt-2 font-semibold uppercase tracking-wide">Click para ver detalle</p>
-                    </div>
-                </button>
-            </div>
         </div>
 
-        {% set kpi_sec = namespace(n=0) %}
-        {% for _v in [ventas_emitidas, cobrado_en_ventas, saldo_financiado_generado, total_cobros_creditos, interes_financiero_generado, total_pagos_compras, gastos_corrientes_mes, descuentos_manuales_ventas, descuentos_fidelizacion_ventas, saldo_favor_fidelizacion_aplicado] %}{% set kpi_sec.n = [kpi_sec.n, ('{:,.0f}'.format(_v)|length) + 2]|max %}{% endfor %}
-        <div class="mt-5 grid kpi-grid-sec gap-3 lg:gap-4 xl:max-w-[1380px] mx-auto" style="--kpi-len: {{ kpi_sec.n }}">
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Ventas Emitidas</p>
-                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(ventas_emitidas).replace(",", ".") }}</p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Cobrado en Ventas</p>
-                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(cobrado_en_ventas).replace(",", ".") }}</p>
-                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Solo incluye pagos registrados al momento de la venta.</p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Saldo Financiado</p>
-                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(saldo_financiado_generado).replace(",", ".") }}</p>
-                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Monto enviado a cuenta por cobrar en ventas a credito.</p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Cobros de Créditos</p>
-                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(total_cobros_creditos).replace(",", ".") }}</p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Interés Financiero</p>
-                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(interes_financiero_generado).replace(",", ".") }}</p>
-                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Se genera solo en planes de cuotas con interes.</p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Pagos de Compras</p>
-                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(total_pagos_compras).replace(",", ".") }}</p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Gastos Corrientes</p>
-                    <p class="kpi-amount font-bold text-gray-800 dark:text-white mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(gastos_corrientes_mes).replace(",", ".") }}</p>
-                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">
-                        {% if gastos_corrientes_fuera_caja > 0 %}
-                        Incluye ₲ {{ "{:,.0f}".format(gastos_corrientes_fuera_caja).replace(",", ".") }} pagados fuera de caja.
-                        {% else %}
-                        Todos los gastos del período impactaron desde caja.
-                        {% endif %}
-                    </p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Descuentos Manuales</p>
-                    <p class="kpi-amount font-bold text-amber-600 dark:text-amber-400 mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(descuentos_manuales_ventas).replace(",", ".") }}</p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Desc. Fidelización</p>
-                    <p class="kpi-amount font-bold text-emerald-600 dark:text-emerald-400 mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(descuentos_fidelizacion_ventas).replace(",", ".") }}</p>
-                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">Incluye saldo a favor y beneficios aplicados.</p>
-                </div>
-            </div>
-            <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
-                <div class="w-full min-w-0">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">Saldo a Favor Usado</p>
-                    <p class="kpi-amount font-bold text-cyan-600 dark:text-cyan-400 mt-1 leading-tight"><span class="kpi-cur">₲</span>{{
-                        "{:,.0f}".format(saldo_favor_fidelizacion_aplicado).replace(",", ".") }}</p>
-                </div>
-            </div>
+        <div id="contabilidad-panel-resumen" role="tabpanel" aria-labelledby="contabilidad-tab-resumen"
+            x-show="vista === 'resumen'">
+            {% include 'caja/_contabilidad_resumen.html' %}
+        </div>
+        <div id="contabilidad-panel-flujo" role="tabpanel" aria-labelledby="contabilidad-tab-flujo"
+            x-show="vista === 'flujo'" x-cloak>
+            {% include 'caja/_contabilidad_flujo.html' %}
+        </div>
+        <div id="contabilidad-panel-detalle" role="tabpanel" aria-labelledby="contabilidad-tab-detalle"
+            x-show="vista === 'detalle'" x-cloak>
+            {% include 'caja/_contabilidad_detalle.html' %}
         </div>
 
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden mt-6">
-            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 class="font-semibold text-gray-700 dark:text-gray-200">Ajustes Comerciales No Caja</h2>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-gray-50 dark:bg-gray-700/50">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
-                            <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                        {% for row in conceptos_no_caja %}
-                        <tr>
-                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ row.concepto }}</td>
-                            <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">₲ {{ "{:,.0f}".format(row.monto or 0).replace(",", ".") }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="2" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">Sin ajustes comerciales no caja en el período.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl px-4 py-3 text-sm text-blue-900 dark:text-blue-100 space-y-1">
-            <p>
-                <span class="font-semibold">Lectura del informe:</span>
-                Resultado Caja usa cobros reales (incluye movimientos manuales). Ganancia Neta mide rendimiento operativo del mes.
-            </p>
-            {% if resultado_caja_mes >= 0 and ganancia_neta_mes < 0 %}
-            <p>
-                Hay caja positiva, pero la operación del mes dio pérdida. Puede ocurrir por cobros de créditos o ingresos manuales
-                (por ejemplo, inicio de caja) que aumentan caja, pero no cuentan como ganancia operativa.
-            </p>
-            {% elif resultado_caja_mes < 0 and ganancia_neta_mes >= 0 %}
-            <p>
-                La operación del mes es rentable, pero la caja quedó negativa por salidas de efectivo del período (pagos, compras o
-                gastos) mayores a los cobros en caja.
-            </p>
-            {% elif resultado_caja_mes >= 0 and ganancia_neta_mes >= 0 %}
-            <p>
-                Escenario saludable: hubo liquidez positiva y también rentabilidad operativa.
-            </p>
-            {% else %}
-            <p>
-                Señal de alerta: hubo salida neta de caja y además pérdida operativa en el período.
-            </p>
-            {% endif %}
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 class="font-semibold text-gray-700 dark:text-gray-200">Flujo de Caja por Concepto</h2>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-gray-50 dark:bg-gray-700/50">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
-                            <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Entrada</th>
-                            <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Salida</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                        {% for row in conceptos %}
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ row.concepto }}</td>
-                            <td
-                                class="px-4 py-3 text-right {% if row.entrada > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-gray-800 dark:text-gray-100{% endif %}">
-                                ₲ {{ "{:,.0f}".format(row.entrada or 0).replace(",", ".") }}
-                            </td>
-                            <td
-                                class="px-4 py-3 text-right {% if row.salida > 0 %}text-red-600 dark:text-red-400{% else %}text-gray-800 dark:text-gray-100{% endif %}">
-                                ₲ {{ "{:,.0f}".format(row.salida or 0).replace(",", ".") }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% if conceptos|length == 0 %}
-                        <tr>
-                            <td colspan="3" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
-                                No hay movimientos en el período seleccionado.
-                            </td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                    <tfoot class="bg-gray-50 dark:bg-gray-700/50">
-                        <tr>
-                            <td class="px-4 py-3 text-right font-bold text-gray-800 dark:text-gray-100">Totales</td>
-                            <td class="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                                <button type="button" @click="abrirDetalleModal('ingresos')"
-                                    class="inline-flex items-center gap-2 rounded-md px-2 py-1 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
-                                    <span>₲ {{ "{:,.0f}".format(total_ingresos).replace(",", ".") }}</span>
-                                    <i class="fas fa-up-right-from-square text-xs"></i>
-                                </button>
-                            </td>
-                            <td class="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400">
-                                <button type="button" @click="abrirDetalleModal('egresos')"
-                                    class="inline-flex items-center gap-2 rounded-md px-2 py-1 hover:bg-red-50 dark:hover:bg-red-900/20 focus:outline-none focus:ring-2 focus:ring-red-500/40">
-                                    <span>₲ {{ "{:,.0f}".format(total_egresos).replace(",", ".") }}</span>
-                                    <i class="fas fa-up-right-from-square text-xs"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                <h2 class="font-semibold text-gray-700 dark:text-gray-200">Detalle Operativo y de Caja</h2>
-                <span class="text-sm text-gray-500 dark:text-gray-400">{{ detalles|length }} registros</span>
-            </div>
-            <div class="overflow-x-auto max-h-96">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
-                        <tr>
-                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
-                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Tipo</th>
-                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Referencia
-                            </th>
-                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Detalle
-                            </th>
-                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Forma de Pago
-                            </th>
-                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Entrada</th>
-                            <th class="bg-gray-50 dark:bg-gray-800 px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Salida</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                        {% for d in detalles %}
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                            <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ d.fecha|local_strftime('%d/%m/%Y
-                                %H:%M') }}</td>
-                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ d.concepto }}</td>
-                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ d.referencia }}</td>
-                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ d.detalle }}</td>
-                            <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ d.forma_pago }}</td>
-                            <td
-                                class="px-4 py-3 text-right {% if d.entrada > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-gray-800 dark:text-gray-100{% endif %}">
-                                ₲ {{ "{:,.0f}".format(d.entrada or 0).replace(",", ".") }}
-                            </td>
-                            <td
-                                class="px-4 py-3 text-right {% if d.salida > 0 %}text-red-600 dark:text-red-400{% else %}text-gray-800 dark:text-gray-100{% endif %}">
-                                ₲ {{ "{:,.0f}".format(d.salida or 0).replace(",", ".") }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% if detalles|length == 0 %}
-                        <tr>
-                            <td colspan="7" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
-                                No hay movimientos en el período seleccionado.
-                            </td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div>
+
+    {% include 'caja/_contabilidad_ayuda_kpi.html' %}
 
     <div x-show="detalleModalOpen" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
         <div class="fixed inset-0 bg-gray-900/60" @click="cerrarDetalleModal()"></div>
@@ -393,15 +145,17 @@
                 x-transition:leave="ease-in duration-150"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                role="dialog" aria-modal="true" aria-labelledby="contabilidad-detalle-titulo"
                 class="relative w-full max-w-6xl rounded-2xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="detalleModalTitulo"></h3>
+                        <h3 id="contabilidad-detalle-titulo" class="text-lg font-semibold text-gray-900 dark:text-white" x-text="detalleModalTitulo"></h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                             Período filtrado: {{ desde.strftime('%d/%m/%Y') if desde else '-' }} - {{ hasta.strftime('%d/%m/%Y') if hasta else '-' }}
                         </p>
                     </div>
                     <button type="button" @click="cerrarDetalleModal()"
+                        aria-label="Cerrar detalle"
                         class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400/40 rounded-lg p-2">
                         <i class="fas fa-times"></i>
                     </button>
@@ -411,53 +165,109 @@
                     <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
                         <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Total</p>
                         <p class="mt-1 text-2xl font-bold"
-                            :class="detalleModalTipo === 'ingresos' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
+                            :class="detalleModalTono === 'ingreso'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : (detalleModalTono === 'descuento' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')"
                             x-text="'₲ ' + formatMoney(detalleModalTotal)"></p>
                     </div>
                     <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
-                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Registros</p>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Movimientos</p>
                         <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white" x-text="detalleModalCount"></p>
                     </div>
                     <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
-                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo</p>
-                        <p class="mt-1 text-sm font-semibold"
-                            :class="detalleModalTipo === 'ingresos' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
-                            x-text="detalleModalTipo === 'ingresos' ? 'Entradas del período' : 'Salidas del período'"></p>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipos</p>
+                        <p class="mt-1 text-2xl font-bold"
+                            :class="detalleModalTono === 'ingreso'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : (detalleModalTono === 'descuento' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')"
+                            x-text="detalleModalGrupos.length"></p>
                     </div>
                 </div>
 
-                <div class="max-h-[70vh] overflow-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
-                            <tr>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Referencia</th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Detalle</th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Forma de Pago</th>
-                                <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <template x-for="(item, index) in detalleModalItems" :key="`${detalleModalTipo}-${index}`">
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
-                                    <td class="px-4 py-3 text-gray-600 dark:text-gray-300" x-text="item.fecha || '-'"></td>
-                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100" x-text="item.concepto || '-'"></td>
-                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100" x-text="item.referencia || '-'"></td>
-                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100" x-text="item.detalle || '-'"></td>
-                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100" x-text="item.forma_pago || '-'"></td>
-                                    <td class="px-4 py-3 text-right font-semibold"
-                                        :class="detalleModalTipo === 'ingresos' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
-                                        x-text="'₲ ' + formatMoney(item.monto)"></td>
-                                </tr>
-                            </template>
-                            <tr x-show="!detalleModalItems.length">
-                                <td colspan="6" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
-                                    No hay registros para este total con el filtro actual.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="border-b border-gray-200 dark:border-gray-700 bg-blue-50/70 dark:bg-blue-900/20 px-6 py-3">
+                    <p class="text-sm text-blue-900 dark:text-blue-100" x-text="detalleModalAlcance"></p>
+                </div>
+
+                <div class="max-h-[70vh] overflow-auto bg-gray-50/70 dark:bg-gray-900/20 p-4 space-y-3">
+                    <template x-for="grupo in detalleModalGrupos" :key="`${detalleModalTipo}-${grupo.key}`">
+                        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                            <button type="button" @click="toggleDetalleGrupo(grupo.key)"
+                                class="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                                :aria-expanded="detalleGrupoAbierto === grupo.key">
+                                <i class="fas fa-chevron-right w-3 text-xs text-gray-400 transition-transform"
+                                    :class="detalleGrupoAbierto === grupo.key ? 'rotate-90' : ''"></i>
+                                <span class="min-w-0 flex-1">
+                                    <span class="block font-semibold text-gray-900 dark:text-white" x-text="grupo.label"></span>
+                                    <span class="block text-xs text-gray-500 dark:text-gray-400"
+                                        x-text="`${grupo.count} movimiento${grupo.count === 1 ? '' : 's'}`"></span>
+                                </span>
+                                <span class="shrink-0 font-bold"
+                                    :class="detalleModalTono === 'ingreso'
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : (detalleModalTono === 'descuento' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')"
+                                    x-text="'₲ ' + formatMoney(grupo.total)"></span>
+                            </button>
+                            <div x-show="detalleGrupoAbierto === grupo.key" class="space-y-2 border-t border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/30">
+                                <template x-for="origen in grupo.origins" :key="`${grupo.key}-${origen.key}`">
+                                    <div class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                                        <button type="button" @click="toggleDetalleOrigen(grupo.key, origen.key)"
+                                            class="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                                            :aria-expanded="detalleOrigenAbierto === `${grupo.key}::${origen.key}`">
+                                            <i class="fas fa-chevron-right w-3 text-[10px] text-gray-400 transition-transform"
+                                                :class="detalleOrigenAbierto === `${grupo.key}::${origen.key}` ? 'rotate-90' : ''"></i>
+                                            <span class="min-w-0 flex-1">
+                                                <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="origen.label"></span>
+                                                <span class="block text-xs text-gray-500 dark:text-gray-400"
+                                                    x-text="`${origen.count} movimiento${origen.count === 1 ? '' : 's'}`"></span>
+                                            </span>
+                                            <span class="shrink-0 text-sm font-bold text-gray-800 dark:text-gray-100"
+                                                x-text="'₲ ' + formatMoney(origen.total)"></span>
+                                        </button>
+                                        <div x-show="detalleOrigenAbierto === `${grupo.key}::${origen.key}`" class="overflow-x-auto border-t border-gray-200 dark:border-gray-700">
+                                            <table class="min-w-full text-sm">
+                                                <thead class="bg-gray-50 dark:bg-gray-900/40">
+                                                    <tr>
+                                                        <th class="px-4 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Fecha</th>
+                                                        <th class="px-4 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
+                                                        <th class="px-4 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Referencia</th>
+                                                        <th class="px-4 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Detalle</th>
+                                                        <th class="px-4 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">Forma de pago</th>
+                                                        <th class="px-4 py-2 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                                    <template x-for="(item, index) in origen.items" :key="`${grupo.key}-${origen.key}-${index}`">
+                                                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                                            <td class="px-4 py-2 text-gray-600 dark:text-gray-300" x-text="item.fecha || '-'"></td>
+                                                            <td class="px-4 py-2 text-gray-900 dark:text-gray-100" x-text="item.concepto || '-'"></td>
+                                                            <td class="px-4 py-2 text-gray-900 dark:text-gray-100">
+                                                                <a x-show="item.venta_id"
+                                                                    :href="ventaDetalleUrl(item.venta_id)" target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    class="inline-flex items-center gap-1.5 font-semibold text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+                                                                    title="Ver la venta y sus productos">
+                                                                    <span x-text="item.referencia || `Venta #${item.venta_id}`"></span>
+                                                                    <i class="fas fa-arrow-up-right-from-square text-[10px]" aria-hidden="true"></i>
+                                                                    <span class="sr-only">Ver venta y productos</span>
+                                                                </a>
+                                                                <span x-show="!item.venta_id" x-text="item.referencia || '-'"></span>
+                                                            </td>
+                                                            <td class="px-4 py-2 text-gray-900 dark:text-gray-100" x-text="item.detalle || '-'"></td>
+                                                            <td class="px-4 py-2 text-gray-900 dark:text-gray-100" x-text="item.forma_pago || '-'"></td>
+                                                            <td class="px-4 py-2 text-right font-semibold" x-text="'₲ ' + formatMoney(item.monto)"></td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </section>
+                    </template>
+                    <div x-show="!detalleModalGrupos.length" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                        No hay movimientos para este total con el filtro actual.
+                    </div>
                 </div>
 
                 <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
@@ -541,7 +351,7 @@
     })();
 </script>
 <script>
-    function contabilidadReportApp() {
+    function contabilidadReportApp(vistaInicial = 'resumen') {
         let payload = {};
         try {
             const raw = document.getElementById('contabilidad-detalle-modal-data')?.textContent || '{}';
@@ -550,29 +360,153 @@
             payload = {};
         }
         return {
+            vista: vistaInicial,
             detalleFuente: payload || {},
             detalleModalOpen: false,
             detalleModalTipo: 'ingresos',
             detalleModalTitulo: '',
-            detalleModalItems: [],
+            detalleModalAlcance: '',
+            detalleModalTono: 'ingreso',
+            detalleModalGrupos: [],
+            detalleGrupoAbierto: null,
+            detalleOrigenAbierto: null,
             detalleModalTotal: 0,
             detalleModalCount: 0,
+            ayudaKpiOpen: false,
+            ayudaKpiTitulo: '',
+            ayudaKpiResumen: '',
+            ayudaKpiAclaracion: '',
+            ayudaKpiFormula: '',
+            ayudaKpiDisparador: null,
             formatMoney(value) {
                 const number = Number(value || 0);
                 return new Intl.NumberFormat('es-PY').format(Number.isFinite(number) ? number : 0);
             },
+            // Tipo (concepto) > origen (forma de pago) > movimientos, ordenados por monto.
+            agruparDetalle(items) {
+                const grupos = new Map();
+                items.forEach((item) => {
+                    const ventaMatch = /Venta #(\d+)/.exec(item.referencia || '');
+                    const fila = { ...item, venta_id: ventaMatch ? Number(ventaMatch[1]) : null };
+                    const gKey = fila.concepto || 'Sin concepto';
+                    const oKey = fila.forma_pago || 'Sin forma de pago';
+                    if (!grupos.has(gKey)) grupos.set(gKey, { key: gKey, label: gKey, total: 0, count: 0, origenes: new Map() });
+                    const grupo = grupos.get(gKey);
+                    if (!grupo.origenes.has(oKey)) grupo.origenes.set(oKey, { key: oKey, label: oKey, total: 0, count: 0, items: [] });
+                    const origen = grupo.origenes.get(oKey);
+                    const monto = Number(fila.monto || 0);
+                    grupo.total += monto; grupo.count += 1;
+                    origen.total += monto; origen.count += 1; origen.items.push(fila);
+                });
+                const porTotal = (x, y) => y.total - x.total;
+                return [...grupos.values()].map((g) => ({
+                    key: g.key, label: g.label, total: g.total, count: g.count,
+                    origins: [...g.origenes.values()].sort(porTotal),
+                })).sort(porTotal);
+            },
+            ventaDetalleUrl(ventaId) {
+                const baseUrl = {{ url_for('ventas.detalle', id=0)|tojson }};
+                return baseUrl.replace(/0$/, String(ventaId));
+            },
             abrirDetalleModal(tipo) {
-                const modalTipo = tipo === 'egresos' ? 'egresos' : 'ingresos';
+                this.cerrarAyudaKpi(false);
+                const configuraciones = {
+                    ingresos: {
+                        titulo: 'Detalle de Ingresos',
+                        alcance: 'Primero elegí el tipo de ingreso y después su origen para ver los movimientos.',
+                        tono: 'ingreso'
+                    },
+                    egresos: {
+                        titulo: 'Detalle de Egresos',
+                        alcance: 'Primero elegí el tipo de egreso y después de dónde salió el dinero.',
+                        tono: 'egreso'
+                    }
+                };
+                const modalTipo = Object.prototype.hasOwnProperty.call(configuraciones, tipo) ? tipo : 'ingresos';
+                const configuracion = configuraciones[modalTipo];
                 const payload = this.detalleFuente?.[modalTipo] || {};
                 this.detalleModalTipo = modalTipo;
-                this.detalleModalTitulo = modalTipo === 'ingresos' ? 'Detalle de Ingresos Caja' : 'Detalle de Egresos Caja';
-                this.detalleModalItems = Array.isArray(payload.items) ? payload.items : [];
+                this.detalleModalTitulo = configuracion.titulo;
+                this.detalleModalAlcance = configuracion.alcance;
+                this.detalleModalTono = configuracion.tono;
+                this.detalleModalGrupos = this.agruparDetalle(Array.isArray(payload.items) ? payload.items : []);
+                this.detalleGrupoAbierto = this.detalleModalGrupos.length === 1
+                    ? this.detalleModalGrupos[0].key
+                    : null;
+                const grupoUnico = this.detalleModalGrupos.length === 1 ? this.detalleModalGrupos[0] : null;
+                this.detalleOrigenAbierto = grupoUnico?.origins?.length === 1
+                    ? `${grupoUnico.key}::${grupoUnico.origins[0].key}`
+                    : null;
                 this.detalleModalTotal = Number(payload.total || 0);
-                this.detalleModalCount = Number(payload.count || this.detalleModalItems.length || 0);
+                this.detalleModalCount = Number(payload.count || 0);
                 this.detalleModalOpen = true;
+            },
+            toggleDetalleGrupo(key) {
+                this.detalleGrupoAbierto = this.detalleGrupoAbierto === key ? null : key;
+                this.detalleOrigenAbierto = null;
+            },
+            toggleDetalleOrigen(groupKey, originKey) {
+                const key = `${groupKey}::${originKey}`;
+                this.detalleOrigenAbierto = this.detalleOrigenAbierto === key ? null : key;
             },
             cerrarDetalleModal() {
                 this.detalleModalOpen = false;
+                this.detalleGrupoAbierto = null;
+                this.detalleOrigenAbierto = null;
+            },
+            abrirAyudaKpi(tipo, disparador) {
+                const explicaciones = {
+                    resultado_dinero: {
+                        titulo: 'Movimiento Neto',
+                        resumen: 'Es todo el dinero registrado que entró menos todo el que salió en el período.',
+                        aclaracion: 'Incluye caja, transferencias y otros métodos. No representa por sí solo la ganancia.',
+                        formula: 'Ingresos − Egresos'
+                    },
+                    resultado_operativo: {
+                        titulo: 'Resultado Operativo',
+                        resumen: 'Compara las ventas del período con las compras y los gastos.',
+                        aclaracion: 'No es ganancia real: descuenta toda compra, aunque siga en stock.',
+                        formula: 'Ventas − compras − gastos'
+                    },
+                    ingresos: {
+                        titulo: 'Ingresos',
+                        resumen: 'Es todo el dinero registrado que entró, sin importar su origen.',
+                        aclaracion: 'Incluye caja, transferencias y otros métodos: ventas, cobros de créditos, pedidos, ajustes y reversas.',
+                        formula: ''
+                    },
+                    egresos: {
+                        titulo: 'Egresos',
+                        resumen: 'Es todo el dinero registrado que salió, sin importar su origen.',
+                        aclaracion: 'Incluye caja, transferencias y otros métodos: compras, gastos, vueltos y anulaciones.',
+                        formula: ''
+                    },
+                    gastos_corrientes: {
+                        titulo: 'Gastos Corrientes',
+                        resumen: 'Son los gastos fijos del negocio pagados en el período (alquiler, luz, servicios).',
+                        aclaracion: 'Los pagados desde caja ya están incluidos en Egresos.',
+                        formula: ''
+                    }
+                };
+                const explicacion = explicaciones[tipo];
+                if (!explicacion) return;
+                this.ayudaKpiTitulo = explicacion.titulo;
+                this.ayudaKpiResumen = explicacion.resumen;
+                this.ayudaKpiAclaracion = explicacion.aclaracion;
+                this.ayudaKpiFormula = explicacion.formula;
+                this.ayudaKpiDisparador = disparador || null;
+                this.ayudaKpiOpen = true;
+            },
+            cerrarAyudaKpi(devolverFoco = true) {
+                this.ayudaKpiOpen = false;
+                const disparador = this.ayudaKpiDisparador;
+                this.ayudaKpiDisparador = null;
+                if (devolverFoco && disparador && document.contains(disparador)) {
+                    requestAnimationFrame(() => disparador.focus());
+                }
+            },
+            cerrarModales() {
+                this.cerrarDetalleModal();
+                this.cerrarAyudaKpi();
             }
         }
     }

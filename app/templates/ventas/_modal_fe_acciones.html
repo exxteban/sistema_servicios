@@ -1,0 +1,131 @@
+{# Factura electronica en el modal del Historial de ventas: estado, notas de
+   credito y las acciones que `acciones_para_venta` permite (emitir, corregir
+   rechazo, cancelar, anular con NC, inutilizar). Los datos salen de
+   `datos_fe_modal`. Son formularios POST de verdad (no fetch) para que el
+   flash y el redirect se comporten igual que en el detalle de la venta.
+   Espera `fe_motivos_nc` en el contexto. #}
+<template x-if="venta && venta.fe">
+    <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-4 space-y-3 text-left">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Factura electrónica</span>
+            <span class="font-mono text-xs text-gray-700 dark:text-gray-200" x-text="venta.fe.numero"></span>
+            <span class="rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                x-show="!venta.fe.estado">sin factura</span>
+            <span class="rounded px-2 py-0.5 text-xs font-semibold"
+                x-show="venta.fe.estado"
+                :class="{
+                    'bg-green-100 text-green-800': venta.fe.estado === 'aprobado',
+                    'bg-red-100 text-red-800': ['cancelado','rechazado','error'].includes(venta.fe.estado),
+                    'bg-amber-100 text-amber-800': venta.fe.estado === 'inutilizado',
+                    'bg-blue-100 text-blue-800': ['generado','firmado','enviado'].includes(venta.fe.estado)
+                }"
+                x-text="venta.fe.estado"></span>
+        </div>
+
+        <template x-for="nota in venta.fe.notas" :key="nota.numero">
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Nota de crédito <span class="font-mono" x-text="nota.numero"></span>
+                (<span x-text="nota.estado"></span>)
+            </p>
+        </template>
+
+        <p class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-2 text-xs text-blue-800 dark:text-blue-200"
+            x-show="venta.fe.envio_en_curso && venta.fe.estado === 'firmado'">
+            El envío a SIFEN se hace solo en unos minutos; no hay nada que hacer.
+        </p>
+        <p class="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-2 text-xs text-amber-800 dark:text-amber-200"
+            x-show="venta.fe.envio_en_curso && venta.fe.estado !== 'firmado'">
+            Todavía no se pudo emitir, así que no hay comprobante para entregar. El
+            sistema lo reintenta solo cada unos minutos.
+        </p>
+
+        <p class="text-xs text-gray-500 dark:text-gray-400" x-show="!venta.fe.puede_operar">
+            Para anular o acreditar esta factura hacen falta permisos de facturación electrónica.
+        </p>
+
+        <form method="post" :action="venta.fe.url_emitir" x-show="venta.fe.puede_emitir"
+            class="space-y-2 rounded-lg border border-emerald-200 dark:border-emerald-900 p-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs text-gray-600 dark:text-gray-300">
+                Esta venta se cobró sin factura electrónica. Se emite con los datos
+                de la venta y el cliente que ya tiene cargados.
+            </p>
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-700">
+                <i class="fas fa-file-circle-check mr-2"></i>Emitir factura electrónica
+            </button>
+        </form>
+
+        <form method="post" :action="venta.fe.url_emitir" x-show="venta.fe.puede_corregir_rechazo"
+            class="space-y-2 rounded-lg border border-red-200 dark:border-red-900 p-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-red-700 dark:text-red-300">SIFEN rechazó la factura</p>
+            <p class="text-xs text-gray-700 dark:text-gray-200" x-text="venta.fe.motivo_rechazo"></p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Corregí lo que indica y reenviala: sale con el mismo número.
+            </p>
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-700">
+                <i class="fas fa-rotate-right mr-2"></i>Corregir y reenviar
+            </button>
+        </form>
+
+        <p class="text-xs text-purple-700 dark:text-purple-300" x-show="venta.fe.devoluciones_pendientes > 0">
+            Hay <span x-text="venta.fe.devoluciones_pendientes"></span> devolución(es) sin acreditar.
+            Se emiten desde <button type="button" class="underline"
+                @click="window.location.href = '/ventas/' + venta.id">la venta</button>,
+            donde está el detalle de lo que volvió.
+        </p>
+
+        <form method="post" :action="venta.fe.url_cancelar" x-show="venta.fe.puede_cancelar"
+            class="space-y-2 rounded-lg border border-red-200 dark:border-red-900 p-3"
+            onsubmit="return confirm('¿Cancelar esta factura electrónica en SIFEN? Esta acción es definitiva.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-red-700 dark:text-red-300">Cancelar la factura en SIFEN</p>
+            <input type="text" name="motivo" required minlength="5" maxlength="500"
+                placeholder="Motivo (5 a 500 caracteres)"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700">
+                <i class="fas fa-ban mr-2"></i>Cancelar factura
+            </button>
+        </form>
+
+        <form method="post" :action="venta.fe.url_anular_nc" x-show="venta.fe.puede_anular_con_nc"
+            class="space-y-2 rounded-lg border border-orange-200 dark:border-orange-900 p-3"
+            onsubmit="return confirm('¿Emitir una nota de crédito por el TOTAL de esta factura? No mueve plata ni stock: para revertir el cobro hay que anular la venta después.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-orange-700 dark:text-orange-300">Anular la factura con una nota de crédito</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400" x-show="venta.fe.plazo_cancelacion_vencido">
+                Pasaron más de 48h: SIFEN ya no permite cancelarla, así que esta es la única salida.
+            </p>
+            <select name="motivo" required
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+                {% for codigo, texto in fe_motivos_nc %}
+                <option value="{{ codigo }}">{{ texto }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="descripcion" maxlength="255"
+                placeholder="Detalle (opcional, va en el documento)"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-700">
+                <i class="fas fa-file-circle-xmark mr-2"></i>Anular con NC
+            </button>
+        </form>
+
+        <form method="post" :action="venta.fe.url_inutilizar" x-show="venta.fe.puede_inutilizar"
+            class="space-y-2 rounded-lg border border-amber-200 dark:border-amber-900 p-3"
+            onsubmit="return confirm('¿Informar a SIFEN que este número no se va a usar? No se puede deshacer.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">Este número quedó sin usar: hay que informarlo</p>
+            <input type="text" name="motivo" required minlength="5" maxlength="500"
+                placeholder="Motivo (5 a 500 caracteres)"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            <button type="submit"
+                class="inline-flex items-center rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-800">
+                <i class="fas fa-eraser mr-2"></i>Inutilizar número
+            </button>
+        </form>
+    </div>
+</template>

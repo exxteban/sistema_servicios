@@ -159,6 +159,8 @@
 
         {% include 'ventas/_facturacion_electronica.html' %}
 
+        {% include 'ventas/_devoluciones.html' %}
+
         <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
             <a href="{{ url_for('ventas.listar') }}" class="text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors">
                 <i class="fas fa-arrow-left mr-2"></i>Volver
@@ -179,6 +181,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if puede_devolver and lineas_devolucion %}{% include 'ventas/_devoluciones_js.html' %}{% endif %}
 <script>
     async function anularVenta(idVenta) {
         if (!confirm('¿Anular esta venta? Se restaurará el stock.')) return;

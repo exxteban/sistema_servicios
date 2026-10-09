@@ -1,0 +1,106 @@
+{# JS de la pantalla de devolucion (ventas/_devoluciones.html). El endpoint
+   valida todo de nuevo; aca solo se arma el pedido. #}
+<script>
+    // --- Devolución -------------------------------------------------------
+    // El endpoint valida todo de nuevo; acá sólo se arma el pedido y se
+    // muestra el error que devuelve, que es el que sabe de verdad qué pasó.
+    function itemsDevolucion() {
+        const items = [];
+        document.querySelectorAll('[data-devolucion-item]').forEach((input) => {
+            const cantidad = parseInt(input.value || '0', 10);
+            if (cantidad > 0) {
+                items.push({
+                    id_detalle_venta: parseInt(input.dataset.devolucionItem, 10),
+                    cantidad: cantidad,
+                });
+            }
+        });
+        return items;
+    }
+
+    function recalcularDevolucion() {
+        let total = 0;
+        document.querySelectorAll('[data-devolucion-item]').forEach((input) => {
+            const cantidad = parseFloat(input.value || '0');
+            const maximo = parseFloat(input.max || '0');
+            // El endpoint también lo rechaza, pero avisar acá evita cargar la
+            // devolución entera para enterarse recién al confirmar.
+            if (cantidad > maximo) input.value = maximo;
+            total += parseFloat(input.value || '0') * parseFloat(input.dataset.precio || '0');
+        });
+        const salida = document.getElementById('devolucionTotal');
+        if (salida) salida.textContent = '₲ ' + Math.round(total).toLocaleString('es-PY');
+    }
+
+    function abrirDevolucion() {
+        const modal = document.getElementById('devolucionModal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        recalcularDevolucion();
+    }
+
+    function cerrarDevolucion() {
+        const modal = document.getElementById('devolucionModal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function errorDevolucion(mensaje) {
+        const p = document.getElementById('devolucionError');
+        if (!p) return;
+        p.textContent = mensaje;
+        p.classList.toggle('hidden', !mensaje);
+    }
+
+    async function confirmarDevolucion(idVenta) {
+        errorDevolucion('');
+        const items = itemsDevolucion();
+        if (!items.length) {
+            errorDevolucion('Indicá al menos un ítem para devolver.');
+            return;
+        }
+        const motivo = (document.getElementById('devolucionMotivo').value || '').trim();
+        if (!motivo) {
+            errorDevolucion('Indicá el motivo de la devolución.');
+            return;
+        }
+
+        await ejecutarConAutorizacion(
+            'anular_venta',
+            `Devolución de venta #${idVenta}`,
+            async (idAutorizacion) => {
+                const boton = document.getElementById('devolucionConfirmar');
+                if (boton) boton.disabled = true;
+                try {
+                    const respuesta = await fetch(`/ventas/${idVenta}/devolucion`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token() }}',
+                        },
+                        body: JSON.stringify({
+                            items: items,
+                            motivo: motivo,
+                            accion_stock: document.getElementById('devolucionStock').value,
+                            metodo_reembolso: document.getElementById('devolucionReembolso').value,
+                            observaciones: (document.getElementById('devolucionObs').value || '').trim(),
+                            id_autorizacion: idAutorizacion || null,
+                        }),
+                    });
+                    const datos = await respuesta.json().catch(() => ({}));
+                    if (!respuesta.ok) {
+                        errorDevolucion(datos.error || datos.mensaje || 'No se pudo registrar la devolución.');
+                        return;
+                    }
+                    window.location.reload();
+                } finally {
+                    if (boton) boton.disabled = false;
+                }
+            },
+            'venta',
+            idVenta
+        );
+    }
+</script>

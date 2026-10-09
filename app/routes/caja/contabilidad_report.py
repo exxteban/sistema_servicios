@@ -14,13 +14,14 @@ from app.models import (
     PagoCompra,
     PagoCuentaCobrar,
     PagoVenta,
+    PedidoClientePago,
     Venta,
 )
 from app.routes.caja.common import (
     _enriquecer_motivos_movimientos,
     _resolver_metodo_efectivo_id,
 )
-from app.routes.caja.contabilidad_detalles import construir_detalles_contables
+from app.routes.caja.contabilidad_detalles import ESTADOS_VENTA_CONTABLES, construir_detalles_contables
 from cobranzas.models import PlanCreditoVenta
 from gastos_corrientes.models import PagoGastoCorriente
 from gastos_corrientes.services.gasto_corriente_service import aplicar_scope_cliente
@@ -98,7 +99,14 @@ def _clasificar_movimientos(movimientos):
             continue
         if mov.tipo == 'egreso' and referencia_tipo == 'anulacion_venta':
             continue
-        if mov.tipo == 'ingreso' and referencia_tipo == 'cobro_credito':
+        if mov.tipo == 'ingreso' and referencia_tipo in ('cobro_credito', 'pago_pedido'):
+            # Se cuentan desde PagoCuentaCobrar / PedidoClientePago, por metodo.
+            continue
+        if mov.tipo == 'ingreso' and referencia_tipo == 'anulacion_venta':
+            # Al anular, el vuelto entregado vuelve a la caja: es la reversa de
+            # un egreso de vuelto, no un ingreso vario.
+            totales['vuelto'] -= monto
+            totales['mov_egresos'] -= monto
             continue
 
         if mov.tipo == 'ingreso':
@@ -128,6 +136,10 @@ def _clasificar_movimientos(movimientos):
 
 
 def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
+    # Una venta anulada sigue siendo un hecho del periodo en que fue emitida.
+    # Su reversa se reconoce aparte, en la fecha de anulacion. Excluirla por su
+    # estado actual borraba el ingreso original y luego restaba igualmente la
+    # devolucion: perdida ficticia el mismo dia, ingreso perdido si fue despues.
     metodos = (
         MetodoPago.query
         .order_by(MetodoPago.orden_display.asc(), MetodoPago.nombre.asc())
@@ -138,7 +150,7 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
     ventas_emitidas_rows = (
         Venta.query.options(joinedload(Venta.cliente))
         .filter(
-            Venta.estado == 'completada',
+            Venta.estado.in_(ESTADOS_VENTA_CONTABLES),
             Venta.fecha_venta >= start_utc,
             Venta.fecha_venta < end_utc,
         )
@@ -155,7 +167,7 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
         )
         .join(Venta, PagoVenta.id_venta == Venta.id_venta)
         .filter(
-            Venta.estado == 'completada',
+            Venta.estado.in_(ESTADOS_VENTA_CONTABLES),
             Venta.fecha_venta >= start_utc,
             Venta.fecha_venta < end_utc,
         )
@@ -179,6 +191,24 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
         .all()
     )
     pagos_creditos_agg = {int(r.id_metodo_pago): r for r in pagos_creditos_agg_rows}
+
+    # Senas y saldos de pedidos: plata que entra antes de que exista la venta
+    # (la entrega genera la venta sin pagos). Sin esto el efectivo caia en
+    # "Ingresos Manuales / Ajustes" y la transferencia no aparecia en ningun lado.
+    pagos_pedidos_agg_rows = (
+        db.session.query(
+            PedidoClientePago.id_metodo_pago,
+            func.sum(PedidoClientePago.monto).label('total'),
+        )
+        .filter(
+            PedidoClientePago.fecha_pago >= start_utc,
+            PedidoClientePago.fecha_pago < end_utc,
+            PedidoClientePago.estado == 'activo',
+        )
+        .group_by(PedidoClientePago.id_metodo_pago)
+        .all()
+    )
+    pagos_pedidos_agg = {int(r.id_metodo_pago): _money(r.total) for r in pagos_pedidos_agg_rows}
 
     pagos_compras_agg_rows = (
         db.session.query(
@@ -255,7 +285,7 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
         db.session.query(func.coalesce(func.sum(CuentaPorCobrar.monto_total), 0))
         .join(Venta, CuentaPorCobrar.id_venta == Venta.id_venta)
         .filter(
-            Venta.estado == 'completada',
+            Venta.estado.in_(ESTADOS_VENTA_CONTABLES),
             Venta.fecha_venta >= start_utc,
             Venta.fecha_venta < end_utc,
         )
@@ -268,7 +298,7 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
         .join(CuentaPorCobrar, PlanCreditoVenta.id_cuenta_cobrar == CuentaPorCobrar.id_cuenta_cobrar)
         .join(Venta, CuentaPorCobrar.id_venta == Venta.id_venta)
         .filter(
-            Venta.estado == 'completada',
+            Venta.estado.in_(ESTADOS_VENTA_CONTABLES),
             Venta.fecha_venta >= start_utc,
             Venta.fecha_venta < end_utc,
         )
@@ -340,6 +370,7 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
     ventas_emitidas = sum(_money(getattr(venta, 'total', 0)) for venta in ventas_emitidas_rows)
     cobrado_en_ventas = sum(item['total'] for item in ventas_por_metodo)
     total_cobros_creditos = sum(item['total'] for item in creditos_por_metodo)
+    total_cobros_pedidos = sum(pagos_pedidos_agg.values())
     total_pagos_compras = sum(item['total'] for item in compras_por_metodo)
     total_anulaciones = sum(_money(value) for value in anulaciones_por_metodo.values())
     facturacion_real = ventas_emitidas - total_anulaciones_comerciales
@@ -348,7 +379,7 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
         _money(pago.monto_pagado) for pago in pagos_gastos_activos if not pago.pagado_desde_caja
     )
 
-    total_ingresos = cobrado_en_ventas + total_cobros_creditos + totales_mov['ingresos_varios'] + totales_mov['reversas_gastos_corrientes']
+    total_ingresos = cobrado_en_ventas + total_cobros_creditos + total_cobros_pedidos + totales_mov['ingresos_varios'] + totales_mov['reversas_gastos_corrientes']
     total_egresos = total_pagos_compras + totales_mov['mov_egresos'] + total_anulaciones
     resultado_caja_mes = total_ingresos - total_egresos
 
@@ -383,6 +414,11 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
     for credito in creditos_por_metodo:
         if credito['total']:
             conceptos.append({'concepto': f'Cobros de Créditos - {credito["nombre"]}', 'entrada': credito['total'], 'salida': 0.0})
+
+    for metodo in metodos:
+        total_pedido = pagos_pedidos_agg.get(int(metodo.id_metodo_pago), 0.0)
+        if total_pedido:
+            conceptos.append({'concepto': f'Cobrado en Pedidos - {metodo.nombre}', 'entrada': total_pedido, 'salida': 0.0})
 
     if totales_mov['ingresos_varios']:
         conceptos.append(
@@ -461,6 +497,7 @@ def calcular_informe_contable_rango(start_utc: datetime, end_utc: datetime):
         'total_ventas': cobrado_en_ventas,
         'facturacion_real': facturacion_real,
         'total_cobros_creditos': total_cobros_creditos,
+        'total_cobros_pedidos': total_cobros_pedidos,
         'total_pagos_compras': total_pagos_compras,
         'efectivo_id': efectivo_id,
     }

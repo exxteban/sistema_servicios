@@ -1,0 +1,209 @@
+<style>
+    /* Tarjetas KPI: tipografia fluida segun el ancho real de la tarjeta */
+    .kpi-card { container-type: inline-size; }
+    .kpi-amount {
+        /* fallback para navegadores sin container queries */
+        font-size: 1.2rem;
+        font-size: clamp(0.95rem, calc(172cqi / var(--kpi-len, 16)), 1.8rem);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+    }
+    .kpi-amount-hero { font-size: clamp(1rem, calc(178cqi / var(--kpi-len, 16)), 1.95rem); }
+    .kpi-amount .kpi-cur { font-size: 0.72em; margin-right: 0.15em; font-weight: 600; }
+    .kpi-grid-hero { grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); }
+    .kpi-grid-sec { grid-template-columns: repeat(auto-fit, minmax(min(224px, 100%), 1fr)); }
+
+    /* Tarjetas principales (estilo del sistema padre): neutras, el color va en el
+       numero y en el punto del titulo. Clases propias y no de Tailwind: style.css
+       esta purgado y el tema oscuro repinta bg-white. */
+    .kpi-tile {
+        position: relative; display: flex; flex-direction: column;
+        padding: 0.875rem 1rem; border-radius: 0.75rem;
+        background: #fff; border: 1px solid #e5e7eb; color: #111827;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+        transition: border-color .15s, box-shadow .15s;
+    }
+    html.dark .kpi-tile { background: #1f2937; border-color: #374151; color: #f3f4f6; box-shadow: none; }
+    .kpi-tile-link { cursor: pointer; }
+    .kpi-tile-link:hover { border-color: #cbd5e1; box-shadow: 0 2px 8px rgb(0 0 0 / 0.06); }
+    html.dark .kpi-tile-link:hover { border-color: #4b5563; }
+    .kpi-tile-btn {
+        display: flex; flex-direction: column; flex: 1; width: 100%; min-width: 0;
+        text-align: left; background: none; border: 0; padding: 0; color: inherit; border-radius: 0.5rem;
+    }
+    .kpi-tile-btn:focus-visible { outline: 2px solid #6366f1; outline-offset: 4px; }
+    .kpi-label {
+        display: flex; align-items: center; gap: 0.4rem; padding-right: 1.75rem;
+        font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #6b7280;
+    }
+    html.dark .kpi-label { color: #9ca3af; }
+    .kpi-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; flex: none; background: var(--kpi-accent, #9ca3af); }
+    .kpi-tag {
+        font-size: 0.625rem; letter-spacing: 0.04em; padding: 0.05rem 0.35rem; border-radius: 0.25rem;
+        background: #f3f4f6; color: #6b7280;
+    }
+    html.dark .kpi-tag { background: #374151; color: #d1d5db; }
+    .kpi-tile .kpi-amount { margin-top: 0.4rem; font-weight: 700; line-height: 1.15; }
+    .kpi-pos { color: #059669; }
+    .kpi-neg { color: #e11d48; }
+    html.dark .kpi-pos { color: #34d399; }
+    html.dark .kpi-neg { color: #fb7185; }
+    .kpi-sub { margin-top: 0.5rem; font-size: 0.75rem; line-height: 1.35; color: #6b7280; }
+    html.dark .kpi-sub { color: #9ca3af; }
+    .kpi-sub b { font-weight: 600; color: #374151; }
+    html.dark .kpi-sub b { color: #e5e7eb; }
+    .kpi-more { margin-top: auto; padding-top: 0.5rem; align-self: flex-end; font-size: 0.6875rem; font-weight: 500; color: #9ca3af; }
+    .kpi-tile-link:hover .kpi-more { color: #4f46e5; }
+    html.dark .kpi-tile-link:hover .kpi-more { color: #a5b4fc; }
+    .kpi-help {
+        position: absolute; top: 0.625rem; right: 0.625rem; z-index: 10;
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 1.375rem; height: 1.375rem; border-radius: 9999px;
+        border: 1px solid #e5e7eb; background: transparent; color: #9ca3af;
+        font-size: 0.6875rem; font-weight: 700; line-height: 1;
+    }
+    .kpi-help:hover { background: #f3f4f6; color: #374151; }
+    .kpi-help:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+    html.dark .kpi-help { border-color: #4b5563; color: #9ca3af; }
+    html.dark .kpi-help:hover { background: #374151; color: #f3f4f6; }
+</style>
+{% macro ayuda_kpi(tipo, titulo) -%}
+<button type="button" data-kpi-ayuda="{{ tipo }}"
+    @click.stop="abrirAyudaKpi('{{ tipo }}', $event.currentTarget)"
+    class="kpi-help"
+    title="Explicar {{ titulo }}" aria-label="Explicar {{ titulo }}" aria-haspopup="dialog">
+    ?
+</button>
+{%- endmacro %}
+{% macro gs(valor) %}{{ "{:,.0f}".format(valor or 0).replace(",", ".") }}{% endmacro %}
+
+<div class="mb-4 xl:max-w-[1180px] mx-auto rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <p class="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Cómo se forma el movimiento neto</p>
+    <div class="mt-2 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+        <span class="rounded-lg bg-emerald-50 px-3 py-1.5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Ingresos: ₲ {{ gs(total_ingresos) }}</span>
+        <span aria-hidden="true">−</span>
+        <span class="rounded-lg bg-red-50 px-3 py-1.5 text-red-700 dark:bg-red-900/30 dark:text-red-300">Egresos: ₲ {{ gs(total_egresos) }}</span>
+        <span aria-hidden="true">=</span>
+        <span class="rounded-lg bg-slate-100 px-3 py-1.5 font-black dark:bg-slate-700">Movimiento neto: ₲ {{ gs(resultado_caja_mes) }}</span>
+    </div>
+</div>
+
+{% set kpi_hero = namespace(n=0) %}
+{% for _v in [resultado_caja_mes, ganancia_neta_mes, total_ingresos, total_egresos, gastos_corrientes_mes] %}{% set kpi_hero.n = [kpi_hero.n, ('{:,.0f}'.format(_v)|length) + 2]|max %}{% endfor %}
+<div class="grid kpi-grid-hero gap-3 xl:max-w-[1180px] mx-auto" style="--kpi-len: {{ kpi_hero.n }}">
+    <div class="kpi-tile kpi-card">
+        {{ ayuda_kpi('resultado_dinero', 'Movimiento Neto') }}
+        <p class="kpi-label">Movimiento Neto</p>
+        <p class="kpi-amount kpi-amount-hero {% if resultado_caja_mes < 0 %}kpi-neg{% elif resultado_caja_mes > 0 %}kpi-pos{% endif %}"><span class="kpi-cur">₲</span>{{ gs(resultado_caja_mes) }}</p>
+        <p class="kpi-sub">Ingresos − egresos</p>
+    </div>
+    <div class="kpi-tile kpi-card">
+        {{ ayuda_kpi('resultado_operativo', 'Resultado Operativo') }}
+        <p class="kpi-label">Resultado Operativo</p>
+        <p class="kpi-amount kpi-amount-hero {% if ganancia_neta_mes < 0 %}kpi-neg{% elif ganancia_neta_mes > 0 %}kpi-pos{% endif %}"><span class="kpi-cur">₲</span>{{ gs(ganancia_neta_mes) }}</p>
+        <p class="kpi-sub"><span class="kpi-tag">Indicador</span> Ventas − compras y gastos</p>
+    </div>
+    <div class="kpi-tile kpi-tile-link kpi-card" style="--kpi-accent: #10b981">
+        {{ ayuda_kpi('ingresos', 'Ingresos') }}
+        <button type="button" @click="abrirDetalleModal('ingresos')" class="kpi-tile-btn" title="Ver tipos y movimientos">
+            <span class="kpi-label"><span class="kpi-dot"></span>Ingresos</span>
+            <span class="kpi-amount kpi-amount-hero"><span class="kpi-cur">₲</span>{{ gs(total_ingresos) }}</span>
+            <span class="kpi-more">Ver detalle ›</span>
+        </button>
+    </div>
+    <div class="kpi-tile kpi-tile-link kpi-card" style="--kpi-accent: #f43f5e">
+        {{ ayuda_kpi('egresos', 'Egresos') }}
+        <button type="button" @click="abrirDetalleModal('egresos')" class="kpi-tile-btn" title="Ver tipos y movimientos">
+            <span class="kpi-label"><span class="kpi-dot"></span>Egresos</span>
+            <span class="kpi-amount kpi-amount-hero"><span class="kpi-cur">₲</span>{{ gs(total_egresos) }}</span>
+            <span class="kpi-more">Ver detalle ›</span>
+        </button>
+    </div>
+    <div class="kpi-tile kpi-card" style="--kpi-accent: #f59e0b">
+        {{ ayuda_kpi('gastos_corrientes', 'Gastos Corrientes') }}
+        <p class="kpi-label"><span class="kpi-dot"></span>Gastos Corrientes</p>
+        <p class="kpi-amount kpi-amount-hero"><span class="kpi-cur">₲</span>{{ gs(gastos_corrientes_mes) }}</p>
+        <p class="kpi-sub">
+            {% if gastos_corrientes_fuera_caja %}<b>₲ {{ gs(gastos_corrientes_fuera_caja) }}</b> pagados fuera de caja
+            {% else %}Todos impactaron desde caja{% endif %}
+        </p>
+    </div>
+</div>
+
+{% set tarjetas_sec = [
+    ('Ventas Emitidas', ventas_emitidas, 'text-gray-800 dark:text-white', ''),
+    ('Cobrado en Ventas', cobrado_en_ventas, 'text-gray-800 dark:text-white', 'Solo incluye pagos registrados al momento de la venta.'),
+    ('Cobrado en Pedidos', total_cobros_pedidos, 'text-gray-800 dark:text-white', 'Señas y pagos de pedidos, antes de la entrega.'),
+    ('Saldo Financiado', saldo_financiado_generado, 'text-gray-800 dark:text-white', 'Monto enviado a cuenta por cobrar en ventas a crédito.'),
+    ('Cobros de Créditos', total_cobros_creditos, 'text-gray-800 dark:text-white', ''),
+    ('Interés Financiero', interes_financiero_generado, 'text-gray-800 dark:text-white', 'Se genera solo en planes de cuotas con interés.'),
+    ('Pagos de Compras', total_pagos_compras, 'text-gray-800 dark:text-white', ''),
+    ('Descuentos Manuales', descuentos_manuales_ventas, 'text-amber-600 dark:text-amber-400', 'Descuentos cargados a mano en las ventas del período.'),
+    ('Desc. Fidelización', descuentos_fidelizacion_ventas, 'text-emerald-600 dark:text-emerald-400', 'Incluye saldo a favor y beneficios aplicados.'),
+    ('Saldo a Favor Usado', saldo_favor_fidelizacion_aplicado, 'text-cyan-600 dark:text-cyan-400', 'Ya está incluido en Desc. Fidelización. No sumar nuevamente.'),
+] %}
+{% set kpi_sec = namespace(n=0) %}
+{% for _t in tarjetas_sec %}{% set kpi_sec.n = [kpi_sec.n, ('{:,.0f}'.format(_t[1] or 0)|length) + 2]|max %}{% endfor %}
+<div class="mt-5 grid kpi-grid-sec gap-3 lg:gap-4 xl:max-w-[1380px] mx-auto" style="--kpi-len: {{ kpi_sec.n }}">
+    {% for titulo, valor, color, nota in tarjetas_sec %}
+    <div class="kpi-card bg-white dark:bg-gray-800 rounded-xl shadow-md px-4 py-3.5 lg:px-5 lg:py-4 min-h-[112px]">
+        <div class="w-full min-w-0">
+            <p class="text-gray-500 dark:text-gray-400 text-sm">{{ titulo }}</p>
+            <p class="kpi-amount font-bold {{ color }} mt-1 leading-tight"><span class="kpi-cur">₲</span>{{ gs(valor) }}</p>
+            {% if nota %}<p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">{{ nota }}</p>{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden mt-6">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <h2 class="font-semibold text-gray-700 dark:text-gray-200">Ajustes Comerciales No Caja</h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-700/50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Concepto</th>
+                    <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300">Monto</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for row in conceptos_no_caja %}
+                <tr>
+                    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ row.concepto }}</td>
+                    <td class="px-4 py-3 text-right text-gray-800 dark:text-gray-100">₲ {{ gs(row.monto) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">Sin ajustes comerciales no caja en el período.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl px-4 py-3 text-sm text-blue-900 dark:text-blue-100 space-y-1">
+    <p>
+        <span class="font-semibold">Lectura del informe:</span>
+        Ingresos y Egresos reúnen todo el dinero registrado del período (caja, transferencias y otros métodos).
+        El Resultado Operativo mide el rendimiento del mes: ventas menos compras y gastos.
+    </p>
+    {% if resultado_caja_mes >= 0 and ganancia_neta_mes < 0 %}
+    <p>
+        El movimiento neto fue positivo, pero el Resultado Operativo quedó negativo. Puede ocurrir por cobros de créditos
+        o ingresos manuales (por ejemplo, inicio de caja) que aumentan la caja pero no cuentan como ganancia operativa.
+    </p>
+    {% elif resultado_caja_mes < 0 and ganancia_neta_mes >= 0 %}
+    <p>
+        El Resultado Operativo quedó positivo, pero el movimiento neto fue negativo por salidas del período
+        (pagos, compras o gastos) mayores a los cobros.
+    </p>
+    {% elif resultado_caja_mes >= 0 and ganancia_neta_mes >= 0 %}
+    <p>Movimiento Neto y Resultado Operativo quedaron positivos: hubo liquidez y rentabilidad.</p>
+    {% else %}
+    <p>Señal de alerta: hubo salida neta de dinero y además pérdida operativa en el período.</p>
+    {% endif %}
+</div>
