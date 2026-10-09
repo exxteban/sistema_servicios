@@ -1,0 +1,53 @@
+{# Recordatorio de gastos corrientes: badge en el encabezado.
+   Antes era una alerta flotante que podia quedar sobre el menu
+   y robarle el clic; ahora vive en el flujo del topnav. #}
+{% if (current_user.es_admin() or current_user.tiene_permiso('ver_gastos_corrientes')) %}
+{% set gastos_alert_url = url_for('gastos_corrientes.index') %}
+<a href="{{ gastos_alert_url }}" data-tab-url="{{ gastos_alert_url }}"
+    data-tab-title="Gastos corrientes" data-tab-icon="fas fa-file-invoice-dollar"
+    class="app-tab-link crm-nav-pill app-gastos-alert"
+    x-cloak x-show="count > 0"
+    x-data="{
+        count: 0,
+        overdueCount: 0,
+        alertCount: 0,
+        baseUrl: '{{ gastos_alert_url }}',
+        targetUrl: '{{ gastos_alert_url }}',
+        aplicar(detail) {
+            const data = detail || {};
+            this.count = Number(data.count || 0);
+            this.overdueCount = Number(data.overdue_count || 0);
+            this.alertCount = Number(data.alert_count || 0);
+            this.targetUrl = this.buildUrl(data);
+        },
+        init() {
+            if (window.__gastosCorrientesUltimoResumen) {
+                this.aplicar(window.__gastosCorrientesUltimoResumen);
+            }
+            window.addEventListener('gastos-corrientes:alertas-actualizadas', (event) => {
+                this.aplicar(event && event.detail);
+            });
+        },
+        buildUrl(detail) {
+            try {
+                const url = new URL(this.baseUrl, window.location.origin);
+                const periodo = (detail && detail.periodo) ? String(detail.periodo) : '';
+                if (periodo) url.searchParams.set('periodo', periodo);
+                if (Number(detail && detail.overdue_count || 0) > 0) {
+                    url.searchParams.set('estado', 'vencido');
+                }
+                return url.pathname + url.search;
+            } catch (e) {
+                return this.baseUrl;
+            }
+        }
+    }"
+    :class="{ 'app-gastos-alert--overdue': overdueCount > 0, 'is-pulsing': count > 0 }"
+    :href="targetUrl" :data-tab-url="targetUrl"
+    :title="`Gastos corrientes: ${overdueCount} vencido(s) | ${alertCount} por vencer`"
+    aria-label="Abrir gastos corrientes">
+    <i class="fas fa-file-invoice-dollar app-gastos-alert__icon"></i>
+    <span class="app-gastos-alert__label crm-topnav__action-label">Gastos</span>
+    <span class="app-gastos-alert__count" x-text="count > 99 ? '99+' : count"></span>
+</a>
+{% endif %}

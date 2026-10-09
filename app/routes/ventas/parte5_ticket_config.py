@@ -1,4 +1,5 @@
 from .parte1 import *
+from .ticket_context import build_sales_ticket_context
 
 
 def _normalize_ticket_paper_width_mm(value, default=58):
@@ -168,64 +169,22 @@ def config_ticket_preview():
     if venta:
         detalles = venta.detalles.all()
         pagos = venta.pagos.all()
-        total_pagado = sum(float(p.monto) for p in pagos)
-        total = float(venta.total or 0)
-        vuelto = max(0, total_pagado - total)
-        try:
-            subtotal = float(getattr(venta, 'subtotal', venta.total) or 0)
-        except Exception:
-            subtotal = float(total or 0)
-        try:
-            descuento = float(getattr(venta, 'descuento_monto', 0) or 0)
-        except Exception:
-            descuento = 0.0
-    else:
-        from types import SimpleNamespace
-        from datetime import datetime
-        venta = SimpleNamespace(
-            id_venta=1,
-            fecha_venta=datetime.utcnow(),
-            total=28000,
-            subtotal=30000,
-            descuento_monto=2000,
-            descuento_manual_monto=1500,
-            descuento_fidelizacion_monto=500,
-            beneficio_fidelizacion_tipo='descuento_monto',
-            beneficio_fidelizacion_descripcion='Beneficio ejemplo',
-            cliente=SimpleNamespace(nombre='CONSUMIDOR FINAL')
+        ctx = build_sales_ticket_context(
+            venta,
+            detalles=detalles,
+            pagos=pagos,
+            pagos_resumen=_build_pagos_resumen(pagos),
+            preview=True,
         )
-        producto = SimpleNamespace(nombre='Producto de ejemplo')
-        detalles = [SimpleNamespace(producto=producto, precio_unitario=28000, subtotal=28000, cantidad=1)]
-        pagos = [SimpleNamespace(metodo=SimpleNamespace(nombre='Efectivo'), monto=28000)]
-        total_pagado = 28000
-        vuelto = 0
-        subtotal = 30000
-        descuento = 2000
+    else:
+        ctx = _sample_sales_ticket_context()
 
-    moneda_simbolo = '₲'
-    preview = True
-    pagos_resumen = _build_pagos_resumen(pagos)
-
-    ctx = dict(
-        venta=venta,
-        detalles=detalles,
-        pagos=pagos,
-        pagos_resumen=pagos_resumen,
+    ctx.update(
         empresa=empresa,
-        subtotal=subtotal,
-        descuento=descuento,
-        descuento_manual=float(getattr(venta, 'descuento_manual_monto', 0) or 0),
-        descuento_fidelizacion=float(getattr(venta, 'descuento_fidelizacion_monto', 0) or 0),
-        total_pagado=total_pagado,
-        vuelto=vuelto,
-        preview=preview,
-        moneda_simbolo=moneda_simbolo,
         footer_text=footer_text,
         paper_width_mm=paper_width_mm,
-        beneficios_aplicados=[],
-        beneficio_aplicado_texto='Gs. 500 de descuento · Beneficio ejemplo',
-        beneficio_fidelizacion_tipo=str(getattr(venta, 'beneficio_fidelizacion_tipo', '') or ''),
-        beneficio_fidelizacion_descripcion=str(getattr(venta, 'beneficio_fidelizacion_descripcion', '') or ''),
+        moneda_simbolo='₲',
+        preview=True,
     )
 
     try:
@@ -248,3 +207,54 @@ def config_ticket_preview():
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
+
+
+def _sample_sales_ticket_context():
+    from types import SimpleNamespace
+    from datetime import datetime
+    venta = SimpleNamespace(
+        id_venta=1,
+        fecha_venta=datetime.utcnow(),
+        total=28000,
+        subtotal=30000,
+        descuento_monto=2000,
+        descuento_manual_monto=1500,
+        descuento_fidelizacion_monto=500,
+        beneficio_fidelizacion_tipo='descuento_monto',
+        beneficio_fidelizacion_descripcion='Beneficio ejemplo',
+        cliente=SimpleNamespace(nombre='CONSUMIDOR FINAL')
+    )
+    producto = SimpleNamespace(nombre='Producto de ejemplo')
+    detalles = [SimpleNamespace(producto=producto, precio_unitario=28000, subtotal=28000, cantidad=1)]
+    pagos = [SimpleNamespace(metodo=SimpleNamespace(nombre='Efectivo'), monto=28000)]
+    return dict(
+        venta=venta,
+        detalles=detalles,
+        pagos=pagos,
+        pagos_resumen=_build_pagos_resumen(pagos),
+        subtotal=30000,
+        descuento=2000,
+        descuento_manual=1500,
+        descuento_fidelizacion=500,
+        total_pagado=28000,
+        vuelto=0,
+        embedded=False,
+        es_venta_credito=False,
+        cobro_label='Pagado',
+        detalle_pago_label='Pagos',
+        monto_financiado=0.0,
+        resumen_credito_plan={
+            'modo': 'cuenta_corriente',
+            'cantidad_cuotas': 0,
+            'tasa_interes_pct': 0.0,
+            'interes_total': 0.0,
+            'total_con_interes': 0.0,
+            'cuota_estimada': 0.0,
+        },
+        beneficios_aplicados=[],
+        beneficio_aplicado_texto='Gs. 500 de descuento · Beneficio ejemplo',
+        beneficio_fidelizacion_tipo='descuento_monto',
+        beneficio_fidelizacion_descripcion='Beneficio ejemplo',
+        gastronomia_entrega=None,
+        gastronomia_modificadores_por_detalle={},
+    )
