@@ -69,6 +69,21 @@ def _entero(texto, defecto=None):
         return defecto
 
 
+# iTipIDRec 5: receptor innominado (sin documento de identidad).
+TIPO_ID_INNOMINADO = 5
+
+
+def declarado_innominado(campos):
+    """True si la factura salió a un receptor sin identificar.
+
+    Es lo que mira SIFEN para rechazar la NC, y no cambia aunque después se
+    complete la ficha del cliente: la NC lleva el receptor de la factura.
+    """
+    if not campos or campos.get('iNatRec') == NATURALEZA_CONTRIBUYENTE:
+        return False
+    return _entero(campos.get('iTipIDRec'), TIPO_ID_INNOMINADO) == TIPO_ID_INNOMINADO
+
+
 def receptor_api(campos):
     """`receiver` de la API con la identidad exacta de la factura."""
     receptor = {
@@ -146,6 +161,7 @@ def cliente_facturado_propio(original, cliente_actual):
 __all__ = [
     'cliente_facturado_propio',
     'cliente_propio',
+    'declarado_innominado',
     'leer_receptor',
     'receptor_api',
     'redondeo_declarado',

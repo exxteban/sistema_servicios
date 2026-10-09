@@ -1,0 +1,90 @@
+{#
+  Rescata los mensajes flash del panel principal.
+
+  En una carga completa de pagina (un formulario que postea sin ajax, o un
+  redirect del servidor) el mensaje se renderiza dentro de
+  `#app-tab-panel-principal`. Enseguida el runtime de tabs restaura las pestanas
+  guardadas y activa la que estaba en uso, con lo cual el panel principal queda
+  `hidden` y el mensaje nunca se ve: el usuario percibe que "la pagina se
+  actualizo y no paso nada", aunque el servidor haya explicado el rechazo.
+
+  Por eso los sacamos del panel y los colgamos de <body>, en una capa fija que
+  no depende de que pestana este activa.
+#}
+<style>
+    #app-flash-stack {
+        position: fixed;
+        top: calc(var(--app-shell-topbar-height, 3.5rem) + 0.75rem);
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 12005;
+        width: min(38rem, calc(100vw - 2rem));
+        max-height: calc(var(--app-shell-vh, 100vh) - var(--app-shell-topbar-height, 3.5rem) - 1.5rem);
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        pointer-events: none;
+    }
+    #app-flash-stack > * {
+        pointer-events: auto;
+        margin-bottom: 0 !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, .25);
+    }
+</style>
+<script>
+    (function () {
+        function rescatarFlashes() {
+            var principal = document.getElementById('app-tab-panel-principal');
+            if (!principal) {
+                return;
+            }
+            var mensajes = principal.querySelectorAll('.flash-message');
+            if (!mensajes.length) {
+                return;
+            }
+
+            var stack = document.getElementById('app-flash-stack');
+            if (!stack) {
+                stack = document.createElement('div');
+                stack.id = 'app-flash-stack';
+                document.body.appendChild(stack);
+            }
+
+            mensajes.forEach(function (mensaje) {
+                // Se mueve el nodo tal cual: Alpine sigue el elemento aunque cambie
+                // de lugar en el DOM, asi que x-show y el boton de cerrar no se
+                // rompen. Igual atamos un cierre en JS plano por si Alpine no cargo.
+                stack.appendChild(mensaje);
+                mensaje.querySelectorAll('button').forEach(function (boton) {
+                    boton.addEventListener('click', function () {
+                        if (mensaje.parentElement) {
+                            mensaje.parentElement.removeChild(mensaje);
+                        }
+                    });
+                });
+            });
+
+            // Los avisos de error se quedan hasta que el usuario los cierre; los
+            // de exito se van solos para no tapar la pantalla.
+            stack.querySelectorAll('.flash-message').forEach(function (mensaje) {
+                var categoria = mensaje.getAttribute('data-flash-category') || '';
+                if (categoria === 'danger' || categoria === 'warning') {
+                    return;
+                }
+                setTimeout(function () {
+                    if (mensaje.parentElement) {
+                        mensaje.parentElement.removeChild(mensaje);
+                    }
+                }, 6000);
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', rescatarFlashes);
+        } else {
+            rescatarFlashes();
+        }
+    })();
+</script>

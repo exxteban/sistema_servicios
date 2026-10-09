@@ -39,6 +39,7 @@ from facturacion_electronica.services.proveedores.api_perfil import (
     obtener_perfil,
 )
 from facturacion_electronica.services.proveedores.api_rechazo import texto_resultado
+from facturacion_electronica.services.respuesta_sifen import _buscar_clave
 
 # Estados de la API en los que el documento remoto todavía puede terminar en
 # SIFEN. `REJECTED` y `VOIDED` no están: ahí el número ya no va a salir.
@@ -48,10 +49,14 @@ ESTADOS_REMOTOS_VIVOS = (
 )
 
 # El `result` del evento es un objeto libre en su OpenAPI (igual que el de los
-# lotes), así que el veredicto se lee por el texto. Ante la duda se toma el
-# 201 como bueno: su endpoint es síncrono —registra el evento y responde—, no
-# queda nada pendiente que consultar después.
+# lotes). El veredicto se lee, en orden: `dEstRes` de SIFEN ("Aprobado" /
+# "Rechazado", el campo oficial y el que mira el motor propio), el `status` del
+# evento en la API, y recién sin ninguno de los dos el texto del mensaje. Ante
+# la duda se toma el 201 como bueno: su endpoint es síncrono —registra el
+# evento y responde—, no queda nada pendiente que consultar después.
 _PALABRAS_DE_RECHAZO = ('rechaz', 'no autoriz', 'inválid', 'invalid', 'denegad')
+_STATUS_RECHAZO = ('REJECT', 'FAIL', 'ERROR', 'DENIED')
+_STATUS_APROBADO = ('APPROV', 'ACCEPT', 'REGISTER', 'SUCCESS')
 
 MENSAJE_REMOTO_VIVO = (
     'Ese número ya está dado de alta en la API y su pipeline lo transmite solo. '
@@ -68,7 +73,17 @@ MENSAJE_SANDBOX = (
 )
 
 
-def _rechazado(mensaje):
+def _rechazado(evento, mensaje):
+    estado_sifen = str(_buscar_clave(evento.get('result'), {'dEstRes'}) or '').lower()
+    if 'rechaz' in estado_sifen:
+        return True
+    if 'aprob' in estado_sifen:
+        return False
+    estado_api = str(evento.get('status') or '').upper()
+    if any(clave in estado_api for clave in _STATUS_RECHAZO):
+        return True
+    if any(clave in estado_api for clave in _STATUS_APROBADO):
+        return False
     texto = (mensaje or '').lower()
     return any(palabra in texto for palabra in _PALABRAS_DE_RECHAZO)
 
@@ -149,7 +164,7 @@ def inutilizar_numero(config, documento, motivo, refrescar):
     detalle = ' - '.join(parte for parte in (codigo, mensaje) if parte)
 
     documento.respuesta_raw = serializar(evento)
-    if _rechazado(mensaje):
+    if _rechazado(evento, mensaje):
         documento.respuesta_mensaje = (
             f'SIFEN no aprobó la inutilización: {detalle}'
         )[:2000]

@@ -80,14 +80,23 @@ def error_devolucion_no_acreditable(devolucion):
     return None
 
 
-def error_original_no_acreditable(original):
+def error_original_no_acreditable(original, xml_factura=None):
     """Error si la factura que se quiere corregir no admite una NC ahora.
 
     Lo mira tanto la emisión manual como el reintento del job: el original
     puede haber cambiado de estado entre el primer intento y el segundo, y
     acreditar una factura que se está cancelando emite dos veces la misma
     plata (la baja y la NC).
+
+    `xml_factura` es el XML de la factura cuando no está guardado acá (modo
+    API, que lo baja antes de reservar número). Ver `error_receptor_original`.
     """
+    return error_estado_original(original) or error_receptor_original(original, xml_factura)
+
+
+def error_estado_original(original):
+    """La parte de la guarda que no depende del receptor: existe, está
+    aprobada y no tiene una cancelación en curso. No pega a la red."""
     if original is None or not original.cdc:
         return ('La venta no tiene factura electrónica emitida; no hay nada '
                 'que acreditar.')
@@ -99,14 +108,40 @@ def error_original_no_acreditable(original):
                 'confirmó. Esperá a que la anulación quede firme: si se concreta, '
                 'la nota de crédito sobra, y si SIFEN la rechaza, recién ahí '
                 'corresponde emitirla.')
+    return None
 
-    # SIFEN deja facturar a un consumidor sin identificar, pero no deja
-    # acreditarle: la NC de una factura innominada vuelve rechazada con
-    # "El adquiriente del comprobante de venta informado no se encuentra
-    # identificado" (visto el 2026-09-22 en la NC 0000004). Se frena acá antes
-    # de reservar número, igual que `validar_cliente` en la factura: corregir
-    # la ficha del cliente no debe costar un correlativo.
+
+def error_receptor_original(original, xml_factura=None):
+    """Error si la factura salió a un receptor sin identificar.
+
+    SIFEN deja facturar a un consumidor sin identificar, pero no deja
+    acreditarle: la NC de una factura innominada vuelve rechazada con
+    "El adquiriente del comprobante de venta informado no se encuentra
+    identificado" (visto el 2026-09-22 en la NC 0000004). Se frena acá antes
+    de reservar número.
+
+    Se decide con el receptor **que declaró la factura** (su XML), porque es
+    el que lleva la NC (`receptor_facturado`). Mirar la ficha de hoy dejaba
+    pasar la NC de una factura innominada si después se cargó la cédula: se
+    reservaba número y SIFEN la rechazaba igual. Sin XML se cae a la ficha,
+    que es también lo que usa la NC del motor propio en ese caso.
+    """
     from facturacion_electronica.services.data_builder import receptor_innominado
+    from facturacion_electronica.services.receptor_facturado import (
+        declarado_innominado,
+        leer_receptor,
+        xml_local,
+    )
+
+    campos = leer_receptor(xml_factura or xml_local(original))
+    if campos:
+        if not declarado_innominado(campos):
+            return None
+        return ('La factura se emitió a un receptor sin identificar, y SIFEN no acepta '
+                'notas de crédito a un receptor innominado. La nota de crédito lleva el '
+                'receptor que declaró la factura, así que completar ahora la ficha del '
+                'cliente no lo cambia. Si la factura tiene menos de 48h, el camino que '
+                'sí funciona es cancelarla.')
 
     cliente = getattr(getattr(original, 'venta', None), 'cliente', None)
     if receptor_innominado(cliente):

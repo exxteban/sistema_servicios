@@ -858,6 +858,7 @@
                                                 setActiveTab(existingId);
                                                 const existingLoader = tabLoadersById.get(existingId);
                                                 if (existingLoader) await existingLoader(response.url);
+                                                window.appInjectFlashesFromHtml(tabPanelsById.get(existingId), rawHtml);
                                                 closeTab(tabId);
                                                 saveState();
                                                 return;
@@ -881,6 +882,8 @@
 
                                 if (response.redirected && response.url) {
                                     await loadContent(response.url);
+                                    // loadContent vuelve a pedir la pagina, ya sin los flash.
+                                    window.appInjectFlashesFromHtml(panel, rawHtml);
                                     saveState();
                                     return;
                                 }

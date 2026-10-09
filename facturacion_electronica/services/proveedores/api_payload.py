@@ -18,6 +18,7 @@ from facturacion_electronica.services.data_builder import (
     CONDICION_CREDITO,
     TIPO_DOCUMENTO_FACTURA,
     _descripcion_medio,
+    _total_item,
     construir_condicion,
     construir_entregas_con_origen,
     construir_items,
@@ -191,6 +192,33 @@ def construir_lineas(detalles, total_objetivo=None):
     return lineas
 
 
+def error_total_descuadrado(venta):
+    """Error si los ítems de la venta suman menos de lo que la venta cobró.
+
+    El descuento global se reparte sobre las líneas, pero un cobro **de más**
+    (un recargo que no está en ningún ítem) no tiene dónde ir: la API no tiene
+    líneas libres ni recargos globales, y las entregas cuadran contra el total,
+    así que el alta rebotaba con `400 invalid_payment` y el número ya estaba
+    reservado. Inventar una línea sería declarar algo que nadie cargó: se
+    frena antes y se dice cuánto falta. Se tolera 1 Gs por línea, que es lo que
+    puede perder el redondeo de cada una.
+    """
+    detalles = list(venta.detalles)
+    objetivo = int(round(float(venta.total or 0)))
+    if not detalles or objetivo <= 0:
+        return None
+    items = construir_items(detalles, total_objetivo=venta.total)
+    suma = sum(_total_item(item) for item in items)
+    faltante = objetivo - int(round(suma))
+    if faltante <= len(items):
+        return None
+    return (
+        f'La venta cobra {objetivo:,} Gs pero sus ítems suman {int(round(suma)):,} Gs: '
+        f'hay {faltante:,} Gs que no están en ningún ítem y la factura no puede declararlos. '
+        'Revisá la venta (un recargo tiene que cargarse como ítem).'
+    ).replace(',', '.')
+
+
 def _nombre_metodo(pago):
     metodo = getattr(pago, 'metodo', None)
     return (getattr(metodo, 'nombre', '') or '').strip()
@@ -326,30 +354,52 @@ def referencia_externa(documento):
     abre fila nueva (se corrige con `correct/`), asi que las filas anteriores
     de la venta son justamente las que ocupan una referencia; la primera
     factura sigue siendo `141`, como las ya emitidas.
+
+    La NC de anulación tiene el mismo caso: si la anterior se canceló, la
+    nueva fila de la misma venta pedía otra vez `anulacion-141` y la API
+    respondía el mismo 409. Lleva el sufijo con el mismo criterio.
     """
     if documento.tipo_documento == TIPO_NOTA_CREDITO:
         if documento.id_devolucion is None:
-            return f'anulacion-{documento.id_venta}'
+            base = f'anulacion-{documento.id_venta}'
+            anteriores = _anteriores_de_la_venta(documento, _filtro_nc_anulacion())
+            return base if not anteriores else f'{base}-{anteriores + 1}'
         return f'devolucion-{documento.id_devolucion}'
-    anteriores = _facturas_anteriores(documento)
+    anteriores = _anteriores_de_la_venta(documento, _filtro_factura())
     return str(documento.id_venta) if not anteriores else f'{documento.id_venta}-{anteriores + 1}'
 
 
-def _facturas_anteriores(documento):
-    """Facturas de la misma venta dadas de alta antes que esta (menor id)."""
+def _filtro_factura():
     from app import db
     from facturacion_electronica import TIPO_FACTURA
+    from facturacion_electronica.models import DocumentoElectronico
+
+    # El tipo nulo es de los documentos viejos: son facturas.
+    return db.or_(
+        DocumentoElectronico.tipo_documento.is_(None),
+        DocumentoElectronico.tipo_documento == TIPO_FACTURA,
+    )
+
+
+def _filtro_nc_anulacion():
+    from app import db
+    from facturacion_electronica.models import DocumentoElectronico
+
+    return db.and_(
+        DocumentoElectronico.tipo_documento == TIPO_NOTA_CREDITO,
+        DocumentoElectronico.id_devolucion.is_(None),
+    )
+
+
+def _anteriores_de_la_venta(documento, filtro):
+    """Documentos de la misma venta y la misma clase dados de alta antes (menor id)."""
     from facturacion_electronica.models import DocumentoElectronico
 
     if getattr(documento, 'id', None) is None:
         return 0
     return DocumentoElectronico.query.filter(
         DocumentoElectronico.id_venta == documento.id_venta,
-        # El tipo nulo es de los documentos viejos: son facturas.
-        db.or_(
-            DocumentoElectronico.tipo_documento.is_(None),
-            DocumentoElectronico.tipo_documento == TIPO_FACTURA,
-        ),
+        filtro,
         DocumentoElectronico.id < documento.id,
     ).count()
 
@@ -433,4 +483,5 @@ __all__ = [
     'construir_receptor',
     'construir_lineas',
     'construir_pago',
+    'error_total_descuadrado',
 ]

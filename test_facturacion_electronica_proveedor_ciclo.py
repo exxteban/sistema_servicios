@@ -19,6 +19,57 @@ from test_facturacion_electronica_proveedor_base import BaseProveedorApi, respue
 class TestProveedorApiCiclo(BaseProveedorApi):
     # -- el rechazo con su motivo ------------------------------------------
 
+    def test_un_cobro_que_no_esta_en_los_items_frena_antes_del_numero(self):
+        """La API no tiene recargos globales: el alta rebotaba con
+        `invalid_payment` con el número ya reservado."""
+        from app.models import Categoria, Producto
+        from app.models.venta import DetalleVenta
+        from facturacion_electronica.services.numeracion_service import peek_proximo_numero
+        from facturacion_electronica.services.proveedores.fachada import emitir_para_pos
+
+        self._activar_api()
+        venta = self._venta()
+        venta.total = 120000
+        producto = Producto(
+            codigo='REC-001', nombre='Producto con recargo',
+            id_categoria=Categoria.query.first().id_categoria, precio_compra=5000,
+            precio_venta=100000, stock_actual=10,
+        )
+        db.session.add(producto)
+        db.session.flush()
+        db.session.add(DetalleVenta(
+            id_venta=venta.id_venta, id_producto=producto.id_producto, cantidad=1,
+            precio_unitario=100000, precio_original=100000, porcentaje_iva=10,
+            monto_iva=0, descuento_linea=0, subtotal=100000,
+        ))
+        db.session.commit()
+        proximo = peek_proximo_numero('001', '001')
+
+        def _solicitar(config, metodo, ruta, **kwargs):
+            raise AssertionError(f'no se debe llamar a la API: {ruta}')
+
+        with patch('facturacion_electronica.services.proveedores.api_client.solicitar', _solicitar):
+            documento, error = emitir_para_pos(venta)
+
+        self.assertIn('20.000 Gs que no están en ningún ítem', error)
+        self.assertIsNone(documento.numero)
+        self.assertEqual(peek_proximo_numero('001', '001'), proximo)
+
+    def test_un_descuento_global_no_frena(self):
+        from facturacion_electronica.services.proveedores.api_payload import (
+            error_total_descuadrado,
+        )
+        from types import SimpleNamespace
+
+        detalle = SimpleNamespace(
+            producto=None, servicio=None, id_producto=1, cantidad=3,
+            precio_unitario=33333.33, subtotal=99999.99, descuento_linea=0, porcentaje_iva=10,
+        )
+        self.assertIsNone(error_total_descuadrado(
+            SimpleNamespace(detalles=[detalle], total=90000)))
+        self.assertIsNone(error_total_descuadrado(
+            SimpleNamespace(detalles=[detalle], total=100000)))
+
     def test_el_rechazo_trae_el_motivo_de_sifen(self):
         """El documento sólo dice `REJECTED` / "Rechazado": el código y el
         mensaje de SIFEN están en el ítem del lote, no en los eventos del DE.

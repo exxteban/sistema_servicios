@@ -29,13 +29,11 @@ from facturacion_electronica import (
 from facturacion_electronica.models import DocumentoElectronico
 from facturacion_electronica.services.config_service import obtener_configuracion
 from facturacion_electronica.services.emision_service import (
-    HORAS_LIMITE_CANCELACION,
     nota_credito_de_correccion,
     obtener_documento,
 )
 from facturacion_electronica.services.guarda import (
     error_devolucion_no_acreditable,
-    error_original_no_acreditable,
     error_venta_no_facturable,
 )
 from facturacion_electronica.services.kude_service import construir_contexto_kude
@@ -64,8 +62,13 @@ from facturacion_electronica.services.proveedores.api_documento import (
 )
 from facturacion_electronica.services.proveedores.api_inutilizacion import inutilizar_numero
 from facturacion_electronica.services.proveedores.api_timbrado import resolver_timbrado_nc
-from facturacion_electronica.services.proveedores.api_nota_credito import armar_cuerpo_nc, reabrir_nc_rechazada
-from facturacion_electronica.services.proveedores.api_payload import construir_emision_api
+from facturacion_electronica.services.proveedores.api_nota_credito import (
+    NC_NO_HABILITADA, armar_cuerpo_nc, reabrir_nc_rechazada, verificar_original,
+)
+from facturacion_electronica.services.proveedores.api_payload import (
+    construir_emision_api,
+    error_total_descuadrado,
+)
 from facturacion_electronica.services.proveedores.api_perfil import (
     aplicar_perfil_al_config,
     congelar_identidad,
@@ -88,15 +91,8 @@ TIPO_FACTURA = TIPO_DOC_FACTURA
 
 # La API acepta la nota de crédito (`document_type=5`) desde su 1.5.0; se
 # encendió el 2026-09-26. Necesita un timbrado de tipo 5 cargado en la API. La
-# NC a un receptor innominado la frena antes `error_original_no_acreditable`.
+# NC a un receptor innominado la frena antes `verificar_original`.
 API_EMITE_NOTAS_CREDITO = True
-
-NC_NO_HABILITADA = (
-    'Las notas de crédito por la API de facturación electrónica todavía no están '
-    'habilitadas: el proveedor aún no transmitió ninguna a SIFEN. Mientras tanto, si la '
-    f'factura tiene menos de {HORAS_LIMITE_CANCELACION}h se la puede anular en SIFEN; si ya '
-    'pasaron, hay que esperar a que se habiliten.'
-)
 
 
 class ProveedorApi(ProveedorFE):
@@ -157,41 +153,29 @@ class ProveedorApi(ProveedorFE):
             )
             db.session.add(documento)
 
-        error_cliente = (
+        # Todo se frena antes de reservar número: corregir la ficha o la
+        # venta no tiene que costar un correlativo.
+        error_previo = (
             validar_cliente(venta.cliente)
             or validar_receptor_api(venta.cliente)
             or validar_monto_innominado(venta.cliente, venta.total)
+            or bloqueo_entrega_inicial(venta)
+            or error_total_descuadrado(venta)
         )
-        if error_cliente:
-            documento.estado = ESTADO_ERROR
-            documento.respuesta_mensaje = error_cliente
-            db.session.commit()
-            return documento, error_cliente
-
-        error_credito = bloqueo_entrega_inicial(venta)
-        if error_credito:
-            documento.estado = ESTADO_ERROR
-            documento.respuesta_mensaje = error_credito
-            db.session.commit()
-            return documento, error_credito
+        if error_previo:
+            return self._fallar(documento, error_previo)
 
         config = obtener_configuracion()
         faltantes = self.faltantes_readiness(config)
         if faltantes:
-            documento.estado = ESTADO_ERROR
-            documento.respuesta_mensaje = 'Configuración incompleta: ' + ', '.join(faltantes)
-            db.session.commit()
-            return documento, documento.respuesta_mensaje
+            return self._fallar(documento, 'Configuración incompleta: ' + ', '.join(faltantes))
 
         establecimiento = normalizar_codigo(config.establecimiento)
         punto = normalizar_codigo(config.punto_expedicion)
         if not documento.numero:
             numero, error_numero = reservar_numero(establecimiento, punto)
             if error_numero:
-                documento.estado = ESTADO_ERROR
-                documento.respuesta_mensaje = error_numero
-                db.session.commit()
-                return documento, error_numero
+                return self._fallar(documento, error_numero)
             documento.numero = numero
         documento.establecimiento = establecimiento
         documento.punto = punto
@@ -214,7 +198,8 @@ class ProveedorApi(ProveedorFE):
             return None, error_devolucion
 
         original = obtener_documento(devolucion.id_venta)
-        error_original = error_original_no_acreditable(original)
+        config = obtener_configuracion()
+        xml_factura, error_original = verificar_original(config, original)
         if error_original:
             return None, error_original
 
@@ -233,7 +218,6 @@ class ProveedorApi(ProveedorFE):
         if not lineas:
             return None, 'La devolución no tiene ítems.'
 
-        config = obtener_configuracion()
         faltantes = self.faltantes_readiness(config)
         if faltantes:
             return None, 'Configuración incompleta: ' + ', '.join(faltantes)
@@ -278,7 +262,8 @@ class ProveedorApi(ProveedorFE):
             return None, 'La venta ya no existe.'
 
         original = obtener_documento(venta.id_venta)
-        error_original = error_original_no_acreditable(original)
+        config = obtener_configuracion()
+        xml_factura, error_original = verificar_original(config, original)
         if error_original:
             return None, error_original
 
@@ -301,7 +286,6 @@ class ProveedorApi(ProveedorFE):
         if not lineas:
             return existente, 'La venta no tiene ítems para acreditar.'
 
-        config = obtener_configuracion()
         faltantes = self.faltantes_readiness(config)
         if faltantes:
             return existente, 'Configuración incompleta: ' + ', '.join(faltantes)
@@ -324,9 +308,9 @@ class ProveedorApi(ProveedorFE):
         clave_idempotencia(documento)
         db.session.commit()
 
-        return self._alta_remota_nc(config, documento, lineas, original)
+        return self._alta_remota_nc(config, documento, lineas, original, xml_factura)
 
-    def _alta_remota_nc(self, config, documento, lineas, original):
+    def _alta_remota_nc(self, config, documento, lineas, original, xml_factura=None):
         """Alta de una NC, venga de una devolución o de la anulación de la factura.
 
         Recibe las líneas ya armadas: es lo único que cambia entre las dos: la
@@ -354,7 +338,9 @@ class ProveedorApi(ProveedorFE):
         if venta is None:
             return self._fallar(documento, 'La venta asociada ya no existe.')
 
-        cuerpo, error = armar_cuerpo_nc(config, documento, original, venta, lineas, timbrado_id)
+        cuerpo, error = armar_cuerpo_nc(
+            config, documento, original, venta, lineas, timbrado_id, xml=xml_factura,
+        )
         if error:
             return self._fallar(documento, error)
         remoto, error = api_client.solicitar(
@@ -464,7 +450,7 @@ class ProveedorApi(ProveedorFE):
         from app.models.devolucion import Devolucion
 
         original = db.session.get(DocumentoElectronico, documento.id_documento_asociado or 0)
-        error_original = error_original_no_acreditable(original)
+        xml_factura, error_original = verificar_original(config, original)
         if error_original:
             return error_original
 
@@ -489,10 +475,19 @@ class ProveedorApi(ProveedorFE):
         if error_numero:
             return error_numero
 
-        _documento, error = self._alta_remota_nc(config, documento, lineas, original)
+        _documento, error = self._alta_remota_nc(config, documento, lineas, original, xml_factura)
         return error
 
     def _fallar(self, documento, error):
+        """Marca el intento fallido. Devuelve (documento, error).
+
+        Una factura rechazada que existe en la API se queda `rechazado`: lo
+        que falló es el reintento (la ficha, el perfil), no lo que SIFEN sabe
+        de ella. Pasarla a 'error' escondía el motivo del rechazo, que es justo
+        lo que hay que corregir, hasta que el job la volvía a releer.
+        """
+        if documento.estado == ESTADO_RECHAZADO and documento.api_documento_id:
+            return documento, error
         documento.estado = ESTADO_ERROR
         documento.respuesta_mensaje = error
         db.session.commit()

@@ -163,6 +163,65 @@ class TestProveedorApiAnulacionConNc(BaseProveedorApi):
 
         self.assertIn('ya tiene una nota de crédito de anulación', error)
 
+    def test_factura_innominada_no_se_acredita_aunque_la_ficha_tenga_cedula(self):
+        """La NC lleva el receptor de la factura, no el de la ficha: si la
+        factura salió innominada, cargar la cédula después no la salva. Se
+        frena antes de reservar número y sin dar de alta nada."""
+        from facturacion_electronica.models import DocumentoElectronico
+        from facturacion_electronica.services.proveedores.fachada import (
+            emitir_nota_credito_correccion,
+        )
+
+        self._activar_api()
+        venta, _factura = self._venta_facturada()
+        innominada = xml_factura('0', 'Sin Nombre').replace(
+            '<iTipIDRec>1</iTipIDRec>', '<iTipIDRec>5</iTipIDRec>')
+        self.xml_de_factura.return_value = (innominada, None)
+
+        with patch(
+            'facturacion_electronica.services.proveedores.api_client.solicitar'
+        ) as nunca:
+            documento, error = emitir_nota_credito_correccion(venta, 1)
+
+        nunca.assert_not_called()
+        self.assertIsNone(documento)
+        self.assertIn('receptor sin identificar', error)
+        self.assertIn('completar ahora la ficha', error)
+        self.assertEqual(DocumentoElectronico.query.filter_by(
+            id_venta=venta.id_venta, tipo_documento=TIPO_NOTA_CREDITO).count(), 0)
+
+    def test_la_nc_que_reemplaza_a_una_cancelada_estrena_referencia(self):
+        """La API reserva `external_ref` también para los cancelados: repetir
+        `anulacion-<venta>` era `409 external_ref_conflict`."""
+        from facturacion_electronica import ESTADO_CANCELADO
+        from facturacion_electronica.services.proveedores.fachada import (
+            emitir_nota_credito_correccion,
+        )
+
+        self._activar_api()
+        venta, _factura = self._venta_facturada()
+        altas = []
+
+        def _solicitar(config, metodo, ruta, **kwargs):
+            if ruta == '/sifen/me/':
+                return self._perfil_con_timbrado_de_nc(), None
+            if ruta == '/sifen/electronic-documents/':
+                altas.append(kwargs.get('json'))
+                return respuesta_api(document_type=TIPO_NOTA_CREDITO), None
+            raise AssertionError(f'ruta inesperada: {ruta}')
+
+        with patch('facturacion_electronica.services.proveedores.api_client.solicitar', _solicitar):
+            primera, error = emitir_nota_credito_correccion(venta, 1)
+            self.assertIsNone(error)
+            primera.estado = ESTADO_CANCELADO
+            db.session.commit()
+            segunda, error = emitir_nota_credito_correccion(venta, 1)
+
+        self.assertIsNone(error)
+        self.assertNotEqual(segunda.id, primera.id)
+        self.assertEqual(altas[0]['external_ref'], f'anulacion-{venta.id_venta}')
+        self.assertEqual(altas[1]['external_ref'], f'anulacion-{venta.id_venta}-2')
+
     def test_el_job_reintenta_la_nc_de_anulacion(self):
         """`_reintentar_nota_credito` daba por sentado que toda NC tiene una
         devolución: la de anulación quedaba huérfana ('la devolución ya no
@@ -258,7 +317,10 @@ class TestProveedorApiAnulacionConNc(BaseProveedorApi):
         self.assertNotIn('ruc', receptor)
 
     def test_sin_el_xml_de_la_factura_no_se_emite(self):
-        """Caer a la ficha es el error que se corrige: mejor frenar y reintentar."""
+        """Caer a la ficha es el error que se corrige: mejor frenar y reintentar.
+
+        Se frena antes de crear la NC: un corte pasajero no consume número."""
+        from facturacion_electronica.models import DocumentoElectronico
         from facturacion_electronica.services.proveedores.fachada import (
             emitir_nota_credito_correccion,
         )
@@ -274,7 +336,9 @@ class TestProveedorApiAnulacionConNc(BaseProveedorApi):
 
         self.assertIn('receptor de la factura', error)
         self.assertEqual(altas, [])
-        self.assertEqual(documento.estado, ESTADO_ERROR)
+        self.assertIsNone(documento)
+        self.assertEqual(DocumentoElectronico.query.filter_by(
+            id_venta=venta.id_venta, tipo_documento=TIPO_NOTA_CREDITO).count(), 0)
 
     def test_una_nc_rechazada_se_vuelve_a_dar_de_alta_con_el_mismo_numero(self):
         """Antes el botón sólo refrescaba la NC rechazada y decía "emitida".
