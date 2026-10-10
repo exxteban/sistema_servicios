@@ -1,0 +1,100 @@
+{# Menu lateral "Ventas": POS, registro vendedor, pedidos, ticket y FE.
+   Usa los permisos p_* definidos en app_shell.html. #}
+{% if p_pos or p_registro_vendedor or p_pedidos or p_ticket %}
+<div class="relative group w-12"
+    {% if p_cola_cobro %}x-data="cajaNotification()"{% endif %}>
+    <button
+        type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'ventas' })"
+        data-sidebar-trigger="ventas" :aria-expanded="activeMenu === 'ventas'" aria-controls="sidebar-menu-ventas"
+        class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 focus:outline-none relative"
+        {% if p_cola_cobro %}:class="{ 'whatsapp-pending-animation': hasPendingCobros }"{% endif %}
+        style="--accent-rgb: 34, 197, 94" aria-label="Ventas">
+        <i class="fas fa-cash-register text-lg group-hover:scale-110 transition-transform"></i>
+        {% if p_cola_cobro %}
+        <span x-show="hasPendingCobros" x-cloak x-text="pendingCount > 99 ? '99+' : pendingCount"
+            class="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center"></span>
+        {% endif %}
+    </button>
+
+    <template x-if="activeMenu === 'ventas'">
+    <div data-sidebar-menu="ventas" id="sidebar-menu-ventas"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+        x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+        x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+        class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+        :style="getMenuStyle('ventas')" aria-hidden="false">
+
+        <div
+            class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+            Operaciones
+        </div>
+
+        {% if p_pos %}
+        <a href="{{ url_for('ventas.pos') }}" data-permiso="crear_venta"
+            data-tab-url="{{ url_for('ventas.pos') }}" data-tab-title="POS"
+            data-tab-icon="fas fa-cash-register"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-green-400 group-hover/item:bg-green-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-cash-register text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Punto de Venta</span>
+        </a>
+        {% endif %}
+        {% if p_registro_vendedor %}
+        <a href="{{ url_for('ventas.registro_vendedor') }}" data-permiso="crear_venta"
+            data-tab-url="{{ url_for('ventas.registro_vendedor') }}" data-tab-title="Registro vendedor"
+            data-tab-icon="fas fa-clipboard-list"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover/item:bg-amber-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-clipboard-list text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Registro vendedor</span>
+        </a>
+        <a href="{{ url_for('ventas.registro_vendedor_enviadas') }}" data-permiso="crear_venta"
+            data-tab-url="{{ url_for('ventas.registro_vendedor_enviadas') }}"
+            data-tab-title="Mis ventas enviadas" data-tab-icon="fas fa-paper-plane"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center text-sky-400 group-hover/item:bg-sky-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-paper-plane text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Mis ventas enviadas</span>
+        </a>
+        {% endif %}
+
+        {% if p_pedidos %}
+        <a href="{{ url_for('pedidos.listar') }}"
+            data-tab-url="{{ url_for('pedidos.listar') }}" data-tab-title="Pedidos"
+            data-tab-icon="fas fa-clipboard-list"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover/item:bg-cyan-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-clipboard-list text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Pedidos</span>
+        </a>
+        {% endif %}
+
+        {% if p_ticket %}
+        <a href="{{ url_for('ventas.config_ticket') }}" data-permiso="editar_configuracion"
+            data-tab-url="{{ url_for('ventas.config_ticket') }}" data-tab-title="Ticket"
+            data-tab-icon="fas fa-receipt"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover/item:bg-blue-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-receipt text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Config. Ticket</span>
+        </a>
+        {% endif %}
+
+        {% include 'layout/_fe_menu_links.html' %}
+    </div>
+    </template>
+</div>
+{% endif %}

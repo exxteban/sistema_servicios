@@ -1,0 +1,126 @@
+html,
+body,
+.app-shell-body,
+#app-tab-panels,
+.app-tab-panel {
+    /* pan-x tambien: tablas y grillas anchas se recorren deslizando de costado. */
+    touch-action: pan-x pan-y pinch-zoom;
+}
+
+html {
+    background-color: #f3f4f6;
+    overscroll-behavior: none;
+}
+
+html.dark {
+    background-color: #111827;
+}
+
+body.app-shell-body {
+    background-color: #f3f4f6;
+    background-attachment: fixed;
+    min-width: 100%;
+}
+
+html.dark body.app-shell-body {
+    background-color: #111827;
+}
+
+body[data-app-shell-root="true"]::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: #f3f4f6;
+}
+
+html.dark body[data-app-shell-root="true"]::before {
+    background: #111827;
+}
+
+.app-tab-panel,
+.main-card,
+.brand-panel {
+    -webkit-overflow-scrolling: touch;
+}
+
+html.app-zooming {
+    text-rendering: optimizeSpeed;
+}
+
+html.app-zooming [data-app-zoom-types~="filter"],
+html.app-zooming .crm-topnav,
+html.app-zooming .app-shell-sidebar,
+html.app-zooming .app-shell-flyout-menu,
+html.app-zooming .app-toast,
+html.app-zooming .app-agenda-summary,
+html.app-zooming .app-gastos-alert,
+html.app-zooming .app-agenda-live-alert,
+html.app-zooming .main-card,
+html.app-zooming .brand-panel,
+html.app-zooming .fi {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+    box-shadow: none !important;
+}
+
+html.app-zooming [data-app-zoom-types~="shadow"] {
+    box-shadow: none !important;
+}
+
+html.app-zooming [data-app-zoom-types~="animate"],
+html.app-zooming .agenda-pending-animation,
+html.app-zooming .whatsapp-pending-animation,
+html.app-zooming .animate-slide-down {
+    animation: none !important;
+    transition: none !important;
+}
+
+html.app-zooming [data-app-zoom-types~="overlay"] {
+    will-change: auto !important;
+}
+
+html.app-zooming body[data-app-shell-root="true"] {
+    overscroll-behavior: contain;
+}
+
+html.app-zooming body[data-app-shell-root="true"] [data-app-shell-viewport-lock="true"] {
+    min-width: 0;
+}
+
+html.app-zooming body[data-app-shell-root="true"] .app-tab-panel {
+    overscroll-behavior-y: contain;
+}
+
+/* While the user is zoomed in, allow dragging in every direction so the
+   zoomed viewport can be panned instead of staying static. Without pan-x the
+   browser only lets the inner panels scroll vertically and the magnified view
+   gets stuck horizontally. */
+html.app-zooming,
+html.app-zooming body.app-shell-body,
+html.app-zooming #app-tab-panels,
+html.app-zooming .app-tab-panel,
+html.app-zooming .main-card,
+html.app-zooming .brand-panel,
+html.app-zooming body[data-app-shell-root="true"] [data-app-shell-viewport-lock="true"] {
+    touch-action: pan-x pan-y pinch-zoom !important;
+    overscroll-behavior: auto !important;
+}
+
+html.app-zooming .orb,
+html.app-zooming [data-app-zoom-types~="filter"] .orb {
+    filter: none !important;
+}
+
+html.app-zooming .sidebar-link,
+html.app-zooming .crm-nav-pill,
+html.app-zooming .crm-nav-icon-btn,
+html.app-zooming .crm-logout-btn,
+html.app-zooming .app-toast,
+html.app-zooming .app-agenda-summary-host,
+html.app-zooming .app-agenda-live-alert,
+html.app-zooming [data-app-zoom-costly="true"] {
+    transition: none !important;
+}
