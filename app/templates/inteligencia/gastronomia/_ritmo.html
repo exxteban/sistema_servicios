@@ -1,0 +1,112 @@
+{% from "inteligencia/gastronomia/_macros.html" import card_header, barra, vacio, plural %}
+{% set g = panel.gastronomia %}
+{% set card = 'flex flex-col rounded-2xl bg-white p-4 shadow-md dark:bg-gray-800 xl:h-[20rem]' %}
+{% set cuerpo = 'mt-3 min-h-0 flex-1 overflow-auto pr-1' %}
+
+{# Horarios: picos + franjas flojas con promo sugerida #}
+<div class="{{ card }}">
+    {{ card_header('Ritmo por horario', eyebrow='Operación', eyebrow_class='text-sky-600 dark:text-sky-400') }}
+    <div class="{{ cuerpo }}">
+        {% set max_pedidos = (g.horarios_pico|map(attribute='pedidos')|max) if g.horarios_pico else 0 %}
+        <div class="space-y-2">
+            {% for horario in g.horarios_pico %}
+            <div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="font-semibold text-gray-900 dark:text-white">{{ horario.hora_label }}{% if loop.first %} <span class="ml-1 rounded bg-emerald-50 px-1.5 text-[10px] text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">pico</span>{% endif %}</span>
+                    <span class="text-gray-600 dark:text-gray-300">{{ plural(horario.pedidos, 'pedido') }} · {{ horario.total_label }}</span>
+                </div>
+                {{ barra((horario.pedidos / max_pedidos * 100) if max_pedidos else 0, 'bg-sky-500') }}
+            </div>
+            {% else %}
+            {{ vacio('Sin volumen suficiente para detectar picos.') }}
+            {% endfor %}
+        </div>
+
+        {% if g.promos_horario_bajo %}
+        <p class="mt-4 text-[10px] font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">Horarios flojos para empujar venta</p>
+        <div class="mt-1 space-y-2">
+            {% for promo in g.promos_horario_bajo %}
+            <div class="rounded-lg bg-cyan-50/70 px-3 py-2 dark:bg-cyan-500/10">
+                <p class="text-xs font-semibold text-gray-900 dark:text-white">{{ promo.titulo }}</p>
+                <p class="text-[11px] text-gray-600 dark:text-gray-300">{{ promo.accion }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# Mix: canales + categorías #}
+<div class="{{ card }}">
+    {{ card_header('Mix de venta', eyebrow='Canales y categorías', eyebrow_class='text-emerald-600 dark:text-emerald-400') }}
+    <div class="{{ cuerpo }} space-y-2">
+        {% for canal in g.canales %}
+        <div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="font-semibold text-gray-900 dark:text-white">{{ canal.canal_label }}</span>
+                <span class="font-semibold text-emerald-700 dark:text-emerald-300">{{ canal.total_label }}</span>
+            </div>
+            {{ barra(canal.participacion, 'bg-emerald-500') }}
+            <p class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">{{ plural(canal.pedidos, 'pedido') }} · {{ canal.participacion_label }}</p>
+        </div>
+        {% else %}
+        {{ vacio('Sin canales con venta cobrada.') }}
+        {% endfor %}
+
+        <p class="pt-2 text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">Categorías fuertes del menú</p>
+        {% for categoria in g.categorias_top %}
+        <div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="font-semibold text-gray-900 dark:text-white">{{ categoria.nombre }}</span>
+                <span class="text-gray-600 dark:text-gray-300">{{ categoria.total_label }}</span>
+            </div>
+            {{ barra(categoria.participacion, 'bg-violet-500') }}
+        </div>
+        {% else %}
+        {{ vacio('Sin categorías con ventas cobradas.') }}
+        {% endfor %}
+    </div>
+</div>
+
+{# Extras y modificadores #}
+<div class="{{ card }}">
+    {{ card_header('Extras y modificadores', eyebrow='Upsell', eyebrow_class='text-orange-600 dark:text-orange-400') }}
+    <div class="{{ cuerpo }}">
+        <ul class="divide-y divide-gray-100 dark:divide-gray-700">
+            {% for mod in g.modificadores_top %}
+            <li class="flex items-center justify-between gap-2 py-1.5 text-xs">
+                <span class="min-w-0 truncate font-semibold text-gray-900 dark:text-white" title="{{ mod.nombre }}">{{ mod.nombre }}</span>
+                <span class="shrink-0 text-right text-gray-600 dark:text-gray-300">
+                    ×{{ mod.cantidad }}
+                    <span class="ml-1 {% if mod.delta_total > 0 %}text-emerald-600 dark:text-emerald-400{% elif mod.delta_total < 0 %}text-rose-600 dark:text-rose-400{% else %}text-gray-400{% endif %}">{{ mod.delta_total_label }}</span>
+                </span>
+            </li>
+            {% else %}
+            <li>{{ vacio('Sin modificadores registrados en el período.') }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{# Clientes frecuentes #}
+<div class="{{ card }}">
+    {{ card_header('Clientes frecuentes gastronómicos', eyebrow='Clientes', eyebrow_class='text-emerald-600 dark:text-emerald-400', badge=g.clientes_frecuentes|length, badge_class='bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300') }}
+    <div class="{{ cuerpo }} space-y-2">
+        {% for cliente in g.clientes_frecuentes %}
+        <div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/40" title="{{ cliente.accion }}">
+            <div class="flex items-start justify-between gap-2">
+                <p class="min-w-0 truncate text-xs font-semibold text-gray-900 dark:text-white">{{ cliente.nombre }}</p>
+                {% if cliente.whatsapp_url %}
+                <a href="{{ cliente.whatsapp_url }}" target="_blank" rel="noopener" class="shrink-0 text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-300">WhatsApp</a>
+                {% else %}
+                <span class="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{{ cliente.telefono_label }}</span>
+                {% endif %}
+            </div>
+            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ plural(cliente.pedidos, 'pedido') }} · {{ cliente.total_label }} · Últ. {{ cliente.ultima_visita_label }}</p>
+            <p class="text-[11px] text-gray-500 dark:text-gray-400">Favorito: {{ cliente.producto_favorito }}</p>
+        </div>
+        {% else %}
+        {{ vacio('Se detectan al repetirse nombre o celular en pedidos cobrados.') }}
+        {% endfor %}
+    </div>
+</div>
