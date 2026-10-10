@@ -38,7 +38,7 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
     promos_horario_bajo = promociones_horario_bajo(cliente_id_resuelto, periodo_actual, productos)
     productos_bajo_margen = productos_alto_volumen_bajo_margen(cliente_id_resuelto, periodo_actual)
     clientes_frecuentes = clientes_frecuentes_gastronomia(cliente_id_resuelto, periodo_actual)
-    insights = _construir_insights(resumen_actual, resumen_anterior, productos, canales, horarios)
+    insights = _construir_insights(resumen_actual, resumen_anterior, productos)
 
     return {
         'activo': True,
@@ -128,6 +128,7 @@ def _productos_top(cliente_id: int, periodo_actual: dict, periodo_anterior: dict
         resultado.append({
             **item,
             'total_label': _formatear_moneda(item['total']),
+            'participacion': round(participacion, 1),
             'participacion_label': f'{participacion:.1f}%',
             'variacion_label': variacion['label'],
             'direccion': variacion['direccion'],
@@ -194,6 +195,7 @@ def _categorias_top(cliente_id: int, periodo: dict, limite: int = 6) -> list[dic
         'cantidad': int(cantidad or 0),
         'total': float(total or 0),
         'total_label': _formatear_moneda(float(total or 0)),
+        'participacion': round(float(total or 0) / total_general * 100, 1) if total_general else 0.0,
         'participacion_label': f'{(float(total or 0) / total_general * 100):.1f}%' if total_general else '0.0%',
     } for nombre, cantidad, total in filas]
 
@@ -223,6 +225,7 @@ def _canales(cliente_id: int, periodo: dict) -> list[dict]:
         'pedidos': int(pedidos or 0),
         'total': float(total or 0),
         'total_label': _formatear_moneda(float(total or 0)),
+        'participacion': round(float(total or 0) / total_general * 100, 1) if total_general else 0.0,
         'participacion_label': f'{(float(total or 0) / total_general * 100):.1f}%' if total_general else '0.0%',
     } for canal, pedidos, total in filas]
 
@@ -316,19 +319,11 @@ def _pedidos_cancelados(cliente_id: int, inicio, fin) -> int:
     )
 
 
-def _construir_insights(actual: dict, anterior: dict, productos: list[dict], canales: list[dict], horarios: list[dict]) -> list[dict]:
+def _construir_insights(actual: dict, anterior: dict, productos: list[dict]) -> list[dict]:
     insights = []
     ventas_variacion = _calcular_variacion(actual['ventas_total'], anterior['ventas_total'])
     ticket_variacion = _calcular_variacion(actual['ticket_promedio'], anterior['ticket_promedio'])
 
-    if productos:
-        lider = productos[0]
-        insights.append({
-            'prioridad': 'media' if lider['direccion'] == 'down' else 'baja',
-            'titulo': f"{lider['nombre']} lidera el menu",
-            'detalle': f"Vendio {lider['cantidad']} unidades y aporto {lider['participacion_label']} del ingreso gastronomico.",
-            'accion': lider['accion'],
-        })
     if ventas_variacion['direccion'] == 'down':
         insights.append({
             'prioridad': 'alta',
@@ -343,28 +338,19 @@ def _construir_insights(actual: dict, anterior: dict, productos: list[dict], can
             'detalle': f"El ticket marca {ticket_variacion['label']} contra el periodo anterior.",
             'accion': 'Ofrecer extras, bebidas o combos antes de cerrar el pedido.',
         })
-    if canales:
-        canal = canales[0]
-        insights.append({
-            'prioridad': 'baja',
-            'titulo': f"{canal['canal_label']} es el canal mas fuerte",
-            'detalle': f"Concentra {canal['participacion_label']} de la venta del periodo.",
-            'accion': 'Cuidar disponibilidad y velocidad en ese canal antes de abrir nuevas promociones.',
-        })
-    if horarios:
-        horario = horarios[0]
-        insights.append({
-            'prioridad': 'media',
-            'titulo': f"Pico operativo a las {horario['hora_label']}",
-            'detalle': f"Registra {horario['pedidos']} pedidos y {horario['total_label']} cobrados.",
-            'accion': 'Ajustar personal, mise en place y delivery alrededor de esa franja.',
-        })
     if actual['tiempo_preparacion_min'] >= 25:
         insights.append({
             'prioridad': 'media',
             'titulo': 'La cocina esta tardando mas de lo ideal',
             'detalle': f"Preparacion promedio: {actual['tiempo_preparacion_min']} min.",
             'accion': 'Revisar productos lentos, capacidad por horario y organizacion de comandas.',
+        })
+    if not insights and productos:
+        insights.append({
+            'prioridad': 'baja',
+            'titulo': 'Ventas, ticket y cocina estables',
+            'detalle': 'No hay caidas frente al periodo anterior ni demoras de cocina.',
+            'accion': 'Aprovechar el ritmo para probar combos o upsell en los productos lideres.',
         })
     if not insights:
         insights.append({

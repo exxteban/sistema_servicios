@@ -1,0 +1,24 @@
+{% set resumen = panel.gastronomia.resumen %}
+{% macro tendencia(direccion) %}{% if direccion == 'up' %}text-emerald-600 dark:text-emerald-400{% elif direccion == 'down' %}text-rose-600 dark:text-rose-400{% else %}text-gray-500 dark:text-gray-400{% endif %}{% endmacro %}
+<div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <div class="rounded-xl border-l-4 border-emerald-500 bg-white px-4 py-3 shadow-sm dark:bg-gray-800">
+        <p class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Venta gastronómica</p>
+        <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ resumen.ventas_total_label }}</p>
+        <p class="text-[11px] {{ tendencia(resumen.ventas_direccion) }}">{{ resumen.ventas_variacion_label }} vs período anterior</p>
+    </div>
+    <div class="rounded-xl border-l-4 border-sky-500 bg-white px-4 py-3 shadow-sm dark:bg-gray-800">
+        <p class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Pedidos cobrados</p>
+        <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ resumen.pedidos_cobrados }}</p>
+        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ panel.gastronomia.periodo_label }}</p>
+    </div>
+    <div class="rounded-xl border-l-4 border-violet-500 bg-white px-4 py-3 shadow-sm dark:bg-gray-800">
+        <p class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Ticket promedio</p>
+        <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ resumen.ticket_promedio_label }}</p>
+        <p class="text-[11px] {{ tendencia(resumen.ticket_direccion) }}">{{ resumen.ticket_variacion_label }} vs anterior</p>
+    </div>
+    <div class="rounded-xl border-l-4 border-orange-500 bg-white px-4 py-3 shadow-sm dark:bg-gray-800">
+        <p class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Preparación</p>
+        <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ resumen.tiempo_preparacion_min }} min</p>
+        <p class="text-[11px] text-gray-500 dark:text-gray-400">Promedio de cocina a listo</p>
+    </div>
+</div>
