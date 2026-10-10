@@ -7,12 +7,14 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     {% set browser_title %}{% block title %}{% endblock %}{% endset %}
     <title>{% set browser_title = browser_title | striptags | trim %}{% if browser_title %}{{ browser_title }} - {% endif %}Sistema de Gestión Gastronómica</title>
+    <script src="{{ static_url('js/app_zoom_stability.js') }}"></script>
     {% include 'layout/head_assets.html' %}
     {% block extra_css %}{% endblock %}
 </head>
 
-<body data-endpoint="{{ request.endpoint or '' }}"
+<body data-endpoint="{{ request.endpoint or '' }}" data-app-shell-root="true"
     class="app-shell-body bg-gray-100 dark:bg-gray-900 dark:text-gray-100 overflow-hidden flex flex-col transition-colors duration-300"
+    @sidebar-close-request.window="sidebarOpen = false"
     x-data="{ 
           sidebarOpen: false, 
           darkMode: localStorage.getItem('darkMode') === 'true'

@@ -1,0 +1,416 @@
+{# Componentes Alpine de notificaciones del sidebar (agenda, caja, WhatsApp). #}
+<script>
+    const agendaActivitySyncStorageKey = 'agenda-activity-sync';
+
+    function agendaNotification() {
+        return {
+            hasPendingAgenda: false,
+            pendingCount: 0,
+            overdueCount: 0,
+            alertCount: 0,
+            pollInterval: null,
+            currentPollMs: null,
+            scheduledCheckTimeout: null,
+            isChecking: false,
+            lastKeys: null,
+            lastItems: [],
+            suppressedIds: {},
+            suppressMs: 15000,
+            inactivePollMs: 30000,
+            activePollMs: 3000,
+            storagePrefix: 'agenda-runtime-alerta-vista',
+
+            init() {
+                this.startPolling();
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        this.stopPolling();
+                    } else {
+                        this.startPolling();
+                        this.checkAgendaAlerts();
+                    }
+                });
+                window.addEventListener('agenda:resolver-actividad', (event) => {
+                    this.resolveAgendaActivity(event && event.detail ? event.detail : {});
+                });
+                window.addEventListener('storage', (event) => {
+                    if (!event || event.key !== agendaActivitySyncStorageKey || !event.newValue) {
+                        return;
+                    }
+                    try {
+                        this.resolveAgendaActivity(JSON.parse(event.newValue));
+                    } catch (e) {
+                    }
+                });
+            },
+
+            startPolling() {
+                this.checkAgendaAlerts();
+                this.refreshPollingInterval();
+            },
+
+            stopPolling() {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                }
+                this.currentPollMs = null;
+                this.clearScheduledCheck();
+            },
+
+            refreshPollingInterval() {
+                if (document.hidden) {
+                    if (this.pollInterval) {
+                        clearInterval(this.pollInterval);
+                        this.pollInterval = null;
+                    }
+                    this.currentPollMs = null;
+                    return;
+                }
+                const nextPollMs = this.hasPendingAgenda ? this.activePollMs : this.inactivePollMs;
+                if (this.pollInterval && this.currentPollMs === nextPollMs) {
+                    return;
+                }
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                }
+                this.currentPollMs = nextPollMs;
+                this.pollInterval = setInterval(() => this.checkAgendaAlerts(), nextPollMs);
+            },
+
+            clearScheduledCheck() {
+                if (this.scheduledCheckTimeout) {
+                    clearTimeout(this.scheduledCheckTimeout);
+                    this.scheduledCheckTimeout = null;
+                }
+            },
+
+            scheduleNextCheck(nextCheckAtUtc, serverTimeUtc) {
+                this.clearScheduledCheck();
+
+                const nextCheckMs = Date.parse(nextCheckAtUtc || '');
+                const serverTimeMs = Date.parse(serverTimeUtc || '');
+                if (!Number.isFinite(nextCheckMs) || !Number.isFinite(serverTimeMs)) {
+                    return;
+                }
+
+                const maxDelayMs = 5 * 60 * 1000;
+                const delayMs = Math.min(Math.max(0, nextCheckMs - serverTimeMs + 250), maxDelayMs);
+                this.scheduledCheckTimeout = setTimeout(() => {
+                    this.scheduledCheckTimeout = null;
+                    this.checkAgendaAlerts();
+                }, delayMs);
+            },
+
+            pruneSuppressed() {
+                const nowMs = Date.now();
+                const nextSuppressed = {};
+                Object.keys(this.suppressedIds || {}).forEach((id) => {
+                    const ts = Number(this.suppressedIds[id] || 0);
+                    if (nowMs - ts < this.suppressMs) {
+                        nextSuppressed[id] = ts;
+                    }
+                });
+                this.suppressedIds = nextSuppressed;
+            },
+
+            suppressActivityId(activityId) {
+                const id = String(activityId || '').trim();
+                if (!id) return;
+                this.suppressedIds[id] = Date.now();
+                this.pruneSuppressed();
+            },
+
+            isSuppressed(activityId) {
+                const id = String(activityId || '').trim();
+                if (!id) return false;
+                const ts = Number(this.suppressedIds[id] || 0);
+                if (!ts) {
+                    return false;
+                }
+                return Date.now() - ts < this.suppressMs;
+            },
+
+            applyStateFromItems(items, summary) {
+                const safeItems = Array.isArray(items) ? items : [];
+                const hasSummary = summary && typeof summary === 'object';
+                let overdueCount = hasSummary ? Number(summary.overdue_count || 0) : 0;
+                let alertCount = hasSummary ? Number(summary.alert_count || 0) : 0;
+                if (!Number.isFinite(overdueCount) || !Number.isFinite(alertCount) || !hasSummary) {
+                    overdueCount = 0;
+                    alertCount = 0;
+                    safeItems.forEach((item) => {
+                        if (item && item.estado_alerta === 'overdue') {
+                            overdueCount += 1;
+                        } else if (item && item.estado_alerta === 'alert') {
+                            alertCount += 1;
+                        }
+                    });
+                }
+                const totalCount = hasSummary && Number.isFinite(Number(summary.count))
+                    ? Number(summary.count)
+                    : safeItems.length;
+                this.lastItems = safeItems.slice();
+                this.pendingCount = totalCount;
+                this.overdueCount = overdueCount;
+                this.alertCount = alertCount;
+                this.hasPendingAgenda = this.pendingCount > 0;
+                this.refreshPollingInterval();
+
+                window.dispatchEvent(new CustomEvent('agenda:alertas-actualizadas', {
+                    detail: {
+                        count: this.pendingCount,
+                        overdue_count: this.overdueCount,
+                        alert_count: this.alertCount,
+                        has_alerts: this.hasPendingAgenda,
+                        items: this.lastItems
+                    }
+                }));
+            },
+
+            buildAlertKey(item) {
+                const triggerAt = item && (item.trigger_at_utc || item.fecha_inicio_utc || '');
+                const estado = item && item.estado_alerta ? item.estado_alerta : 'alert';
+                const id = item && item.id ? item.id : '0';
+                return `${this.storagePrefix}:${id}:${estado}:${triggerAt}`;
+            },
+
+            wasAlreadyNotified(key) {
+                try {
+                    return window.localStorage && localStorage.getItem(key) === '1';
+                } catch (e) {
+                    return false;
+                }
+            },
+
+            markNotified(key) {
+                try {
+                    if (window.localStorage) {
+                        localStorage.setItem(key, '1');
+                    }
+                } catch (e) {
+                }
+            },
+
+            notifyNewAgendaItems(items) {
+                if (!Array.isArray(items) || !items.length) {
+                    return;
+                }
+
+                const unseenItems = items.filter((item) => (
+                    item
+                    && item.estado_alerta === 'overdue'
+                    && !this.wasAlreadyNotified(this.buildAlertKey(item))
+                ));
+                if (!unseenItems.length) {
+                    return;
+                }
+
+                let delivered = false;
+                if (typeof window.__emitAgendaLiveAlerts === 'function') {
+                    window.__emitAgendaLiveAlerts({
+                        items: unseenItems
+                    });
+                    delivered = true;
+                } else if (typeof window.mostrarNotificacion === 'function') {
+                    const primaryItem = unseenItems[0];
+                    const total = unseenItems.length;
+                    const suffix = total > 1 ? ` Hay ${total} actividades de agenda requiriendo atención.` : '';
+                    const message = primaryItem.estado_alerta === 'overdue'
+                        ? `Agenda: "${primaryItem.titulo}" ya venció y sigue pendiente.${suffix}`
+                        : `Agenda: "${primaryItem.titulo}" entró en alerta.${suffix}`;
+                    window.mostrarNotificacion(message, 'warning');
+                    delivered = true;
+                } else {
+                    window.__agendaLiveAlertQueue = Array.isArray(window.__agendaLiveAlertQueue)
+                        ? window.__agendaLiveAlertQueue
+                        : [];
+                    window.__agendaLiveAlertQueue.push({ items: unseenItems });
+                    delivered = true;
+                }
+
+                if (delivered) {
+                    unseenItems.forEach((item) => this.markNotified(this.buildAlertKey(item)));
+                }
+            },
+
+            resolveAgendaActivity(detail) {
+                const activityId = String((detail && detail.id) || '');
+                if (!activityId) {
+                    return;
+                }
+                this.suppressActivityId(activityId);
+
+                if (Array.isArray(this.lastKeys)) {
+                    const token = `${this.storagePrefix}:${activityId}:`;
+                    this.lastKeys = this.lastKeys.filter((key) => !String(key).startsWith(token));
+                }
+                const items = Array.isArray(this.lastItems)
+                    ? this.lastItems.filter((item) => String(item && item.id ? item.id : '') !== activityId)
+                    : [];
+                this.applyStateFromItems(items);
+                this.checkAgendaAlerts();
+            },
+
+            async checkAgendaAlerts() {
+                if (this.isChecking) {
+                    return;
+                }
+                this.isChecking = true;
+                try {
+                    const response = await fetch('/agenda/api/alertas/resumen?limit=80', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!response.ok) return;
+
+                    const data = await response.json();
+                    this.pruneSuppressed();
+                    const items = (Array.isArray(data.items) ? data.items : [])
+                        .filter((item) => !this.isSuppressed(item && item.id ? item.id : ''));
+                    const keys = items
+                        .map((item) => this.buildAlertKey(item))
+                        .sort();
+
+                    const shouldNotify = this.lastKeys === null
+                        ? items
+                        : items.filter((item) => !this.lastKeys.includes(this.buildAlertKey(item)));
+                    this.notifyNewAgendaItems(shouldNotify);
+                    this.applyStateFromItems(items, data);
+                    this.scheduleNextCheck(data && data.next_check_at_utc, data && data.server_time_utc);
+                    this.lastKeys = keys;
+                } catch (e) {
+                } finally {
+                    this.isChecking = false;
+                }
+            }
+        };
+    }
+
+    function whatsappNotification() {
+        return {
+            hasPendingChats: false,
+            pendingCount: 0,
+            pollInterval: null,
+            lastData: null,
+
+            init() {
+                this.startPolling();
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        this.stopPolling();
+                    } else {
+                        this.startPolling();
+                        this.checkPendingChats();
+                    }
+                });
+            },
+
+            startPolling() {
+                this.checkPendingChats();
+                this.pollInterval = setInterval(() => this.checkPendingChats(), 10000);
+            },
+
+            stopPolling() {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                }
+            },
+
+            async checkPendingChats() {
+                try {
+                    const response = await fetch('/whatsapp/asesor/conversaciones', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!response.ok) return;
+                    const data = await response.json();
+
+                    const colaCount = data.cola ? data.cola.length : 0;
+                    const pendingConvs = data.conversaciones ? data.conversaciones.filter(c => c.estado_asignacion === 'pendiente').length : 0;
+                    this.pendingCount = colaCount + pendingConvs;
+                    this.hasPendingChats = this.pendingCount > 0;
+
+                    if (this.lastData && this.pendingCount > this.lastData) {
+                        if (window.mostrarNotificacion) {
+                            window.mostrarNotificacion(`Tienes ${this.pendingCount} chat${this.pendingCount > 1 ? 's' : ''} pendiente${this.pendingCount > 1 ? 's' : ''} en WhatsApp`, 'info');
+                        }
+                    }
+                    this.lastData = this.pendingCount;
+                } catch (e) {
+                }
+            }
+        };
+    }
+
+    function cajaNotification() {
+        return {
+            hasPendingCobros: false,
+            pendingCount: 0,
+            pollInterval: null,
+            lastCount: null,
+
+            init() {
+                this.startPolling();
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        this.stopPolling();
+                    } else {
+                        this.startPolling();
+                        this.checkPendingCobros();
+                    }
+                });
+                window.addEventListener('caja:cola-cobro-actualizada', (event) => {
+                    const detail = event && event.detail ? event.detail : {};
+                    const count = Number(detail.count || 0);
+                    const alertaActiva = Boolean(detail.alertaActiva);
+                    this.pendingCount = count;
+                    this.hasPendingCobros = alertaActiva && count > 0;
+                    this.lastCount = count;
+                });
+            },
+
+            startPolling() {
+                this.checkPendingCobros();
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                }
+                this.pollInterval = setInterval(() => this.checkPendingCobros(), 3000);
+            },
+
+            stopPolling() {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                }
+            },
+
+            async checkPendingCobros() {
+                try {
+                    const response = await fetch('/caja/api/cola-cobro/resumen?detalle=0', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!response.ok) return;
+
+                    const data = await response.json();
+                    const count = Number(data.count || 0);
+                    const alertaActiva = Boolean(data.alerta_activa);
+
+                    this.pendingCount = count;
+                    this.hasPendingCobros = alertaActiva && count > 0;
+
+                    if (this.lastCount !== null && count > this.lastCount && window.mostrarNotificacion) {
+                        window.mostrarNotificacion(
+                            `Hay ${count} pendiente${count === 1 ? '' : 's'} de cobro en caja`,
+                            'info'
+                        );
+                    }
+                    this.lastCount = count;
+                } catch (e) {
+                }
+            }
+        };
+    }
+</script>

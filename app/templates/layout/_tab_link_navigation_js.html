@@ -1,0 +1,128 @@
+            let lastClickTime = 0;
+            let lastClickKey = null;
+            const CLICK_DEBOUNCE_MS = 300;
+
+            function handleAppTabLink(link, event) {
+                if (!link) return;
+
+                const url = link.getAttribute('data-tab-url') || link.getAttribute('href');
+                if (!url) return;
+
+                const target = link.getAttribute('target');
+                if (target === '_blank') return;
+
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (typeof event.stopImmediatePropagation === 'function') {
+                        event.stopImmediatePropagation();
+                    }
+                }
+
+                const now = Date.now();
+                const key = normalizeKey(url);
+
+                const menu = link.closest('[data-sidebar-menu]');
+                if (menu) {
+                    menu.dispatchEvent(new CustomEvent('sidebar-menu-close-now', {
+                        detail: { name: menu.getAttribute('data-sidebar-menu') },
+                        bubbles: true
+                    }));
+                }
+
+                if (lastClickKey === key && (now - lastClickTime) < CLICK_DEBOUNCE_MS) {
+                    const existingId = tabIdsByKey.get(key);
+                    if (existingId) {
+                        setActiveTab(existingId);
+                    }
+                    return;
+                }
+
+                lastClickTime = now;
+                lastClickKey = key;
+                try {
+                    openTab(url, link.getAttribute('data-tab-title') || link.textContent.trim(), link.getAttribute('data-tab-icon'), { preferExistingByTitle: link.classList.contains('sidebar-link') });
+                } catch {
+                    window.location.href = url;
+                }
+            }
+
+            // Navegar solo al completar el clic; arrastrar para hacer scroll no abre enlaces.
+            const TAP_MOVE_TOLERANCE_PX = 12;
+            const DRAG_SUPPRESS_MS = 700;
+            let pendingPointer = null;
+            let draggedLink = null;
+            let draggedAt = 0;
+
+            function clearPendingPointer() {
+                pendingPointer = null;
+            }
+
+            function markPointerDragged() {
+                if (!pendingPointer) return;
+                draggedLink = pendingPointer.link;
+                draggedAt = Date.now();
+                clearPendingPointer();
+            }
+
+            function movedBeyondTolerance(pending, e) {
+                return Math.abs(e.clientX - pending.x) > TAP_MOVE_TOLERANCE_PX
+                    || Math.abs(e.clientY - pending.y) > TAP_MOVE_TOLERANCE_PX;
+            }
+
+            document.addEventListener('pointerdown', (e) => {
+                clearPendingPointer();
+                const targetEl = e.target instanceof Element ? e.target : null;
+                if (targetEl && targetEl.closest('[data-tab-ignore-click="1"]')) return;
+                const link = targetEl ? targetEl.closest('.app-tab-link') : null;
+                if (!link) return;
+                pendingPointer = {
+                    link,
+                    id: e.pointerId,
+                    x: e.clientX,
+                    y: e.clientY
+                };
+            }, true);
+
+            document.addEventListener('pointermove', (e) => {
+                if (!pendingPointer || e.pointerId !== pendingPointer.id) return;
+                if (movedBeyondTolerance(pendingPointer, e)) {
+                    markPointerDragged();
+                }
+            }, true);
+
+            document.addEventListener('pointercancel', markPointerDragged, true);
+            window.addEventListener('scroll', markPointerDragged, true);
+
+            document.addEventListener('pointerup', (e) => {
+                const pending = pendingPointer;
+                clearPendingPointer();
+                if (!pending || e.pointerId !== pending.id) return;
+                if (movedBeyondTolerance(pending, e)) {
+                    draggedLink = pending.link;
+                    draggedAt = Date.now();
+                    return;
+                }
+            }, true);
+
+            document.addEventListener('click', (e) => {
+                const targetEl = e.target instanceof Element ? e.target : null;
+                if (targetEl && targetEl.closest('[data-tab-ignore-click="1"]')) return;
+                const link = targetEl ? targetEl.closest('.app-tab-link') : null;
+                if (!link) return;
+
+                // Si el gesto fue un arrastre (scroll), algunos navegadores igual emiten
+                // el click al soltar: no debe abrir nada.
+                if (link === draggedLink && (Date.now() - draggedAt) < DRAG_SUPPRESS_MS) {
+                    draggedLink = null;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (typeof e.stopImmediatePropagation === 'function') {
+                        e.stopImmediatePropagation();
+                    }
+                    return;
+                }
+
+                handleAppTabLink(link, e);
+            }, true);
+

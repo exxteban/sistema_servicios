@@ -1,0 +1,286 @@
+{# Menus laterales de gestion: Inventario, Directorio y Sistema. #}
+{% set p_prod = current_user.tiene_permiso('ver_inventario') %}
+{% set p_prov = current_user.tiene_permiso('ver_proveedores') %}
+{% set p_usados = current_user.tiene_permiso('ver_recepcion_usados') or current_user.tiene_permiso('crear_recepcion_usados') %}
+{% set p_presup_emp = current_user.tiene_permiso('ver_presupuestos_empresariales') or current_user.tiene_permiso('crear_presupuestos_empresariales') %}
+
+{% if p_prod or p_prov or p_usados or p_presup_emp %}
+<div class="relative group w-12">
+    <button
+        type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'inventario' })"
+        data-sidebar-trigger="inventario" :aria-expanded="activeMenu === 'inventario'" aria-controls="sidebar-menu-inventario"
+        class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 focus:outline-none"
+        style="--accent-rgb: 59, 130, 246" aria-label="Inventario">
+        <i class="fas fa-boxes-stacked text-lg group-hover:scale-110 transition-transform"></i>
+    </button>
+
+    <template x-if="activeMenu === 'inventario'">
+    <div data-sidebar-menu="inventario" id="sidebar-menu-inventario"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+        x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+        x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+        class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+        :style="getMenuStyle('inventario')" aria-hidden="false">
+
+        <div
+            class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+            Logística
+        </div>
+
+        {% if p_prod %}
+        <a href="{{ url_for('productos.listar') }}" data-permiso="ver_inventario"
+            data-tab-url="{{ url_for('productos.listar') }}" data-tab-title="Productos"
+            data-tab-icon="fas fa-box"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover/item:bg-blue-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-box text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Productos</span>
+        </a>
+
+        <a href="{{ url_for('tienda_admin.panel') }}"
+            data-tab-url="{{ url_for('tienda_admin.panel') }}" data-tab-title="Mi Tienda Online"
+            data-tab-icon="fas fa-store"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover/item:bg-emerald-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-store text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Mi Tienda Online</span>
+        </a>
+        {% endif %}
+
+        {% if p_prov %}
+        <a href="{{ url_for('proveedores.listar') }}" data-permiso="ver_proveedores"
+            data-tab-url="{{ url_for('proveedores.listar') }}" data-tab-title="Proveedores"
+            data-tab-icon="fas fa-truck-loading"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center text-sky-400 group-hover/item:bg-sky-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-truck-loading text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Proveedores</span>
+        </a>
+        {% endif %}
+
+        {% if p_usados %}
+        <a href="{{ url_for('recepcion_usados.listar') }}" data-permiso="ver_recepcion_usados"
+            data-tab-url="{{ url_for('recepcion_usados.listar') }}" data-tab-title="Compra de usados"
+            data-tab-icon="fas fa-file-signature"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover/item:bg-amber-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-file-signature text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Compra de usados</span>
+        </a>
+        {% endif %}
+
+        {% if p_presup_emp %}
+        <a href="{{ url_for('presupuestos_empresariales.listar') }}" data-permiso="ver_presupuestos_empresariales"
+            data-tab-url="{{ url_for('presupuestos_empresariales.listar') }}" data-tab-title="Presupuestos empresariales"
+            data-tab-icon="fas fa-file-contract"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover/item:bg-emerald-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-file-contract text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Presupuestos empresariales</span>
+        </a>
+        {% endif %}
+    </div>
+    </template>
+</div>
+{% endif %}
+
+{% set p_cli = current_user.tiene_permiso('ver_clientes') %}
+{% set p_fid = current_user.tiene_permiso('editar_cliente') %}
+{% set p_usr = current_user.tiene_permiso('gestionar_usuarios') %}
+
+{% if p_cli or p_fid or p_usr %}
+<div class="relative group w-12">
+    <button
+        type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'directorio' })"
+        data-sidebar-trigger="directorio" :aria-expanded="activeMenu === 'directorio'" aria-controls="sidebar-menu-directorio"
+        class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-pink-500/20 transition-all duration-300 focus:outline-none"
+        style="--accent-rgb: 236, 72, 153" aria-label="Directorio">
+        <i class="fas fa-address-book text-lg group-hover:scale-110 transition-transform"></i>
+    </button>
+
+    <template x-if="activeMenu === 'directorio'">
+    <div data-sidebar-menu="directorio" id="sidebar-menu-directorio"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+        x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+        x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+        class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+        :style="getMenuStyle('directorio')" aria-hidden="false">
+
+        <div
+            class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+            Directorio
+        </div>
+
+        {% if p_cli %}
+        <a href="{{ url_for('clientes.listar') }}" data-permiso="ver_clientes"
+            data-tab-url="{{ url_for('clientes.listar') }}" data-tab-title="Clientes"
+            data-tab-icon="fas fa-users"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center text-pink-400 group-hover/item:bg-pink-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-users text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Clientes</span>
+        </a>
+        {% endif %}
+
+        {% if p_fid %}
+        <a href="{{ url_for('clientes_fidelizacion.panel') }}" data-permiso="editar_cliente"
+            data-tab-url="{{ url_for('clientes_fidelizacion.panel') }}" data-tab-title="Fidelizacion"
+            data-tab-icon="fas fa-gift"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover/item:bg-purple-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-gift text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Fidelizacion</span>
+        </a>
+        {% endif %}
+
+        {% if p_usr %}
+        <a href="{{ url_for('usuarios.listar') }}" data-permiso="gestionar_usuarios"
+            data-tab-url="{{ url_for('usuarios.listar') }}" data-tab-title="Usuarios"
+            data-tab-icon="fas fa-user-cog"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 group-hover/item:bg-red-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-user-cog text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Usuarios</span>
+        </a>
+        {% endif %}
+    </div>
+    </template>
+</div>
+{% endif %}
+
+{% set p_rep = current_user.tiene_permiso('ver_reportes') %}
+{% set p_comp = current_user.tiene_permiso('ver_compras') %}
+{% set p_aud = current_user.tiene_permiso('ver_auditoria') %}
+{% set p_asistente_ia = current_user.tiene_permiso('usar_asistente_ia') %}
+{% set p_modulos_sistema = es_usuario_root_actual %}
+
+{% if p_rep or p_comp or p_aud or p_asistente_ia or p_modulos_sistema %}
+<div class="relative group w-12">
+    <button
+        type="button" @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'sistema' })"
+        data-sidebar-trigger="sistema" :aria-expanded="activeMenu === 'sistema'" aria-controls="sidebar-menu-sistema"
+        class="sidebar-link w-12 h-12 flex items-center justify-center rounded-xl hover:bg-white/10 hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 focus:outline-none"
+        style="--accent-rgb: 234, 179, 8" aria-label="Sistema">
+        <i class="fas fa-chart-pie text-lg group-hover:scale-110 transition-transform"></i>
+    </button>
+
+    <template x-if="activeMenu === 'sistema'">
+    <div data-sidebar-menu="sistema" id="sidebar-menu-sistema"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-x-1 scale-95"
+        x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+        x-transition:leave-end="opacity-0 translate-x-1 scale-95"
+        class="app-shell-flyout-menu absolute left-full ml-4 w-60 origin-left bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 overflow-x-hidden overflow-y-auto"
+        :style="getMenuStyle('sistema')" aria-hidden="false">
+
+        <div
+            class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10 mb-1">
+            Sistema
+        </div>
+
+        {% if p_rep %}
+        <a href="{{ url_for('reportes.index') }}" data-permiso="ver_reportes"
+            data-tab-url="{{ url_for('reportes.index') }}" data-tab-title="Reportes"
+            data-tab-icon="fas fa-chart-bar"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center text-yellow-400 group-hover/item:bg-yellow-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-chart-bar text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Reportes</span>
+        </a>
+
+        <a href="{{ url_for('inteligencia.dashboard') }}" data-permiso="ver_reportes"
+            data-tab-url="{{ url_for('inteligencia.dashboard') }}" data-tab-title="Inteligencia"
+            data-tab-icon="fas fa-brain"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover/item:bg-cyan-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-brain text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Inteligencia</span>
+            {% if inteligencia_menu_badge %}
+            <span data-bi-alertas="{{ inteligencia_menu_badge }}" class="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-cyan-400/15 px-2 py-0.5 text-[11px] font-semibold text-cyan-100 ring-1 ring-cyan-300/20">
+                {{ inteligencia_menu_badge }}
+            </span>
+            {% endif %}
+        </a>
+        {% endif %}
+
+        {% if p_asistente_ia %}
+        <a href="{{ url_for('asistente_ia.chat') }}" data-permiso="usar_asistente_ia"
+            data-tab-url="{{ url_for('asistente_ia.chat') }}" data-tab-title="Asistente IA"
+            data-tab-icon="fas fa-robot"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover/item:bg-blue-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-robot text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Asistente IA</span>
+        </a>
+        {% endif %}
+
+        {% if p_comp %}
+        <a href="{{ url_for('compras.listar') }}" data-permiso="ver_compras"
+            data-tab-url="{{ url_for('compras.listar') }}" data-tab-title="Compras"
+            data-tab-icon="fas fa-truck"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center text-orange-400 group-hover/item:bg-orange-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-truck text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Compras</span>
+        </a>
+        {% endif %}
+
+        {% if p_aud %}
+        <a href="{{ url_for('auditoria.listar') }}" data-permiso="ver_auditoria"
+            data-tab-url="{{ url_for('auditoria.listar') }}" data-tab-title="Auditoría"
+            data-tab-icon="fas fa-clipboard-list"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center text-teal-400 group-hover/item:bg-teal-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-clipboard-list text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Auditoría</span>
+        </a>
+        {% endif %}
+
+        {% if p_modulos_sistema %}
+        <a href="{{ url_for('usuarios.modulos_sistema') }}"
+            data-tab-url="{{ url_for('usuarios.modulos_sistema') }}" data-tab-title="Módulos del sistema"
+            data-tab-icon="fas fa-puzzle-piece"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div
+                class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover/item:bg-amber-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-puzzle-piece text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Módulos del sistema</span>
+        </a>
+        {% endif %}
+    </div>
+    </template>
+</div>
+{% endif %}

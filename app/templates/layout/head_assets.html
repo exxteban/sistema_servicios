@@ -4,6 +4,7 @@
             window.__appShellViewportInit = true;
 
             let rafId = null;
+            let forceNextUpdate = false;
 
             function getViewportHeight() {
                 const vv = window.visualViewport;
@@ -24,20 +25,38 @@
                 return Math.max(0, Math.round(rawHeight || 0));
             }
 
+            // Mientras hay pinch-zoom real (ver app_zoom_stability.js) la altura
+            // queda congelada para que el shell no salte al ampliar/reducir.
+            function shouldFreezeViewportHeight() {
+                return typeof window.__appShellShouldFreezeViewportHeight === 'function'
+                    && window.__appShellShouldFreezeViewportHeight();
+            }
+
             function applyViewportHeight() {
                 rafId = null;
+                const forceUpdate = forceNextUpdate;
+                forceNextUpdate = false;
+                if (!forceUpdate && shouldFreezeViewportHeight() && window.__appShellViewportHeight) {
+                    return;
+                }
                 const viewportHeight = getViewportHeight();
                 if (!viewportHeight) return;
                 document.documentElement.style.setProperty('--app-shell-vh', `${viewportHeight}px`);
                 window.__appShellViewportHeight = viewportHeight;
             }
 
-            function queueViewportHeightUpdate() {
+            function queueViewportHeightUpdate(options) {
+                if (options && options.force) {
+                    forceNextUpdate = true;
+                }
                 if (rafId !== null) return;
                 rafId = window.requestAnimationFrame(applyViewportHeight);
             }
 
             window.__appShellGetViewportHeight = getViewportHeight;
+            window.__appShellRefreshViewportHeight = function () {
+                queueViewportHeightUpdate({ force: true });
+            };
 
             ['resize', 'orientationchange', 'pageshow', 'load'].forEach((eventName) => {
                 window.addEventListener(eventName, queueViewportHeightUpdate, { passive: true });
@@ -52,6 +71,13 @@
             if (window.visualViewport) {
                 window.visualViewport.addEventListener('resize', queueViewportHeightUpdate, { passive: true });
             }
+
+            window.addEventListener('app:zoom-state-change', (event) => {
+                const detail = event && event.detail ? event.detail : {};
+                if (!detail.zooming) {
+                    queueViewportHeightUpdate({ force: true });
+                }
+            }, { passive: true });
 
             queueViewportHeightUpdate();
         })();
@@ -251,7 +277,11 @@
 
     <link rel="stylesheet" href="{{ static_url('css/style.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/custom.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/app_zoom_stability.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/gastos_corrientes_reminders.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/sidebar_experience.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/sidebar_responsive.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/app_overlay_offsets.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/daily_insights.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/modal_layers.css') }}">
 
@@ -299,8 +329,12 @@
             }
         }
 
+        /* El menu flotante nace dentro del sidebar, que empieza debajo de la barra
+           superior. Si su alto maximo usa el viewport completo termina metiendose
+           debajo del topbar y las primeras opciones quedan tapadas e inalcanzables. */
         .app-shell-flyout-menu {
-            max-height: calc(var(--app-shell-vh) - 1rem);
+            max-height: calc(var(--app-shell-vh) - var(--app-shell-topbar-height) - 1.5rem);
+            overscroll-behavior: contain;
         }
 
         .app-tab-panel[hidden] {
@@ -401,4 +435,5 @@
     </style>
 
     <script src="{{ static_url('js/autorizacion.js') }}" defer></script>
+    <script src="{{ static_url('js/sidebar_experience.js') }}" defer></script>
     <script src="{{ static_url('js/dashboard_event_bus.js') }}" defer></script>
