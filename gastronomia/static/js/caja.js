@@ -45,6 +45,15 @@
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
+  // El backend guarda UTC sin zona: se agrega la Z para mostrarlo en hora local.
+  const formatSentAt = (iso) => {
+    if (!iso) return '';
+    const value = String(iso);
+    const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+    const date = new Date(/^\d{4}-\d{2}-\d{2}T/.test(value) && !hasTimezone ? `${value}Z` : value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('es-PY', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+  };
   const deliveryCode = (order) => escapeHtml(order.codigo_entrega || `#${String(order.id_pedido || 0).padStart(3, '0')}`);
   const selectPaymentMethod = (button) => {
     if (!button || !paymentMethodInput) return;
@@ -136,6 +145,7 @@
         <div>
           <h2 class="text-xl font-black text-gray-900 dark:text-white">${deliveryCode(order)} ${escapeHtml(order.tipo_pedido)}</h2>
           <p class="mt-1 text-sm font-semibold text-gray-500">${order.mesa ? `Mesa ${escapeHtml(order.mesa)} - ` : ''}${escapeHtml(order.estado)}</p>
+          ${formatSentAt(order.fecha_creacion) ? `<p class="mt-1 text-xs font-semibold text-gray-500"><i class="far fa-clock mr-1"></i>Enviado a caja: ${formatSentAt(order.fecha_creacion)}</p>` : ''}
           ${order.referencia_entrega ? `<p class="mt-1 text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">${escapeHtml(order.referencia_entrega)}</p>` : ''}
           ${(order.tipo_pedido || '').toLowerCase() === 'delivery' ? `<p class="mt-1 text-xs font-bold text-gray-500">Envio: ${money(order.costo_envio || 0)}</p>` : ''}
         </div>

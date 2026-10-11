@@ -716,6 +716,8 @@
                         title="Vista previa del ticket"></iframe>
                 </div>
 
+                {% include "ventas/pos_html/ui_pos_factura_electronica.html" %}
+
                 <div class="pt-2 flex gap-3 relative z-10 shrink-0">
                     <button type="button" @click.prevent="cancelarVistaPrevia()"
                         class="flex-1 rounded-lg border border-gray-300 bg-gray-100 py-3 font-medium text-gray-700 transition hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
@@ -725,7 +727,7 @@
                         class="flex-1 rounded-lg border border-green-700 bg-green-600 py-3 font-medium text-white transition hover:bg-green-700 dark:border-green-500"
                         :disabled="confirmandoVenta">
                         <i class="fas fa-check-circle mr-2"></i>
-                        <span x-text="confirmandoVenta ? 'Procesando...' : 'Confirmar compra e imprimir'"></span>
+                        <span x-text="confirmandoVenta ? 'Procesando...' : ($data.feEmitir ? 'Confirmar, facturar e imprimir' : 'Confirmar compra e imprimir')"></span>
                     </button>
                 </div>
             </div>
