@@ -1,0 +1,42 @@
+{# Progreso de la factura electronica despues de registrar la venta. #}
+{% if factura_electronica_pos is defined and factura_electronica_pos and factura_electronica_pos.lista and not solo_registro_vendedor %}
+<div x-show="feProgreso.visible" x-cloak
+    class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4" style="z-index: 10000;">
+    <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white"
+            x-text="feProgreso.error ? 'No se pudo emitir la factura' : 'Generando factura electronica'"></h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            No cierre esta pantalla. Tiempo transcurrido: <strong x-text="feProgreso.segundos"></strong> s
+        </p>
+        <ol class="mt-4 space-y-3">
+            <template x-for="etapa in feEtapas" :key="etapa.key">
+                <li class="flex items-start gap-3 text-sm"
+                    :class="{
+                        'text-gray-400': feEstadoEtapa(etapa.key) === 'pendiente',
+                        'font-semibold text-gray-900 dark:text-white': feEstadoEtapa(etapa.key) === 'activa',
+                        'text-emerald-700 dark:text-emerald-300': feEstadoEtapa(etapa.key) === 'ok',
+                        'text-rose-700 dark:text-rose-300': feEstadoEtapa(etapa.key) === 'error'
+                    }">
+                    <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center">
+                        <i class="fas" :class="{
+                            'fa-circle text-[8px]': feEstadoEtapa(etapa.key) === 'pendiente',
+                            'fa-spinner fa-spin text-emerald-600': feEstadoEtapa(etapa.key) === 'activa',
+                            'fa-check': feEstadoEtapa(etapa.key) === 'ok',
+                            'fa-times': feEstadoEtapa(etapa.key) === 'error'
+                        }"></i>
+                    </span>
+                    <span>
+                        <span x-text="etapa.label"></span>
+                        <span class="block text-xs font-normal" x-show="feProgreso.detalles[etapa.key]"
+                            x-text="feProgreso.detalles[etapa.key]"></span>
+                    </span>
+                </li>
+            </template>
+        </ol>
+        <p class="mt-4 text-xs text-gray-500 dark:text-gray-400"
+            x-text="feProgreso.error
+                ? 'La venta quedo registrada. Se imprime el ticket normal y la factura se reintenta sola.'
+                : 'Puede tardar unos segundos mientras se firma el documento.'"></p>
+    </div>
+</div>
+{% endif %}
