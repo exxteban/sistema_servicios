@@ -251,7 +251,7 @@
     chargeButton.classList.toggle('opacity-70', chargeBusy || blocked);
     chargeButton.classList.toggle('cursor-not-allowed', chargeBusy || blocked);
     if (chargeBusy) {
-      chargeButton.textContent = 'Cobrando...';
+      chargeButton.textContent = factura.requested() ? 'Cobrando y generando factura...' : 'Cobrando...';
       return;
     }
     if (!hasOpenCashSession) {
@@ -296,6 +296,7 @@
       return;
     }
     const ticketWindow = selectedOrderId ? window.open('', '_blank') : null;
+    if (ticketWindow && factura.requested() && factura.mostrarProgreso) factura.mostrarProgreso(ticketWindow);
     chargeSelected(ticketWindow).catch((error) => {
       if (ticketWindow) ticketWindow.close();
       setChargeBusy(false);

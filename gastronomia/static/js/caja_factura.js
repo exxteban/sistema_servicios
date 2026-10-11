@@ -99,7 +99,9 @@
     }
     return null;
   };
+  const progreso = window.GastroCajaProgreso || {abrir: () => {}, etapa: () => {}, terminar: () => {}};
   const abrir = (url, targetWindow) => {
+    progreso.terminar(targetWindow);
     if (targetWindow && !targetWindow.closed) {
       targetWindow.location = url;
       return true;
@@ -112,6 +114,9 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let detail = 'no se pudo emitir la factura electronica.';
+    progreso.etapa(targetWindow, 'cobro', 'ok', `Venta #${idVenta} registrada`);
+    progreso.etapa(targetWindow, 'factura', 'activa');
+    notify(`Venta #${idVenta} cobrada. Generando factura electronica...`, true);
     try {
       const response = await fetch(`/facturacion-electronica/emitir-pos/${idVenta}`, {
         method: 'POST',
@@ -119,7 +124,12 @@
         signal: controller.signal,
       });
       const data = await response.json().catch(() => ({}));
-      if (response.ok && data.success) return abrir(data.kude_url, targetWindow);
+      if (response.ok && data.success) {
+        progreso.etapa(targetWindow, 'factura', 'ok');
+        progreso.etapa(targetWindow, 'imprimir', 'activa', 'Factura (KuDE)');
+        notify(`Venta #${idVenta} cobrada y facturada.`, true);
+        return abrir(data.kude_url, targetWindow);
+      }
       if (data.error) detail = data.error;
     } catch (error) {
       detail = error?.name === 'AbortError'
@@ -129,7 +139,14 @@
       clearTimeout(timer);
     }
     const recovered = await estadoEmitido(idVenta);
-    if (recovered) return abrir(recovered.kude_url, targetWindow);
+    if (recovered) {
+      progreso.etapa(targetWindow, 'factura', 'ok');
+      progreso.etapa(targetWindow, 'imprimir', 'activa', 'Factura (KuDE)');
+      return abrir(recovered.kude_url, targetWindow);
+    }
+    progreso.etapa(targetWindow, 'factura', 'error', detail);
+    progreso.etapa(targetWindow, 'imprimir', 'activa', 'Ticket normal');
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     notify(`Venta #${idVenta} cobrada, pero ${detail} Se imprime el ticket normal; la factura se reintenta sola.`, false);
     abrir(ticketUrl, targetWindow);
     return false;
@@ -145,6 +162,10 @@
 
   window.GastroCajaFactura = {
     requested: () => checkbox.checked,
+    mostrarProgreso: (targetWindow) => {
+      progreso.abrir(targetWindow);
+      progreso.etapa(targetWindow, 'cobro', 'activa');
+    },
     payload: () => (checkbox.checked
       ? {factura_electronica: true, id_cliente_factura: selectedClient?.id_cliente || null}
       : {}),

@@ -66,13 +66,60 @@
                 return this.imprimirDocumentoEnFrame(`${kudeUrl}${sep}preview=1&_=${Date.now()}`, kudeUrl);
             },
 
+            // --- Progreso visible mientras se emite (si no, la pantalla parece colgada) ---
+            feEtapas: [
+                { key: 'venta', label: 'Registrando la venta' },
+                { key: 'factura', label: 'Generando y firmando la factura electronica' },
+                { key: 'imprimir', label: 'Abriendo el comprobante para imprimir' },
+            ],
+            feProgreso: { visible: false, error: false, segundos: 0, estados: {}, detalles: {} },
+            feProgresoTimer: null,
+
+            feEstadoEtapa(key) {
+                return this.feProgreso.estados[key] || 'pendiente';
+            },
+
+            feEtapa(key, estado, detalle = '') {
+                this.feProgreso.estados = { ...this.feProgreso.estados, [key]: estado };
+                this.feProgreso.detalles = { ...this.feProgreso.detalles, [key]: detalle };
+                if (estado === 'error') this.feProgreso.error = true;
+            },
+
+            feProgresoAbrir() {
+                clearInterval(this.feProgresoTimer);
+                const inicio = Date.now();
+                this.feProgreso = { visible: true, error: false, segundos: 0, estados: {}, detalles: {} };
+                this.feProgresoTimer = setInterval(() => {
+                    this.feProgreso.segundos = Math.floor((Date.now() - inicio) / 1000);
+                }, 500);
+            },
+
+            feProgresoCerrar() {
+                clearInterval(this.feProgresoTimer);
+                this.feProgresoTimer = null;
+                this.feProgreso.visible = false;
+            },
+
+            async feImprimirConProgreso(antesDeImprimir, detalle, imprimir) {
+                if (!this.feProgreso.error) this.feEtapa('factura', 'ok');
+                this.feEtapa('imprimir', 'activa', detalle);
+                antesDeImprimir();
+                try {
+                    return await imprimir();
+                } finally {
+                    this.feProgresoCerrar();
+                }
+            },
+
             // Devuelve si se pudo abrir la impresion (KuDE o, si fallo, el ticket).
             async feEmitirEImprimir(idVenta, antesDeImprimir = () => {}) {
                 const timeoutMs = Number(this.feConfig && this.feConfig.timeout_ms) || 110000;
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), timeoutMs);
                 let detalle = 'no se pudo emitir la factura electronica.';
-                mostrarNotificacion(`Venta #${idVenta} registrada. Emitiendo factura electronica...`, 'info');
+                this.feProgresoAbrir();
+                this.feEtapa('venta', 'ok', `Venta #${idVenta} registrada`);
+                this.feEtapa('factura', 'activa');
                 try {
                     const response = await fetch(`/facturacion-electronica/emitir-pos/${idVenta}`, {
                         method: 'POST',
@@ -81,8 +128,8 @@
                     });
                     const data = await response.json().catch(() => ({}));
                     if (response.ok && data.success && data.kude_url) {
-                        antesDeImprimir();
-                        return await this.imprimirKude(data.kude_url);
+                        return await this.feImprimirConProgreso(antesDeImprimir, 'Factura (KuDE)',
+                            () => this.imprimirKude(data.kude_url));
                     }
                     if (data.error) detalle = data.error;
                 } catch (e) {
@@ -93,9 +140,15 @@
                     clearTimeout(timer);
                 }
                 const recuperado = await this.feEstadoEmitido(idVenta);
-                antesDeImprimir();
-                if (recuperado && recuperado.kude_url) return await this.imprimirKude(recuperado.kude_url);
+                if (recuperado && recuperado.kude_url) {
+                    return await this.feImprimirConProgreso(antesDeImprimir, 'Factura (KuDE)',
+                        () => this.imprimirKude(recuperado.kude_url));
+                }
+                this.feEtapa('factura', 'error', detalle);
                 mostrarNotificacion(`Venta #${idVenta} cobrada, pero ${detalle} Se imprime el ticket normal; la factura se reintenta sola.`, 'warning');
-                return await this.imprimirTicketVenta(idVenta);
+                // Que se alcance a leer el motivo antes del dialogo de impresion.
+                await new Promise((resolve) => setTimeout(resolve, 1800));
+                return await this.feImprimirConProgreso(antesDeImprimir, 'Ticket normal',
+                    () => this.imprimirTicketVenta(idVenta));
             },
 
