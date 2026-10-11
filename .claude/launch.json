@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "prueba-fe",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["run.py"],
+      "port": 5055,
+      "env": {
+        "PORT": "5055",
+        "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/C--Users-csarl-Documents-proyectos-saas-sistema-servicios/fa2776c3-3f0e-42d8-99a5-31a3ef785887/scratchpad/inventario_prueba.db",
+        "SERVER": "flask",
+        "DEBUG": "0"
+      }
+    }
+  ]
+}

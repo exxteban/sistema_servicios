@@ -129,8 +129,16 @@
             },
 
             async imprimirTicketVenta(idVenta) {
+                return this.imprimirDocumentoEnFrame(
+                    `/ventas/${idVenta}/ticket?embedded=1&_=${Date.now()}`,
+                    `/ventas/${idVenta}/ticket`
+                );
+            },
+
+            // Imprime `url` desde el iframe oculto; si no se puede, abre `fallbackUrl`.
+            async imprimirDocumentoEnFrame(url, fallbackUrl) {
                 const abrirFallback = () => {
-                    const w = window.open(`/ventas/${idVenta}/ticket`, '_blank');
+                    const w = window.open(fallbackUrl, '_blank');
                     if (!w) return false;
                     this.configurarRestauracionFocoImpresion(w);
                     return true;
@@ -144,8 +152,6 @@
                     if (!frame) {
                         return abrirFallback();
                     }
-
-                    const url = `/ventas/${idVenta}/ticket?embedded=1&_=${Date.now()}`;
 
                     return await new Promise((resolve) => {
                         let finished = false;

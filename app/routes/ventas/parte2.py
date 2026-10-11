@@ -8,6 +8,7 @@ from app.services.clientes_servicios import (
     parse_cliente_servicio_ids,
 )
 from app.services.agenda_turnos_peluqueria import build_pos_data_from_agenda_turno
+from app.services.fe_pos import contexto_factura_electronica_pos
 from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO, DIAS_VENCIMIENTO_CUENTA_CORRIENTE
 
 
@@ -217,6 +218,7 @@ def _render_pos_interface(sesion=None, solo_registro_vendedor=False):
         puede_crear_producto_rapido=puede_crear_producto_rapido,
         categorias_pos_rapido=categorias_pos_rapido_data,
         solo_registro_vendedor=solo_registro_vendedor,
+        factura_electronica_pos=None if solo_registro_vendedor else contexto_factura_electronica_pos(),
     )
 
 @ventas_bp.route('/pos')

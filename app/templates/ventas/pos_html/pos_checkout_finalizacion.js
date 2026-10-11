@@ -23,6 +23,7 @@
     cancelarVistaPrevia() {
         this.mostrarModalVistaPrevia = false;
         this.ticketPreviewHtml = '';
+        if (typeof this.feReset === 'function') this.feError = '';
     },
 
     esCobroGastronomiaDesdeCola() {
@@ -131,6 +132,12 @@
                 this.procesando = false;
                 return;
             }
+            const conFactura = typeof this.feSolicitada === 'function' && this.feSolicitada();
+            if (conFactura && !(await this.feValidarAntesDeCobrar())) {
+                mostrarNotificacion(this.feError, 'error');
+                this.procesando = false;
+                return;
+            }
             const requestId = clientRequestId || this.generarClientRequestId();
             const payload = this.construirPayloadVenta(requestId, idAutorizacion);
 
@@ -202,10 +209,17 @@
                 if (idVenta) {
                     this.guardarUltimaVenta(idVenta);
 
-                    if (cerrarEnDashboardPrincipal) {
-                        this.programarVueltaDashboardPrincipal();
+                    // La emision puede tardar: la vuelta al dashboard se programa
+                    // recien al imprimir, para no salir antes del KuDE o del ticket.
+                    const antesDeImprimir = () => {
+                        if (cerrarEnDashboardPrincipal) this.programarVueltaDashboardPrincipal();
+                    };
+                    if (conFactura) {
+                        impresionOk = await this.feEmitirEImprimir(idVenta, antesDeImprimir);
+                    } else {
+                        antesDeImprimir();
+                        impresionOk = await this.imprimirTicketVenta(idVenta);
                     }
-                    impresionOk = await this.imprimirTicketVenta(idVenta);
                     if (!impresionOk) {
                         mostrarNotificacion('Venta #' + idVenta + ' registrada. No se pudo abrir la impresión, use "Reimprimir Último Ticket"', 'warning');
                     }
@@ -479,6 +493,7 @@
     },
 
     limpiarVenta() {
+        if (typeof this.feReset === 'function') this.feReset();
         const rid = this.reparacionId;
         const colaId = this.colaCobroId;
         this.carrito = [];
