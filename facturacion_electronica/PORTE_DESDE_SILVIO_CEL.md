@@ -13,6 +13,7 @@ posible para poder resincronizarlo copiando la carpeta.
 | `app/utils/unidades_venta.py`, `app/services/caja_transacciones.py` | `d70e957b` | 2026-10-01 |
 | `app/templates/ventas/_facturacion_electronica.html` | `d70e957b` | 2026-10-01 |
 | Tests `test_facturacion_electronica_*.py` | `62a78acc` | 2026-10-08 |
+| `api_xml.py`, `pertenencia.py`, `tareas_periodicas.py`, parches en `api.py` / `api_nota_credito.py`, `test_facturacion_electronica_api_xml.py` | `ce7a31d1` | 2026-10-13 |
 
 Resincronizado el 2026-10-08 (antes: `d70e957b`). Trajo: envío por lotes del
 motor propio (siRecepLoteDE + consulta a los 10 min, respaldo por CDC; en
@@ -22,6 +23,14 @@ columnas nuevas), cada documento lo sigue sólo el proveedor que lo transmitió
 factura del motor propio, certificado/CSC/timbrado de la API por ambiente y
 KuDE al ancho de papel del ticket (`ticket_paper_width_mm`). Ninguna divergencia
 local se tocó.
+
+Parche del padre `ce7a31d1` (2026-10-13) aplicado el 2026-10-15: copia local del
+XML firmado de lo que aprueba la API (`proveedores/api_xml.py`, columna
+`xml_firmado`, job del scheduler), y la NC lee ese XML antes de ir a la API.
+Se aplicó **a mano, sin copiar la carpeta**, porque `api.py`,
+`api_nota_credito.py`, `api_payload.py`, `api_inutilizacion.py`, `guarda.py` y
+`receptor_facturado.py` tienen cambios hechos acá (commit `476e0da`, ver abajo)
+que el padre no tiene todavía.
 
 Resincronización anterior el 2026-10-02 (antes: `c807628a`). Trajo: refactor de
 `emision_service` (envío, eventos, generación, NC y respuesta SIFEN en archivos
@@ -52,6 +61,15 @@ se deja igual para no abrir una divergencia: partirlo primero en el padre.
    `test_facturacion_electronica_promociones_servicios.py`; además el helper
    `_detalle` de `test_facturacion_electronica_data_builder.py` arma
    `subtotal = cantidad × precio − descuento` (re-aplicar al copiar ese test).
+
+4. **Cambios hechos acá que el padre no tiene** (commit `476e0da`, no son de
+   servicios sino mejoras del módulo; conviene subirlos al padre): guarda de
+   NC dividida en `error_estado_original` / `error_receptor_original`
+   (receptor del XML de la factura, `declarado_innominado`),
+   `verificar_original` y `NC_NO_HABILITADA` en `api_nota_credito.py`,
+   `error_total_descuadrado` y sufijo de idempotencia de NC de anulación en
+   `api_payload.py`, veredicto por `dEstRes` en `api_inutilizacion.py`.
+   **Una copia directa de la carpeta los borra**: usar `git merge-file`.
 
 Todo lo demás propio de servicios vive **fuera** del módulo:
 

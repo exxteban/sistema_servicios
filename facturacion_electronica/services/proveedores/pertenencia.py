@@ -14,9 +14,10 @@ al motor propio:
 
 Cómo se reconoce cada uno:
 
-- **De la API:** tiene `api_documento_id`.
-- **Del motor propio:** sin `api_documento_id`, con XML firmado local (la API
-  nunca lo guarda) y con señales de que salió: estado transmitido o
+- **De la API:** tiene `api_documento_id`. Desde 2026-10 también puede tener
+  `xml_firmado` (la copia local de `api_xml`), así que este chequeo va primero.
+- **Del motor propio:** sin `api_documento_id`, con XML firmado local y con
+  señales de que salió: estado transmitido o
   rechazado, fecha de envío o número de lote. Uno que sólo se generó y nunca
   salió no ata a nadie: la API lo puede emitir.
 """
