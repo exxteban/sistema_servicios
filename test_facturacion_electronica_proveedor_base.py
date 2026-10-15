@@ -56,7 +56,7 @@ def simular_xml_de_factura(prueba, xml=None):
     from unittest.mock import patch
 
     parche = patch(
-        'facturacion_electronica.services.proveedores.api_nota_credito.descargar_xml',
+        'facturacion_electronica.services.proveedores.api_nota_credito.xml_del_documento',
         return_value=(xml or xml_factura(), None),
     )
     simulado = parche.start()

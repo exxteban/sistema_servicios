@@ -56,11 +56,11 @@ from facturacion_electronica.services.proveedores.api_documento import (
     completar_protocolo,
     descargar_kude_pdf,
     liberar_numero_tomado,
-    descargar_xml,
     MENSAJE_SANDBOX,
     transmite,
 )
 from facturacion_electronica.services.proveedores.api_inutilizacion import inutilizar_numero
+from facturacion_electronica.services.proveedores.api_xml import xml_del_documento
 from facturacion_electronica.services.proveedores.api_timbrado import resolver_timbrado_nc
 from facturacion_electronica.services.proveedores.api_nota_credito import (
     NC_NO_HABILITADA, armar_cuerpo_nc, reabrir_nc_rechazada, verificar_original,
@@ -551,7 +551,7 @@ class ProveedorApi(ProveedorFE):
         return descargar_kude_pdf(obtener_configuracion(), documento)
 
     def xml_documento(self, documento):
-        return descargar_xml(obtener_configuracion(), documento)
+        return xml_del_documento(obtener_configuracion(), documento)
 
     def avanzar(self, documento):
         """Un paso del circuito asíncrono. Devuelve el error, o None si avanzó."""

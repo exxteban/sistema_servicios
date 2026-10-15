@@ -78,7 +78,7 @@ def _nc_con_xml(xml):
     documento = SimpleNamespace(numero='0000001', nc_motivo=1, nc_motivo_desc='x',
                                 tipo_documento=TIPO_NOTA_CREDITO, id_devolucion=None, id_venta=9)
     original = SimpleNamespace(cdc='0' * 44)
-    with patch('facturacion_electronica.services.proveedores.api_nota_credito.descargar_xml',
+    with patch('facturacion_electronica.services.proveedores.api_nota_credito.xml_del_documento',
                return_value=(xml, None)):
         cuerpo, error = armar_cuerpo_nc(None, documento, original, SimpleNamespace(), [], 'uuid')
     assert error is None

@@ -21,10 +21,8 @@ from facturacion_electronica.services.guarda import (
     error_estado_original,
     error_receptor_original,
 )
-from facturacion_electronica.services.proveedores.api_documento import (
-    clave_idempotencia,
-    descargar_xml,
-)
+from facturacion_electronica.services.proveedores.api_documento import clave_idempotencia
+from facturacion_electronica.services.proveedores.api_xml import xml_del_documento
 from facturacion_electronica.services.proveedores.api_payload import construir_nota_credito_api
 from facturacion_electronica.services.receptor_facturado import (
     leer_receptor,
@@ -42,7 +40,7 @@ NC_NO_HABILITADA = (
 
 def _xml_de_factura(config, original):
     """XML de la factura en la API. (xml, error) con el error ya redactado."""
-    xml, error = descargar_xml(config, original)
+    xml, error = xml_del_documento(config, original)
     if error:
         return None, f'No se pudo leer el receptor de la factura que se acredita: {error}'
     return xml, None
