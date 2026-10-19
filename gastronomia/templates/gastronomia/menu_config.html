@@ -3,7 +3,7 @@
 {% block title %}Menu Gastronomia{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-7xl space-y-6" data-gastro-menu>
+<div class="mx-auto max-w-7xl space-y-6" data-gastro-menu data-default-entry-tab="{{ 'plantilla' if not productos else 'categoria' }}">
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
 
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -28,9 +28,12 @@
     <div data-main-tab-panel="menu" role="tabpanel">
         <section class="mx-auto max-w-xl space-y-5">
             <div class="gastro-entry-tabs flex flex-wrap gap-2" role="tablist" aria-label="Carga de menu">
+                <button type="button" class="gastro-entry-tab" data-entry-tab="plantilla" role="tab" aria-selected="false"><i class="fas fa-magic mr-2"></i>Empezar con plantilla</button>
                 <button type="button" class="gastro-entry-tab activa" data-entry-tab="categoria" role="tab" aria-selected="true">Categoria</button>
                 <button type="button" class="gastro-entry-tab" data-entry-tab="producto" role="tab" aria-selected="false">Producto y extras</button>
             </div>
+
+            {% include "gastronomia/_menu_plantillas.html" %}
 
             <div data-entry-tab-panel="categoria" role="tabpanel">
                 <form id="categoria-form" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -93,18 +96,18 @@
                             <textarea name="descripcion" rows="2"
                                       class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
                         </label>
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            Ingredientes removibles
-                            <textarea name="ingredientes_removibles" rows="3" placeholder="Ej: lechuga&#10;tomate&#10;carne | 8000"
+                        <div class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            Ingredientes que el cliente puede quitar
+                            <span class="mt-0.5 block text-xs font-medium text-gray-500 dark:text-gray-400">Ej.: "sin cebolla". Si quitarlo debe bajar el precio, anota cuanto descuenta.</span>
+                            <textarea name="ingredientes_removibles" data-extras-editor="removible" rows="3" placeholder="Ej: lechuga&#10;tomate&#10;carne | 8000" aria-label="Ingredientes removibles"
                                       class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
-                            <span class="mt-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Uno por linea. Agrega "| descuento" cuando quitarlo deba restar del precio. Ej.: carne | 8000.</span>
-                        </label>
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        </div>
+                        <div class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
                             Adicionales con precio
-                            <textarea name="adicionales_precio" rows="3" placeholder="Ej: carne extra | 8000&#10;tomate extra | 2000"
+                            <span class="mt-0.5 block text-xs font-medium text-gray-500 dark:text-gray-400">Ej.: "queso extra". En el POS se suman al precio del producto.</span>
+                            <textarea name="adicionales_precio" data-extras-editor="adicional" rows="3" placeholder="Ej: carne extra | 8000&#10;tomate extra | 2000" aria-label="Adicionales con precio"
                                       class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
-                            <span class="mt-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Uno por linea. En el POS apareceran para sumar al precio.</span>
-                        </label>
+                        </div>
                         <div class="grid grid-cols-2 gap-3">
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
                                 Precio
@@ -374,6 +377,7 @@
 {% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/menu_asistentes.css', v='20261019-1') }}">
 <style>
     .gastro-image-preview-shell {
         height: 9rem;
@@ -498,7 +502,9 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='modificadores-20260728-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_extras_editor.js', v='20261019-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='modificadores-20261019-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_plantillas.js', v='20261019-2') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_channel_prices.js', v='20260531-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/category_order.js', v='20260528-3') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/stock_config.js', v='20260531-2') }}"></script>

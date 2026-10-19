@@ -25,7 +25,8 @@
     editProductId: 'gastro_edit_product',
   };
   const allowedMainTabs = new Set(['menu', 'menu-cargado', 'stock']);
-  const allowedEntryTabs = new Set(['categoria', 'producto']);
+  const allowedEntryTabs = new Set(['plantilla', 'categoria', 'producto']);
+  const defaultEntryTab = document.querySelector('[data-gastro-menu]')?.dataset?.defaultEntryTab || 'categoria';
   const allowedMenuTabs = new Set(['categorias', 'productos', 'pedidosya', 'monchis', 'promociones', 'tv']);
   const persistedAlertKey = 'gastro-menu-alert';
   let productoImageObjectUrl = '';
@@ -48,7 +49,7 @@
   const normalizeMenuState = (state = {}) => {
     const normalized = {
       mainTab: allowedMainTabs.has(state.mainTab) && hasTabValue(mainTabButtons, 'mainTab', state.mainTab) ? state.mainTab : 'menu',
-      entryTab: allowedEntryTabs.has(state.entryTab) && hasTabValue(entryTabButtons, 'entryTab', state.entryTab) ? state.entryTab : 'categoria',
+      entryTab: allowedEntryTabs.has(state.entryTab) && hasTabValue(entryTabButtons, 'entryTab', state.entryTab) ? state.entryTab : defaultEntryTab,
       menuTab: allowedMenuTabs.has(state.menuTab) && hasTabValue(tabButtons, 'menuTab', state.menuTab) ? state.menuTab : 'categorias',
       editProductId: state.editProductId ? String(state.editProductId) : '',
     };
@@ -59,7 +60,7 @@
     }
 
     if (normalized.mainTab !== 'menu') {
-      normalized.entryTab = 'categoria';
+      normalized.entryTab = defaultEntryTab;
       normalized.editProductId = '';
     }
 
@@ -72,7 +73,7 @@
 
   const currentMenuState = (overrides = {}) => normalizeMenuState({
     mainTab: activeTabValue(mainTabButtons, 'mainTab', 'menu'),
-    entryTab: activeTabValue(entryTabButtons, 'entryTab', 'categoria'),
+    entryTab: activeTabValue(entryTabButtons, 'entryTab', defaultEntryTab),
     menuTab: activeTabValue(tabButtons, 'menuTab', 'categorias'),
     editProductId: '',
     ...overrides,
@@ -82,7 +83,7 @@
     const url = new URL(window.location.href);
     return normalizeMenuState({
       mainTab: url.searchParams.get(menuStateParamKeys.mainTab) || 'menu',
-      entryTab: url.searchParams.get(menuStateParamKeys.entryTab) || 'categoria',
+      entryTab: url.searchParams.get(menuStateParamKeys.entryTab) || defaultEntryTab,
       menuTab: url.searchParams.get(menuStateParamKeys.menuTab) || 'categorias',
       editProductId: url.searchParams.get(menuStateParamKeys.editProductId) || '',
     });
@@ -315,6 +316,7 @@
     if (productoForm.adicionales_precio) {
       productoForm.adicionales_precio.value = producto.adicionales_precio || '';
     }
+    productoForm.dispatchEvent(new CustomEvent('gastro:extras-refresh'));
     productoForm.precio.value = producto.precio || 0;
     productoForm.orden.value = producto.orden || 0;
     productoForm.imagen_url.value = producto.imagen_url || '';
@@ -536,6 +538,8 @@
     await cargarProductoParaEditar(initialState.editProductId);
   };
 
+  window.gastroMenuReload = reloadMenuView;
+  window.gastroMenuShowAlert = showAlert;
   renderImagePreview({emptyText: 'Sin imagen'});
   restorePersistedAlert();
   restoreMenuState().catch((error) => showAlert(error.message, false));
