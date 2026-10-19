@@ -232,6 +232,10 @@ def _commit_or_raise_duplicate(message: str) -> None:
         raise ValueError(message) from exc
 
 
+def es_categoria_bebida(nombre: str | None) -> bool:
+    return _categoria_prioridad_default(_normalizar_nombre_categoria(nombre)) == 2
+
+
 def _categoria_sort_key(categoria: GastronomiaCategoria) -> tuple[int, int, str]:
     nombre = _normalizar_nombre_categoria(categoria.nombre)
     return (int(categoria.orden or 0), _categoria_prioridad_default(nombre), nombre)

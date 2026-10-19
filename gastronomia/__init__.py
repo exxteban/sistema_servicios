@@ -8,6 +8,7 @@ from gastronomia.routes.delivery_api_routes import gastronomia_delivery_api_bp
 from gastronomia.routes.entregas_api_routes import gastronomia_entregas_api_bp
 from gastronomia.routes.menu_tv_api_routes import gastronomia_menu_tv_api_bp
 from gastronomia.routes.menu_plantillas_api_routes import gastronomia_menu_plantillas_api_bp
+from gastronomia.routes.menu_combo_api_routes import gastronomia_menu_combo_api_bp
 from gastronomia.routes.pedido_api_routes import gastronomia_pedidos_api_bp
 from gastronomia.routes.reportes_api_routes import gastronomia_reportes_api_bp
 from gastronomia.routes.salon_api_routes import gastronomia_salon_api_bp
@@ -35,6 +36,7 @@ __all__ = [
     'gastronomia_entregas_api_bp',
     'gastronomia_menu_tv_api_bp',
     'gastronomia_menu_plantillas_api_bp',
+    'gastronomia_menu_combo_api_bp',
     'gastronomia_pedidos_api_bp',
     'gastronomia_reportes_api_bp',
     'gastronomia_salon_api_bp',

@@ -105,3 +105,47 @@
 .dark .gastro-extras-empty {
     color: rgb(156 163 175);
 }
+.gastro-choice-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgb(229 231 235);
+    padding: 1rem;
+    text-align: left;
+    font-size: 0.9rem;
+    color: rgb(55 65 81);
+    background: white;
+    transition: all 160ms ease;
+}
+.gastro-choice-card i {
+    font-size: 1.4rem;
+    color: rgb(225 29 72);
+}
+.gastro-choice-card:hover {
+    border-color: rgb(244 63 94);
+    background: rgb(255 241 242);
+}
+.gastro-combo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-radius: 0.6rem;
+    border: 1px solid rgb(229 231 235);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(31 41 55);
+}
+.dark .gastro-choice-card,
+.dark .gastro-combo-item {
+    border-color: rgb(75 85 99);
+    background: rgb(17 24 39);
+    color: rgb(229 231 235);
+}
+.dark .gastro-choice-card:hover {
+    border-color: rgb(251 113 133);
+    background: rgb(136 19 55 / 0.35);
+}

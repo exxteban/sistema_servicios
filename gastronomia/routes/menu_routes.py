@@ -6,6 +6,7 @@ from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.access import cliente_id_actual_gastronomia, mensaje_contexto_gastronomia
 from gastronomia.services.menu_service import listar_categorias, listar_productos
 from gastronomia.services.menu_plantillas_service import listar_plantillas
+from gastronomia.services.menu_combo_service import resumen_productos_para_combo
 from gastronomia.services.channel_price_service import CANALES_PRECIOS, listar_precios_canal
 from gastronomia.services.menu_tv_service import obtener_o_preparar_config_tv, serializar_config_tv
 from gastronomia.services.permisos import PERMISO_MENU, requiere_permiso_gastronomia
@@ -44,6 +45,7 @@ def menu_config():
         categorias=categorias,
         productos=productos,
         menu_plantillas=listar_plantillas(),
+        menu_productos_combo=resumen_productos_para_combo(productos),
         canales_precios=CANALES_PRECIOS,
         precios_por_canal=precios_por_canal,
         menu_tv_config=menu_tv_data,

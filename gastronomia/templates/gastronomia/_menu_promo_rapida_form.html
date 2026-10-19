@@ -1,0 +1,39 @@
+<div data-promo-paso="promo" class="hidden space-y-4">
+    <div>
+        <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Que promo queres hacer?</p>
+        <div class="mt-2 grid grid-cols-2 gap-2">
+            <button type="button" data-promo-tipo="2x1" class="gastro-template-card"><span class="text-xl">2x1</span><span class="text-xs font-medium">Lleva 2, paga 1</span></button>
+            <button type="button" data-promo-tipo="3x2" class="gastro-template-card"><span class="text-xl">3x2</span><span class="text-xs font-medium">Lleva 3, paga 2</span></button>
+            <button type="button" data-promo-tipo="porcentaje" class="gastro-template-card"><span class="text-xl">% menos</span><span class="text-xs font-medium">Descuento en porcentaje</span></button>
+            <button type="button" data-promo-tipo="precio" class="gastro-template-card"><span class="text-xl">Precio especial</span><span class="text-xs font-medium">Un precio mas bajo</span></button>
+        </div>
+    </div>
+
+    <div data-promo-valor-campo class="hidden">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+            <span data-promo-valor-label>Descuento</span>
+            <input data-promo-valor type="text" inputmode="decimal" class="gastro-template-input mt-1">
+            <span data-promo-valor-ayuda class="mt-1 block text-xs font-medium text-gray-500 dark:text-gray-400"></span>
+        </label>
+    </div>
+
+    <div data-promo-detalle class="hidden space-y-3">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+            Nombre de la promo
+            <input data-promo-nombre type="text" maxlength="160" class="gastro-template-input mt-1">
+        </label>
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+            Cuanto dura
+            <select data-promo-dias class="gastro-template-input mt-1">
+                <option value="1">Solo hoy</option>
+                <option value="7">1 semana</option>
+                <option value="15">15 dias</option>
+                <option value="30" selected>1 mes</option>
+            </select>
+        </label>
+        <button type="button" data-promo-guardar class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50">
+            <i class="fas fa-check"></i>Crear promo
+        </button>
+        <p class="text-center text-xs text-gray-500 dark:text-gray-400">Arranca ya. La podes pausar o cambiar en Menu cargado &rarr; Promociones.</p>
+    </div>
+</div>

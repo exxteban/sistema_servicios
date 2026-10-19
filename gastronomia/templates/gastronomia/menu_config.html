@@ -280,6 +280,9 @@
                                     </label>
                                 </div>
                                 <div class="mt-3 flex flex-wrap gap-2">
+                                    <button type="button" data-promo-producto="{{ producto.id_producto }}" class="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 dark:border-rose-400/40 dark:text-rose-200 dark:hover:bg-rose-500/10">
+                                        <i class="fas fa-tags"></i>Hacer promo
+                                    </button>
                                     <button type="button" data-edit-product="{{ producto.id_producto }}" class="inline-flex items-center gap-2 rounded-lg border border-amber-200 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-200 dark:hover:bg-amber-500/10">
                                         <i class="fas fa-pen"></i>Editar producto
                                     </button>
@@ -373,11 +376,13 @@
     <div data-main-tab-panel="stock" class="hidden" role="tabpanel">
         {% include "gastronomia/_stock_config.html" %}
     </div>
+
+    {% include "gastronomia/_menu_promo_rapida.html" %}
 </div>
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/menu_asistentes.css', v='20261019-1') }}">
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/menu_asistentes.css', v='20261019-2') }}">
 <style>
     .gastro-image-preview-shell {
         height: 9rem;
@@ -505,6 +510,8 @@
 <script src="{{ url_for('gastronomia.static', filename='js/menu_extras_editor.js', v='20261019-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='modificadores-20261019-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_plantillas.js', v='20261019-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_promo_rapida.js', v='20261019-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_combo.js', v='20261019-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_channel_prices.js', v='20260531-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/category_order.js', v='20260528-3') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/stock_config.js', v='20260531-2') }}"></script>
