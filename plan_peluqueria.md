@@ -274,4 +274,4 @@ Las fases 2, 3 y 4 son independientes entre sí una vez cerrada la Fase 1. Para 
   - Job en segundo plano `app/bootstrap/peluqueria_recordatorios_scheduler.py`, igual que el de facturación electrónica: cada 5 min (`PELUQUERIA_RECORDATORIOS_INTERVAL_SECONDS`), se apaga con `PELUQUERIA_RECORDATORIOS_SCHEDULER=0` y no corre en tests.
   - Se configura en la pantalla "Horario del local", que avisa si WhatsApp no está configurado.
   - Importante: sin plantilla aprobada por Meta, WhatsApp solo entrega texto a quien escribió en las últimas 24 h. Para que llegue a todos hay que crear la plantilla con 4 variables (nombre, servicio, fecha y hora, profesional) y cargar su nombre.
-- Encontrado y no tocado (fuera de alcance): `app/routes/agenda/__init__.py` renderiza `errores/403.html`, que no existe. Un usuario sin `agenda_acceso` recibe un error 500 en lugar de un 403.
+- Arreglado aparte: `errores/403.html` no existía, así que Agenda, CRM y WhatsApp daban un error 500 en lugar de un 403 a quien no tenía permiso. Ahora existe la plantilla, recibe el `mensaje` de cada módulo y lo cubre `test_agenda_sin_permiso_403.py`.

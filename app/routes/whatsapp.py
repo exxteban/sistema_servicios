@@ -74,7 +74,7 @@ def _require_whatsapp_conversaciones_permiso():
     )
     if wants_json:
         return jsonify({'error': 'Sin permisos', 'mensaje': mensaje, 'permiso_requerido': 'whatsapp_conversaciones', 'modo_demo': modo_demo}), 403
-    return render_template('errores/403.html'), 403
+    return render_template('errores/403.html', mensaje=mensaje), 403
 
 
 # ─── Panel Asesor (Página HTML) ─────────────────────────────────────────────
