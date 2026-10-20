@@ -7,12 +7,15 @@ from __future__ import annotations
 
 from flask import has_request_context, request
 
+from app.services.marca_rubro_login import PANEL_LOGIN_GASTRONOMIA, panel_login_servicios
+
 
 MARCA_GASTRONOMIA = {
     'es_gastronomia': True,
     'titulo': 'Sistema de Gestión Gastronómica',
     'rubro': 'Gastronomía',
     'subtitulo_login': 'Sistema de Gestión para Gastronomía',
+    'panel_login': PANEL_LOGIN_GASTRONOMIA,
 }
 
 _TEXTOS_POR_DASHBOARD = {
@@ -37,6 +40,7 @@ def construir_marca_rubro(*, modo: str, dashboard_id: str, nombre_empresa: str =
         'titulo': nombre_empresa or textos['titulo'],
         'rubro': textos['rubro'],
         'subtitulo_login': textos['titulo'],
+        'panel_login': panel_login_servicios(dashboard_id),
     }
 
 

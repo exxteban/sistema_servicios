@@ -301,12 +301,13 @@ body{
     <div class="brand-panel">
       <div class="brand-dots"></div>
 
+      {% set panel = marca_rubro.panel_login if marca_rubro and marca_rubro.panel_login else none %}
+      {% set feature_colores = [('rgba(217,119,6,.35)', '#fed7aa'), ('rgba(16,185,129,.3)', '#86efac'), ('rgba(245,158,11,.28)', '#fcd34d'), ('rgba(239,68,68,.28)', '#fca5a5'), ('rgba(234,179,8,.3)', '#fde047')] %}
+      {% if panel %}
       <!-- Iconos flotantes decorativos -->
-      <div class="fi fi-1"><i class="fas fa-burger"></i></div>
-      <div class="fi fi-2"><i class="fas fa-boxes"></i></div>
-      <div class="fi fi-3"><i class="fas fa-users-gear"></i></div>
-      <div class="fi fi-4"><i class="fas fa-chart-pie"></i></div>
-      <div class="fi fi-5"><i class="fas fa-robot"></i></div>
+      {% for icono in panel.iconos_flotantes %}
+      <div class="fi fi-{{ loop.index }}"><i class="{{ icono }}"></i></div>
+      {% endfor %}
 
       <!-- Logo y descripcion -->
       <div style="position:relative;z-index:1">
@@ -315,36 +316,24 @@ body{
           <img src="{{ static_url(app_brand_logo_path) }}" alt="Logo empresa"
                style="width:100%;height:100%;object-fit:contain;padding:4px;border-radius:12px;">
           {% else %}
-          <i class="fas fa-utensils"></i>
+          <i class="{{ panel.icono_logo }}"></i>
           {% endif %}
         </div>
-        <h2 class="brand-title">Tu local gastron&#243;mico,<br>en un solo lugar</h2>
-        <p class="brand-desc">Gestion&#225; pedidos, insumos, clientes y personal de tu hamburgues&#237;a, lomiter&#237;a o restaurante desde un solo panel.</p>
+        <h2 class="brand-title">{{ panel.titulo[0] }}<br>{{ panel.titulo[1] }}</h2>
+        <p class="brand-desc">{{ panel.descripcion }}</p>
       </div>
 
       <!-- Features -->
       <ul class="features" style="position:relative;z-index:1">
+        {% for icono, titulo, detalle in panel.features %}
+        {% set fondo, color = feature_colores[loop.index0 % feature_colores|length] %}
         <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(217,119,6,.35)"><i class="fas fa-cash-register" style="color:#fed7aa"></i></span>
-          <div class="feature-text"><p>Pedidos y Caja</p><small>Ventas r&#225;pidas con caja integrada</small></div>
+          <span class="fi-badge" style="background:{{ fondo }}"><i class="{{ icono }}" style="color:{{ color }}"></i></span>
+          <div class="feature-text"><p>{{ titulo }}</p><small>{{ detalle }}</small></div>
         </li>
-        <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(16,185,129,.3)"><i class="fas fa-boxes" style="color:#86efac"></i></span>
-          <div class="feature-text"><p>Insumos y Stock</p><small>Control de ingredientes con alertas</small></div>
-        </li>
-        <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(245,158,11,.28)"><i class="fas fa-users-gear" style="color:#fcd34d"></i></span>
-          <div class="feature-text"><p>Personal y Turnos</p><small>Asistencia, turnos y rendimiento</small></div>
-        </li>
-        <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(239,68,68,.28)"><i class="fas fa-chart-line" style="color:#fca5a5"></i></span>
-          <div class="feature-text"><p>Reportes y An&#225;lisis</p><small>Estad&#237;sticas y gr&#225;ficos al instante</small></div>
-        </li>
-        <li class="feature-item">
-          <span class="fi-badge" style="background:rgba(234,179,8,.3)"><i class="fas fa-robot" style="color:#fde047"></i></span>
-          <div class="feature-text"><p>Asistente IA</p><small>Insights inteligentes de tu local</small></div>
-        </li>
+        {% endfor %}
       </ul>
+      {% endif %}
 
       <div class="brand-footer" style="position:relative;z-index:1">
         &copy; {{ now().year }} {% if app_brand_name %}{{ app_brand_name }}{% elif marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.titulo }}{% else %}Sistema de Gesti&#243;n Gastron&#243;mica{% endif %}

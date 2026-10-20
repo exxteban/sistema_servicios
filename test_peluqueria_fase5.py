@@ -44,6 +44,20 @@ class TestMarcaSegunRubro(Fase5TestBase):
         self.assertIn('Peluquería · Barbería', dashboard)
         self.assertIn('Sistema de Gestión para Peluquería y Barbería', login)
 
+    def test_login_panel_izquierdo_de_peluqueria(self):
+        login = self.app.test_client().get('/auth/login').get_data(as_text=True)
+
+        self.assertIn('Tu peluquería o barbería,', login)
+        self.assertIn('Agenda y Turnos', login)
+        for texto in ('Tu local gastron', 'Insumos y Stock', 'hamburgues', 'fa-burger', 'fa-utensils'):
+            self.assertNotIn(texto, login)
+
+    def test_login_panel_izquierdo_de_gastronomia_sin_cambios(self):
+        marca = construir_marca_rubro(modo='gastronomia', dashboard_id='general')
+
+        self.assertEqual(marca['panel_login']['titulo'], ('Tu local gastronómico,', 'en un solo lugar'))
+        self.assertEqual(marca['panel_login']['features'][1][1], 'Insumos y Stock')
+
     def test_nombre_de_empresa_tiene_prioridad(self):
         marca = construir_marca_rubro(modo='servicios', dashboard_id='peluqueria_barberia', nombre_empresa='Barbería Don Juan')
 

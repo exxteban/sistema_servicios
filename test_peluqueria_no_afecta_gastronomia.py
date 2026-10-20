@@ -59,6 +59,9 @@ class TestPeluqueriaNoAfectaGastronomia(unittest.TestCase):
 
         self.assertIn('<title>Iniciar Sesion - Sistema de Gestion Gastronomica</title>', html)
         self.assertIn('Sistema de Gesti&#243;n para Gastronom&#237;a', html)
+        self.assertIn('Tu local gastronómico,', html)
+        self.assertIn('Insumos y Stock', html)
+        self.assertIn('fa-burger', html)
 
     def test_layout_mantiene_marca_gastronomica(self):
         self._loguear()
