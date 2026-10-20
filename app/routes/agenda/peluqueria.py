@@ -19,7 +19,6 @@ from app.services.agenda_turnos_peluqueria import (
     resolve_turno_peluqueria_catalog_service,
 )
 from app.services.peluqueria_horario import horarios_turno_peluqueria, obtener_horario_peluqueria, query_turnos_solapados
-from app.services.peluqueria_senas import registrar_sena_turno, resolver_sena_al_cerrar, sena_turno, turno_ya_cobrado
 from app.services.peluqueria_turno_catalogo import build_turno_peluqueria_catalogo
 from app.utils.helpers import today_local, utc_naive_to_local
 
@@ -262,91 +261,6 @@ def nuevo_turno_peluqueria():
     return _render_turno_rapido(_turno_inicial_desde_agenda(request.args))
 
 
-@agenda_bp.route('/turnos/peluqueria/<int:id_actividad>/gestionar', methods=['GET', 'POST'])
-@login_required
-def gestionar_turno_peluqueria(id_actividad):
-    actividad = _cargar_turno_peluqueria_visible_o_404(id_actividad)
-    if request.method == 'GET':
-        return render_template(
-            'agenda/peluqueria_gestionar_turno.html',
-            actividad=actividad,
-            fecha_actual=_to_date_input(actividad.fecha_inicio),
-            hora_actual=_to_time_input(actividad.fecha_inicio),
-            duracion_actual=_duracion_minutos_actividad(actividad),
-            puede_reprogramar=current_user.tiene_permiso('agenda_editar'),
-            puede_cancelar=current_user.tiene_permiso('agenda_cancelar'),
-            puede_registrar_sena=(current_user.tiene_permiso('agenda_editar') or current_user.tiene_permiso('crear_venta')),
-            sena_actual=float(sena_turno(actividad)),
-            turno_cobrado=turno_ya_cobrado(actividad),
-        )
-
-    accion = (request.form.get('accion') or '').strip().lower()
-    if accion == 'reprogramar':
-        if not current_user.tiene_permiso('agenda_editar'):
-            flash('No tienes permiso para reprogramar turnos.', 'danger')
-            return _redirect_gestion_turno(actividad)
-        fecha_inicio = _parse_datetime_local(f"{request.form.get('fecha') or ''}T{request.form.get('hora') or ''}")
-        duracion = _parse_positive_int(request.form.get('duracion')) or _duracion_minutos_actividad(actividad)
-        if fecha_inicio is None:
-            flash('Completa una fecha y hora validas para reprogramar.', 'warning')
-            return _redirect_gestion_turno(actividad)
-        fecha_fin = fecha_inicio + timedelta(minutes=duracion)
-        turno_solapado = _buscar_turno_solapado(
-            profesional_id=actividad.usuario_id,
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            excluir_actividad_id=actividad.id,
-        )
-        if turno_solapado is not None:
-            flash('Ese profesional ya tiene otro turno en ese horario.', 'warning')
-            return _redirect_gestion_turno(actividad)
-        actividad.fecha_inicio = fecha_inicio
-        actividad.fecha_fin = fecha_fin
-        actividad.estado = 'pendiente'
-        if actividad.cliente_servicio is not None:
-            actividad.cliente_servicio.fecha_programada = fecha_inicio
-            if (actividad.cliente_servicio.estado or '').strip().lower() in {'solicitado', 'presupuestado', 'cancelado'}:
-                actividad.cliente_servicio.estado = 'agendado'
-                actividad.cliente_servicio.fecha_cierre = None
-        flash('Turno reprogramado correctamente.', 'success')
-    elif accion == 'sena':
-        if not (current_user.tiene_permiso('agenda_editar') or current_user.tiene_permiso('crear_venta')):
-            flash('No tienes permiso para registrar señas.', 'danger')
-            return _redirect_gestion_turno(actividad)
-        monto = parse_turno_manual_price(request.form.get('monto_sena'))
-        ok, error = registrar_sena_turno(actividad, monto, current_user, request.form.get('nota_sena'))
-        if not ok:
-            db.session.rollback()
-            flash(error, 'warning')
-            return _redirect_gestion_turno(actividad)
-        flash('Seña registrada: entró a tu caja y se descuenta al cobrar el turno.', 'success')
-    elif accion in {'cancelar', 'no_show'}:
-        if not current_user.tiene_permiso('agenda_cancelar'):
-            flash('No tienes permiso para cerrar turnos.', 'danger')
-            return _redirect_gestion_turno(actividad)
-        if turno_ya_cobrado(actividad):
-            flash('Este turno ya fue cobrado; no se puede cancelar desde acá.', 'warning')
-            return _redirect_gestion_turno(actividad)
-        ok, error = resolver_sena_al_cerrar(actividad, current_user, devolver=request.form.get('devolver_sena') == '1')
-        if not ok:
-            db.session.rollback()
-            flash(error, 'warning')
-            return _redirect_gestion_turno(actividad)
-        motivo = (request.form.get('motivo') or '').strip()
-        etiqueta = 'No-show' if accion == 'no_show' else 'Cancelado'
-        actividad.estado = 'cancelada'
-        if actividad.cliente_servicio is not None and not actividad.cliente_servicio.id_venta:
-            actividad.cliente_servicio.estado = 'cancelado'
-        _append_turno_note(actividad, f'{etiqueta} desde peluquería/barbería' + (f': {motivo}' if motivo else '.'))
-        flash('Turno marcado como no-show.' if accion == 'no_show' else 'Turno cancelado correctamente.', 'success')
-    else:
-        flash('Acción no válida para este turno.', 'warning')
-        return _redirect_gestion_turno(actividad)
-
-    db.session.commit()
-    return _redirect_gestion_turno(actividad)
-
-
 @agenda_bp.route('/turnos/peluqueria/crear', methods=['POST'])
 @login_required
 def crear_turno_peluqueria():
@@ -414,6 +328,8 @@ def crear_turno_peluqueria():
         creado_por_id=current_user.id_usuario,
         cliente_id=cliente_id,
         cliente_servicio_id=(int(asignacion.id_cliente_servicio) if asignacion else None),
+        servicio_id=(int(servicio_resuelto.id_servicio) if servicio_resuelto else None),
+        servicio_precio_opcion_id=(int(servicio_precio_opcion.id_opcion_precio) if servicio_precio_opcion else None),
         origen_modulo='agenda',
         mostrar_agenda_en='solo_responsable',
         recordatorio_a='solo_responsable',

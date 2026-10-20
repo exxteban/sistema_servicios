@@ -231,3 +231,19 @@ Las fases 2, 3 y 4 son independientes entre sí una vez cerrada la Fase 1. Para 
 - Los botones "Agenda" y "Ver agenda completa" del dashboard de peluquería apuntan a la agenda del día; en el dashboard de servicios genérico siguen yendo a la agenda de siempre. El acceso "Agenda" del menú lateral no se tocó porque es compartido.
 - `agenda/lista.html` pasó de 922 a 259 líneas. El JS se movió tal cual a `_lista_js.html` (523) y las funciones puras a `_lista_helpers_js.html` (`window.AgendaListaHelpers`). Probado en pantalla: alertas de vencida y sincronización por polling funcionan igual.
 - Nota: para revisar si una clase de Tailwind está compilada hay que mirar también dentro de los `@media` (las clases `sm:`, `md:` y `lg:` viven ahí).
+
+### Fase 4 — hecha (2026-10-19)
+- Estados del turno en `app/services/peluqueria_turno_estado.py`: Agendado → En atención → Terminado → Cobrado, más Cancelado y No-show. "Gestionar turno" muestra la barra de pasos y los botones **Empezar atención**, **Terminar** y **Cobrar** (`_peluqueria_turno_estado.html`). La ruta pasó a `app/routes/agenda/peluqueria_gestion.py`, con acciones chicas en lugar de un solo bloque de if/elif.
+- Columnas nuevas en `AgendaActividad`, todas nulables:
+  - `atencion_inicio`: permite "En atención" sin servicio del cliente, o sea sin cliente.
+  - `cierre_motivo` (`cancelado` / `no_show`): el no-show ya no se busca en el texto de las notas, salvo en turnos viejos sin motivo.
+  - `servicio_id` y `servicio_precio_opcion_id`: guardan el servicio elegido para cobrar después un turno sin cliente.
+- Cobrar (`/agenda/turnos/peluqueria/<id>/cobrar`):
+  - Con servicio del cliente usa `cliente_servicio_id`. El POS ahora también recibe al profesional como vendedor (`profesional_para_cobro`, cambio aditivo en `clientes_servicios.py` y `pos_state_runtime.js`).
+  - Sin cliente pasa turno, servicio y profesional. Los turnos viejos se resuelven por título, igual que Cobros pendientes.
+  - En los dos casos la seña se descuenta sola.
+- Terminado sin cobrar sigue en Cobros pendientes. No se puede reprogramar un turno en atención o atendido, ni cancelar uno terminado o cobrado.
+- El contador "En atención" del dashboard cuenta también los turnos sin cliente, y su botón Cobrar en peluquería usa la ruta nueva. El "Iniciar" genérico de agenda también marca `atencion_inicio` en citas.
+- `_sincronizar_cliente_servicio_desde_actividad` pasó de `routes/agenda/formularios.py` a `app/services/agenda_cliente_servicio_sync.py` sin cambiar su lógica.
+- WhatsApp: botones "Confirmar turno" y "Recordar turno" que abren `wa.me` con el mensaje armado. El teléfono se normaliza con `app/utils/phone_utils.normalizar_telefono`. No se envía nada automáticamente; si el cliente no tiene teléfono, se pide cargarlo.
+- Mapa del día y agenda del día muestran "Terminado" (ámbar) aparte de "Cobrado".

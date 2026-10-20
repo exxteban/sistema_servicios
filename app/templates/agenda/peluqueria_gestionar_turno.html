@@ -23,10 +23,7 @@
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">#{{ actividad.id }}</span>
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ actividad.estado|title }}</span>
-                    {% if actividad.cliente_servicio and actividad.cliente_servicio.id_venta %}
-                    <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">Cobrado</span>
-                    {% endif %}
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ estado_label }}</span>
                 </div>
                 <h2 class="mt-3 text-2xl font-black text-slate-950 dark:text-white">{{ actividad.titulo }}</h2>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -39,10 +36,17 @@
                 <p class="mt-1 font-bold text-slate-950 dark:text-white">{{ actividad.cliente.nombre if actividad.cliente else 'Consumidor Final' }}</p>
                 {% if actividad.cliente_servicio and actividad.cliente_servicio.servicio %}
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ actividad.cliente_servicio.servicio.nombre }}</p>
+                {% elif actividad.servicio %}
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ actividad.servicio.nombre }}</p>
+                {% endif %}
+                {% if actividad.cliente and actividad.cliente.telefono %}
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400"><i class="fas fa-phone mr-1"></i>{{ actividad.cliente.telefono }}</p>
                 {% endif %}
             </div>
         </div>
     </section>
+
+    {% include 'agenda/_peluqueria_turno_estado.html' %}
 
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
@@ -75,7 +79,7 @@
                 </button>
             </form>
             {% else %}
-            <p class="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">No tienes permiso para reprogramar turnos.</p>
+            <p class="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">{% if estado in ['en_atencion', 'terminado', 'cobrado'] %}Este turno ya está en atención o atendido: no se puede reprogramar.{% else %}No tienes permiso para reprogramar turnos.{% endif %}</p>
             {% endif %}
         </section>
 
@@ -116,6 +120,10 @@
         <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">Usa cancelado cuando avisan; usa no-show cuando el cliente no aparece.</p>
         {% if turno_cobrado %}
         <p class="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm font-semibold text-rose-800 dark:bg-slate-950/60 dark:text-rose-200">El turno ya fue cobrado; no se puede cancelar desde acá.</p>
+        {% elif cerrado %}
+        <p class="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm font-semibold text-rose-800 dark:bg-slate-950/60 dark:text-rose-200">Turno cerrado como {{ estado_label|lower }}. Para volver a darlo, reprogramalo.</p>
+        {% elif estado == 'terminado' %}
+        <p class="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm font-semibold text-rose-800 dark:bg-slate-950/60 dark:text-rose-200">El turno ya se atendió: falta cobrarlo.</p>
         {% elif puede_cancelar %}
         <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
             <form method="POST" action="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}" class="space-y-3">

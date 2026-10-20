@@ -436,6 +436,12 @@
                             .catch(e => console.error('Error cargando cliente del servicio:', e));
                     }
 
+                    if (CLIENTE_SERVICIO_DATA.id_usuario_vendedor) {
+                        const candidato = Number(CLIENTE_SERVICIO_DATA.id_usuario_vendedor);
+                        if (this.vendedoresCajeros.some(v => Number(v.id_usuario) === candidato)) {
+                            this.vendedorId = candidato;
+                        }
+                    }
                     this.aplicarSenaTurno(CLIENTE_SERVICIO_DATA.sena);
                     this.actualizarTotal();
                     const totalAsignaciones = this.clienteServicioIds.length || (this.clienteServicioId ? 1 : 0);

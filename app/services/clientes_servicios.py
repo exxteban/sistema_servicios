@@ -122,7 +122,7 @@ def build_pos_data_from_cliente_servicios(asignaciones):
     if not items:
         return None
 
-    from app.services.peluqueria_senas import sena_para_cobro
+    from app.services.peluqueria_senas import profesional_para_cobro, sena_para_cobro
 
     return {
         'id': ids[0],
@@ -132,4 +132,6 @@ def build_pos_data_from_cliente_servicios(asignaciones):
         'items': items,
         # Seña de turnos de agenda ya ingresada a caja: se descuenta al cobrar.
         'sena': sena_para_cobro(cliente_servicio_ids=ids),
+        # Profesional del turno de agenda, como vendedor sugerido (None si no hay turno o hay varios).
+        'id_usuario_vendedor': profesional_para_cobro(ids),
     }

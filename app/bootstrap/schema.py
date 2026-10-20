@@ -389,6 +389,10 @@ SCHEMA_COLUMN_MIGRATIONS = {
             ("ALTER TABLE agenda_actividades ADD COLUMN sena_monto NUMERIC(12, 2)",),
             ("ALTER TABLE agenda_actividades ADD COLUMN sena_monto DECIMAL(12, 2) NULL",),
         ),
+        ('atencion_inicio', ("ALTER TABLE agenda_actividades ADD COLUMN atencion_inicio DATETIME",), ("ALTER TABLE agenda_actividades ADD COLUMN atencion_inicio DATETIME NULL",)),
+        ('cierre_motivo', ("ALTER TABLE agenda_actividades ADD COLUMN cierre_motivo VARCHAR(20)",), ("ALTER TABLE agenda_actividades ADD COLUMN cierre_motivo VARCHAR(20) NULL",)),
+        ('servicio_id', ("ALTER TABLE agenda_actividades ADD COLUMN servicio_id INTEGER",), ("ALTER TABLE agenda_actividades ADD COLUMN servicio_id INT NULL",)),
+        ('servicio_precio_opcion_id', ("ALTER TABLE agenda_actividades ADD COLUMN servicio_precio_opcion_id INTEGER",), ("ALTER TABLE agenda_actividades ADD COLUMN servicio_precio_opcion_id INT NULL",)),
     ],
 }
 

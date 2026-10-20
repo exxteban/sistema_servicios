@@ -119,3 +119,22 @@ def sena_para_cobro(*, actividad_id=None, cliente_servicio_ids=None) -> float:
     else:
         return 0.0
     return float(sum((sena_turno(actividad) for actividad in query.all()), Decimal('0')))
+
+
+def profesional_para_cobro(cliente_servicio_ids) -> int | None:
+    """Profesional de los turnos de esos servicios del cliente, si es uno solo (será el vendedor en el POS)."""
+    if not cliente_servicio_ids:
+        return None
+    filas = (
+        AgendaActividad.query
+        .with_entities(AgendaActividad.usuario_id)
+        .filter(
+            AgendaActividad.tipo == 'cita',
+            AgendaActividad.estado != 'cancelada',
+            AgendaActividad.cliente_servicio_id.in_([int(i) for i in cliente_servicio_ids]),
+        )
+        .distinct()
+        .all()
+    )
+    ids = {int(fila[0]) for fila in filas if fila[0]}
+    return ids.pop() if len(ids) == 1 else None

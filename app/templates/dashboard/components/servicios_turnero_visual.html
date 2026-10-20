@@ -24,7 +24,8 @@
                 <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
                     <span class="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-100"><span class="mr-1 inline-block h-2 w-2 rounded-full bg-violet-500 dark:bg-violet-300"></span>Agendado</span>
                     <span class="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-100"><span class="mr-1 inline-block h-2 w-2 rounded-full bg-cyan-500 dark:bg-cyan-300"></span>En atención</span>
-                    <span class="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-100"><span class="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-300"></span>Finalizado</span>
+                    <span class="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-100"><span class="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500 dark:bg-amber-300"></span>Terminado</span>
+                    <span class="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-100"><span class="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-300"></span>Cobrado</span>
                     <span class="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-100"><span class="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500 dark:bg-rose-300"></span>No-show/cancelado</span>
                 </div>
                 <div class="inline-flex items-center gap-3 self-start rounded-2xl border border-slate-200/80 bg-white/75 px-4 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-sm dark:border-slate-700/70 dark:bg-slate-950/75 dark:shadow-black/20 lg:self-auto">
@@ -50,6 +51,10 @@
                 {% set card_class = 'border-cyan-200 bg-cyan-50/90 shadow-cyan-100/80 ring-1 ring-white/60 dark:border-cyan-300/30 dark:bg-gradient-to-br dark:from-cyan-500/18 dark:via-slate-900/95 dark:to-slate-950 dark:shadow-cyan-950/25 dark:ring-cyan-300/10' %}
                 {% set accent_class = 'from-cyan-400 to-blue-500 dark:from-cyan-300 dark:to-blue-400' %}
                 {% set badge_class = 'bg-cyan-100 text-cyan-700 ring-cyan-200 dark:bg-cyan-300/15 dark:text-cyan-100 dark:ring-cyan-300/25' %}
+            {% elif estado == 'terminado' %}
+                {% set card_class = 'border-amber-200 bg-amber-50/90 shadow-amber-100/80 ring-1 ring-white/60 dark:border-amber-300/25 dark:bg-gradient-to-br dark:from-amber-500/16 dark:via-slate-900/95 dark:to-slate-950 dark:shadow-amber-950/25 dark:ring-amber-300/10' %}
+                {% set accent_class = 'from-amber-400 to-orange-500 dark:from-amber-300 dark:to-orange-400' %}
+                {% set badge_class = 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-300/15 dark:text-amber-100 dark:ring-amber-300/25' %}
             {% elif estado == 'hecha' %}
                 {% set card_class = 'border-emerald-200 bg-emerald-50/90 shadow-emerald-100/80 ring-1 ring-white/60 dark:border-emerald-300/25 dark:bg-gradient-to-br dark:from-emerald-500/16 dark:via-slate-900/95 dark:to-slate-950 dark:shadow-emerald-950/25 dark:ring-emerald-300/10' %}
                 {% set accent_class = 'from-emerald-400 to-lime-500 dark:from-emerald-300 dark:to-lime-400' %}

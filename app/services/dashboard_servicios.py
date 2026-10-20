@@ -280,6 +280,7 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
     for actividad in agenda_items:
         turno_tipo = infer_turno_peluqueria_tipo_from_title(actividad.titulo)
         servicios_por_actividad[int(actividad.id)] = resolve_turno_peluqueria_catalog_service(
+            servicio_id=actividad.servicio_id,
             turno_tipo_id=turno_tipo,
             title=actividad.titulo,
         )
@@ -305,6 +306,8 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
             params['agenda_turno_vendedor_id'] = int(actividad.usuario_id)
         if servicio is not None:
             params['agenda_turno_servicio_id'] = int(servicio.id_servicio)
+            if actividad.servicio_precio_opcion_id and int(servicio.id_servicio) == int(actividad.servicio_id or 0):
+                params['agenda_turno_precio_opcion_id'] = int(actividad.servicio_precio_opcion_id)
         else:
             params['agenda_turno_titulo'] = actividad.titulo or TURNO_PELUQUERIA_TIPO_LABELS.get(turno_tipo, 'Turno')
         items_agenda.append({

@@ -53,6 +53,13 @@ class AgendaActividad(db.Model):
     observaciones = db.Column(db.Text)
     # Seña cobrada por adelantado (entra a caja al registrarse y se descuenta al cobrar el turno).
     sena_monto = db.Column(db.Numeric(12, 2), nullable=True)
+    # Peluquería: cuándo empezó la atención (el turno queda "En atención" aunque no tenga cliente).
+    atencion_inicio = db.Column(db.DateTime, nullable=True)
+    # Motivo de cierre cuando estado == 'cancelada': 'cancelado' o 'no_show'. Nulo en turnos viejos.
+    cierre_motivo = db.Column(db.String(20), nullable=True)
+    # Servicio del catálogo elegido al dar el turno, para poder cobrarlo después aunque no tenga cliente.
+    servicio_id = db.Column(db.Integer, db.ForeignKey('servicios.id_servicio'), nullable=True)
+    servicio_precio_opcion_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -62,6 +69,7 @@ class AgendaActividad(db.Model):
     cliente_servicio = db.relationship('ClienteServicio', backref=db.backref('agenda_actividades', lazy='dynamic'))
     reparacion = db.relationship('Reparacion', backref=db.backref('agenda_actividades', lazy='dynamic'))
     venta = db.relationship('Venta', backref=db.backref('agenda_actividades', lazy='dynamic'))
+    servicio = db.relationship('Servicio', foreign_keys=[servicio_id])
     crm_contacto = db.relationship('CrmContacto', backref=db.backref('agenda_actividades', lazy='dynamic'))
     usuarios_agenda = db.relationship(
         'Usuario',
