@@ -25,6 +25,8 @@ SCHEMA_COLUMN_MIGRATIONS = {
         ),
     ],
     'usuarios': [
+        ('atiende_clientes', ("ALTER TABLE usuarios ADD COLUMN atiende_clientes BOOLEAN",), ("ALTER TABLE usuarios ADD COLUMN atiende_clientes TINYINT(1) NULL",)),
+        ('comision_porcentaje', ("ALTER TABLE usuarios ADD COLUMN comision_porcentaje NUMERIC(5, 2)",), ("ALTER TABLE usuarios ADD COLUMN comision_porcentaje DECIMAL(5, 2) NULL",)),
         (
             'id_cliente',
             (
@@ -34,19 +36,6 @@ SCHEMA_COLUMN_MIGRATIONS = {
             (
                 "ALTER TABLE usuarios ADD COLUMN id_cliente INT NULL",
                 "CREATE INDEX ix_usuarios_id_cliente ON usuarios(id_cliente)",
-            ),
-        ),
-    ],
-    'agenda_actividades': [
-        (
-            'cliente_servicio_id',
-            (
-                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INTEGER",
-                "CREATE INDEX IF NOT EXISTS ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
-            ),
-            (
-                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INT NULL",
-                "CREATE INDEX ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
             ),
         ),
     ],
@@ -204,6 +193,10 @@ SCHEMA_COLUMN_MIGRATIONS = {
         ('hora_compra', ("ALTER TABLE compras ADD COLUMN hora_compra TIME",), ("ALTER TABLE compras ADD COLUMN hora_compra TIME NULL",)),
         ('factura_imagen_url', ("ALTER TABLE compras ADD COLUMN factura_imagen_url VARCHAR(500)",), ("ALTER TABLE compras ADD COLUMN factura_imagen_url VARCHAR(500) NULL",)),
         ('es_resumida', ("ALTER TABLE compras ADD COLUMN es_resumida BOOLEAN NOT NULL DEFAULT 0",), ("ALTER TABLE compras ADD COLUMN es_resumida TINYINT(1) NOT NULL DEFAULT 0",)),
+    ],
+    'detalle_ventas': [
+        # Bases anteriores al catálogo de servicios (migrations/servicios_catalogo.py no corre en update_min).
+        ('id_servicio', ("ALTER TABLE detalle_ventas ADD COLUMN id_servicio INTEGER",), ("ALTER TABLE detalle_ventas ADD COLUMN id_servicio INT NULL",)),
     ],
     'ventas': [
         (
@@ -385,6 +378,29 @@ SCHEMA_COLUMN_MIGRATIONS = {
     'agenda_actividades': [
         ('mostrar_agenda_en', ("ALTER TABLE agenda_actividades ADD COLUMN mostrar_agenda_en VARCHAR(30) NOT NULL DEFAULT 'solo_responsable'",), ("ALTER TABLE agenda_actividades ADD COLUMN mostrar_agenda_en VARCHAR(30) NOT NULL DEFAULT 'solo_responsable'",)),
         ('recordatorio_a', ("ALTER TABLE agenda_actividades ADD COLUMN recordatorio_a VARCHAR(30) NOT NULL DEFAULT 'solo_responsable'",), ("ALTER TABLE agenda_actividades ADD COLUMN recordatorio_a VARCHAR(30) NOT NULL DEFAULT 'solo_responsable'",)),
+        # Antes estaban en otra clave 'agenda_actividades' del dict, que esta pisaba (nunca se aplicaban).
+        (
+            'cliente_servicio_id',
+            (
+                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INTEGER",
+                "CREATE INDEX IF NOT EXISTS ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
+            ),
+            (
+                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INT NULL",
+                "CREATE INDEX ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
+            ),
+        ),
+        (
+            'sena_monto',
+            ("ALTER TABLE agenda_actividades ADD COLUMN sena_monto NUMERIC(12, 2)",),
+            ("ALTER TABLE agenda_actividades ADD COLUMN sena_monto DECIMAL(12, 2) NULL",),
+        ),
+        ('atencion_inicio', ("ALTER TABLE agenda_actividades ADD COLUMN atencion_inicio DATETIME",), ("ALTER TABLE agenda_actividades ADD COLUMN atencion_inicio DATETIME NULL",)),
+        ('cierre_motivo', ("ALTER TABLE agenda_actividades ADD COLUMN cierre_motivo VARCHAR(20)",), ("ALTER TABLE agenda_actividades ADD COLUMN cierre_motivo VARCHAR(20) NULL",)),
+        ('servicio_id', ("ALTER TABLE agenda_actividades ADD COLUMN servicio_id INTEGER",), ("ALTER TABLE agenda_actividades ADD COLUMN servicio_id INT NULL",)),
+        ('servicio_precio_opcion_id', ("ALTER TABLE agenda_actividades ADD COLUMN servicio_precio_opcion_id INTEGER",), ("ALTER TABLE agenda_actividades ADD COLUMN servicio_precio_opcion_id INT NULL",)),
+        ('precio_manual', ("ALTER TABLE agenda_actividades ADD COLUMN precio_manual NUMERIC(12, 2)",), ("ALTER TABLE agenda_actividades ADD COLUMN precio_manual DECIMAL(12, 2) NULL",)),
+        ('recordatorio_whatsapp_at', ("ALTER TABLE agenda_actividades ADD COLUMN recordatorio_whatsapp_at DATETIME",), ("ALTER TABLE agenda_actividades ADD COLUMN recordatorio_whatsapp_at DATETIME NULL",)),
     ],
 }
 

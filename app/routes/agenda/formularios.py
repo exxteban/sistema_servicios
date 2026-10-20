@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -24,6 +23,10 @@ from app.routes.agenda.actividades import (
     _validar_destinatarios,
     _validar_temporalidad_actividad,
     _wants_json_response,
+)
+from app.services.peluqueria_turno_estado import marcar_inicio_atencion
+from app.services.agenda_cliente_servicio_sync import (
+    sincronizar_cliente_servicio_desde_actividad as _sincronizar_cliente_servicio_desde_actividad,
 )
 from app.routes.agenda.relaciones import (
     _obtener_opciones_formulario,
@@ -83,31 +86,6 @@ def _redirect_agenda_next(default_endpoint='agenda.lista_actividades'):
     if next_url.startswith('/') and not next_url.startswith('//'):
         return next_url
     return url_for(default_endpoint)
-
-
-def _sincronizar_cliente_servicio_desde_actividad(actividad: AgendaActividad, *, accion: str):
-    asignacion = getattr(actividad, 'cliente_servicio', None)
-    if asignacion is None:
-        return
-    estado = (asignacion.estado or '').strip().lower()
-    if accion == 'iniciar' and estado in {'solicitado', 'agendado', 'presupuestado'}:
-        asignacion.estado = 'en_proceso'
-        return
-    if accion == 'completar' and estado != 'cancelado':
-        asignacion.estado = 'completado'
-        if not asignacion.fecha_cierre:
-            asignacion.fecha_cierre = datetime.utcnow()
-        return
-    if accion == 'cancelar' and not getattr(asignacion, 'id_venta', None):
-        asignacion.estado = 'cancelado'
-        if not asignacion.fecha_cierre:
-            asignacion.fecha_cierre = datetime.utcnow()
-        return
-    if accion == 'reprogramar':
-        asignacion.fecha_programada = actividad.fecha_inicio
-        if estado in {'solicitado', 'presupuestado', 'cancelado'}:
-            asignacion.estado = 'agendado'
-            asignacion.fecha_cierre = None
 
 
 @agenda_bp.route('/actividades/nueva', methods=['GET', 'POST'])
@@ -231,6 +209,7 @@ def iniciar_actividad(id_actividad: int):
         flash(mensaje, 'danger')
         return redirect(_redirect_agenda_next())
     actividad = _cargar_actividad_visible_o_404(id_actividad)
+    marcar_inicio_atencion(actividad)
     _sincronizar_cliente_servicio_desde_actividad(actividad, accion='iniciar')
     db.session.commit()
     mensaje = 'Actividad iniciada.'
@@ -251,6 +230,8 @@ def completar_actividad(id_actividad: int):
         return redirect(_redirect_agenda_next())
     actividad = _cargar_actividad_visible_o_404(id_actividad)
     estado_alerta = _resolver_estado_alerta(actividad)
+    # Sin atencion_inicio el turno 'hecha' se toma como cobrado por adelantado y sigue ocupando el horario.
+    marcar_inicio_atencion(actividad)
     actividad.estado = 'hecha'
     _sincronizar_cliente_servicio_desde_actividad(actividad, accion='completar')
     db.session.commit()

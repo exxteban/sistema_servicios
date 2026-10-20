@@ -53,6 +53,20 @@
             return `₲ ${new Intl.NumberFormat('es-PY').format(Number(value || 0))}`;
         }
 
+        // Moneda configurada (Configuracion moneda_*), igual que el filtro |moneda del servidor.
+        const MONEDA = {{ app_moneda_config()|tojson }};
+
+        function formatMonedaConfig(value) {
+            const decimales = Number(MONEDA.decimales || 0);
+            let numero;
+            try {
+                numero = new Intl.NumberFormat(MONEDA.locale, { minimumFractionDigits: decimales, maximumFractionDigits: decimales }).format(Number(value || 0));
+            } catch (e) {
+                numero = Number(value || 0).toFixed(decimales);
+            }
+            return `${MONEDA.simbolo} ${numero}`;
+        }
+
         function pluralizePendientes(count) {
             return `${count} pendiente${count === 1 ? '' : 's'}`;
         }
@@ -127,7 +141,7 @@
             const totalMonto = Number(resumen.total_monto || 0);
 
             if (cobrosPendientesMontoEl) {
-                cobrosPendientesMontoEl.textContent = `Gs. ${new Intl.NumberFormat('es-PY').format(totalMonto)}`;
+                cobrosPendientesMontoEl.textContent = formatMonedaConfig(totalMonto);
             }
             if (cobrosPendientesCountEl) {
                 cobrosPendientesCountEl.textContent = pluralizeServiciosSinCobrar(totalCount);
@@ -147,7 +161,7 @@
                 const fechaLabel = escapeHtml(asignacion && asignacion.fecha_solicitud_label ? asignacion.fecha_solicitud_label : '');
                 const cobrarUrl = String(asignacion && asignacion.cobrar_url ? asignacion.cobrar_url : '');
                 const idClienteServicio = Number((asignacion && asignacion.id_cliente_servicio) || 0);
-                const monto = `Gs. ${new Intl.NumberFormat('es-PY').format(Number(asignacion && asignacion.subtotal ? asignacion.subtotal : 0))}`;
+                const monto = formatMonedaConfig(asignacion && asignacion.subtotal ? asignacion.subtotal : 0);
                 const iniciales = (clienteNombre || 'CF').trim().slice(0, 2).toUpperCase();
                 const detalle = `${servicioNombre} · ${idClienteServicio ? `#${idClienteServicio}` : 'Turno agenda'} · ${estadoDisplay}`;
                 const contenido = `
@@ -179,7 +193,7 @@
             const totalMonto = Number(resumen.total_monto || 0);
 
             if (serviciosRealizadosTotalEl) {
-                serviciosRealizadosTotalEl.innerHTML = `${totalCount} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. ${new Intl.NumberFormat('es-PY').format(totalMonto)}</span>`;
+                serviciosRealizadosTotalEl.innerHTML = `${totalCount} <span class="font-normal text-slate-500 dark:text-slate-400">${escapeHtml(formatMonedaConfig(totalMonto))}</span>`;
             }
             if (serviciosRealizadosTotalMetaEl) {
                 serviciosRealizadosTotalMetaEl.textContent = pluralizeServiciosRealizados(totalCount);
@@ -202,7 +216,7 @@
                     <div>
                         <div class="flex items-center justify-between text-xs">
                             <span class="truncate pr-3 text-slate-600 dark:text-slate-300">${nombre}</span>
-                            <span class="shrink-0 font-bold text-slate-900 dark:text-white">${cantidad} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. ${new Intl.NumberFormat('es-PY').format(total)}</span></span>
+                            <span class="shrink-0 font-bold text-slate-900 dark:text-white">${cantidad} <span class="font-normal text-slate-500 dark:text-slate-400">${escapeHtml(formatMonedaConfig(total))}</span></span>
                         </div>
                         <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                             <div class="h-full rounded-full ${colorClass}" style="width: ${porcentaje}%"></div>
@@ -214,8 +228,7 @@
 
         async function refresh() {
             if (!isAlive()) {
-                if (timerId) clearInterval(timerId);
-                timerId = null;
+                unbind();
                 return;
             }
             if (inFlight) return;
@@ -267,17 +280,28 @@
             }
         }
 
-        window.dashboardRefreshTotals = refresh;
-        window.addEventListener('dashboard:refresh-totals', refresh);
-        window.addEventListener('caja:venta-cobrada', refresh);
-        window.addEventListener('agenda:alertas-actualizadas', refresh);
-        window.addEventListener('agenda:resolver-actividad', refresh);
-        window.addEventListener('storage', (event) => {
+        const refreshEvents = ['dashboard:refresh-totals', 'caja:venta-cobrada', 'agenda:alertas-actualizadas', 'agenda:resolver-actividad'];
+
+        function onStorage(event) {
             if (!event || !['agenda-activity-sync', 'caja_estado_refresh_v1'].includes(event.key)) {
                 return;
             }
             refresh();
-        });
+        }
+
+        // El dashboard puede re-renderizarse en el lugar (refresco silencioso):
+        // la instancia vieja suelta sus listeners para no retener el DOM anterior.
+        function unbind() {
+            if (timerId) clearInterval(timerId);
+            timerId = null;
+            refreshEvents.forEach((name) => window.removeEventListener(name, refresh));
+            window.removeEventListener('storage', onStorage);
+            if (window.dashboardRefreshTotals === refresh) window.dashboardRefreshTotals = undefined;
+        }
+
+        window.dashboardRefreshTotals = refresh;
+        refreshEvents.forEach((name) => window.addEventListener(name, refresh));
+        window.addEventListener('storage', onStorage);
 
         refresh();
         timerId = setInterval(refresh, 15000);

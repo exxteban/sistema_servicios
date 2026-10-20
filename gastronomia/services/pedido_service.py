@@ -6,18 +6,13 @@ from decimal import Decimal
 
 from app import db
 from app.services.promociones_calculo import calculate_promotion_totals, money
-from app.utils.public_url import build_public_url
 from gastronomia.models import (
-    GastronomiaDeliveryUbicacion,
     GastronomiaPedido,
     GastronomiaPedidoEvento,
     GastronomiaPedidoItem,
     GastronomiaPedidoItemModificador,
-    GastronomiaPedidoPago,
-    GastronomiaProducto,
     generar_codigo_publico_pedido,
 )
-from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
@@ -28,8 +23,9 @@ from gastronomia.services.pedido_validation_utils import (
     parse_optional_coordinate,
     parse_optional_positive_int,
 )
+from gastronomia.services.pedido_serializer import serializar_pedidos  # noqa: F401  (reexportado)
+from gastronomia.services.pedido_stock import aplicar_stock_por_transicion, pedido_difiere_stock
 from gastronomia.services.stock_service import (
-    alertas_stock_pedido,
     consumir_stock_item,
     restaurar_stock_items as _restaurar_stock_items,
 )
@@ -97,150 +93,6 @@ def obtener_ultimo_evento_id(cliente_id: int) -> int:
     return int(ultimo or 0)
 
 
-def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
-    if not pedidos:
-        return []
-
-    pedido_ids = [int(pedido.id_pedido) for pedido in pedidos]
-    cliente_ids = {int(pedido.cliente_id) for pedido in pedidos}
-    pagos = (
-        GastronomiaPedidoPago.query
-        .filter(
-            GastronomiaPedidoPago.cliente_id.in_(cliente_ids),
-            GastronomiaPedidoPago.pedido_id.in_(pedido_ids),
-        )
-        .all()
-    )
-    pagos_por_pedido = {int(pago.pedido_id): pago for pago in pagos}
-
-    items = (
-        GastronomiaPedidoItem.query
-        .filter(
-            GastronomiaPedidoItem.cliente_id.in_(cliente_ids),
-            GastronomiaPedidoItem.pedido_id.in_(pedido_ids),
-        )
-        .order_by(GastronomiaPedidoItem.id_item.asc())
-        .all()
-    )
-    item_ids = [int(item.id_item) for item in items]
-    modificadores_por_item = {item_id: [] for item_id in item_ids}
-    if item_ids:
-        modificadores = (
-            GastronomiaPedidoItemModificador.query
-            .filter(
-                GastronomiaPedidoItemModificador.cliente_id.in_(cliente_ids),
-                GastronomiaPedidoItemModificador.item_id.in_(item_ids),
-            )
-            .order_by(GastronomiaPedidoItemModificador.id_modificador.asc())
-            .all()
-        )
-        for modificador in modificadores:
-            modificadores_por_item.setdefault(int(modificador.item_id), []).append(modificador.to_dict())
-
-    items_por_pedido = {pedido_id: [] for pedido_id in pedido_ids}
-    for item in items:
-        item_data = {
-            'id_item': item.id_item,
-            'producto_id': item.producto_id,
-            'canal_precio': item.canal_precio,
-            'nombre_producto': item.nombre_producto,
-            'cantidad': int(item.cantidad or 0),
-            'precio_unitario': float(item.precio_unitario or 0),
-            'precio_original': float(item.precio_original or 0),
-            'descuento_linea': float(item.descuento_linea or 0),
-            'id_promocion_aplicada': item.id_promocion_aplicada,
-            'promocion_descripcion': item.promocion_descripcion,
-            'cantidad_bonificada': int(item.cantidad_bonificada or 0),
-            'notas': item.notas,
-            'subtotal': float(item.subtotal or 0),
-            'modificadores': modificadores_por_item.get(int(item.id_item), []),
-        }
-        items_por_pedido.setdefault(int(item.pedido_id), []).append(item_data)
-
-    ubicaciones_delivery = (
-        GastronomiaDeliveryUbicacion.query
-        .filter(
-            GastronomiaDeliveryUbicacion.cliente_id.in_(cliente_ids),
-            GastronomiaDeliveryUbicacion.pedido_id.in_(pedido_ids),
-            ubicacion_delivery_publicable_filter(),
-        )
-        .order_by(GastronomiaDeliveryUbicacion.fecha_registro.desc(), GastronomiaDeliveryUbicacion.id_ubicacion.desc())
-        .all()
-    )
-    ubicacion_por_pedido = {}
-    for ubicacion in ubicaciones_delivery:
-        ubicacion_por_pedido.setdefault(int(ubicacion.pedido_id), ubicacion)
-
-    return [
-        _pedido_to_dict_prearmado(
-            pedido,
-            pago=pagos_por_pedido.get(int(pedido.id_pedido)),
-            items=items_por_pedido.get(int(pedido.id_pedido), []),
-            ubicacion_delivery=ubicacion_por_pedido.get(int(pedido.id_pedido)),
-        )
-        for pedido in pedidos
-    ]
-
-
-def _pedido_to_dict_prearmado(
-    pedido: GastronomiaPedido,
-    *,
-    pago: GastronomiaPedidoPago | None,
-    items: list[dict],
-    ubicacion_delivery: GastronomiaDeliveryUbicacion | None = None,
-) -> dict:
-    pago_data = pago.to_dict() if pago else None
-    url_seguimiento = f'/gastronomia/pedido/{pedido.codigo_publico}' if pedido.codigo_publico else None
-    return {
-        'id_pedido': pedido.id_pedido,
-        'codigo_entrega': pedido.codigo_entrega,
-        'cliente_id': pedido.cliente_id,
-        'usuario_id': pedido.usuario_id,
-        'tipo_pedido': pedido.tipo_pedido,
-        'origen_pedido': pedido.origen_pedido,
-        'codigo_publico': pedido.codigo_publico,
-        'url_seguimiento': url_seguimiento,
-        'url_seguimiento_publica': _url_seguimiento_publica(pedido.codigo_publico),
-        'mesa': pedido.mesa,
-        'referencia_entrega': pedido.referencia_entrega,
-        'nombre_cliente': pedido.nombre_cliente,
-        'celular_cliente': pedido.celular_cliente,
-        'direccion_entrega': pedido.direccion_entrega,
-        'ubicacion_entrega_url': pedido.ubicacion_entrega_url,
-        'destino_latitud': pedido.destino_latitud,
-        'destino_longitud': pedido.destino_longitud,
-        'tiempo_estimado_minutos': pedido.tiempo_estimado_minutos,
-        'repartidor_id': pedido.repartidor_id,
-        'repartidor': pedido.repartidor.to_dict() if pedido.repartidor else None,
-        'estado': pedido.estado,
-        'notas': pedido.notas,
-        'subtotal': float(pedido.subtotal or 0),
-        'costo_envio': float(pedido.costo_envio or 0),
-        'total': float(pedido.total or 0),
-        'fecha_creacion': pedido.fecha_creacion.isoformat() if pedido.fecha_creacion else None,
-        'fecha_envio_cocina': pedido.fecha_envio_cocina.isoformat() if pedido.fecha_envio_cocina else None,
-        'fecha_inicio_preparacion': pedido.fecha_inicio_preparacion.isoformat() if pedido.fecha_inicio_preparacion else None,
-        'fecha_listo': pedido.fecha_listo.isoformat() if pedido.fecha_listo else None,
-        'fecha_asignacion_delivery': pedido.fecha_asignacion_delivery.isoformat() if pedido.fecha_asignacion_delivery else None,
-        'fecha_entrega': pedido.fecha_entrega.isoformat() if pedido.fecha_entrega else None,
-        'pagado': bool(pago),
-        'estado_pago': 'pagado' if pago else 'pendiente',
-        'pago': pago_data,
-        'items': items,
-        'ultima_ubicacion_delivery': ubicacion_delivery.to_dict() if ubicacion_delivery else None,
-        'alertas_stock': alertas_stock_pedido(pedido.id_pedido),
-    }
-
-
-def _url_seguimiento_publica(codigo_publico: str | None) -> str | None:
-    if not codigo_publico:
-        return None
-    return build_public_url(
-        'gastronomia.seguimiento_pedido_publico',
-        codigo_publico=codigo_publico,
-    )
-
-
 def obtener_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido | None:
     return GastronomiaPedido.query.filter(
         GastronomiaPedido.cliente_id == int(cliente_id),
@@ -248,7 +100,14 @@ def obtener_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido | None:
     ).first()
 
 
-def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPedido:
+def crear_pedido(
+    cliente_id: int,
+    usuario_id: int,
+    data: dict,
+    *,
+    es_encargo: bool = False,
+    fecha_programada: datetime | None = None,
+) -> GastronomiaPedido:
     pedido_data = _validar_datos_pedido(cliente_id, data)
     estado_inicial = 'enviado_cocina' if pedido_data['tipo_pedido'] == 'delivery' and pedido_data['origen_pedido'] != 'tienda_online' else 'abierto'
 
@@ -257,6 +116,8 @@ def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPed
         usuario_id=int(usuario_id),
         tipo_pedido=pedido_data['tipo_pedido'],
         origen_pedido=pedido_data['origen_pedido'],
+        es_encargo=bool(es_encargo),
+        fecha_programada=fecha_programada,
         codigo_publico=_codigo_publico_unico(),
         mesa=pedido_data['mesa'],
         referencia_entrega=pedido_data['referencia_entrega'],
@@ -286,7 +147,14 @@ def crear_pedido(cliente_id: int, usuario_id: int, data: dict) -> GastronomiaPed
     return pedido
 
 
-def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> GastronomiaPedido:
+def actualizar_pedido_abierto(
+    cliente_id: int,
+    pedido_id: int,
+    data: dict,
+    *,
+    fecha_programada: datetime | None = None,
+    total_minimo: Decimal | None = None,
+) -> GastronomiaPedido:
     pedido = obtener_pedido(cliente_id, pedido_id)
     if not pedido:
         raise ValueError('Pedido no encontrado.')
@@ -296,6 +164,10 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
         raise ValueError('No se puede editar un pedido que ya fue cobrado.')
 
     pedido_data = _validar_datos_pedido(cliente_id, data)
+    if pedido.es_encargo and pedido_data['tipo_pedido'] != 'retiro':
+        raise ValueError('Los encargos solo admiten retiro en el local.')
+    if fecha_programada is not None:
+        pedido.fecha_programada = fecha_programada
     pedido.tipo_pedido = pedido_data['tipo_pedido']
     pedido.origen_pedido = pedido_data['origen_pedido']
     pedido.codigo_publico = pedido.codigo_publico or _codigo_publico_unico()
@@ -316,6 +188,8 @@ def actualizar_pedido_abierto(cliente_id: int, pedido_id: int, data: dict) -> Ga
         pedido.fecha_envio_cocina = pedido.fecha_envio_cocina or datetime.utcnow()
     try:
         _reemplazar_items_pedido(cliente_id, pedido, pedido_data['items'])
+        if total_minimo is not None and Decimal(str(pedido.total or 0)) <= total_minimo:
+            raise ValueError('El total del encargo tiene que seguir siendo mayor que la sena cobrada.')
     except ValueError:
         db.session.rollback()
         raise
@@ -337,7 +211,13 @@ def enviar_pedido_cocina(cliente_id: int, pedido_id: int) -> GastronomiaPedido:
     return pedido
 
 
-def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> GastronomiaPedido:
+def cambiar_estado_pedido(
+    cliente_id: int,
+    pedido_id: int,
+    estado: str,
+    *,
+    sena_resuelta: bool = False,
+) -> GastronomiaPedido:
     pedido = obtener_pedido(cliente_id, pedido_id)
     if not pedido:
         raise ValueError('Pedido no encontrado.')
@@ -351,6 +231,11 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
         raise ValueError(
             'No se puede cancelar un pedido ya cobrado. '
             'Anula la venta desde reportes para revertir el cobro y restaurar el stock.'
+        )
+    if estado == 'cancelado' and estado_anterior != 'cancelado' and not sena_resuelta and _tiene_sena_vigente(pedido):
+        raise ValueError(
+            'Este encargo tiene una sena cobrada. Cancelalo desde Encargos '
+            'eligiendo que hacer con la sena.'
         )
     if estado == 'en_camino' and pedido.estado not in {'listo', 'en_camino'}:
         raise ValueError('Solo se pueden despachar pedidos listos.')
@@ -366,17 +251,17 @@ def cambiar_estado_pedido(cliente_id: int, pedido_id: int, estado: str) -> Gastr
     elif estado in {'entregado', 'cobrado'}:
         pedido.fecha_entrega = pedido.fecha_entrega or datetime.utcnow()
     try:
-        if estado == 'cancelado' and estado_anterior != 'cancelado':
-            _restaurar_stock_items(pedido.items.all())
-        elif estado != 'cancelado' and estado_anterior == 'cancelado':
-            for item in pedido.items.all():
-                consumir_stock_item(item)
+        aplicar_stock_por_transicion(pedido, estado_anterior, estado)
     except ValueError:
         db.session.rollback()
         raise
     db.session.commit()
     registrar_evento_pedido(pedido, f'pedido_{estado}')
     return pedido
+
+
+def _tiene_sena_vigente(pedido: GastronomiaPedido) -> bool:
+    return bool(pedido.es_encargo and pedido.adelantos.filter_by(estado='vigente').first())
 
 
 def registrar_evento_pedido(pedido: GastronomiaPedido, tipo: str) -> GastronomiaPedidoEvento:
@@ -467,15 +352,22 @@ def _reemplazar_items_pedido(cliente_id: int, pedido: GastronomiaPedido, items_d
     db.session.flush()
 
     total = Decimal('0.00')
+    diferir_stock = pedido_difiere_stock(pedido)
     for item_data in items_data:
-        item = _crear_item_desde_payload(cliente_id, pedido.id_pedido, item_data)
+        item = _crear_item_desde_payload(cliente_id, pedido.id_pedido, item_data, diferir_stock=diferir_stock)
         total += Decimal(str(item.subtotal or 0))
 
     pedido.subtotal = total
     pedido.total = total + Decimal(str(pedido.costo_envio or 0)).quantize(Decimal('0.01'))
 
 
-def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) -> GastronomiaPedidoItem:
+def _crear_item_desde_payload(
+    cliente_id: int,
+    pedido_id: int,
+    item_data: dict,
+    *,
+    diferir_stock: bool = False,
+) -> GastronomiaPedidoItem:
     from app.services.tienda_promociones import get_active_gastronomia_product_promotion
     from gastronomia.services.channel_price_service import normalizar_canal_precio
 
@@ -512,6 +404,7 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
         promocion_descripcion=metrics['descripcion'],
         cantidad_bonificada=metrics['cantidad_bonificada'],
         notas=(item_data.get('notas') or '').strip() or None,
+        texto_personalizado=(item_data.get('texto_personalizado') or '').strip()[:240] or None,
         subtotal=subtotal,
     )
     db.session.add(item)
@@ -529,7 +422,8 @@ def _crear_item_desde_payload(cliente_id: int, pedido_id: int, item_data: dict) 
             precio_delta=Decimal(str(seleccion['precio_delta'])),
         ))
     db.session.flush()
-    consumir_stock_item(item)
+    if not diferir_stock:
+        consumir_stock_item(item)
     return item
 
 

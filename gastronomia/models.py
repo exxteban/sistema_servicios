@@ -2,11 +2,13 @@
 from datetime import datetime
 
 from app import db
+from gastronomia.config_flags import PasteleriaFlagsMixin, PasteleriaParametrosMixin
+from gastronomia.encargo_models import PedidoEncargoMixin, PedidoItemEncargoMixin
 import json
 import secrets
 
 
-class GastronomiaClienteConfig(db.Model):
+class GastronomiaClienteConfig(PasteleriaFlagsMixin, PasteleriaParametrosMixin, db.Model):
     __tablename__ = 'gastronomia_cliente_config'
 
     id_config = db.Column(db.Integer, primary_key=True)
@@ -247,7 +249,7 @@ class GastronomiaMesa(db.Model):
         }
 
 
-class GastronomiaPedido(db.Model):
+class GastronomiaPedido(PedidoEncargoMixin, db.Model):
     __tablename__ = 'gastronomia_pedidos'
 
     id_pedido = db.Column(db.Integer, primary_key=True)
@@ -301,6 +303,8 @@ class GastronomiaPedido(db.Model):
             'usuario_id': self.usuario_id,
             'tipo_pedido': self.tipo_pedido,
             'origen_pedido': self.origen_pedido,
+            'es_encargo': bool(self.es_encargo),
+            'fecha_programada': self.fecha_programada.isoformat() if self.fecha_programada else None,
             'codigo_publico': self.codigo_publico,
             'url_seguimiento': f'/gastronomia/pedido/{self.codigo_publico}' if self.codigo_publico else None,
             'mesa': self.mesa,
@@ -414,7 +418,7 @@ class GastronomiaDeliveryUbicacion(db.Model):
         }
 
 
-class GastronomiaPedidoItem(db.Model):
+class GastronomiaPedidoItem(PedidoItemEncargoMixin, db.Model):
     __tablename__ = 'gastronomia_pedido_items'
 
     id_item = db.Column(db.Integer, primary_key=True)
@@ -460,6 +464,7 @@ class GastronomiaPedidoItem(db.Model):
             'promocion_descripcion': self.promocion_descripcion,
             'cantidad_bonificada': int(self.cantidad_bonificada or 0),
             'notas': self.notas,
+            'texto_personalizado': self.texto_personalizado,
             'subtotal': float(self.subtotal or 0),
             'modificadores': [
                 item.to_dict()

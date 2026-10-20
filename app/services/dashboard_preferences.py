@@ -35,7 +35,7 @@ _SERVICE_CARD_DEFINITIONS = (
     ('servicios_realizados', 'Servicios realizados', 'Ranking de servicios del dia'),
     ('clientes_panel', 'Clientes', 'Resumen comercial de clientes'),
     ('insumos_criticos', 'Insumos criticos', 'Alertas de stock bajo'),
-    ('comisiones_dia', 'Comisiones del dia', 'Resumen rapido de comisiones'),
+    ('comisiones_dia', 'Comisiones del dia', 'Comision de cada profesional sobre los servicios cobrados hoy'),
 )
 
 _SERVICE_CARD_ZONES = {

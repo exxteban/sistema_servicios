@@ -1,0 +1,40 @@
+<script>
+// Vuelve a cargar en el formulario los datos enviados cuando el servidor rechazó el turno
+// (por ejemplo, horario ocupado), para que no se pierda lo que ya se había completado.
+function peluqueriaTurnoRapidoAplicarInicial(vm, inicial) {
+    if (!inicial || typeof inicial !== 'object') return;
+
+    const profesional = vm.profesionales.find((item) => Number(item.id) === Number(inicial.profesional_id));
+    if (profesional) vm.seleccionarProfesional(profesional);
+
+    const servicio = vm.modoCatalogo()
+        ? vm.catalogo.find((item) => Number(item.id) === Number(inicial.servicio_catalogo_id))
+        : vm.tiposBase.find((item) => item.id === inicial.servicio_turno_id);
+    if (servicio) {
+        vm.seleccionarServicio(servicio);
+        if (inicial.servicio_precio_opcion_id) vm.opcionId = String(inicial.servicio_precio_opcion_id);
+        if (vm.esServicioLibre() && inicial.servicio_turno_nombre && inicial.servicio_turno_nombre !== servicio.nombre) {
+            vm.servicioPersonalizado = inicial.servicio_turno_nombre;
+        }
+    }
+
+    if (Number(inicial.duracion) > 0) vm.duracion = Number(inicial.duracion);
+    if (inicial.fecha) vm.fecha = inicial.fecha;
+    if (inicial.hora) vm.hora = inicial.hora;
+
+    if (Number(inicial.precio_manual) > 0) {
+        vm.usarPrecioManual = true;
+        vm.precioManual = inicial.precio_manual;
+    }
+
+    if (inicial.cliente) {
+        vm.seleccionarCliente(inicial.cliente);
+    } else if (inicial.cliente_nuevo_nombre) {
+        vm.crearClienteNuevo = true;
+        vm.clienteNuevoNombre = inicial.cliente_nuevo_nombre;
+        vm.clienteNuevoTelefono = inicial.cliente_nuevo_telefono || '';
+    }
+
+    if (inicial.observaciones) vm.observaciones = inicial.observaciones;
+}
+</script>

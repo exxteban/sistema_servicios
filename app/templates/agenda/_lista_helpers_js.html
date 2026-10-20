@@ -1,0 +1,163 @@
+<script>
+    // Funciones puras de la lista de actividades (no dependen del estado de la página).
+    window.AgendaListaHelpers = (function () {
+        function parseUtcDate(value) {
+            if (!value) return null;
+            const parsed = new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        function updateBadge(row, state) {
+            const badge = row.querySelector('.agenda-reminder-badge');
+            if (!badge) return;
+
+            badge.className = 'agenda-reminder-badge px-2 py-0.5 rounded-full font-semibold';
+            if (state === 'overdue') {
+                badge.classList.add('bg-red-100', 'text-red-700', 'dark:bg-red-900/30', 'dark:text-red-300');
+                badge.textContent = 'Vencida';
+                return;
+            }
+
+            if (state === 'alert') {
+                badge.classList.add('bg-amber-100', 'text-amber-700', 'dark:bg-amber-900/30', 'dark:text-amber-300');
+                badge.textContent = 'En alerta';
+                return;
+            }
+
+            badge.classList.add('hidden');
+            badge.textContent = '';
+        }
+
+        function setRowState(row, state) {
+            row.classList.remove('agenda-alert-row--warning', 'agenda-alert-row--overdue');
+            if (state === 'overdue') {
+                row.classList.add('agenda-alert-row--overdue');
+            } else if (state === 'alert') {
+                row.classList.add('agenda-alert-row--warning');
+            }
+            updateBadge(row, state);
+        }
+
+        function evaluateRowFromSchedule(row) {
+            const nowMs = Date.now();
+            if ((row.dataset.estado || '').toLowerCase() !== 'pendiente') {
+                return 'idle';
+            }
+            const serverState = String(row.dataset.alertaInicial || '').trim();
+
+            const startDate = parseUtcDate(row.dataset.fechaInicioUtc);
+            const endDate = parseUtcDate(row.dataset.fechaFinUtc);
+            const reminderMinutes = Number.parseInt(row.dataset.recordatorioMinutos || '', 10);
+            if (!startDate) {
+                return serverState || 'idle';
+            }
+
+            const startMs = startDate.getTime();
+            const endMs = endDate ? endDate.getTime() : NaN;
+            const dueMs = Number.isFinite(endMs) && endMs >= startMs ? endMs : startMs;
+            if (nowMs >= dueMs) {
+                return 'overdue';
+            }
+
+            if (Number.isFinite(reminderMinutes) && reminderMinutes >= 0) {
+                const reminderAtMs = dueMs - (reminderMinutes * 60 * 1000);
+                if (nowMs >= reminderAtMs && nowMs < dueMs) {
+                    return 'alert';
+                }
+            }
+
+            return serverState || 'idle';
+        }
+
+        function getNextRowRefreshAt(row, nowMs = Date.now()) {
+            if ((row.dataset.estado || '').toLowerCase() !== 'pendiente') {
+                return null;
+            }
+
+            const startDate = parseUtcDate(row.dataset.fechaInicioUtc);
+            if (!startDate) {
+                return null;
+            }
+
+            const endDate = parseUtcDate(row.dataset.fechaFinUtc);
+            const reminderMinutes = Number.parseInt(row.dataset.recordatorioMinutos || '', 10);
+            const startMs = startDate.getTime();
+            const endMs = endDate ? endDate.getTime() : NaN;
+            const dueMs = Number.isFinite(endMs) && endMs >= startMs ? endMs : startMs;
+            if (nowMs >= dueMs) {
+                return null;
+            }
+
+            if (Number.isFinite(reminderMinutes) && reminderMinutes >= 0) {
+                const reminderAtMs = dueMs - (reminderMinutes * 60 * 1000);
+                if (nowMs < reminderAtMs) {
+                    return reminderAtMs;
+                }
+            }
+
+            return dueMs > nowMs ? dueMs : null;
+        }
+
+        function normalizeResolvedActivityDetail(detail) {
+            const activityId = Number((detail && (detail.id || detail.activityId)) || 0);
+            const estado = String((detail && detail.estado) || '').trim().toLowerCase();
+            const estadoAlerta = String((detail && detail.estado_alerta) || '').trim().toLowerCase();
+            return {
+                id: activityId,
+                estado: estado || null,
+                estado_alerta: estadoAlerta && estadoAlerta !== 'idle' ? estadoAlerta : null,
+                eliminada: Boolean(detail && detail.eliminada),
+                synced_at: Number((detail && detail.synced_at) || Date.now())
+            };
+        }
+
+        function arraysEqual(left, right) {
+            if (!Array.isArray(left) || !Array.isArray(right)) {
+                return false;
+            }
+            if (left.length !== right.length) {
+                return false;
+            }
+            for (let index = 0; index < left.length; index += 1) {
+                if (Number(left[index]) !== Number(right[index])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function estadoClasses(estado) {
+            if (estado === 'hecha') {
+                return ['bg-green-100', 'text-green-800', 'dark:bg-green-900/30', 'dark:text-green-300'];
+            }
+            if (estado === 'cancelada') {
+                return ['bg-red-100', 'text-red-800', 'dark:bg-red-900/30', 'dark:text-red-300'];
+            }
+            return ['bg-yellow-100', 'text-yellow-800', 'dark:bg-yellow-900/30', 'dark:text-yellow-300'];
+        }
+
+        function estadoLabel(estado) {
+            if (!estado) return 'Pendiente';
+            return estado.charAt(0).toUpperCase() + estado.slice(1);
+        }
+
+        function shouldRemoveByCurrentFilter(nextEstado) {
+            const url = new URL(window.location.href);
+            const estadoFiltro = String(url.searchParams.get('estado') || '').trim().toLowerCase();
+            return Boolean(estadoFiltro) && estadoFiltro !== nextEstado;
+        }
+
+        return {
+            parseUtcDate,
+            updateBadge,
+            setRowState,
+            evaluateRowFromSchedule,
+            getNextRowRefreshAt,
+            normalizeResolvedActivityDetail,
+            arraysEqual,
+            estadoClasses,
+            estadoLabel,
+            shouldRemoveByCurrentFilter,
+        };
+    })();
+</script>

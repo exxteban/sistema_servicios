@@ -79,6 +79,8 @@ def register_runtime_features(app, db):
         'ia_openai_api_key',
         'ia_deepseek_api_key',
         'ia_api_key',
+        'modo_operacion_principal',
+        'dashboard_negocio_activo',
     )
 
     def _obtener_configuracion_ui_mapa():
@@ -99,6 +101,11 @@ def register_runtime_features(app, db):
             valores = {}
         g._runtime_ui_config = valores
         return valores
+
+    def _marca_rubro(nombre_empresa):
+        from app.services.marca_rubro import obtener_marca_rubro
+
+        return obtener_marca_rubro(nombre_empresa, configuraciones=_obtener_configuracion_ui_mapa())
 
     @app.context_processor
     def inject_branding():
@@ -177,6 +184,7 @@ def register_runtime_features(app, db):
             modulo_flujo_caja_activo = True
             modulo_facturacion_electronica_activo = False
             es_usuario_root_actual = False
+        marca_rubro = _marca_rubro(nombre_empresa)
         return {
             'app_brand_name': nombre_empresa,
             'app_brand_logo_path': logo_empresa_path,
@@ -189,6 +197,9 @@ def register_runtime_features(app, db):
             'modulo_flujo_caja_activo': modulo_flujo_caja_activo,
             'modulo_facturacion_electronica_activo': modulo_facturacion_electronica_activo,
             'es_usuario_root_actual': es_usuario_root_actual,
+            'marca_rubro': marca_rubro,
+            # Pantalla de inicio real: en gastronomía main.dashboard redirige a gastronomia.dashboard.
+            'app_dashboard_endpoint': 'gastronomia.dashboard' if marca_rubro.get('es_gastronomia') else 'main.dashboard',
         }
 
     @app.context_processor
@@ -357,3 +368,8 @@ def register_runtime_features(app, db):
     iniciar_scheduler_facturacion_electronica(
         app, _is_truthy_env('FACTURACION_ELECTRONICA_SCHEDULER', '1'),
     )
+
+    if _is_truthy_env('PELUQUERIA_RECORDATORIOS_SCHEDULER', '1'):
+        from app.bootstrap.peluqueria_recordatorios_scheduler import iniciar_scheduler_recordatorios_peluqueria
+
+        iniciar_scheduler_recordatorios_peluqueria(app)

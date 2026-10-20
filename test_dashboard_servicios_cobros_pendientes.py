@@ -99,7 +99,7 @@ class TestDashboardServiciosCobrosPendientes(unittest.TestCase):
         self.assertIn('Color completo', html)
         self.assertIn(f'/ventas/pos?cliente_servicio_id={int(self.asignacion_a.id_cliente_servicio)}', html)
         self.assertIn(f'/ventas/pos?cliente_servicio_id={int(self.asignacion_b.id_cliente_servicio)}', html)
-        self.assertIn('Gs. 200.000', html)
+        self.assertIn('₲ 200.000', html)
         self.assertIn('2 servicios sin cobrar.', html)
         self.assertIn('data-dashboard-range=', html)
         self.assertIn('renderCobrosPendientes(data.cobros_pendientes)', html)

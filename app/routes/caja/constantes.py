@@ -45,3 +45,6 @@ REF_AJUSTE_MANUAL = 'ajuste_manual'
 
 REF_ABONO_REPARACION = 'reparacion_abono'
 """Ingreso (o egreso por ajuste) por la seña/abono cobrado al recibir una reparación."""
+
+REF_SENA_TURNO = 'turno_sena'
+"""Ingreso (o egreso por devolución) por la seña de un turno de agenda (peluquería/barbería)."""

@@ -93,7 +93,9 @@
                 }, true);
             }
 
-            const DASHBOARD_URL = {{ url_for('main.dashboard') | tojson }};
+            const DASHBOARD_URL = {{ url_for(app_dashboard_endpoint|default('main.dashboard')) | tojson }};
+            // '/' también es el dashboard: en gastronomía redirige a la pantalla de inicio del rubro.
+            const DASHBOARD_PATH_ALIASES = {{ [url_for('main.dashboard'), url_for(app_dashboard_endpoint|default('main.dashboard'))] | tojson }};
             const LOGIN_URL = {{ url_for('auth.login') | tojson }};
             const STORAGE_KEY = `app_tabs_v1_u{{ current_user.id_usuario }}`;
             const LEGACY_STORAGE_KEY = 'app_tabs_v1';
@@ -165,9 +167,10 @@
 
             function isDashboardUrl(url) {
                 try {
-                    const dashboardPath = normalizePathname(new URL(DASHBOARD_URL, window.location.origin).pathname);
                     const path = normalizePathname(new URL(url, window.location.origin).pathname);
-                    return path === dashboardPath;
+                    return DASHBOARD_PATH_ALIASES.some((alias) => (
+                        normalizePathname(new URL(alias, window.location.origin).pathname) === path
+                    ));
                 } catch {
                     return false;
                 }
@@ -409,6 +412,7 @@
 
                 if (isActive) {
                     setActiveTab(fallbackTabId);
+                    if (fallbackTabId === principalTabId) refreshPrincipalDashboardInPlace();
                 }
 
                 saveState();
@@ -922,6 +926,11 @@
 
                             link.addEventListener('click', async (e) => {
                                 e.preventDefault();
+                                // El dashboard vive en la pestaña principal: no duplicarlo aquí.
+                                if (isDashboardUrl(linkUrl.toString()) && window.appNavigateToDashboard) {
+                                    window.appNavigateToDashboard();
+                                    return;
+                                }
                                 if (isBackLink && window.appGoBack) {
                                     window.appGoBack();
                                     return;

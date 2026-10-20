@@ -20,7 +20,7 @@ def _require_agenda_acceso_permiso():
     )
     if wants_json:
         return jsonify({'error': 'Sin permisos', 'mensaje': mensaje, 'permiso_requerido': 'agenda_acceso', 'modo_demo': modo_demo}), 403
-    return render_template('errores/403.html'), 403
+    return render_template('errores/403.html', mensaje=mensaje), 403
 
 
-from app.routes.agenda import actividades, alertas, dashboard, formularios, peluqueria, relaciones  # noqa: E402, F401
+from app.routes.agenda import actividades, alertas, dashboard, formularios, peluqueria, peluqueria_agenda_dia, peluqueria_comisiones, peluqueria_gestion, peluqueria_horario, relaciones  # noqa: E402, F401

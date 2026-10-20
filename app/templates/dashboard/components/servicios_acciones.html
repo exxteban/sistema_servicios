@@ -1,0 +1,118 @@
+{# Acciones del encabezado del dashboard de servicios. #}
+{% if dashboard_negocio.id == 'peluqueria_barberia' %}
+{# Peluquería: las 3 acciones del día a día a la vista; el resto en "Más". #}
+{% if current_user.tiene_permiso('agenda_crear') %}
+<a href="{{ url_for('agenda.nuevo_turno_peluqueria') }}"
+   data-tab-url="{{ url_for('agenda.nuevo_turno_peluqueria') }}"
+   data-tab-title="Nuevo turno" data-tab-icon="fas fa-plus"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-violet-300/60 transition hover:bg-violet-600 dark:border-violet-500/50 dark:bg-violet-600 dark:text-white dark:shadow-none dark:hover:bg-violet-500">
+    <i class="fas fa-plus"></i>Nuevo turno
+</a>
+{% endif %}
+{% if can_ver_agenda %}
+<a href="{{ url_for('agenda.agenda_dia_peluqueria') }}"
+   data-tab-url="{{ url_for('agenda.agenda_dia_peluqueria') }}"
+   data-tab-title="Agenda del día" data-tab-icon="fas fa-calendar-check"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-5 py-2.5 text-sm font-semibold text-cyan-800 shadow-sm shadow-cyan-200/60 transition hover:border-cyan-300 hover:bg-cyan-100 dark:border-cyan-600/50 dark:bg-cyan-700 dark:text-white dark:shadow-none dark:hover:bg-cyan-600">
+    <i class="far fa-calendar"></i>Agenda de hoy
+</a>
+{% endif %}
+{% if can_crear_venta %}
+<a href="{{ url_for('ventas.pos') }}"
+   data-tab-url="{{ url_for('ventas.pos') }}"
+   data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-sm font-semibold text-rose-800 shadow-sm shadow-rose-200/60 transition hover:border-rose-300 hover:bg-rose-100 dark:border-rose-600/50 dark:bg-rose-700 dark:text-white dark:shadow-none dark:hover:bg-rose-600">
+    <i class="fas fa-dollar-sign"></i>Cobrar
+</a>
+{% endif %}
+<details class="dashboard-acciones-mas relative">
+    <summary class="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/5">
+        <i class="fas fa-ellipsis-h"></i>Más
+    </summary>
+    <div class="absolute right-0 z-30 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-slate-900">
+        {% if current_user.tiene_permiso('crear_producto') %}
+        <a href="{{ url_for('servicios.nuevo') }}" data-tab-url="{{ url_for('servicios.nuevo') }}" data-tab-title="Nuevo servicio" data-tab-icon="fas fa-concierge-bell" class="app-tab-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5">
+            <i class="fas fa-concierge-bell w-4 text-emerald-500"></i>Cargar servicio
+        </a>
+        {% endif %}
+        {% if can_ver_inventario %}
+        <a href="{{ url_for('servicios.listar') }}" data-tab-url="{{ url_for('servicios.listar') }}" data-tab-title="Servicios y costos" data-tab-icon="fas fa-list-ul" class="app-tab-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5">
+            <i class="fas fa-list-ul w-4 text-amber-500"></i>Servicios y costos
+        </a>
+        {% endif %}
+        <a href="{{ url_for('clientes.nuevo') }}" data-tab-url="{{ url_for('clientes.nuevo') }}" data-tab-title="Cliente nuevo" data-tab-icon="fas fa-user-plus" class="app-tab-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5">
+            <i class="fas fa-user-plus w-4 text-fuchsia-500"></i>Cliente nuevo
+        </a>
+        {% if current_user.es_admin() or current_user.tiene_permiso('ver_reporte_ventas') %}
+        <a href="{{ url_for('agenda.comisiones_peluqueria') }}" data-tab-url="{{ url_for('agenda.comisiones_peluqueria') }}" data-tab-title="Comisiones" data-tab-icon="fas fa-hand-holding-usd" class="app-tab-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5">
+            <i class="fas fa-hand-holding-usd w-4 text-emerald-500"></i>Comisiones
+        </a>
+        {% endif %}
+        {% if current_user.es_admin() %}
+        <a href="{{ url_for('agenda.horario_peluqueria') }}" data-tab-url="{{ url_for('agenda.horario_peluqueria') }}" data-tab-title="Horario del local" data-tab-icon="far fa-clock" class="app-tab-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5">
+            <i class="far fa-clock w-4 text-violet-500"></i>Horario del local
+        </a>
+        {% endif %}
+    </div>
+</details>
+<style>.dashboard-acciones-mas > summary::-webkit-details-marker { display: none; }</style>
+<script>
+    if (!window.__dashboardAccionesMasInit) {
+        window.__dashboardAccionesMasInit = true;
+        document.addEventListener('click', (event) => {
+            document.querySelectorAll('details.dashboard-acciones-mas[open]').forEach((menu) => {
+                if (!menu.contains(event.target) || event.target.closest('a')) menu.removeAttribute('open');
+            });
+        });
+    }
+</script>
+{% else %}
+{% if current_user.tiene_permiso('agenda_crear') %}
+{% set nuevo_turno_url = url_for('agenda.nuevo_turno_peluqueria') if dashboard_negocio.id == 'peluqueria_barberia' else url_for('agenda.nueva_actividad') %}
+<a href="{{ nuevo_turno_url }}"
+   data-tab-url="{{ nuevo_turno_url }}"
+   data-tab-title="Nuevo turno" data-tab-icon="fas fa-plus"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-violet-300/60 transition hover:bg-violet-600 dark:border-violet-500/50 dark:bg-violet-600 dark:text-white dark:shadow-none dark:hover:bg-violet-500">
+    <i class="fas fa-plus"></i>Nuevo turno
+</a>
+{% endif %}
+{% if current_user.tiene_permiso('crear_producto') %}
+<a href="{{ url_for('servicios.nuevo') }}"
+   data-tab-url="{{ url_for('servicios.nuevo') }}"
+   data-tab-title="Nuevo servicio" data-tab-icon="fas fa-concierge-bell"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-300/60 transition hover:bg-emerald-600 dark:border-emerald-500/50 dark:bg-emerald-600 dark:text-white dark:shadow-none dark:hover:bg-emerald-500">
+    <i class="fas fa-concierge-bell"></i>Cargar servicio
+</a>
+{% endif %}
+{% if can_ver_inventario %}
+<a href="{{ url_for('servicios.listar') }}"
+   data-tab-url="{{ url_for('servicios.listar') }}"
+   data-tab-title="Servicios y costos" data-tab-icon="fas fa-list-ul"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 shadow-sm shadow-amber-200/60 transition hover:border-amber-300 hover:bg-amber-100 dark:border-amber-600/50 dark:bg-amber-700 dark:text-white dark:shadow-none dark:hover:bg-amber-600">
+    <i class="fas fa-list-ul"></i>Servicios y costos
+</a>
+{% endif %}
+{% if can_ver_agenda %}
+{% set agenda_url = url_for('agenda.agenda_dia_peluqueria') if dashboard_negocio.id == 'peluqueria_barberia' else url_for('agenda.dashboard') %}
+<a href="{{ agenda_url }}"
+   data-tab-url="{{ agenda_url }}"
+   data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-5 py-2.5 text-sm font-semibold text-cyan-800 shadow-sm shadow-cyan-200/60 transition hover:border-cyan-300 hover:bg-cyan-100 dark:border-cyan-600/50 dark:bg-cyan-700 dark:text-white dark:shadow-none dark:hover:bg-cyan-600">
+    <i class="far fa-calendar"></i>Agenda
+</a>
+{% endif %}
+{% if can_crear_venta %}
+<a href="{{ url_for('ventas.pos') }}"
+   data-tab-url="{{ url_for('ventas.pos') }}"
+   data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-sm font-semibold text-rose-800 shadow-sm shadow-rose-200/60 transition hover:border-rose-300 hover:bg-rose-100 dark:border-rose-600/50 dark:bg-rose-700 dark:text-white dark:shadow-none dark:hover:bg-rose-600">
+    <i class="fas fa-dollar-sign"></i>Cobrar servicio
+</a>
+{% endif %}
+<a href="{{ url_for('clientes.nuevo') }}"
+   data-tab-url="{{ url_for('clientes.nuevo') }}"
+   data-tab-title="Cliente nuevo" data-tab-icon="fas fa-user-plus"
+   class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-5 py-2.5 text-sm font-semibold text-fuchsia-800 shadow-sm shadow-fuchsia-200/60 transition hover:border-fuchsia-300 hover:bg-fuchsia-100 dark:border-fuchsia-600/50 dark:bg-fuchsia-700 dark:text-white dark:shadow-none dark:hover:bg-fuchsia-600">
+    <i class="fas fa-user-plus"></i>Cliente nuevo
+</a>
+{% endif %}

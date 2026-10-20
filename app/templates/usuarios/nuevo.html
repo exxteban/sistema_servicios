@@ -81,6 +81,22 @@
             <span class="text-sm text-gray-700 dark:text-gray-200">Usuario activo</span>
         </div>
 
+        {%- if marca_rubro and not marca_rubro.es_gastronomia %}
+        <div class="flex items-center gap-2">
+            <input type="hidden" name="atiende_clientes_presente" value="1">
+            <input type="checkbox" name="atiende_clientes" value="1" class="h-4 w-4" {% if request.form.get('atiende_clientes') %}checked{% endif %}>
+            <span class="text-sm text-gray-700 dark:text-gray-200">Atiende clientes</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">(aparece como profesional en turnos y agenda)</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <label for="comision_porcentaje" class="text-sm text-gray-700 dark:text-gray-200">Comisión sobre servicios</label>
+            <input type="number" id="comision_porcentaje" name="comision_porcentaje" min="0" max="100" step="0.5" value="{{ request.form.get('comision_porcentaje', '') }}" placeholder="Ej: 40"
+                class="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+            <span class="text-sm text-gray-500 dark:text-gray-400">%</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">(vacío = sin comisión)</span>
+        </div>
+        {%- endif %}
+
         <div class="flex items-center gap-2">
             <input type="checkbox" name="modo_demo" class="h-4 w-4" {% if modo_demo %}checked{% endif %}>
             <span class="text-sm text-gray-700 dark:text-gray-200">Modo demo</span>

@@ -1,0 +1,523 @@
+<script>
+    (function () {
+        const currentScript = document.currentScript;
+        const agendaTabContent = currentScript ? currentScript.closest('[data-app-tab-content]') : null;
+        const agendaListRoot = (agendaTabContent && agendaTabContent.querySelector('[data-agenda-list-root="1"]'))
+            || document.querySelector('[data-agenda-list-root="1"]');
+        if (!agendaListRoot) {
+            return;
+        }
+        const agendaActivitySyncStorageKey = 'agenda-activity-sync';
+        const agendaListSyncUrl = {{ url_for('agenda.estado_actividades_lista') | tojson }};
+        const agendaListSyncPollMs = 4000;
+        let agendaReminderTimeoutId = null;
+        let agendaListSyncIntervalId = null;
+        let agendaListSyncRequestInFlight = false;
+        let agendaListRefreshInFlight = false;
+        const {
+            parseUtcDate, updateBadge, setRowState, evaluateRowFromSchedule, getNextRowRefreshAt,
+            normalizeResolvedActivityDetail, arraysEqual, estadoClasses, estadoLabel, shouldRemoveByCurrentFilter,
+        } = window.AgendaListaHelpers;
+
+        function refreshAgendaAlerts() {
+            agendaListRoot.querySelectorAll('.agenda-activity-row').forEach((row) => {
+                setRowState(row, evaluateRowFromSchedule(row));
+            });
+        }
+
+        function scheduleAgendaAlertsRefresh() {
+            if (agendaReminderTimeoutId) {
+                window.clearTimeout(agendaReminderTimeoutId);
+                agendaReminderTimeoutId = null;
+            }
+
+            refreshAgendaAlerts();
+
+            const nowMs = Date.now();
+            let nextRefreshAt = null;
+            agendaListRoot.querySelectorAll('.agenda-activity-row').forEach((row) => {
+                const candidateAt = getNextRowRefreshAt(row, nowMs);
+                if (!Number.isFinite(candidateAt)) {
+                    return;
+                }
+                if (!Number.isFinite(nextRefreshAt) || candidateAt < nextRefreshAt) {
+                    nextRefreshAt = candidateAt;
+                }
+            });
+
+            if (!Number.isFinite(nextRefreshAt)) {
+                return;
+            }
+
+            const delayMs = Math.max(0, nextRefreshAt - nowMs + 250);
+            agendaReminderTimeoutId = window.setTimeout(scheduleAgendaAlertsRefresh, delayMs);
+        }
+
+        function broadcastResolvedActivity(detail) {
+            const normalized = normalizeResolvedActivityDetail(detail);
+            if (!normalized.id || !window.localStorage) {
+                return;
+            }
+            try {
+                const payload = JSON.stringify(normalized);
+                window.localStorage.setItem(agendaActivitySyncStorageKey, payload);
+                window.localStorage.removeItem(agendaActivitySyncStorageKey);
+            } catch (e) {
+            }
+        }
+
+        function dispatchResolvedActivity(activityId, detail) {
+            const normalized = normalizeResolvedActivityDetail({
+                ...(detail || {}),
+                id: Number(activityId || (detail && detail.id) || 0)
+            });
+            if (!normalized.id) return;
+            window.dispatchEvent(new CustomEvent('agenda:resolver-actividad', {
+                detail: normalized
+            }));
+            broadcastResolvedActivity(normalized);
+        }
+
+        function ensureEmptyStateRow() {
+            const tbody = agendaListRoot.querySelector('.agenda-list-table tbody');
+            if (!tbody) return;
+            const hasRows = tbody.querySelector('.agenda-activity-row');
+            if (hasRows) return;
+            if (tbody.querySelector('[data-empty-agenda-row="1"]')) return;
+            const row = document.createElement('tr');
+            row.setAttribute('data-empty-agenda-row', '1');
+            row.innerHTML = '<td colspan="6" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No hay actividades para los filtros seleccionados.</td>';
+            tbody.appendChild(row);
+        }
+
+        function removeEmptyStateRowIfNeeded() {
+            const tbody = agendaListRoot.querySelector('.agenda-list-table tbody');
+            if (!tbody) return;
+            const hasRows = Boolean(tbody.querySelector('.agenda-activity-row'));
+            if (!hasRows) return;
+            const emptyRow = tbody.querySelector('[data-empty-agenda-row="1"]');
+            if (emptyRow) {
+                emptyRow.remove();
+            }
+        }
+
+        function currentActivityIds() {
+            return Array.from(agendaListRoot.querySelectorAll('.agenda-activity-row'))
+                .map((row) => Number(row.dataset.actividadId || 0))
+                .filter((id) => Number.isFinite(id) && id > 0);
+        }
+
+        function getAgendaListResultsContainer() {
+            return agendaListRoot.querySelector('[data-agenda-list-results="1"]');
+        }
+
+        function getAgendaListFilterForm() {
+            return agendaListRoot.querySelector('[data-agenda-filter-form="1"]');
+        }
+
+        function buildAgendaListStateUrl(extraParams = []) {
+            const form = getAgendaListFilterForm();
+            const baseUrl = form && form.getAttribute('action')
+                ? new URL(form.getAttribute('action'), window.location.origin)
+                : new URL(window.location.href, window.location.origin);
+
+            if (form) {
+                const formData = new FormData(form);
+                for (const [key, value] of formData.entries()) {
+                    if (value === null || value === undefined || value === '') {
+                        continue;
+                    }
+                    baseUrl.searchParams.set(key, String(value));
+                }
+            }
+
+            const results = getAgendaListResultsContainer();
+            const currentPage = Number(results && results.dataset.currentPage || 1);
+            if (Number.isFinite(currentPage) && currentPage > 1) {
+                baseUrl.searchParams.set('page', String(currentPage));
+            } else {
+                baseUrl.searchParams.delete('page');
+            }
+
+            extraParams.forEach(([key, value]) => {
+                if (value === null || value === undefined || value === '') {
+                    return;
+                }
+                baseUrl.searchParams.append(key, String(value));
+            });
+
+            return baseUrl;
+        }
+
+        function updateRowAfterResolve(row, nextEstado) {
+            row.dataset.estado = nextEstado;
+            row.dataset.alertaInicial = '';
+            setRowState(row, 'idle');
+
+            const badge = row.querySelector('[data-estado-badge="1"]');
+            if (badge) {
+                badge.className = 'agenda-estado-badge px-2 py-1 rounded text-xs font-semibold';
+                badge.classList.add(...estadoClasses(nextEstado));
+                badge.textContent = estadoLabel(nextEstado);
+            }
+
+            if (nextEstado !== 'pendiente') {
+                row.querySelectorAll('.agenda-resolve-form[data-pending-action="1"]').forEach((form) => form.remove());
+            }
+        }
+
+        function handleResolvedActivityUpdate(detail) {
+            const normalized = normalizeResolvedActivityDetail(detail);
+            if (!normalized.id) {
+                return;
+            }
+
+            const row = agendaListRoot.querySelector(`.agenda-activity-row[data-actividad-id="${normalized.id}"]`);
+            if (!row) {
+                scheduleAgendaAlertsRefresh();
+                return;
+            }
+
+            const nextEstado = String(normalized.estado || row.dataset.estado || 'pendiente').trim().toLowerCase();
+            if (normalized.eliminada || shouldRemoveByCurrentFilter(nextEstado)) {
+                row.remove();
+                ensureEmptyStateRow();
+            } else {
+                removeEmptyStateRowIfNeeded();
+                updateRowAfterResolve(row, nextEstado);
+            }
+
+            scheduleAgendaAlertsRefresh();
+        }
+
+        function buildAgendaListSyncRequestUrl(activityIds) {
+            const sourceUrl = buildAgendaListStateUrl(activityIds.map((id) => ['ids', id]));
+            const url = new URL(agendaListSyncUrl, window.location.origin);
+            ['page', 'estado', 'tipo', 'prioridad', 'responsable_id', 'desde', 'hasta', 'sort', 'dir'].forEach((key) => {
+                const value = sourceUrl.searchParams.get(key);
+                if (value !== null && value !== '') {
+                    url.searchParams.set(key, value);
+                }
+            });
+            sourceUrl.searchParams.getAll('ids').forEach((id) => url.searchParams.append('ids', id));
+            return url.toString();
+        }
+
+        function buildAgendaListPartialUrl() {
+            const url = buildAgendaListStateUrl();
+            url.searchParams.set('partial', '1');
+            return url.toString();
+        }
+
+        async function refreshAgendaListResultsFromServer() {
+            if (agendaListRefreshInFlight) {
+                return;
+            }
+            const results = getAgendaListResultsContainer();
+            if (!results) {
+                return;
+            }
+
+            agendaListRefreshInFlight = true;
+            try {
+                const response = await fetch(buildAgendaListPartialUrl(), {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/html',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) {
+                    return;
+                }
+
+                const html = await response.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const nextResults = doc.getElementById('agenda-list-results');
+                if (!nextResults) {
+                    return;
+                }
+
+                results.replaceWith(nextResults);
+                bindResolveForms();
+                scheduleAgendaAlertsRefresh();
+            } catch (e) {
+            } finally {
+                agendaListRefreshInFlight = false;
+            }
+        }
+
+        async function syncAgendaRowsWithServer() {
+            if (document.hidden) {
+                return;
+            }
+            if (agendaListSyncRequestInFlight) {
+                return;
+            }
+            const activityIds = currentActivityIds();
+
+            agendaListSyncRequestInFlight = true;
+            try {
+                const response = await fetch(buildAgendaListSyncRequestUrl(activityIds), {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = await response.json();
+                const items = Array.isArray(payload && payload.items) ? payload.items : [];
+                const missingIds = Array.isArray(payload && payload.missing_ids) ? payload.missing_ids : [];
+                const pageIds = Array.isArray(payload && payload.page_ids) ? payload.page_ids : [];
+                const itemsById = new Map(items.map((item) => [Number(item && item.id), item]));
+                const currentIds = currentActivityIds();
+
+                if (!arraysEqual(currentIds, pageIds)) {
+                    await refreshAgendaListResultsFromServer();
+                    return;
+                }
+
+                missingIds.forEach((activityId) => {
+                    const row = agendaListRoot.querySelector(`.agenda-activity-row[data-actividad-id="${activityId}"]`);
+                    if (!row) {
+                        return;
+                    }
+                    row.remove();
+                    ensureEmptyStateRow();
+                    dispatchResolvedActivity(activityId, {
+                        estado: 'eliminada',
+                        eliminada: true,
+                        synced_at: Date.now()
+                    });
+                });
+
+                items.forEach((item) => {
+                    const activityId = Number(item && item.id);
+                    if (!activityId) {
+                        return;
+                    }
+                    const row = agendaListRoot.querySelector(`.agenda-activity-row[data-actividad-id="${activityId}"]`);
+                    if (!row) {
+                        return;
+                    }
+                    const nextEstado = String(item && item.estado || row.dataset.estado || 'pendiente').trim().toLowerCase();
+                    row.dataset.alertaInicial = String(item && item.estado_alerta || '').trim().toLowerCase();
+                    if (shouldRemoveByCurrentFilter(nextEstado)) {
+                        row.remove();
+                        ensureEmptyStateRow();
+                        dispatchResolvedActivity(activityId, {
+                            estado: nextEstado,
+                            eliminada: true,
+                            estado_alerta: item && item.estado_alerta ? item.estado_alerta : null,
+                            synced_at: Date.now()
+                        });
+                        return;
+                    }
+                    removeEmptyStateRowIfNeeded();
+                    updateRowAfterResolve(row, nextEstado);
+                    const serverState = itemsById.get(activityId);
+                    setRowState(row, (serverState && serverState.estado_alerta) || evaluateRowFromSchedule(row));
+                });
+
+                scheduleAgendaAlertsRefresh();
+            } catch (e) {
+            } finally {
+                agendaListSyncRequestInFlight = false;
+            }
+        }
+
+        function stopAgendaListServerSyncPolling() {
+            if (agendaListSyncIntervalId) {
+                window.clearInterval(agendaListSyncIntervalId);
+                agendaListSyncIntervalId = null;
+            }
+        }
+
+        function startAgendaListServerSyncPolling() {
+            stopAgendaListServerSyncPolling();
+            if (document.hidden) {
+                return;
+            }
+            syncAgendaRowsWithServer();
+            agendaListSyncIntervalId = window.setInterval(syncAgendaRowsWithServer, agendaListSyncPollMs);
+        }
+
+        async function submitResolveForm(form) {
+            const activityId = String(form.dataset.actividadId || '');
+            const row = activityId
+                ? agendaListRoot.querySelector(`.agenda-activity-row[data-actividad-id="${activityId}"]`)
+                : null;
+            if (!row) {
+                form.submit();
+                return;
+            }
+
+            const previousState = row.classList.contains('agenda-alert-row--overdue')
+                ? 'overdue'
+                : row.classList.contains('agenda-alert-row--warning')
+                    ? 'alert'
+                    : evaluateRowFromSchedule(row);
+
+            const formData = new FormData(form);
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData,
+                credentials: 'same-origin'
+            });
+
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch (e) {
+                payload = null;
+            }
+
+            if (!response.ok || !payload || payload.ok !== true) {
+                if (payload && payload.mensaje && typeof window.mostrarNotificacion === 'function') {
+                    window.mostrarNotificacion(payload.mensaje, 'warning');
+                }
+                throw new Error((payload && payload.mensaje) || 'No se pudo actualizar la actividad');
+            }
+
+            const nextEstado = String((payload && payload.estado) || form.dataset.resolveAction || 'pendiente').trim().toLowerCase();
+            const removeRow = String(form.dataset.removeRow || '0') === '1' || Boolean(payload && payload.eliminada);
+            if (removeRow || shouldRemoveByCurrentFilter(nextEstado)) {
+                row.remove();
+                ensureEmptyStateRow();
+            } else {
+                removeEmptyStateRowIfNeeded();
+                updateRowAfterResolve(row, nextEstado);
+            }
+
+            scheduleAgendaAlertsRefresh();
+            dispatchResolvedActivity(activityId, {
+                estado: nextEstado,
+                estado_alerta: (payload && payload.estado_alerta) || previousState,
+                eliminada: removeRow
+            });
+            if (payload && payload.mensaje && typeof window.mostrarNotificacion === 'function') {
+                window.mostrarNotificacion(payload.mensaje, 'success');
+            }
+        }
+
+        function bindResolveForms() {
+            agendaListRoot.querySelectorAll('.agenda-resolve-form').forEach((form) => {
+                if (form.dataset.agendaBound === '1') return;
+                form.dataset.agendaBound = '1';
+                form.addEventListener('submit', async (event) => {
+                    if (event.defaultPrevented) {
+                        return;
+                    }
+                    event.preventDefault();
+                    if (form.dataset.agendaSubmitting === '1') {
+                        return;
+                    }
+                    form.dataset.agendaSubmitting = '1';
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                        submitButton.classList.add('opacity-60', 'cursor-not-allowed');
+                    }
+                    try {
+                        await submitResolveForm(form);
+                    } catch (e) {
+                        if (typeof window.mostrarNotificacion === 'function') {
+                            window.mostrarNotificacion(e && e.message ? e.message : 'No se pudo procesar la actividad', 'warning');
+                        }
+                    } finally {
+                        form.dataset.agendaSubmitting = '0';
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                            submitButton.classList.remove('opacity-60', 'cursor-not-allowed');
+                        }
+                    }
+                });
+            });
+        }
+
+        function applyServerAlertState(detail) {
+            const items = Array.isArray(detail && detail.items) ? detail.items : [];
+            const itemsById = new Map(items.map((item) => [String(item.id), item.estado_alerta]));
+
+            agendaListRoot.querySelectorAll('.agenda-activity-row').forEach((row) => {
+                const activityId = String(row.dataset.actividadId || '');
+                const serverState = itemsById.get(activityId);
+                row.dataset.alertaInicial = serverState || '';
+                setRowState(row, serverState || evaluateRowFromSchedule(row));
+            });
+        }
+
+        function initAgendaAlerts() {
+            scheduleAgendaAlertsRefresh();
+            bindResolveForms();
+            startAgendaListServerSyncPolling();
+            const onResolvedActivity = (event) => {
+                if (!agendaListRoot.isConnected) {
+                    return;
+                }
+                handleResolvedActivityUpdate(event && event.detail ? event.detail : {});
+            };
+            window.addEventListener('agenda:resolver-actividad', onResolvedActivity);
+
+            const onResolvedActivityStorage = (event) => {
+                if (!agendaListRoot.isConnected) {
+                    return;
+                }
+                if (!event || event.key !== agendaActivitySyncStorageKey || !event.newValue) {
+                    return;
+                }
+                try {
+                    handleResolvedActivityUpdate(JSON.parse(event.newValue));
+                } catch (e) {
+                }
+            };
+            window.addEventListener('storage', onResolvedActivityStorage);
+
+            const onAgendaAlertsUpdated = (event) => {
+                if (!agendaListRoot.isConnected) {
+                    return;
+                }
+                applyServerAlertState(event.detail || {});
+                scheduleAgendaAlertsRefresh();
+            };
+            window.addEventListener('agenda:alertas-actualizadas', onAgendaAlertsUpdated);
+
+            const onAgendaVisibilityChange = () => {
+                if (!agendaListRoot.isConnected) {
+                    stopAgendaListServerSyncPolling();
+                    return;
+                }
+                if (document.hidden) {
+                    stopAgendaListServerSyncPolling();
+                    return;
+                }
+                startAgendaListServerSyncPolling();
+                scheduleAgendaAlertsRefresh();
+            };
+            document.addEventListener('visibilitychange', onAgendaVisibilityChange);
+
+            const onAgendaFocus = () => {
+                if (!agendaListRoot.isConnected) {
+                    return;
+                }
+                startAgendaListServerSyncPolling();
+                syncAgendaRowsWithServer();
+                scheduleAgendaAlertsRefresh();
+            };
+            window.addEventListener('focus', onAgendaFocus);
+            window.addEventListener('pageshow', onAgendaFocus);
+        }
+
+        initAgendaAlerts();
+    })();
+</script>

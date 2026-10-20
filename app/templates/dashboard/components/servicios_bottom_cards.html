@@ -40,7 +40,7 @@
                     </div>
                 </div>
                 <div class="shrink-0 text-right">
-                    <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(asignacion.subtotal or 0).replace(",", ".") }}</p>
+                    <p class="text-sm font-bold text-rose-600 dark:text-rose-400">{{ (asignacion.subtotal or 0)|moneda }}</p>
                     <p class="text-[11px] text-slate-400 dark:text-slate-500">{{ asignacion.fecha_solicitud|local_strftime('%d/%m %H:%M') }}</p>
                 </div>
             {% if can_crear_venta %}
@@ -57,7 +57,7 @@
         <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
             <div class="flex items-center justify-between text-sm">
                 <span class="font-semibold text-slate-600 dark:text-slate-400">Total pendientes</span>
-                <span id="dashboard-cobros-pendientes-total-monto" class="font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(dashboard_servicios_cobros_pendientes_total_monto or 0).replace(",", ".") }}</span>
+                <span id="dashboard-cobros-pendientes-total-monto" class="font-bold text-rose-600 dark:text-rose-400">{{ (dashboard_servicios_cobros_pendientes_total_monto or 0)|moneda }}</span>
             </div>
             <p id="dashboard-cobros-pendientes-total-count" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {{ dashboard_servicios_cobros_pendientes_total_count or 0 }} servicio{% if (dashboard_servicios_cobros_pendientes_total_count or 0) != 1 %}s{% endif %} sin cobrar.
@@ -93,7 +93,7 @@
             <div>
                 <div class="flex items-center justify-between text-xs">
                     <span class="truncate pr-3 text-slate-600 dark:text-slate-300">{{ item.nombre }}</span>
-                    <span class="shrink-0 font-bold text-slate-900 dark:text-white">{{ item.cantidad }} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. {{ "{:,.0f}".format(item.total or 0).replace(",", ".") }}</span></span>
+                    <span class="shrink-0 font-bold text-slate-900 dark:text-white">{{ item.cantidad }} <span class="font-normal text-slate-500 dark:text-slate-400">{{ (item.total or 0)|moneda }}</span></span>
                 </div>
                 <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                     <div class="h-full rounded-full {{ item.color_class }}" style="width: {{ item.porcentaje }}%"></div>
@@ -108,7 +108,7 @@
         <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
             <div class="flex items-center justify-between text-sm">
                 <span class="font-semibold text-slate-600 dark:text-slate-400">Total</span>
-                <span id="dashboard-servicios-realizados-total" class="font-bold text-slate-900 dark:text-white">{{ dashboard_servicios_realizados_total_count or 0 }} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. {{ "{:,.0f}".format(dashboard_servicios_realizados_total_monto or 0).replace(",", ".") }}</span></span>
+                <span id="dashboard-servicios-realizados-total" class="font-bold text-slate-900 dark:text-white">{{ dashboard_servicios_realizados_total_count or 0 }} <span class="font-normal text-slate-500 dark:text-slate-400">{{ (dashboard_servicios_realizados_total_monto or 0)|moneda }}</span></span>
             </div>
             <p id="dashboard-servicios-realizados-total-meta" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {{ dashboard_servicios_realizados_total_count or 0 }} servicio{% if (dashboard_servicios_realizados_total_count or 0) != 1 %}s{% endif %} realizados hoy.
@@ -218,46 +218,4 @@
         {% endif %}
 </section>
 
-<!-- Comisiones del dia -->
-<section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3 2xl:col-span-3 dark:border-white/10 dark:bg-slate-900 {% if 'comisiones_dia' not in dashboard_service_cards_selected %}hidden{% endif %}"
-        :class="{ 'hidden': !isCardVisible('comisiones_dia') }"
-        :style="cardStyle('comisiones_dia')">
-        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-white/5">
-            <div class="flex items-center gap-2">
-                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-sm text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
-                    <i class="fas fa-hand-holding-usd"></i>
-                </span>
-                <h2 class="text-sm font-bold text-slate-950 dark:text-white">Comisiones del día</h2>
-            </div>
-            <a href="{{ url_for('usuarios.listar') }}"
-               data-tab-url="{{ url_for('usuarios.listar') }}"
-               class="app-tab-link text-xs font-bold text-blue-600 dark:text-blue-300 hover:underline">Ver todas</a>
-        </div>
-        <div class="px-5 py-4 space-y-3">
-            {% for usuario in usuarios_activos_lista[:3] %}
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ usuario.nombre_completo[:1] }}</span>
-                    <div>
-                        <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ usuario.nombre_completo }}</p>
-                        <p class="text-xs text-slate-400 dark:text-slate-500">30% de ventas</p>
-                    </div>
-                </div>
-                <p class="text-sm font-bold text-slate-900 dark:text-white">Gs. {{ "{:,.0f}".format((total_cobrado_display or 0) // (usuarios_activos_lista|length or 1) ).replace(",", ".") }}</p>
-            </div>
-            {% else %}
-            <div class="flex flex-col items-center gap-2 py-4 text-center">
-                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                    <i class="fas fa-chart-line text-slate-400 dark:text-slate-500"></i>
-                </span>
-                <p class="text-sm text-slate-400 dark:text-slate-500">Listo para el módulo de comisiones.</p>
-            </div>
-            {% endfor %}
-        </div>
-        <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
-            <div class="flex items-center justify-between text-sm">
-                <span class="font-semibold text-slate-500 dark:text-slate-400">Total comisiones</span>
-                <span class="font-bold text-emerald-600 dark:text-emerald-400">Gs. 0</span>
-            </div>
-        </div>
-</section>
+{% include "dashboard/components/servicios_comisiones.html" %}

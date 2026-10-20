@@ -20,4 +20,5 @@ def test_dashboard_event_bus_refreshes_after_relevant_mutations():
     assert "dashboard:cobros-pendientes-changed" in source
     assert "/^\\/clientes\\/\\d+\\/servicios\\/(?:asignar|\\d+\\/actualizar)$/" in source
     assert "/^\\/agenda\\/turnos\\/peluqueria\\/crear$/" in source
+    assert "/^\\/agenda\\/turnos\\/peluqueria\\/\\d+\\/gestionar$/" in source
     assert "/^\\/ventas\\/(?:procesar|enviar-a-caja)$/" in source

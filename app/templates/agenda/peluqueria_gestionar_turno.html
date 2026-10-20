@@ -23,10 +23,7 @@
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">#{{ actividad.id }}</span>
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ actividad.estado|title }}</span>
-                    {% if actividad.cliente_servicio and actividad.cliente_servicio.id_venta %}
-                    <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">Cobrado</span>
-                    {% endif %}
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ estado_label }}</span>
                 </div>
                 <h2 class="mt-3 text-2xl font-black text-slate-950 dark:text-white">{{ actividad.titulo }}</h2>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -39,17 +36,24 @@
                 <p class="mt-1 font-bold text-slate-950 dark:text-white">{{ actividad.cliente.nombre if actividad.cliente else 'Consumidor Final' }}</p>
                 {% if actividad.cliente_servicio and actividad.cliente_servicio.servicio %}
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ actividad.cliente_servicio.servicio.nombre }}</p>
+                {% elif actividad.servicio %}
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ actividad.servicio.nombre }}</p>
+                {% endif %}
+                {% if actividad.cliente and actividad.cliente.telefono %}
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400"><i class="fas fa-phone mr-1"></i>{{ actividad.cliente.telefono }}</p>
                 {% endif %}
             </div>
         </div>
     </section>
+
+    {% include 'agenda/_peluqueria_turno_estado.html' %}
 
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
             <h2 class="text-base font-black text-slate-950 dark:text-white">Reprogramar rápido</h2>
             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Respeta los choques de horario del profesional asignado.</p>
             {% if puede_reprogramar %}
-            <form method="POST" class="mt-4 space-y-4">
+            <form method="POST" action="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}" class="mt-4 space-y-4">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="accion" value="reprogramar">
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -75,21 +79,28 @@
                 </button>
             </form>
             {% else %}
-            <p class="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">No tienes permiso para reprogramar turnos.</p>
+            <p class="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">{% if estado in ['en_atencion', 'terminado', 'cobrado'] %}Este turno ya está en atención o atendido: no se puede reprogramar.{% else %}No tienes permiso para reprogramar turnos.{% endif %}</p>
             {% endif %}
         </section>
 
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
             <h2 class="text-base font-black text-slate-950 dark:text-white">Seña / anticipo</h2>
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Registra la seña como nota visible del turno y del servicio pendiente.</p>
-            {% if puede_registrar_sena %}
-            <form method="POST" class="mt-4 space-y-4">
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">La seña entra a tu caja ahora y se descuenta sola al cobrar el turno.</p>
+            {% if sena_actual > 0 %}
+            <p class="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">Seña cobrada: {{ sena_actual|moneda }}</p>
+            {% endif %}
+            {% if turno_cobrado %}
+            <p class="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600 dark:bg-white/5 dark:text-slate-300">El turno ya fue cobrado.</p>
+            {% elif cerrado %}
+            <p class="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600 dark:bg-white/5 dark:text-slate-300">El turno está cerrado: reprogramalo para registrar una seña.</p>
+            {% elif puede_registrar_sena %}
+            <form method="POST" action="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}" class="mt-4 space-y-4">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="accion" value="sena">
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Monto</label>
-                        <input type="number" name="monto_sena" min="1" step="1000" placeholder="Ej: 20000" required class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+                        <input type="number" name="monto_sena" min="1" step="any" placeholder="Ej: 20000" required class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Nota</label>
@@ -109,20 +120,38 @@
     <section class="rounded-3xl border border-rose-200 bg-rose-50/80 p-5 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10">
         <h2 class="text-base font-black text-rose-950 dark:text-rose-100">Cerrar turno sin atención</h2>
         <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">Usa cancelado cuando avisan; usa no-show cuando el cliente no aparece.</p>
-        {% if puede_cancelar %}
+        {% if turno_cobrado %}
+        <p class="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm font-semibold text-rose-800 dark:bg-slate-950/60 dark:text-rose-200">El turno ya fue cobrado; no se puede cancelar desde acá.</p>
+        {% elif cerrado %}
+        <p class="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm font-semibold text-rose-800 dark:bg-slate-950/60 dark:text-rose-200">Turno cerrado como {{ estado_label|lower }}. Para volver a darlo, reprogramalo.</p>
+        {% elif estado == 'terminado' %}
+        <p class="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm font-semibold text-rose-800 dark:bg-slate-950/60 dark:text-rose-200">El turno ya se atendió: falta cobrarlo.</p>
+        {% elif puede_cancelar %}
         <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <form method="POST" class="space-y-3">
+            <form method="POST" action="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}" class="space-y-3">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="accion" value="cancelar">
                 <input type="text" name="motivo" placeholder="Motivo opcional" class="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-slate-900 dark:border-rose-500/20 dark:bg-slate-950 dark:text-white">
+                {% if sena_actual > 0 %}
+                <label class="flex items-center gap-2 text-sm font-semibold text-rose-900 dark:text-rose-100">
+                    <input type="checkbox" name="devolver_sena" value="1" checked class="h-4 w-4 rounded border-rose-300">
+                    Devolver la seña ({{ sena_actual|moneda }} sale de caja)
+                </label>
+                {% endif %}
                 <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-300 bg-white px-4 py-3 text-sm font-black text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-slate-950 dark:text-rose-200 dark:hover:bg-rose-500/10">
                     <i class="fas fa-ban"></i> Cancelar turno
                 </button>
             </form>
-            <form method="POST" class="space-y-3">
+            <form method="POST" action="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}" class="space-y-3">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="accion" value="no_show">
                 <input type="text" name="motivo" placeholder="Nota opcional" class="w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-slate-900 dark:border-rose-500/20 dark:bg-slate-950 dark:text-white">
+                {% if sena_actual > 0 %}
+                <label class="flex items-center gap-2 text-sm font-semibold text-rose-900 dark:text-rose-100">
+                    <input type="checkbox" name="devolver_sena" value="1" class="h-4 w-4 rounded border-rose-300">
+                    Devolver la seña ({{ sena_actual|moneda }} sale de caja)
+                </label>
+                {% endif %}
                 <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-3 text-sm font-black text-white transition hover:bg-rose-700">
                     <i class="fas fa-user-slash"></i> Marcar no-show
                 </button>

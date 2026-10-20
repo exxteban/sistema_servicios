@@ -9,7 +9,7 @@ from app.models import AgendaActividad, Cliente, ClienteServicio, DetalleVenta, 
 from app.services.agenda_turnos_peluqueria import (
     TURNO_PELUQUERIA_TIPO_LABELS,
     infer_turno_peluqueria_tipo_from_title,
-    is_turno_peluqueria_catalog_service_chargeable,
+    precio_turno_sin_asignacion,
     resolve_turno_peluqueria_catalog_service,
 )
 from app.utils.helpers import local_strftime, now_local, today_local, utc_bounds_for_local_dates, utc_naive_to_local
@@ -266,7 +266,6 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
         AgendaActividad.query.options(joinedload(AgendaActividad.cliente).load_only(Cliente.id_cliente, Cliente.nombre))
         .filter(
             AgendaActividad.tipo == 'cita',
-            AgendaActividad.cliente_id.isnot(None),
             AgendaActividad.cliente_servicio_id.is_(None),
             AgendaActividad.venta_id.is_(None),
             AgendaActividad.estado.in_(['pendiente', 'hecha']),
@@ -281,6 +280,7 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
     for actividad in agenda_items:
         turno_tipo = infer_turno_peluqueria_tipo_from_title(actividad.titulo)
         servicios_por_actividad[int(actividad.id)] = resolve_turno_peluqueria_catalog_service(
+            servicio_id=actividad.servicio_id,
             turno_tipo_id=turno_tipo,
             title=actividad.titulo,
         )
@@ -295,16 +295,23 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
     for actividad in agenda_items:
         turno_tipo = infer_turno_peluqueria_tipo_from_title(actividad.titulo)
         servicio = servicios_por_actividad.get(int(actividad.id))
-        if servicio is not None and not is_turno_peluqueria_catalog_service_chargeable(servicio):
+        # Precio manual o de la variante elegida al dar el turno; si no, el del servicio.
+        precio = precio_turno_sin_asignacion(actividad, servicio) if servicio is not None else None
+        if servicio is not None and precio is None:
             continue
         if _consumir_si_turno_ya_fue_cobrado(actividad, servicio, vendidos_por_key):
             continue
-        params = {
-            'agenda_turno_cliente_id': int(actividad.cliente_id),
-            'agenda_turno_actividad_id': int(actividad.id),
-        }
+        params = {'agenda_turno_actividad_id': int(actividad.id)}
+        if actividad.cliente_id:
+            params['agenda_turno_cliente_id'] = int(actividad.cliente_id)
+        if actividad.usuario_id:
+            params['agenda_turno_vendedor_id'] = int(actividad.usuario_id)
         if servicio is not None:
             params['agenda_turno_servicio_id'] = int(servicio.id_servicio)
+            if actividad.servicio_precio_opcion_id and int(servicio.id_servicio) == int(actividad.servicio_id or 0):
+                params['agenda_turno_precio_opcion_id'] = int(actividad.servicio_precio_opcion_id)
+            if actividad.precio_manual is not None:
+                params['agenda_turno_precio_manual'] = str(actividad.precio_manual)
         else:
             params['agenda_turno_titulo'] = actividad.titulo or TURNO_PELUQUERIA_TIPO_LABELS.get(turno_tipo, 'Turno')
         items_agenda.append({
@@ -313,7 +320,7 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
             'cliente': {'nombre': actividad.cliente.nombre if actividad.cliente else 'Consumidor Final'},
             'servicio': {'nombre': (servicio.nombre if servicio is not None else TURNO_PELUQUERIA_TIPO_LABELS.get(turno_tipo, actividad.titulo or 'Turno'))},
             'estado_display': 'Turno sin cobrar',
-            'subtotal': float(servicio.precio or 0) if servicio is not None else 0,
+            'subtotal': float(precio or 0),
             'fecha_solicitud': actividad.fecha_inicio,
             'cobrar_url': url_for('ventas.pos', **params),
         })
@@ -408,9 +415,19 @@ def _detalle_profesional_base(usuario) -> dict[str, Any]:
 
 def _detalle_profesional_activo(actividad, *, sesiones_activas_count: int) -> dict[str, Any]:
     asignacion = getattr(actividad, 'cliente_servicio', None)
-    cliente = getattr(getattr(asignacion, 'cliente', None), 'nombre', None) or 'Consumidor Final'
-    servicio = getattr(getattr(asignacion, 'servicio', None), 'nombre', None) or 'Servicio'
+    # Turnos sin servicio del cliente (p. ej. consumidor final): datos del propio turno.
+    cliente = (
+        getattr(getattr(asignacion, 'cliente', None), 'nombre', None)
+        or getattr(getattr(actividad, 'cliente', None), 'nombre', None)
+        or 'Consumidor Final'
+    )
+    servicio = (
+        getattr(getattr(asignacion, 'servicio', None), 'nombre', None)
+        or getattr(getattr(actividad, 'servicio', None), 'nombre', None)
+        or 'Servicio'
+    )
     inicio_local = utc_naive_to_local(getattr(actividad, 'fecha_inicio', None))
+    atencion_local = utc_naive_to_local(getattr(actividad, 'atencion_inicio', None))
     fin_local = utc_naive_to_local(getattr(actividad, 'fecha_fin', None))
     referencia_local = now_local()
 
@@ -422,8 +439,8 @@ def _detalle_profesional_activo(actividad, *, sesiones_activas_count: int) -> di
 
     if inicio_local and fin_local and fin_local >= inicio_local:
         duracion_minutos = int((fin_local - inicio_local).total_seconds() // 60)
-    if inicio_local:
-        transcurrido_minutos = max(int((referencia_local - inicio_local).total_seconds() // 60), 0)
+    if atencion_local or inicio_local:
+        transcurrido_minutos = max(int((referencia_local - (atencion_local or inicio_local)).total_seconds() // 60), 0)
     if fin_local:
         delta_fin = int((fin_local - referencia_local).total_seconds() // 60)
         if delta_fin >= 0:
@@ -474,14 +491,17 @@ def obtener_estado_profesionales_dashboard(usuarios, *, can_ver_agenda: bool, to
         AgendaActividad.query.options(
             joinedload(AgendaActividad.cliente_servicio).joinedload(ClienteServicio.cliente).load_only(Cliente.id_cliente, Cliente.nombre),
             joinedload(AgendaActividad.cliente_servicio).joinedload(ClienteServicio.servicio),
+            joinedload(AgendaActividad.cliente).load_only(Cliente.id_cliente, Cliente.nombre),
+            joinedload(AgendaActividad.servicio).load_only(Servicio.id_servicio, Servicio.nombre),
         )
-        .join(ClienteServicio, ClienteServicio.id_cliente_servicio == AgendaActividad.cliente_servicio_id)
+        .outerjoin(ClienteServicio, ClienteServicio.id_cliente_servicio == AgendaActividad.cliente_servicio_id)
         .filter(
             AgendaActividad.usuario_id.in_(user_ids),
             AgendaActividad.estado == 'pendiente',
             AgendaActividad.fecha_inicio >= start_utc,
             AgendaActividad.fecha_inicio < end_utc,
-            ClienteServicio.estado == 'en_proceso',
+            # Mismo criterio que "En atención" (dashboard_agenda): también turnos sin servicio del cliente.
+            db.or_(AgendaActividad.atencion_inicio.isnot(None), ClienteServicio.estado == 'en_proceso'),
         )
         .order_by(AgendaActividad.usuario_id.asc(), AgendaActividad.fecha_inicio.asc(), AgendaActividad.id.asc())
         .all()

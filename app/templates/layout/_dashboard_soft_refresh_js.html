@@ -1,0 +1,75 @@
+            // Refresco silencioso del dashboard de la pestana principal.
+            // Al volver al Dashboard desde otra pestana se muestra al instante y,
+            // en segundo plano, se reemplaza su contenido por una version nueva del
+            // servidor (sin recargar la pagina ni mostrar el spinner).
+            // Solo aplica a dashboards que lo declaran con data-dashboard-soft-refresh="1";
+            // el resto refresca sus totales con dashboardRefreshTotals.
+            let principalDashboardRefreshController = null;
+
+            function runInlineScripts(host, scriptsHtml) {
+                const template = document.createElement('template');
+                template.innerHTML = scriptsHtml || '';
+                template.content.querySelectorAll('script').forEach((node) => {
+                    if (node.src) return;
+                    const script = document.createElement('script');
+                    Array.from(node.attributes).forEach((attr) => script.setAttribute(attr.name, attr.value));
+                    script.appendChild(document.createTextNode(node.textContent || ''));
+                    host.appendChild(script);
+                });
+            }
+
+            async function refreshPrincipalDashboardInPlace() {
+                const panel = tabPanelsById.get(principalTabId);
+                if (!panel) return;
+                if (!panel.querySelector('[data-dashboard-soft-refresh="1"]')) {
+                    try { window.dashboardRefreshTotals?.(); } catch { }
+                    return;
+                }
+
+                if (principalDashboardRefreshController) {
+                    try { principalDashboardRefreshController.abort(); } catch { }
+                }
+                const controller = new AbortController();
+                principalDashboardRefreshController = controller;
+
+                try {
+                    const fetchUrl = new URL(principalDashboardUrl, window.location.origin);
+                    fetchUrl.searchParams.set('partial', '1');
+                    const response = await fetch(fetchUrl.toString(), {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        cache: 'no-store',
+                        signal: controller.signal
+                    });
+                    if (!response.ok || !isDashboardUrl(response.url || fetchUrl.toString())) return;
+
+                    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+                    const content = doc.getElementById('partial-content');
+                    if (!content || !content.querySelector('[data-dashboard-soft-refresh="1"]')) return;
+                    if (controller !== principalDashboardRefreshController) return;
+
+                    const inlineScripts = [];
+                    content.querySelectorAll('script').forEach((node) => {
+                        inlineScripts.push(node.outerHTML);
+                        node.remove();
+                    });
+                    const partialScripts = doc.getElementById('partial-scripts');
+                    if (partialScripts) inlineScripts.push(partialScripts.innerHTML || '');
+
+                    const scrollTop = panel.scrollTop;
+                    Array.from(panel.children).forEach((child) => {
+                        try { window.Alpine?.destroyTree?.(child); } catch { }
+                    });
+                    panel.innerHTML = content.innerHTML;
+                    // Los scripts van antes de initTree: definen las funciones x-data.
+                    runInlineScripts(panel, inlineScripts.join('\n'));
+                    try { window.Alpine?.initTree?.(panel); } catch { }
+                    panel.scrollTop = scrollTop;
+                } catch (error) {
+                    if (error && error.name === 'AbortError') return;
+                    console.error('No se pudo refrescar el dashboard:', error);
+                } finally {
+                    if (controller === principalDashboardRefreshController) {
+                        principalDashboardRefreshController = null;
+                    }
+                }
+            }

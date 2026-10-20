@@ -36,7 +36,7 @@
                                     Sistema de Gestión
                                 </span>
                                 <span class="crm-topnav__title-secondary hidden sm:inline font-light text-sm text-blue-200/80 tracking-widest uppercase truncate leading-tight">
-                                    Gastronomía
+                                    {% if marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.rubro }}{% else %}Gastronomía{% endif %}
                                 </span>
                             </div>
                             {% if app_brand_name %}
@@ -344,7 +344,7 @@
                         data-app-shell-viewport-lock="true"
                         class="app-tab-panel flex-1 min-h-0 overflow-y-auto p-3 2xl:p-4" data-tab-panel="principal"
                         data-page-title="{{ principal_page_title | e }}"
-                        data-page-is-dashboard="{{ '1' if request.endpoint == 'main.dashboard' else '0' }}"
+                        data-page-is-dashboard="{{ '1' if request.endpoint in ('main.dashboard', app_dashboard_endpoint|default('main.dashboard')) else '0' }}"
                         aria-hidden="false">
                         {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}

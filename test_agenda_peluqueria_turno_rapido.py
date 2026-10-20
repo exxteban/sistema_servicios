@@ -46,7 +46,7 @@ class TestAgendaPeluqueriaTurnoRapido(unittest.TestCase):
         self.assertIn('Nuevo turno rápido', html)
         self.assertIn('/agenda/turnos/peluqueria/crear', html)
         self.assertIn('Corte + barba', html)
-        self.assertIn('Elegí la variante exacta para usar su nombre y costo', html)
+        self.assertIn('Cargá tus servicios para verlos acá', html)
         self.assertIn('Crear y cobrar', html)
         self.assertIn('turno_rapido_tipo', self.client.get('/servicios/nuevo').get_data(as_text=True))
 
@@ -573,7 +573,9 @@ class TestAgendaPeluqueriaTurnoRapido(unittest.TestCase):
 
         dashboard = self.client.get('/')
         html = dashboard.get_data(as_text=True)
-        self.assertNotIn('Cliente Cobrado', html)
+        # Sale de Cobros pendientes (ya no ofrece cobrarlo) y el Mapa del día lo muestra como cobrado.
+        self.assertNotIn(f'agenda_turno_actividad_id={int(actividad.id)}', html)
+        self.assertIn('>Cobrado<', html)
 
 
 if __name__ == '__main__':

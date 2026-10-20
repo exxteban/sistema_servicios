@@ -74,7 +74,7 @@ def _require_whatsapp_conversaciones_permiso():
     )
     if wants_json:
         return jsonify({'error': 'Sin permisos', 'mensaje': mensaje, 'permiso_requerido': 'whatsapp_conversaciones', 'modo_demo': modo_demo}), 403
-    return render_template('errores/403.html'), 403
+    return render_template('errores/403.html', mensaje=mensaje), 403
 
 
 # ─── Panel Asesor (Página HTML) ─────────────────────────────────────────────
@@ -646,7 +646,7 @@ def admin_ia_conversaciones():
             'ultimo_mensaje_at': ultimo_msg.created_at.isoformat() if ultimo_msg else None,
             'total_mensajes': total_msgs,
             'tool_calls_count': tool_calls_count,
-            **_web_bot_badge(c),
+            **get_conversation_origin_meta(c),
         })
 
     return jsonify({
@@ -708,7 +708,7 @@ def admin_ia_conversacion_mensajes(id_conv):
             'activa': conv.activa,
             'inicio_sesion': conv.inicio_sesion.isoformat() if conv.inicio_sesion else None,
             'ultima_actividad': conv.ultima_actividad.isoformat() if conv.ultima_actividad else None,
-            **_web_bot_badge(conv),
+            **get_conversation_origin_meta(conv),
         },
         'mensajes': resultado,
         'contexto': contexto,

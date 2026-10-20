@@ -1,0 +1,72 @@
+{# Pasos del turno y acciones: Empezar atención, Terminar, Cobrar, avisos por WhatsApp. #}
+<style>
+    .turno-pasos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+    .turno-paso { border-radius: 1rem; border: 1px solid #e2e8f0; padding: 0.6rem 0.75rem; font-size: 0.8rem; font-weight: 800; color: #94a3b8; text-align: center; }
+    @media (max-width: 480px) { .turno-pasos { gap: 0.3rem; } .turno-paso { padding: 0.5rem 0.2rem; font-size: 0.68rem; } }
+    .turno-paso--hecho { border-color: #a7f3d0; background: #ecfdf5; color: #047857; }
+    .turno-paso--actual { border-color: #8b5cf6; background: #f5f3ff; color: #5b21b6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18); }
+    .dark .turno-paso { border-color: rgba(255, 255, 255, 0.1); color: #64748b; }
+    .dark .turno-paso--hecho { border-color: rgba(52, 211, 153, 0.3); background: rgba(16, 185, 129, 0.12); color: #6ee7b7; }
+    .dark .turno-paso--actual { border-color: #a78bfa; background: rgba(139, 92, 246, 0.16); color: #ede9fe; }
+    .turno-accion { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; border-radius: 1rem; padding: 0.8rem 1.1rem; font-size: 0.9rem; font-weight: 900; transition: filter .15s; width: 100%; }
+    .turno-accion:hover { filter: brightness(1.07); }
+    .turno-accion--empezar { background: #0891b2; color: #fff; }
+    .turno-accion--terminar { background: #7c3aed; color: #fff; }
+    .turno-accion--cobrar { background: #059669; color: #fff; }
+    .turno-accion--whatsapp { background: #fff; color: #15803d; border: 1px solid #86efac; }
+    .dark .turno-accion--whatsapp { background: rgba(22, 163, 74, 0.12); color: #86efac; border-color: rgba(134, 239, 172, 0.3); }
+</style>
+<section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-base font-black text-slate-950 dark:text-white">Estado del turno</h2>
+        {% if cerrado %}
+        <span class="rounded-full bg-rose-50 px-3 py-1 text-xs font-black text-rose-700 dark:bg-rose-500/15 dark:text-rose-200">{{ estado_label }}</span>
+        {% endif %}
+    </div>
+    <div class="turno-pasos mt-4">
+        {% for paso, etiqueta in pasos %}
+        <div class="turno-paso {% if loop.index0 < indice_actual or (estado == 'cobrado' and paso == 'cobrado') %}turno-paso--hecho{% elif loop.index0 == indice_actual %}turno-paso--actual{% endif %}">
+            {% if loop.index0 < indice_actual or estado == 'cobrado' %}<i class="fas fa-check mr-1"></i>{% endif %}{{ etiqueta }}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if puede_empezar or puede_terminar or url_cobro %}
+    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {% if puede_empezar %}
+        <form method="POST" action="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="accion" value="empezar">
+            <button type="submit" class="turno-accion turno-accion--empezar"><i class="fas fa-play"></i> Empezar atención</button>
+        </form>
+        {% endif %}
+        {% if puede_terminar %}
+        <form method="POST" action="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="accion" value="terminar">
+            <button type="submit" class="turno-accion turno-accion--terminar"><i class="fas fa-flag-checkered"></i> Terminar</button>
+        </form>
+        {% endif %}
+        {% if url_cobro %}
+        <a href="{{ url_cobro }}" data-tab-url="{{ url_cobro }}" data-tab-title="Punto de venta"
+            class="app-tab-link turno-accion turno-accion--cobrar">
+            <i class="fas fa-cash-register"></i> Cobrar{% if sena_actual > 0 %} (seña {{ sena_actual|moneda }} se descuenta){% endif %}
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if not cerrado and estado in ['agendado', 'en_atencion'] and actividad.cliente %}
+    <div class="mt-4 border-t border-slate-200 pt-4 dark:border-white/10">
+        {% if whatsapp_confirmar %}
+        <p class="mb-2 text-xs font-bold text-slate-500 dark:text-slate-400">Avisar por WhatsApp (se abre el mensaje armado; vos lo enviás)</p>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <a href="{{ whatsapp_confirmar }}" target="_blank" rel="noopener" class="turno-accion turno-accion--whatsapp"><i class="fab fa-whatsapp"></i> Confirmar turno</a>
+            <a href="{{ whatsapp_recordar }}" target="_blank" rel="noopener" class="turno-accion turno-accion--whatsapp"><i class="fab fa-whatsapp"></i> Recordar turno</a>
+        </div>
+        {% elif actividad.cliente %}
+        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400"><i class="fab fa-whatsapp mr-1"></i> Cargá el teléfono de {{ actividad.cliente.nombre }} para avisarle por WhatsApp.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>

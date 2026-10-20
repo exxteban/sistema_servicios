@@ -1,26 +1,27 @@
 <script>
 function peluqueriaTurnoRapido(config) {
     return {
+        ...peluqueriaTurnoRapidoEstilos(),
         clientesUrl: config.clientesUrl || '',
+        ocupadosUrl: config.ocupadosUrl || '',
         profesionales: Array.isArray(config.profesionales) ? config.profesionales : [],
-        servicios: Array.isArray(config.servicios) ? config.servicios : [],
-        serviciosCatalogo: Array.isArray(config.serviciosCatalogo) ? config.serviciosCatalogo : [],
+        catalogo: Array.isArray(config.catalogo) ? config.catalogo : [],
+        tiposBase: Array.isArray(config.tiposBase) ? config.tiposBase : [],
         horarios: Array.isArray(config.horarios) ? config.horarios : [],
+        intervalo: Number(config.intervalo || 30),
         puedeCrearCliente: !!config.puedeCrearCliente,
         profesionalId: '',
-        servicioId: '',
-        servicioNombre: '',
+        servicioSel: null,
+        opcionId: '',
         servicioPersonalizado: '',
-        servicioCatalogoManualId: '',
-        servicioPrecioOpcionId: '',
-        servicioOpcionKey: '',
-        servicioCatalogoOverrideId: '',
-        servicioPrecioOpcionModalId: '',
         usarPrecioManual: false,
         precioManual: '',
         duracion: 30,
         fecha: '',
         hora: '',
+        ocupados: [],
+        cargandoOcupados: false,
+        ocupadosFetchId: 0,
         clienteSeleccionado: null,
         clienteId: '',
         clienteBusqueda: '',
@@ -32,415 +33,187 @@ function peluqueriaTurnoRapido(config) {
         cargandoClientes: false,
         clienteFetchId: 0,
         observaciones: '',
-        modalServicioAbierto: false,
-        modoOscuro: false,
-        observadorTema: null,
-        paleta: [
-            { solid: '#7c3aed', soft: 'rgba(124, 58, 237, 0.12)', border: 'rgba(124, 58, 237, 0.28)', ring: 'rgba(124, 58, 237, 0.18)' },
-            { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.12)', border: 'rgba(37, 99, 235, 0.28)', ring: 'rgba(37, 99, 235, 0.18)' },
-            { solid: '#db2777', soft: 'rgba(219, 39, 119, 0.12)', border: 'rgba(219, 39, 119, 0.28)', ring: 'rgba(219, 39, 119, 0.18)' },
-            { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.28)', ring: 'rgba(234, 88, 12, 0.18)' },
-            { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)', border: 'rgba(8, 145, 178, 0.28)', ring: 'rgba(8, 145, 178, 0.18)' },
-            { solid: '#65a30d', soft: 'rgba(101, 163, 13, 0.12)', border: 'rgba(101, 163, 13, 0.28)', ring: 'rgba(101, 163, 13, 0.18)' },
-            { solid: '#dc2626', soft: 'rgba(220, 38, 38, 0.12)', border: 'rgba(220, 38, 38, 0.28)', ring: 'rgba(220, 38, 38, 0.18)' },
-        ],
-        coloresServicio: {
-            corte: { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.12)', border: 'rgba(37, 99, 235, 0.28)', ring: 'rgba(37, 99, 235, 0.18)' },
-            barba: { solid: '#16a34a', soft: 'rgba(22, 163, 74, 0.12)', border: 'rgba(22, 163, 74, 0.28)', ring: 'rgba(22, 163, 74, 0.18)' },
-            corte_barba: { solid: '#7c3aed', soft: 'rgba(124, 58, 237, 0.12)', border: 'rgba(124, 58, 237, 0.28)', ring: 'rgba(124, 58, 237, 0.18)' },
-            color: { solid: '#db2777', soft: 'rgba(219, 39, 119, 0.12)', border: 'rgba(219, 39, 119, 0.28)', ring: 'rgba(219, 39, 119, 0.18)' },
-            peinado: { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.28)', ring: 'rgba(234, 88, 12, 0.18)' },
-            lavado: { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)', border: 'rgba(8, 145, 178, 0.28)', ring: 'rgba(8, 145, 178, 0.18)' },
-            otro: { solid: '#475569', soft: 'rgba(71, 85, 105, 0.12)', border: 'rgba(71, 85, 105, 0.28)', ring: 'rgba(71, 85, 105, 0.18)' },
-        },
         init() {
-            const hoy = new Date();
             this.actualizarModoTema();
             this.inicializarObservadorTema();
-            this.fecha = this.formatearFecha(hoy);
-            this.hora = this.horaInicial(hoy);
+            this.fecha = this.hoy();
             if (this.profesionales.length) this.seleccionarProfesional(this.profesionales[0]);
-            if (this.servicios.length) this.seleccionarServicio(this.servicios[0], { abrirModal: false });
-        },
-        actualizarModoTema() {
-            this.modoOscuro = document.documentElement.classList.contains('dark');
-        },
-        inicializarObservadorTema() {
-            if (this.observadorTema) return;
-            this.observadorTema = new MutationObserver(() => this.actualizarModoTema());
-            this.observadorTema.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-        },
-        colorItem(seed) {
-            const valor = String(seed || 'item');
-            let hash = 0;
-            for (let index = 0; index < valor.length; index += 1) {
-                hash = ((hash << 5) - hash) + valor.charCodeAt(index);
-                hash |= 0;
-            }
-            return this.paleta[Math.abs(hash) % this.paleta.length];
-        },
-        estiloTarjetaProfesional(profesional) {
-            const color = this.colorItem(profesional ? profesional.id : 'profesional');
-            if (this.profesionalId === (profesional ? profesional.id : '')) {
-                return {
-                    borderColor: color.border,
-                    backgroundColor: color.soft,
-                    boxShadow: `0 0 0 3px ${color.ring}`,
-                };
-            }
-            return { borderColor: color.ring };
-        },
-        estiloAvatarProfesional(profesional) {
-            const color = this.colorItem(profesional ? profesional.id : 'profesional');
-            return {
-                backgroundColor: color.solid,
-                boxShadow: this.profesionalId === (profesional ? profesional.id : '') ? `0 0 0 4px ${color.ring}` : 'none',
-            };
+            peluqueriaTurnoRapidoAplicarInicial(this, config.inicial);
+            this.$watch('profesionalId', () => this.cargarOcupados());
+            this.$watch('fecha', () => this.cargarOcupados());
+            this.$watch('duracion', () => this.descartarHoraNoDisponible());
+            this.cargarOcupados();
         },
         seleccionarProfesional(profesional) {
             this.profesionalId = profesional ? profesional.id : '';
-        },
-        colorServicio(servicioId) {
-            return this.coloresServicio[servicioId] || this.colorItem(servicioId || 'servicio');
-        },
-        colorResumen() {
-            return this.colorServicio(this.servicioId || 'corte');
-        },
-        hexToRgba(hex, alpha) {
-            const valor = String(hex || '').replace('#', '');
-            if (valor.length !== 6) return `rgba(124, 58, 237, ${alpha})`;
-            const red = Number.parseInt(valor.slice(0, 2), 16);
-            const green = Number.parseInt(valor.slice(2, 4), 16);
-            const blue = Number.parseInt(valor.slice(4, 6), 16);
-            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-        },
-        estiloResumenPanel() {
-            const color = this.colorResumen();
-            if (this.modoOscuro) {
-                return {
-                    borderColor: color.border,
-                    boxShadow: `0 14px 40px ${this.hexToRgba(color.solid, 0.20)}`,
-                    backgroundImage: `linear-gradient(135deg, #020617 0%, #0f172a 58%, ${this.hexToRgba(color.solid, 0.42)} 100%)`,
-                    color: '#ffffff',
-                };
-            }
-            return {
-                borderColor: color.border,
-                boxShadow: `0 18px 40px ${this.hexToRgba(color.solid, 0.12)}`,
-                backgroundImage: `linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.98) 58%, ${this.hexToRgba(color.solid, 0.14)} 100%)`,
-                color: '#0f172a',
-            };
-        },
-        estiloGlowResumen() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: this.hexToRgba(color.solid, this.modoOscuro ? 0.18 : 0.14),
-            };
-        },
-        estiloTextoResumen() {
-            const color = this.colorResumen();
-            return { color: color.solid };
-        },
-        estiloBadgeResumen() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: this.modoOscuro ? this.hexToRgba(color.solid, 0.14) : this.hexToRgba(color.solid, 0.10),
-                border: `1px solid ${this.hexToRgba(color.solid, this.modoOscuro ? 0.25 : 0.18)}`,
-                color: color.solid,
-            };
-        },
-        estiloPuntoResumen() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: color.solid,
-                boxShadow: `0 0 0 4px ${this.hexToRgba(color.solid, this.modoOscuro ? 0.14 : 0.12)}`,
-            };
-        },
-        estiloIconoResumenCard() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: this.modoOscuro ? this.hexToRgba(color.solid, 0.18) : '#ffffff',
-                color: color.solid,
-                border: `1px solid ${this.hexToRgba(color.solid, this.modoOscuro ? 0.24 : 0.16)}`,
-                boxShadow: this.modoOscuro ? `0 10px 24px ${this.hexToRgba(color.solid, 0.18)}` : `0 10px 24px ${this.hexToRgba(color.solid, 0.10)}`,
-            };
-        },
-        estiloItemResumen() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: this.modoOscuro ? 'rgba(15, 23, 42, 0.34)' : 'rgba(255, 255, 255, 0.72)',
-                borderColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(226, 232, 240, 0.95)',
-                boxShadow: this.modoOscuro ? 'none' : `0 10px 24px ${this.hexToRgba(color.solid, 0.06)}`,
-            };
-        },
-        estiloIconoResumenWrap() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: this.modoOscuro ? this.hexToRgba(color.solid, 0.15) : this.hexToRgba(color.solid, 0.10),
-                border: `1px solid ${this.hexToRgba(color.solid, this.modoOscuro ? 0.20 : 0.12)}`,
-            };
-        },
-        estiloBloqueSecundarioResumen() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.66)',
-                borderColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.10)' : 'rgba(226, 232, 240, 0.9)',
-                boxShadow: this.modoOscuro ? 'none' : `0 12px 30px ${this.hexToRgba(color.solid, 0.08)}`,
-            };
-        },
-        estiloBotonResumen() {
-            const color = this.colorResumen();
-            return {
-                backgroundImage: `linear-gradient(135deg, ${this.hexToRgba(color.solid, 0.92)} 0%, ${color.solid} 100%)`,
-                boxShadow: `0 10px 24px ${this.hexToRgba(color.solid, this.modoOscuro ? 0.24 : 0.20)}`,
-                color: '#ffffff',
-            };
-        },
-        estiloBotonSecundarioResumen() {
-            const color = this.colorResumen();
-            return {
-                backgroundColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.82)',
-                borderColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.14)' : this.hexToRgba(color.solid, 0.16),
-                color: this.modoOscuro ? '#ffffff' : color.solid,
-                boxShadow: this.modoOscuro ? 'none' : `0 10px 24px ${this.hexToRgba(color.solid, 0.08)}`,
-            };
-        },
-        estiloTarjetaServicio(servicio) {
-            const color = this.colorServicio(servicio ? servicio.id : 'servicio');
-            if (this.servicioId === (servicio ? servicio.id : '')) {
-                return {
-                    borderColor: color.border,
-                    backgroundColor: color.soft,
-                    boxShadow: `0 0 0 3px ${color.ring}`,
-                };
-            }
-            return { borderColor: color.ring };
-        },
-        estiloIconoServicio(servicio) {
-            const color = this.colorServicio(servicio ? servicio.id : 'servicio');
-            return { color: color.solid };
-        },
-        seleccionarServicio(servicio, { abrirModal = true } = {}) {
-            if (!servicio) return;
-            this.servicioId = servicio.id;
-            this.servicioNombre = servicio.nombre;
-            this.duracion = Number(servicio.duracion || 30);
-            this.servicioCatalogoManualId = '';
-            this.reiniciarCobroRapido();
-            this.sincronizarOpcionServicio();
-            if (abrirModal && this.servicioActualPuedeAbrirModal()) {
-                this.abrirModalServicio();
-            } else {
-                this.cerrarModalServicio();
-            }
-        },
-        reiniciarCobroRapido() {
-            this.servicioPrecioOpcionId = '';
-            this.servicioOpcionKey = '';
-            this.servicioCatalogoOverrideId = '';
-            this.servicioPrecioOpcionModalId = '';
-            this.usarPrecioManual = false;
-            this.precioManual = '';
-        },
-        servicioCatalogoSeleccionado() {
-            const servicio = this.servicioActual();
-            const servicioId = Number(servicio && servicio.catalogo_id ? servicio.catalogo_id : (this.servicioCatalogoManualId || 0));
-            return this.serviciosCatalogo.find((item) => Number(item.id || 0) === servicioId) || null;
-        },
-        opcionesServicioDirectoSeleccionado() {
-            const servicio = this.servicioActual();
-            return servicio && Array.isArray(servicio.catalogo_opciones) ? servicio.catalogo_opciones : [];
-        },
-        opcionesServicioSeleccionado() {
-            const opcionesDirectas = this.opcionesServicioDirectoSeleccionado();
-            if (opcionesDirectas.length) return opcionesDirectas;
-            const servicio = this.servicioCatalogoSeleccionado();
-            return servicio && Array.isArray(servicio.precios_opciones) ? servicio.precios_opciones : [];
-        },
-        opcionBaseServicioSeleccionado() {
-            const turnoServicio = this.servicioActual();
-            if (turnoServicio && turnoServicio.catalogo_id) {
-                return {
-                    id: '__base__',
-                    servicio_id: Number(turnoServicio.catalogo_id),
-                    etiqueta: turnoServicio.catalogo_nombre || this.servicioNombre || 'Precio base',
-                    costo_label: turnoServicio.catalogo_costo_label || '',
-                    precio_label: turnoServicio.catalogo_precio_label || '',
-                    es_base: true,
-                };
-            }
-            const servicio = this.servicioCatalogoSeleccionado();
-            if (!servicio) return null;
-            return {
-                id: '__base__',
-                servicio_id: Number(servicio.id),
-                etiqueta: servicio.nombre || this.servicioNombre || 'Precio base',
-                costo_label: servicio.costo_label || '',
-                precio_label: servicio.precio_label || '',
-                es_base: true,
-            };
-        },
-        opcionesServicioModal() {
-            const opciones = this.opcionesServicioSeleccionado();
-            if (opciones.length) {
-                return opciones.map((opcion) => ({
-                    ...opcion,
-                    es_base: !!opcion.es_base,
-                    costo_label: opcion.costo_label || '',
-                    precio_label: opcion.precio_label || '',
-                }));
-            }
-            const base = this.opcionBaseServicioSeleccionado();
-            return base ? [base] : [];
-        },
-        sincronizarOpcionServicio() {
-            const opciones = this.opcionesServicioModal();
-            if (!opciones.length) {
-                this.servicioPrecioOpcionId = '';
-                this.servicioOpcionKey = '';
-                this.servicioCatalogoOverrideId = '';
-                return;
-            }
-            if (opciones.some((item) => this.opcionServicioModalKey(item) === this.servicioOpcionKey)) return;
-            if (opciones.length === 1) this.seleccionarOpcionServicio(opciones[0]);
-        },
-        seleccionarOpcionServicio(opcion) {
-            this.servicioOpcionKey = opcion ? this.opcionServicioModalKey(opcion) : '';
-            this.servicioPrecioOpcionId = opcion && !opcion.es_base ? String(opcion.id) : '';
-            this.servicioCatalogoOverrideId = opcion && opcion.servicio_id ? String(opcion.servicio_id) : '';
-        },
-        precioTipoServicioLabel() {
-            const opcion = this.servicioPrecioOpcionSeleccionada();
-            return opcion ? opcion.precio_label : '';
-        },
-        servicioActualTieneVariantes() {
-            return this.opcionesServicioModal().length > 0;
-        },
-        servicioActualPuedeAbrirModal() {
-            return this.servicioActualTieneVariantes() || !!this.opcionBaseServicioSeleccionado();
-        },
-        abrirModalServicio() {
-            if (!this.servicioActualPuedeAbrirModal()) return;
-            this.servicioPrecioOpcionModalId = this.servicioOpcionKey
-                ? String(this.servicioOpcionKey)
-                : (this.servicioActualTieneVariantes() ? '' : '__base__');
-            this.modalServicioAbierto = true;
-        },
-        cerrarModalServicio() {
-            this.modalServicioAbierto = false;
-            this.servicioPrecioOpcionModalId = '';
-        },
-        seleccionarOpcionModal(opcion) {
-            this.servicioPrecioOpcionModalId = this.opcionServicioModalKey(opcion);
-        },
-        opcionServicioModalKey(opcion) {
-            if (!opcion) return '';
-            return opcion.es_base ? `servicio-${opcion.servicio_id || opcion.id || 'base'}` : String(opcion.id);
-        },
-        opcionServicioModalSeleccionada() {
-            return this.opcionesServicioModal().find((item) => this.opcionServicioModalKey(item) === String(this.servicioPrecioOpcionModalId)) || null;
-        },
-        confirmarOpcionServicioModal() {
-            const opcion = this.opcionServicioModalSeleccionada();
-            if (!opcion) return;
-            this.seleccionarOpcionServicio(opcion);
-            this.cerrarModalServicio();
-        },
-        servicioPrecioOpcionSeleccionada() {
-            return this.opcionesServicioModal().find((item) => this.opcionServicioModalKey(item) === String(this.servicioOpcionKey)) || null;
-        },
-        servicioPrecioOpcionFormValue() {
-            const opcion = this.servicioPrecioOpcionSeleccionada();
-            return opcion && !opcion.es_base ? String(opcion.id) : '';
-        },
-        tipoServicioLabel() {
-            const opcion = this.servicioPrecioOpcionSeleccionada();
-            return opcion ? opcion.etiqueta : '';
-        },
-        puedeCrearTurno() {
-            return !this.opcionesServicioSeleccionado().length || !!this.servicioPrecioOpcionSeleccionada();
-        },
-        mensajeTurnoNoDisponible() {
-            if (this.opcionesServicioSeleccionado().length && !this.servicioPrecioOpcionSeleccionada()) {
-                return 'Selecciona el tipo o variante del servicio antes de crear el turno.';
-            }
-            return 'Completa los datos obligatorios del turno antes de continuar.';
-        },
-        nombreServicio() {
-            const tipo = this.tipoServicioLabel();
-            if (this.servicioId === 'otro' && this.servicioPersonalizado.trim()) {
-                return tipo ? `${this.servicioPersonalizado.trim()} - ${tipo}` : this.servicioPersonalizado.trim();
-            }
-            const base = this.servicioNombre || 'Turno';
-            if (!tipo) return base;
-            return tipo.toLowerCase().startsWith(base.toLowerCase()) ? tipo : `${base} - ${tipo}`;
-        },
-        servicioActual() {
-            return this.servicios.find((item) => item.id === this.servicioId) || null;
-        },
-        servicioTieneVinculoDirecto() {
-            const servicio = this.servicioActual();
-            return !!(servicio && servicio.catalogo_id);
-        },
-        servicioCatalogoId() {
-            if (this.servicioCatalogoOverrideId) {
-                return this.servicioCatalogoOverrideId;
-            }
-            const servicio = this.servicioActual();
-            if (servicio && servicio.catalogo_id) {
-                return servicio.catalogo_id;
-            }
-            return this.servicioCatalogoManualId || '';
-        },
-        servicioEsCobrable() {
-            return this.tieneServicioBaseRegistrado() && (this.precioManualValido() || !!this.servicioBaseSeleccionado());
-        },
-        servicioBaseSeleccionado() {
-            const servicioId = Number(this.servicioCatalogoId() || 0);
-            return this.serviciosCatalogo.find((item) => Number(item.id || 0) === servicioId) || null;
-        },
-        servicioBaseSeleccionadoLabel() {
-            const servicio = this.servicioBaseSeleccionado();
-            return servicio ? `${servicio.nombre} · ${servicio.precio_label}` : '';
-        },
-        precioManualValido() {
-            return Number(this.precioManual || 0) > 0;
-        },
-        precioManualFormValue() {
-            if (!this.usarPrecioManual || !this.precioManualValido()) {
-                return '';
-            }
-            return String(Number(this.precioManual));
-        },
-        tieneServicioBaseRegistrado() {
-            return !!this.servicioCatalogoId();
-        },
-        puedeCrearYCobrar() {
-            return this.servicioEsCobrable() && (!this.usarPrecioManual || this.precioManualValido());
-        },
-        mensajeCobroNoDisponible() {
-            if (!this.puedeCrearTurno()) {
-                return 'Selecciona el tipo o variante del servicio antes de continuar.';
-            }
-            if (!this.tieneServicioBaseRegistrado()) {
-                return 'Selecciona un servicio base del catalogo para poder cobrar este turno.';
-            }
-            if (this.usarPrecioManual && !this.precioManualValido()) {
-                return 'Ingresa un precio manual mayor a cero.';
-            }
-            if (!this.servicioBaseSeleccionado()) {
-                return 'Ese servicio vinculado no tiene precio valido. Usa precio manual o corrige el servicio en el catalogo.';
-            }
-            return 'Completa los datos para cobrar este turno.';
         },
         profesionalNombre() {
             const profesional = this.profesionales.find((item) => item.id === this.profesionalId);
             return profesional ? profesional.nombre : 'Sin profesional';
         },
+
+        // --- Servicio: botones del catálogo (o tipos fijos si el catálogo está vacío) ---
+        modoCatalogo() {
+            return this.catalogo.length > 0;
+        },
+        serviciosVisibles() {
+            return this.modoCatalogo() ? this.catalogo : this.tiposBase;
+        },
+        esServicioSeleccionado(servicio) {
+            return !!(servicio && this.servicioSel && this.servicioSel.id === servicio.id);
+        },
+        seleccionarServicio(servicio) {
+            if (!servicio) return;
+            this.servicioSel = servicio;
+            this.duracion = Number(servicio.duracion || 30);
+            const opciones = this.opcionesServicio();
+            this.opcionId = opciones.length === 1 ? String(opciones[0].id) : '';
+            this.usarPrecioManual = false;
+            this.precioManual = '';
+        },
+        opcionesServicio() {
+            return this.servicioSel && Array.isArray(this.servicioSel.opciones) ? this.servicioSel.opciones : [];
+        },
+        opcionSeleccionada() {
+            return this.opcionesServicio().find((item) => String(item.id) === String(this.opcionId)) || null;
+        },
+        seleccionarOpcion(opcion) {
+            this.opcionId = opcion ? String(opcion.id) : '';
+        },
+        detalleBotonServicio(servicio) {
+            const opciones = Array.isArray(servicio.opciones) ? servicio.opciones : [];
+            if (opciones.length > 1) return `${opciones.length} opciones`;
+            if (opciones.length === 1) return opciones[0].precio_label;
+            return servicio.precio_label || (this.modoCatalogo() ? 'Sin precio' : '');
+        },
+        esServicioLibre() {
+            return !this.modoCatalogo() && !!this.servicioSel && this.servicioSel.id === 'otro';
+        },
+        nombreServicio() {
+            if (!this.servicioSel) return 'Turno';
+            if (this.esServicioLibre() && this.servicioPersonalizado.trim()) return this.servicioPersonalizado.trim();
+            const base = this.servicioSel.nombre || 'Turno';
+            const opcion = this.opcionSeleccionada();
+            if (!opcion || !opcion.etiqueta) return base;
+            return opcion.etiqueta.toLowerCase().startsWith(base.toLowerCase()) ? opcion.etiqueta : `${base} - ${opcion.etiqueta}`;
+        },
+        servicioTurnoIdFormValue() {
+            if (!this.servicioSel) return '';
+            return this.modoCatalogo() ? (this.servicioSel.tipo || '') : this.servicioSel.id;
+        },
+        servicioCatalogoIdFormValue() {
+            return this.modoCatalogo() && this.servicioSel ? String(this.servicioSel.id) : '';
+        },
+        opcionIdFormValue() {
+            return this.opcionSeleccionada() ? String(this.opcionId) : '';
+        },
+
+        // --- Precio ---
+        precioServicio() {
+            const opcion = this.opcionSeleccionada();
+            if (opcion) return Number(opcion.precio || 0);
+            return this.modoCatalogo() && this.servicioSel ? Number(this.servicioSel.precio || 0) : 0;
+        },
+        precioServicioLabel() {
+            const opcion = this.opcionSeleccionada();
+            if (opcion) return opcion.precio_label;
+            return this.servicioSel && this.servicioSel.precio_label ? this.servicioSel.precio_label : '';
+        },
+        precioManualValido() {
+            return Number(this.precioManual || 0) > 0;
+        },
+        precioManualFormValue() {
+            return this.usarPrecioManual && this.precioManualValido() ? String(Number(this.precioManual)) : '';
+        },
+        alternarPrecioManual() {
+            this.usarPrecioManual = !this.usarPrecioManual;
+            if (!this.usarPrecioManual) this.precioManual = '';
+        },
+        precioResumen() {
+            if (this.usarPrecioManual && this.precioManualValido()) return Number(this.precioManual).toLocaleString();
+            return this.precioServicioLabel() || 'Sin precio';
+        },
+
+        // --- Hora: grilla con horarios ocupados y pasados ---
+        hoy() {
+            return this.formatearFecha(new Date());
+        },
+        aMinutos(hora) {
+            const [h, m] = String(hora || '').split(':').map(Number);
+            return Number.isFinite(h) && Number.isFinite(m) ? (h * 60) + m : null;
+        },
+        horaPasada(hora) {
+            if (this.fecha !== this.hoy()) return false;
+            const ahora = new Date();
+            return this.aMinutos(hora) < (ahora.getHours() * 60) + ahora.getMinutes();
+        },
+        horaOcupada(hora) {
+            const inicio = this.aMinutos(hora);
+            if (inicio === null) return false;
+            const fin = inicio + Number(this.duracion || 30);
+            return this.ocupados.some((rango) => inicio < rango.fin && fin > rango.inicio);
+        },
+        horasVisibles() {
+            return this.horarios.filter((hora) => !this.horaPasada(hora));
+        },
+        seleccionarHora(hora) {
+            if (this.horaOcupada(hora)) return;
+            this.hora = hora;
+        },
+        descartarHoraNoDisponible() {
+            if (this.hora && (this.horaOcupada(this.hora) || this.horaPasada(this.hora))) this.hora = '';
+        },
+        async cargarOcupados() {
+            const fetchId = ++this.ocupadosFetchId;
+            if (!this.ocupadosUrl || !this.profesionalId || !this.fecha) {
+                this.ocupados = [];
+                this.cargandoOcupados = false;
+                return;
+            }
+            this.cargandoOcupados = true;
+            try {
+                const url = new URL(this.ocupadosUrl, window.location.origin);
+                url.searchParams.set('profesional_id', this.profesionalId);
+                url.searchParams.set('fecha', this.fecha);
+                const response = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                const data = response.ok ? await response.json() : {};
+                if (fetchId !== this.ocupadosFetchId) return;
+                this.ocupados = Array.isArray(data.ocupados) ? data.ocupados : [];
+                this.descartarHoraNoDisponible();
+            } catch (_error) {
+                if (fetchId === this.ocupadosFetchId) this.ocupados = [];
+            } finally {
+                if (fetchId === this.ocupadosFetchId) this.cargandoOcupados = false;
+            }
+        },
+
+        // --- Validaciones y textos del resumen ---
+        puedeCrearTurno() {
+            return !!this.servicioSel
+                && (!this.opcionesServicio().length || !!this.opcionSeleccionada())
+                && !!this.hora
+                && !this.horaOcupada(this.hora);
+        },
+        mensajeTurnoNoDisponible() {
+            if (!this.servicioSel) return 'Elegí un servicio.';
+            if (this.opcionesServicio().length && !this.opcionSeleccionada()) return 'Elegí el tipo de servicio.';
+            if (!this.hora) return 'Elegí una hora libre.';
+            if (this.horaOcupada(this.hora)) return 'Esa hora ya está ocupada para este profesional.';
+            return 'Completá los datos del turno.';
+        },
+        puedeCrearYCobrar() {
+            if (!this.modoCatalogo() || !this.puedeCrearTurno()) return false;
+            return this.usarPrecioManual ? this.precioManualValido() : this.precioServicio() > 0;
+        },
+        mensajeCobroNoDisponible() {
+            if (!this.puedeCrearTurno()) return this.mensajeTurnoNoDisponible();
+            if (!this.modoCatalogo()) return 'Cargá tus servicios para cobrar desde acá.';
+            if (this.usarPrecioManual) return 'Escribí el precio a cobrar.';
+            return 'Este servicio no tiene precio: tocá "Cambiar precio".';
+        },
         tituloTurno() {
             const nombreCliente = this.clienteNombreTurno();
-            const cliente = nombreCliente ? ` - ${nombreCliente}` : '';
-            return `${this.nombreServicio()}${cliente}`;
+            return nombreCliente ? `${this.nombreServicio()} - ${nombreCliente}` : this.nombreServicio();
         },
         descripcionTurno() {
             return `Turno peluquería/barbería: ${this.nombreServicio()} con ${this.profesionalNombre()}.`;
@@ -455,7 +228,7 @@ function peluqueriaTurnoRapido(config) {
             return this.formatearDatetimeLocal(fin);
         },
         horarioResumen() {
-            if (!this.fecha || !this.hora) return 'Sin horario';
+            if (!this.fecha || !this.hora) return 'Elegí una hora';
             return `${this.fecha} ${this.hora} a ${this.fechaFin.slice(11, 16)}`;
         },
         formatearFecha(fecha) {
@@ -464,13 +237,8 @@ function peluqueriaTurnoRapido(config) {
         formatearDatetimeLocal(fecha) {
             return `${this.formatearFecha(fecha)}T${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`;
         },
-        horaInicial(fecha) {
-            const siguiente = new Date(fecha);
-            const minutos = siguiente.getMinutes();
-            siguiente.setMinutes(minutos <= 30 ? 30 : 60, 0, 0);
-            const hora = `${String(siguiente.getHours()).padStart(2, '0')}:${String(siguiente.getMinutes()).padStart(2, '0')}`;
-            return this.horarios.includes(hora) ? hora : '09:00';
-        },
+
+        // --- Cliente ---
         detalleCliente(cliente) {
             if (!cliente) return '';
             return [cliente.ruc_ci, cliente.telefono, cliente.email].filter(Boolean).join(' · ') || 'Sin datos extra';

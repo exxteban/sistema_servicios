@@ -22,7 +22,13 @@ METODO_BUSQUEDAS = {
 
 
 def crear_venta_central_desde_pedido(
-    pedido: GastronomiaPedido, usuario_id: int, data: dict, *, descuento: Decimal, id_cliente_venta: int | None = None,
+    pedido: GastronomiaPedido,
+    usuario_id: int,
+    data: dict,
+    *,
+    descuento: Decimal,
+    id_cliente_venta: int | None = None,
+    sena_aplicada: Decimal = Decimal('0.00'),
 ):
     sesion = _sesion_abierta_usuario(usuario_id)
     if not sesion:
@@ -30,7 +36,8 @@ def crear_venta_central_desde_pedido(
 
     metodo = _resolver_metodo_pago(data)
     subtotal = Decimal(str(pedido.total or 0)).quantize(Decimal('0.01'))
-    total = (subtotal - descuento).quantize(Decimal('0.01'))
+    sena_aplicada = Decimal(str(sena_aplicada or 0)).quantize(Decimal('0.01'))
+    total = (subtotal - descuento - sena_aplicada).quantize(Decimal('0.01'))
     if total < 0:
         raise ValueError('El total del pedido no puede ser negativo.')
 
@@ -39,7 +46,7 @@ def crear_venta_central_desde_pedido(
         id_sesion_caja=sesion.id_sesion,
         id_usuario_vendedor=pedido.usuario_id,
         subtotal=subtotal,
-        descuento_monto=descuento,
+        descuento_monto=descuento + sena_aplicada,
         descuento_manual_monto=descuento,
         descuento_fidelizacion_monto=Decimal('0.00'),
         total_iva_10=Decimal('0.00'),
@@ -47,7 +54,7 @@ def crear_venta_central_desde_pedido(
         total_exenta=Decimal('0.00'),
         total=total,
         tipo_venta='contado',
-        observaciones=_observaciones_venta(pedido, data),
+        observaciones=_observaciones_venta(pedido, data, sena_aplicada=sena_aplicada),
     )
     db.session.add(venta)
     db.session.flush()
@@ -105,6 +112,8 @@ def crear_cola_cobro_central_desde_pedido(
         raise ValueError('El pedido ya fue cobrado.')
     if pedido.estado == 'cancelado':
         raise ValueError('No se puede cobrar un pedido cancelado.')
+    if pedido.es_encargo and pedido.adelantos.filter_by(estado='vigente').first():
+        raise ValueError('Este encargo tiene una sena cobrada: cobralo desde la caja de gastronomia.')
 
     existente = ColaCobro.query.filter(
         ColaCobro.tipo_origen == 'gastronomia',
@@ -239,6 +248,10 @@ def registrar_anulacion_gastronomia_desde_venta_central(venta, usuario_id: int) 
 
     eventos = []
     cancelar_colas_activas_gastronomia_pedido(pedido, venta, usuario_id)
+    if pedido.es_encargo:
+        from gastronomia.services.adelanto_service import revertir_adelantos_aplicados  # evita import circular
+
+        revertir_adelantos_aplicados(pedido)
     if pedido.estado != 'cancelado':
         from gastronomia.services.pedido_service import _restaurar_stock_items
 
@@ -550,8 +563,10 @@ def _slug_metodo(metodo: MetodoPago) -> str:
     return nombre[:40] or 'efectivo'
 
 
-def _observaciones_venta(pedido: GastronomiaPedido, data: dict) -> str:
+def _observaciones_venta(pedido: GastronomiaPedido, data: dict, *, sena_aplicada: Decimal = Decimal('0')) -> str:
     partes = [f'Pedido gastronomia #{pedido.id_pedido}']
+    if sena_aplicada > 0:
+        partes.append(f'Sena aplicada: {sena_aplicada:.2f}')
     if pedido.mesa:
         partes.append(f'Mesa {pedido.mesa}')
     if pedido.tipo_pedido == 'delivery':

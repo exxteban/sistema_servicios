@@ -51,6 +51,7 @@
         const rules = [
             [/^\/clientes\/\d+\/servicios\/(?:asignar|\d+\/actualizar)$/, 'clientes-servicios'],
             [/^\/agenda\/turnos\/peluqueria\/crear$/, 'agenda-turno'],
+            [/^\/agenda\/turnos\/peluqueria\/\d+\/gestionar$/, 'agenda-turno'],
             [/^\/agenda\/actividades(?:\/nueva|\/\d+\/(?:editar|iniciar|completar|cancelar|eliminar|reprogramar))$/, 'agenda'],
             [/^\/ventas\/(?:procesar|enviar-a-caja)$/, 'ventas'],
             [/^\/caja\/api\/cola-cobro\/\d+\/(?:tomar|liberar|cancelar|cobrar)$/, 'caja-cola-cobro'],

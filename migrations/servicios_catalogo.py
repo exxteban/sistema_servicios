@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -61,6 +62,53 @@ def _sqlite_columns(table_name: str):
     if not _sqlite_table_exists(table_name):
         return []
     return [row[1] for row in db.session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()]
+
+
+def _sqlite_table_info(table_name: str):
+    return db.session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+
+
+def _sqlite_index_sqls(table_name: str):
+    return [row[0] for row in db.session.execute(text("""
+        SELECT sql FROM sqlite_master
+        WHERE type = 'index' AND tbl_name = :table_name AND sql IS NOT NULL
+    """), {'table_name': table_name}).fetchall()]
+
+
+def _sqlite_rebuild_table(table_name: str, create_new_table, *, drop_columns=()):
+    """Reconstruye `table_name` con la definición nueva sin perder columnas ni índices agregados después.
+
+    `create_new_table(nombre)` crea la tabla nueva. Las columnas viejas que la definición nueva no tiene
+    (p. ej. las que suma el bootstrap de la app) se agregan antes de copiar, salvo `drop_columns`.
+    """
+    new_name = f'{table_name}_new'
+    old_info = _sqlite_table_info(table_name)
+    old_names = [row[1] for row in old_info]
+    index_sqls = _sqlite_index_sqls(table_name)
+
+    create_new_table(new_name)
+    new_names = {row[1] for row in _sqlite_table_info(new_name)}
+    for _cid, name, col_type, notnull, default, _pk in old_info:
+        if name in new_names or name in drop_columns:
+            continue
+        ddl = f'ALTER TABLE {new_name} ADD COLUMN "{name}" {col_type or ""}'.rstrip()
+        if default is not None:
+            ddl += (' NOT NULL' if notnull else '') + f' DEFAULT {default}'
+        db.session.execute(text(ddl))
+        new_names.add(name)
+
+    columnas = ', '.join(f'"{name}"' for name in old_names if name in new_names)
+    db.session.execute(text(f'INSERT INTO {new_name} ({columnas}) SELECT {columnas} FROM {table_name}'))
+    db.session.execute(text(f"DROP TABLE {table_name}"))
+    db.session.execute(text(f"ALTER TABLE {new_name} RENAME TO {table_name}"))
+
+    for sql in index_sqls:
+        # Un índice sobre una columna que se eliminó a propósito no se recrea.
+        if any(col in sql for col in drop_columns):
+            continue
+        if 'IF NOT EXISTS' not in sql.upper():
+            sql = re.sub(r'^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+', r'CREATE \1INDEX IF NOT EXISTS ', sql, count=1, flags=re.IGNORECASE)
+        db.session.execute(text(sql))
 
 
 def run_migration():
@@ -328,47 +376,7 @@ def _sqlite_migrate_servicios():
 
     if 'id_cliente' in cols:
         db.session.execute(text("PRAGMA foreign_keys=OFF"))
-        _sqlite_create_servicios_table('servicios_new')
-        db.session.execute(text("""
-            INSERT INTO servicios_new (
-                id_servicio,
-                codigo,
-                nombre,
-                categoria,
-                descripcion,
-                costo,
-                precio,
-                duracion_minutos,
-                porcentaje_iva,
-                activo,
-                turno_rapido_tipo,
-                publicado_tienda,
-                descripcion_tienda,
-                orden_tienda,
-                fecha_creacion,
-                fecha_modificacion,
-                id_usuario_modificacion
-            )
-            SELECT
-                id_servicio,
-                codigo,
-                nombre,
-                categoria,
-                descripcion,
-                costo,
-                precio,
-                duracion_minutos,
-                porcentaje_iva,
-                activo,
-                NULL,
-                publicado_tienda,
-                descripcion_tienda,
-                orden_tienda,
-                fecha_creacion,
-                fecha_modificacion,
-                id_usuario_modificacion
-            FROM servicios
-        """))
+        # La relación legacy servicio-cliente pasa a cliente_servicios antes de quitar servicios.id_cliente.
         db.session.execute(text("""
             INSERT INTO cliente_servicios (
                 id_cliente,
@@ -407,8 +415,7 @@ def _sqlite_migrate_servicios():
                     AND cs.estado = 'migrado'
               )
         """))
-        db.session.execute(text("DROP TABLE servicios"))
-        db.session.execute(text("ALTER TABLE servicios_new RENAME TO servicios"))
+        _sqlite_rebuild_table('servicios', _sqlite_create_servicios_table, drop_columns=('id_cliente',))
         db.session.execute(text("PRAGMA foreign_keys=ON"))
 
     db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_servicios_codigo ON servicios(codigo)"))
@@ -418,6 +425,28 @@ def _sqlite_migrate_servicios():
     db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_servicios_turno_rapido_tipo ON servicios(turno_rapido_tipo)"))
     db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_servicios_publicado ON servicios(publicado_tienda, activo)"))
     _sqlite_create_servicio_precios_opciones()
+
+
+def _sqlite_create_detalle_ventas_table(table_name):
+    db.session.execute(text(f"""
+        CREATE TABLE {table_name} (
+            id_detalle_venta INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_venta INTEGER NOT NULL,
+            id_producto INTEGER,
+            id_servicio INTEGER,
+            cantidad INTEGER NOT NULL,
+            precio_unitario NUMERIC(15, 2) NOT NULL,
+            precio_original NUMERIC(15, 2) NOT NULL,
+            porcentaje_iva INTEGER NOT NULL,
+            monto_iva NUMERIC(15, 2) NOT NULL,
+            descuento_linea NUMERIC(15, 2) DEFAULT 0,
+            subtotal NUMERIC(15, 2) NOT NULL,
+            es_kit BOOLEAN DEFAULT 0,
+            FOREIGN KEY(id_venta) REFERENCES ventas(id_venta) ON DELETE CASCADE,
+            FOREIGN KEY(id_producto) REFERENCES productos(id_producto),
+            FOREIGN KEY(id_servicio) REFERENCES servicios(id_servicio) ON DELETE SET NULL
+        )
+    """))
 
 
 def _sqlite_migrate_detalle_ventas():
@@ -437,39 +466,8 @@ def _sqlite_migrate_detalle_ventas():
         return
 
     db.session.execute(text("PRAGMA foreign_keys=OFF"))
-    db.session.execute(text("""
-        CREATE TABLE detalle_ventas_new (
-            id_detalle_venta INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_venta INTEGER NOT NULL,
-            id_producto INTEGER,
-            id_servicio INTEGER,
-            cantidad INTEGER NOT NULL,
-            precio_unitario NUMERIC(15, 2) NOT NULL,
-            precio_original NUMERIC(15, 2) NOT NULL,
-            porcentaje_iva INTEGER NOT NULL,
-            monto_iva NUMERIC(15, 2) NOT NULL,
-            descuento_linea NUMERIC(15, 2) DEFAULT 0,
-            subtotal NUMERIC(15, 2) NOT NULL,
-            es_kit BOOLEAN DEFAULT 0,
-            FOREIGN KEY(id_venta) REFERENCES ventas(id_venta) ON DELETE CASCADE,
-            FOREIGN KEY(id_producto) REFERENCES productos(id_producto),
-            FOREIGN KEY(id_servicio) REFERENCES servicios(id_servicio) ON DELETE SET NULL
-        )
-    """))
-    select_id_servicio = 'id_servicio' if 'id_servicio' in col_names else 'NULL'
-    db.session.execute(text(f"""
-        INSERT INTO detalle_ventas_new (
-            id_detalle_venta, id_venta, id_producto, id_servicio, cantidad,
-            precio_unitario, precio_original, porcentaje_iva, monto_iva,
-            descuento_linea, subtotal, es_kit
-        )
-        SELECT id_detalle_venta, id_venta, id_producto, {select_id_servicio}, cantidad,
-               precio_unitario, precio_original, porcentaje_iva, monto_iva,
-               descuento_linea, subtotal, es_kit
-        FROM detalle_ventas
-    """))
-    db.session.execute(text("DROP TABLE detalle_ventas"))
-    db.session.execute(text("ALTER TABLE detalle_ventas_new RENAME TO detalle_ventas"))
+    # id_servicio puede faltar en bases viejas: la tabla nueva lo crea vacío.
+    _sqlite_rebuild_table('detalle_ventas', _sqlite_create_detalle_ventas_table)
     db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_detalle_ventas_id_venta ON detalle_ventas(id_venta)"))
     db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_detalle_ventas_id_producto ON detalle_ventas(id_producto)"))
     db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_detalle_ventas_id_servicio ON detalle_ventas(id_servicio)"))

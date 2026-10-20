@@ -84,6 +84,9 @@ def ensure_gastronomia_schema():
     elif dialect == 'mysql':
         _ensure_mysql_columns()
         _ensure_mysql_customer_columns()
+    # Antes de cualquier consulta ORM: GastronomiaClienteConfig ya declara los flags de pasteleria.
+    from gastronomia.schema_pasteleria import ensure_pasteleria_schema
+    ensure_pasteleria_schema()
     asegurar_precios_productos(GastronomiaProducto.query.filter_by(activo=True).all())
 
 

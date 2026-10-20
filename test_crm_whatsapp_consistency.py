@@ -445,6 +445,24 @@ class TestCrmWhatsAppConsistency(unittest.TestCase):
         tipos_evento = {item.get('tipo') for item in data.get('eventos', [])}
         self.assertIn('asesor_cerro_conversacion', tipos_evento)
 
+    def test_monitor_ia_whatsapp_marca_origen_web_bot(self):
+        conv = WhatsAppConversacion(
+            telefono='5959test4004', nombre_contacto='Web', modo='bot', activa=True,
+            contexto=json.dumps({'web_bot': {'id_sesion_web': 7, 'label': 'Bot tienda'}}),
+        )
+        db.session.add(conv)
+        db.session.commit()
+
+        self._login(self.admin)
+        resp = self.client.get('/whatsapp/admin/ia_conversaciones')
+        self.assertEqual(resp.status_code, 200)
+        fila = next(item for item in resp.get_json()['conversaciones'] if item['id'] == conv.id)
+        self.assertTrue(fila['origen_web_bot'])
+
+        resp = self.client.get(f'/whatsapp/admin/ia_conversacion/{conv.id}/mensajes')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()['conversacion']['origen_web_bot'])
+
 
 if __name__ == '__main__':
     unittest.main()
