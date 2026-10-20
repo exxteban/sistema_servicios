@@ -29,3 +29,27 @@ class PasteleriaFlagsMixin:
     produccion_diaria_activa = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
     venta_rapida_activa = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
     propina_activa = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
+
+
+OPCION_DEVOLVER_TODO = 'devolver_todo'
+OPCION_RETENER_TODO = 'retener_todo'
+OPCION_RETENER_PARCIAL = 'retener_parcial'
+OPCIONES_CANCELACION = (OPCION_DEVOLVER_TODO, OPCION_RETENER_TODO, OPCION_RETENER_PARCIAL)
+OPCIONES_CANCELACION_DEFAULT = ','.join(OPCIONES_CANCELACION)
+FOTOS_ENCARGO_DEFAULT = 5
+
+
+class PasteleriaParametrosMixin:
+    """Parametros de encargos para `GastronomiaClienteConfig` (el default reproduce el comportamiento base)."""
+
+    encargos_anticipo_horas = db.Column(db.Integer, nullable=False, default=0, server_default='0')
+    encargos_max_por_dia = db.Column(db.Integer, nullable=True)
+    encargos_max_fotos = db.Column(
+        db.Integer, nullable=False, default=FOTOS_ENCARGO_DEFAULT, server_default=str(FOTOS_ENCARGO_DEFAULT),
+    )
+    encargos_cancelacion_opciones = db.Column(
+        db.String(120),
+        nullable=False,
+        default=OPCIONES_CANCELACION_DEFAULT,
+        server_default=OPCIONES_CANCELACION_DEFAULT,
+    )

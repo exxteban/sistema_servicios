@@ -14,7 +14,9 @@ from gastronomia.services.factura_electronica_service import (
     resolver_cliente_factura,
     validar_factura_antes_de_cobrar,
 )
+from gastronomia.services.adelanto_service import aplicar_adelantos, sena_vigente
 from gastronomia.services.pedido_service import obtener_pedido, registrar_evento_pedido
+from gastronomia.services.pedido_stock import consumir_stock_pedido
 from gastronomia.services.venta_integration_service import (
     cerrar_colas_activas_gastronomia_pedido,
     crear_venta_central_desde_pedido,
@@ -119,24 +121,29 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     descuento = _parse_decimal(data.get('descuento_monto'), Decimal('0.00'))
     if descuento < 0:
         raise ValueError('El descuento no puede ser negativo.')
-    if descuento > subtotal:
+    # Encargo con sena: la sena se descuenta del cobro (suma en caja = sena + saldo).
+    sena = sena_vigente(pedido) if pedido.es_encargo else Decimal('0.00')
+    if descuento + sena > subtotal:
         raise ValueError('El descuento no puede superar el total del pedido.')
 
     cliente_factura = resolver_cliente_factura(data)
     if factura_electronica_solicitada(data):
         if not contexto_factura_electronica_caja()['lista']:
             raise ValueError('La facturacion electronica no esta activa o su configuracion esta incompleta.')
-        validar_factura_antes_de_cobrar(cliente_factura, subtotal - descuento)
+        validar_factura_antes_de_cobrar(cliente_factura, subtotal - descuento - sena)
 
-    pago = _reservar_pago_pedido(cliente_id, usuario_id, pedido, metodo_pago, subtotal, descuento, data)
+    pago = _reservar_pago_pedido(cliente_id, usuario_id, pedido, metodo_pago, subtotal, descuento + sena, data)
 
     try:
+        # Solo los encargos con sena pasan el argumento: el resto llama igual que siempre.
+        extra = {'sena_aplicada': sena} if sena > 0 else {}
         integracion = crear_venta_central_desde_pedido(
             pedido,
             usuario_id,
             data,
             descuento=descuento,
             id_cliente_venta=cliente_factura.id_cliente if cliente_factura else None,
+            **extra,
         )
     except ValueError:
         db.session.rollback()
@@ -152,6 +159,9 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     pago.id_movimiento_caja = int(movimiento.id_movimiento_caja) if movimiento else None
     pago.metodo_pago = integracion['metodo_slug'] or metodo_pago
     cerrar_colas_activas_gastronomia_pedido(pedido, venta, usuario_id)
+    if pedido.es_encargo:
+        aplicar_adelantos(pedido, venta.id_venta)
+        consumir_stock_pedido(pedido)  # cobro sin pasar por produccion: el stock sale igual
     registrar_auditoria(
         accion='cobrar_pedido_gastronomia',
         modulo='gastronomia',
@@ -162,7 +172,8 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
             'id_venta': int(venta.id_venta),
             'id_sesion_caja': int(sesion.id_sesion),
             'id_metodo_pago': int(metodo.id_metodo_pago),
-            'total_cobrado': float(subtotal - descuento),
+            'total_cobrado': float(subtotal - descuento - sena),
+            'sena_aplicada': float(sena),
         },
         commit=False,
     )
