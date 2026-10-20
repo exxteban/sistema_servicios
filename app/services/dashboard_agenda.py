@@ -85,6 +85,7 @@ def obtener_resumen_agenda_dashboard(can_ver_agenda, today, usuario=None):
                     AgendaActividad.cliente_servicio_id,
                     AgendaActividad.usuario_id,
                     AgendaActividad.observaciones,
+                    AgendaActividad.venta_id,
                 ),
                 joinedload(AgendaActividad.usuario).load_only(Usuario.id_usuario, Usuario.nombre_completo, Usuario.username),
                 joinedload(AgendaActividad.cliente).load_only(Cliente.id_cliente, Cliente.nombre),
@@ -98,7 +99,6 @@ def obtener_resumen_agenda_dashboard(can_ver_agenda, today, usuario=None):
                 noload(AgendaActividad.usuarios_recordatorio),
             ).filter(
                 AgendaActividad.tipo == 'cita',
-                AgendaActividad.venta_id.is_(None),
                 rango_hoy,
             ),
             usuario=usuario,
@@ -128,17 +128,24 @@ def obtener_resumen_agenda_dashboard(can_ver_agenda, today, usuario=None):
             }
             for actividad in proximas
         ],
-        'turnero_actividades': [_serializar_turnero_actividad(actividad) for actividad in turnero_items],
+        'turnero_actividades': [serializar_turno_peluqueria(actividad) for actividad in turnero_items],
         'fecha_hoy_iso': agenda_fecha_hoy_iso,
     }
 
 
-def _serializar_turnero_actividad(actividad):
+def serializar_turno_peluqueria(actividad):
+    """Turno listo para el Mapa del día y la agenda por profesional."""
     asignacion = actividad.cliente_servicio
     estado = (actividad.estado or '').strip().lower() or 'pendiente'
     asignacion_estado = (asignacion.estado or '').strip().lower() if asignacion else ''
     no_show = 'no-show' in ((actividad.observaciones or '').lower())
-    estado_visual = 'no_show' if no_show else ('en_atencion' if asignacion_estado == 'en_proceso' else estado)
+    cobrado = bool(actividad.venta_id or (asignacion and asignacion.id_venta))
+    if no_show:
+        estado_visual = 'no_show'
+    elif cobrado and estado != 'cancelada':
+        estado_visual = 'hecha'
+    else:
+        estado_visual = 'en_atencion' if asignacion_estado == 'en_proceso' else estado
     servicio_nombre = asignacion.servicio.nombre if asignacion and asignacion.servicio else ''
     return {
         'id': int(actividad.id),
@@ -149,8 +156,8 @@ def _serializar_turnero_actividad(actividad):
         'hora_inicio': local_strftime(actividad.fecha_inicio, '%H:%M'),
         'hora_fin': local_strftime(actividad.fecha_fin, '%H:%M') if actividad.fecha_fin else '',
         'estado': estado_visual,
-        'estado_label': _turnero_estado_label(estado_visual),
-        'cobrado': bool(asignacion and asignacion.id_venta),
+        'estado_label': 'Cobrado' if (cobrado and estado_visual == 'hecha') else _turnero_estado_label(estado_visual),
+        'cobrado': cobrado,
     }
 
 

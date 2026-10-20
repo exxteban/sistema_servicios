@@ -152,14 +152,14 @@ class TestHorarioConfigurable(PeluqueriaTestBase):
         self.assertEqual(horarios_turno_peluqueria()[:2], ('08:00', '08:30'))
 
 
-class TestVolverAlDashboard(PeluqueriaTestBase):
-    def test_crear_turno_vuelve_al_dashboard(self):
+class TestVolverAUnLugarUtil(PeluqueriaTestBase):
+    def test_crear_turno_vuelve_a_la_agenda_del_dia(self):
         servicio = self._crear_servicio()
 
         response = self.client.post('/agenda/turnos/peluqueria/crear', data=self._datos_turno(servicio))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers['Location'], '/')
+        self.assertEqual(response.headers['Location'], f'/agenda/peluqueria/dia?fecha={today_local().isoformat()}')
 
 
 if __name__ == '__main__':

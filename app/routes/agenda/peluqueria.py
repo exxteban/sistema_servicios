@@ -233,6 +233,20 @@ def _turno_inicial_desde_form(form):
     }
 
 
+def _turno_inicial_desde_agenda(args):
+    """Profesional, fecha y hora elegidos tocando un hueco libre de la agenda del día."""
+    inicial = {
+        'profesional_id': _parse_positive_int(args.get('profesional_id')),
+        'fecha': (args.get('fecha') or '').strip()[:10],
+        'hora': (args.get('hora') or '').strip()[:5],
+    }
+    return inicial if any(inicial.values()) else None
+
+
+def _redirect_agenda_dia(fecha_inicio):
+    return redirect(url_for('agenda.agenda_dia_peluqueria', fecha=_to_date_input(fecha_inicio)))
+
+
 def _rechazar_turno_rapido(mensaje):
     flash(mensaje, 'warning')
     return _render_turno_rapido(_turno_inicial_desde_form(request.form))
@@ -245,7 +259,7 @@ def nuevo_turno_peluqueria():
         flash('No tienes permiso para crear turnos.', 'danger')
         return redirect(url_for('agenda.lista_actividades'))
 
-    return _render_turno_rapido()
+    return _render_turno_rapido(_turno_inicial_desde_agenda(request.args))
 
 
 @agenda_bp.route('/turnos/peluqueria/<int:id_actividad>/gestionar', methods=['GET', 'POST'])
@@ -422,7 +436,7 @@ def crear_turno_peluqueria():
         if asignacion is not None:
             return redirect(url_for('ventas.pos', cliente_servicio_id=int(asignacion.id_cliente_servicio)))
         if not servicio_cobrable:
-            return redirect(url_for('main.dashboard'))
+            return _redirect_agenda_dia(actividad.fecha_inicio)
         redirect_params = _build_turno_redirect_pos_params(
             cliente_id=cliente_id,
             servicio_catalogo_id=request.form.get('servicio_catalogo_id'),
@@ -434,4 +448,4 @@ def crear_turno_peluqueria():
         )
         return redirect(url_for('ventas.pos', **redirect_params))
 
-    return redirect(url_for('main.dashboard'))
+    return _redirect_agenda_dia(actividad.fecha_inicio)

@@ -23,4 +23,4 @@ def _require_agenda_acceso_permiso():
     return render_template('errores/403.html'), 403
 
 
-from app.routes.agenda import actividades, alertas, dashboard, formularios, peluqueria, peluqueria_horario, relaciones  # noqa: E402, F401
+from app.routes.agenda import actividades, alertas, dashboard, formularios, peluqueria, peluqueria_agenda_dia, peluqueria_horario, relaciones  # noqa: E402, F401

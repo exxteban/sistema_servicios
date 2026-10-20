@@ -573,7 +573,9 @@ class TestAgendaPeluqueriaTurnoRapido(unittest.TestCase):
 
         dashboard = self.client.get('/')
         html = dashboard.get_data(as_text=True)
-        self.assertNotIn('Cliente Cobrado', html)
+        # Sale de Cobros pendientes (ya no ofrece cobrarlo) y el Mapa del día lo muestra como cobrado.
+        self.assertNotIn(f'agenda_turno_actividad_id={int(actividad.id)}', html)
+        self.assertIn('>Cobrado<', html)
 
 
 if __name__ == '__main__':
