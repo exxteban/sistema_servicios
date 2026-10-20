@@ -304,10 +304,11 @@ class TestSenaEntraACaja(PeluqueriaTestBase):
 
 class TestComisionesInventadasOcultas(PeluqueriaTestBase):
     def test_dashboard_no_muestra_comisiones_falsas(self):
+        # La tarjeta volvió en la Fase 6 con el cálculo real; el 30% inventado no debe aparecer nunca.
         html = self.client.get('/').get_data(as_text=True)
 
-        self.assertNotIn('Comisiones del día', html)
         self.assertNotIn('30% de ventas', html)
+        self.assertNotIn('Listo para el módulo de comisiones', html)
 
 
 if __name__ == '__main__':

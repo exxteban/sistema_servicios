@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Comisiones{% endblock %}
+
+{% block content %}
+{% set desde_iso = resumen.desde.isoformat() %}
+{% set hasta_iso = resumen.hasta.isoformat() %}
+<div class="mx-auto w-full max-w-5xl space-y-4">
+    <div>
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-violet-500">Equipo</p>
+        <h1 class="mt-1 text-3xl font-black tracking-tight text-slate-950 dark:text-white">Comisiones</h1>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Sobre los servicios cobrados por cada profesional (ventas completadas, sin anuladas ni devoluciones).
+        </p>
+    </div>
+
+    <section class="space-y-3 rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
+        <div class="flex flex-wrap gap-2">
+            {% for etiqueta, inicio, fin in rangos %}
+            {% set url_rango = url_for('agenda.comisiones_peluqueria', desde=inicio, hasta=fin) %}
+            <a href="{{ url_rango }}" data-tab-url="{{ url_rango }}" data-tab-title="Comisiones"
+                class="app-tab-link rounded-xl border px-3 py-2 text-xs font-black transition {% if inicio == desde_iso and fin == hasta_iso %}border-violet-500 bg-violet-50 text-violet-800 dark:border-violet-300 dark:bg-violet-500/15 dark:text-violet-100{% else %}border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300{% endif %}">
+                {{ etiqueta }}
+            </a>
+            {% endfor %}
+        </div>
+        <form method="GET" action="{{ url_for('agenda.comisiones_peluqueria') }}" class="flex flex-wrap items-end gap-3">
+            <label class="text-sm font-bold text-slate-700 dark:text-slate-200">Desde
+                <input type="date" name="desde" value="{{ desde_iso }}" class="mt-1 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950 dark:text-white">
+            </label>
+            <label class="text-sm font-bold text-slate-700 dark:text-slate-200">Hasta
+                <input type="date" name="hasta" value="{{ hasta_iso }}" class="mt-1 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950 dark:text-white">
+            </label>
+            <button type="submit" class="rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-700">Ver</button>
+        </form>
+    </section>
+
+    {% if resumen.sin_porcentaje %}
+    <p class="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+        Sin porcentaje cargado: {{ resumen.sin_porcentaje|join(', ') }}.
+        {% if puede_editar_porcentajes %}Cargalo en <a href="{{ url_for('usuarios.listar') }}" data-tab-url="{{ url_for('usuarios.listar') }}" data-tab-title="Usuarios" class="app-tab-link underline">Usuarios</a> (campo "Comisión sobre servicios").{% endif %}
+    </p>
+    {% endif %}
+
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-500 dark:bg-white/[0.03] dark:text-slate-400">
+                    <tr>
+                        <th class="px-4 py-3">Profesional</th>
+                        <th class="px-4 py-3 text-right">Servicios</th>
+                        <th class="px-4 py-3 text-right">Cobrado en servicios</th>
+                        <th class="px-4 py-3 text-right">%</th>
+                        <th class="px-4 py-3 text-right">Comisión</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-white/5">
+                    {% for fila in resumen.filas %}
+                    <tr>
+                        <td class="px-4 py-3 font-bold text-slate-900 dark:text-white">{{ fila.nombre }}</td>
+                        <td class="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{{ fila.servicios }}</td>
+                        <td class="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{{ fila.base|moneda }}</td>
+                        <td class="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{% if fila.porcentaje is not none %}{{ '%g'|format(fila.porcentaje) }}%{% else %}—{% endif %}</td>
+                        <td class="px-4 py-3 text-right font-black text-emerald-700 dark:text-emerald-300">{{ fila.comision|moneda }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="px-4 py-8 text-center text-slate-500 dark:text-slate-400">No hay profesionales para mostrar.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="bg-slate-50 font-black text-slate-900 dark:bg-white/[0.03] dark:text-white">
+                    <tr>
+                        <td class="px-4 py-3" colspan="2">Total</td>
+                        <td class="px-4 py-3 text-right">{{ resumen.total_base|moneda }}</td>
+                        <td class="px-4 py-3"></td>
+                        <td class="px-4 py-3 text-right text-emerald-700 dark:text-emerald-300">{{ resumen.total_comision|moneda }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

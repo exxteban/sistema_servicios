@@ -5,6 +5,12 @@ from flask_login import current_user, login_required
 
 from app.routes.agenda import agenda_bp
 from app.routes.agenda.peluqueria import _obtener_profesionales_disponibles, _parse_positive_int
+from app.services.peluqueria_recordatorios import (
+    HORAS_PERMITIDAS,
+    guardar_config_recordatorios,
+    obtener_config_recordatorios,
+    whatsapp_configurado,
+)
 from app.services.peluqueria_horario import (
     INTERVALOS_PERMITIDOS,
     guardar_horario_peluqueria,
@@ -39,6 +45,10 @@ def horario_peluqueria():
         return redirect(url_for('main.dashboard'))
 
     horario = obtener_horario_peluqueria()
+    if request.method == 'POST' and request.form.get('seccion') == 'recordatorios':
+        error = guardar_config_recordatorios(request.form.get('horas_antes'), request.form.get('template'))
+        flash(error or 'Recordatorios guardados.', 'warning' if error else 'success')
+        return redirect(url_for('agenda.horario_peluqueria'))
     if request.method == 'POST':
         _, error = guardar_horario_peluqueria(
             request.form.get('apertura'),
@@ -60,4 +70,7 @@ def horario_peluqueria():
         'agenda/peluqueria_horario.html',
         horario=horario,
         intervalos=INTERVALOS_PERMITIDOS,
+        recordatorios=obtener_config_recordatorios(),
+        horas_recordatorio=HORAS_PERMITIDAS,
+        whatsapp_configurado=whatsapp_configurado(),
     )

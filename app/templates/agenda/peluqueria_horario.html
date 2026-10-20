@@ -57,5 +57,44 @@
             <i class="fas fa-save"></i> Guardar horario
         </button>
     </form>
+
+    <form method="POST" action="{{ url_for('agenda.horario_peluqueria') }}"
+        class="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="seccion" value="recordatorios">
+        <div>
+            <h2 class="text-base font-black text-slate-950 dark:text-white"><i class="fab fa-whatsapp mr-1 text-emerald-500"></i>Recordatorio automático por WhatsApp</h2>
+            {% if whatsapp_configurado %}
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Se manda una vez por turno a los clientes con teléfono cargado.</p>
+            {% else %}
+            <p class="mt-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                WhatsApp Cloud API no está configurado en esta instalación: los recordatorios no van a salir. Mientras tanto usá el botón "Recordar turno" de cada turno.
+            </p>
+            {% endif %}
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+                <label for="horas_antes" class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Mandar</label>
+                <select id="horas_antes" name="horas_antes" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+                    <option value="" {% if not recordatorios.horas %}selected{% endif %}>Desactivado</option>
+                    {% for horas in horas_recordatorio %}
+                    <option value="{{ horas }}" {% if recordatorios.horas == horas %}selected{% endif %}>{{ horas }} hora{{ '' if horas == 1 else 's' }} antes</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="template" class="mb-1 block text-sm font-bold text-slate-700 dark:text-slate-200">Plantilla aprobada (opcional)</label>
+                <input id="template" type="text" name="template" value="{{ recordatorios.template }}" placeholder="Ej: recordatorio_turno"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+            </div>
+        </div>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+            Sin plantilla se manda texto, pero WhatsApp solo lo entrega a quien te escribió en las últimas 24 horas.
+            Con una plantilla aprobada por Meta llega a todos; debe tener 4 variables: nombre, servicio, fecha y hora, profesional.
+        </p>
+        <button type="submit" class="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700">
+            <i class="fas fa-save"></i> Guardar recordatorios
+        </button>
+    </form>
 </div>
 {% endblock %}

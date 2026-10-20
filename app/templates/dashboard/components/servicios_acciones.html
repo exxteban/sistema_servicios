@@ -43,6 +43,11 @@
         <a href="{{ url_for('clientes.nuevo') }}" data-tab-url="{{ url_for('clientes.nuevo') }}" data-tab-title="Cliente nuevo" data-tab-icon="fas fa-user-plus" class="app-tab-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5">
             <i class="fas fa-user-plus w-4 text-fuchsia-500"></i>Cliente nuevo
         </a>
+        {% if current_user.es_admin() or current_user.tiene_permiso('ver_reporte_ventas') %}
+        <a href="{{ url_for('agenda.comisiones_peluqueria') }}" data-tab-url="{{ url_for('agenda.comisiones_peluqueria') }}" data-tab-title="Comisiones" data-tab-icon="fas fa-hand-holding-usd" class="app-tab-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5">
+            <i class="fas fa-hand-holding-usd w-4 text-emerald-500"></i>Comisiones
+        </a>
+        {% endif %}
         {% if current_user.es_admin() %}
         <a href="{{ url_for('agenda.horario_peluqueria') }}" data-tab-url="{{ url_for('agenda.horario_peluqueria') }}" data-tab-title="Horario del local" data-tab-icon="far fa-clock" class="app-tab-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5">
             <i class="far fa-clock w-4 text-violet-500"></i>Horario del local

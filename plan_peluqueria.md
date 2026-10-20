@@ -258,3 +258,20 @@ Las fases 2, 3 y 4 son independientes entre sí una vez cerrada la Fase 1. Para 
 - La marca toma el modo y el dashboard del mapa de configuración que el runtime ya lee en una sola consulta (`modo_operacion_principal` y `dashboard_negocio_activo` se agregaron a esas claves), así que no suma consultas por página (`test_agenda_perf`).
 - Dashboard de peluquería: 3 acciones a la vista (**Nuevo turno**, **Agenda de hoy**, **Cobrar**) y un menú "Más" con `<details>`: Cargar servicio, Servicios y costos, Cliente nuevo y Horario del local. Los botones se movieron a `dashboard/components/servicios_acciones.html`; el dashboard de servicios genérico conserva su bloque tal cual.
 - Nota para tests: `g` se comparte entre requests cuando la clase deja el contexto de app abierto. Las cachés nuevas usan `request.environ`, y el test limpia `g._runtime_ui_config` después de cambiar la configuración.
+
+### Fase 6 — hecha (2026-10-19)
+- 6.1 Comisiones:
+  - `Usuario.comision_porcentaje` (Numeric, nulable), editable en el formulario de usuario junto a "Atiende clientes".
+  - Cálculo en `app/services/peluqueria_comisiones.py`: líneas de servicio de ventas completadas por vendedor (subtotal con descuento de línea), menos lo devuelto de cada línea (devoluciones no anuladas). Las anuladas no cuentan. Sin porcentaje la comisión es 0 y se avisa; no se inventa nada.
+  - Reporte por rango `/agenda/peluqueria/comisiones` (admin o `ver_reporte_ventas`) con rangos rápidos: hoy, semana, mes y mes anterior.
+  - La tarjeta "Comisiones del día" volvió al dashboard con datos reales (`servicios_comisiones.html`) y hay un acceso en el menú "Más".
+  - El descuento global de la venta no se prorratea en la base; queda para cuando se pida.
+  - Comisión distinta por servicio: todavía no.
+- 6.2 Recordatorios automáticos por WhatsApp (`app/services/peluqueria_recordatorios.py`):
+  - Claves `peluqueria_recordatorio_horas_antes` (vacío = desactivado) y `peluqueria_recordatorio_template`.
+  - Solo actúa si WhatsApp Cloud API está configurado. Reutiliza `app/services/whatsapp/client.py` (`enviar_texto` / `enviar_template`) y el mismo texto que el botón manual (`texto_mensaje_turno`).
+  - Un intento por turno (`AgendaActividad.recordatorio_whatsapp_at`, se limpia al reprogramar). Salta los turnos cancelados, en atención, cobrados o sin teléfono.
+  - Job en segundo plano `app/bootstrap/peluqueria_recordatorios_scheduler.py`, igual que el de facturación electrónica: cada 5 min (`PELUQUERIA_RECORDATORIOS_INTERVAL_SECONDS`), se apaga con `PELUQUERIA_RECORDATORIOS_SCHEDULER=0` y no corre en tests.
+  - Se configura en la pantalla "Horario del local", que avisa si WhatsApp no está configurado.
+  - Importante: sin plantilla aprobada por Meta, WhatsApp solo entrega texto a quien escribió en las últimas 24 h. Para que llegue a todos hay que crear la plantilla con 4 variables (nombre, servicio, fecha y hora, profesional) y cargar su nombre.
+- Encontrado y no tocado (fuera de alcance): `app/routes/agenda/__init__.py` renderiza `errores/403.html`, que no existe. Un usuario sin `agenda_acceso` recibe un error 500 en lugar de un 403.

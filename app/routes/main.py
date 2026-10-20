@@ -17,7 +17,9 @@ from app.models import (
     Venta,
 )
 from app.routes.agenda.visibilidad import query_usuarios_agenda_visibles
+from app.services.peluqueria_comisiones import calcular_comisiones
 from app.services.peluqueria_profesionales import filtrar_query_profesionales
+from app.routes.agenda.peluqueria_comisiones import puede_ver_comisiones
 from app.utils.helpers import today_local, utc_bounds_for_local_dates, parse_iso_date
 from app.services.dashboard_agenda import (
     obtener_resumen_agenda_dashboard,
@@ -312,6 +314,7 @@ def dashboard():
     usuarios_activos_lista = []
     usuarios_ocupados_ids = set()
     dashboard_profesionales_detalle = {}
+    dashboard_comisiones_dia = None
     if dashboard_negocio.get('full_template'):
         profesionales_query = filtrar_query_profesionales(query_usuarios_agenda_visibles())
         profesionales_activos = profesionales_query.count()
@@ -321,6 +324,8 @@ def dashboard():
             can_ver_agenda=can_ver_agenda,
             today=today,
         )
+        if 'comisiones_dia' in dashboard_service_cards_selected and puede_ver_comisiones(current_user):
+            dashboard_comisiones_dia = calcular_comisiones(today, today, profesionales=profesionales_query.all())
 
     template_dashboard = dashboard_negocio.get('full_template') or 'dashboard.html'
 
@@ -329,6 +334,7 @@ def dashboard():
         productos_stock_bajo=productos_stock_bajo,
         productos_stock_bajo_lista=productos_stock_bajo_lista,
         profesionales_activos=profesionales_activos,
+        dashboard_comisiones_dia=dashboard_comisiones_dia,
         usuarios_activos_lista=usuarios_activos_lista,
         sesion_caja=sesion_caja,
         cierre_id=cierre_id,

@@ -33,6 +33,8 @@ class Usuario(UserMixin, db.Model):
     activo = db.Column(db.Boolean, default=True)
     # Peluquería/servicios: si al menos un usuario está marcado, solo los marcados aparecen como profesionales.
     atiende_clientes = db.Column(db.Boolean, nullable=True)
+    # Porcentaje de comisión sobre los servicios que cobra como vendedor. Nulo = sin comisión cargada.
+    comision_porcentaje = db.Column(db.Numeric(5, 2), nullable=True)
     dashboard_range_preference = db.Column(db.String(20), default='hoy')  # Preferencia de rango de fecha del dashboard
     ultimo_acceso = db.Column(db.DateTime)
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)

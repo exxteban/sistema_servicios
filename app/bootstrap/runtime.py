@@ -365,3 +365,8 @@ def register_runtime_features(app, db):
     iniciar_scheduler_facturacion_electronica(
         app, _is_truthy_env('FACTURACION_ELECTRONICA_SCHEDULER', '1'),
     )
+
+    if _is_truthy_env('PELUQUERIA_RECORDATORIOS_SCHEDULER', '1'):
+        from app.bootstrap.peluqueria_recordatorios_scheduler import iniciar_scheduler_recordatorios_peluqueria
+
+        iniciar_scheduler_recordatorios_peluqueria(app)

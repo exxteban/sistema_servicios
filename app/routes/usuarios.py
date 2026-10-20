@@ -1,6 +1,7 @@
 """
 Rutas de administración de usuarios
 """
+from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
@@ -33,6 +34,15 @@ def _aplicar_atiende_clientes(usuario):
     """Solo se toca si el formulario muestra la opción (instalaciones de servicios)."""
     if request.form.get('atiende_clientes_presente') == '1':
         usuario.atiende_clientes = bool(request.form.get('atiende_clientes'))
+        usuario.comision_porcentaje = _parse_porcentaje(request.form.get('comision_porcentaje'))
+
+
+def _parse_porcentaje(valor):
+    try:
+        numero = Decimal(str(valor).replace(',', '.').strip())
+    except (InvalidOperation, ValueError):
+        return None
+    return numero if Decimal('0') <= numero <= Decimal('100') else None
 
 @usuarios_bp.route('/')
 @login_required

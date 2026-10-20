@@ -26,6 +26,7 @@ SCHEMA_COLUMN_MIGRATIONS = {
     ],
     'usuarios': [
         ('atiende_clientes', ("ALTER TABLE usuarios ADD COLUMN atiende_clientes BOOLEAN",), ("ALTER TABLE usuarios ADD COLUMN atiende_clientes TINYINT(1) NULL",)),
+        ('comision_porcentaje', ("ALTER TABLE usuarios ADD COLUMN comision_porcentaje NUMERIC(5, 2)",), ("ALTER TABLE usuarios ADD COLUMN comision_porcentaje DECIMAL(5, 2) NULL",)),
         (
             'id_cliente',
             (
@@ -394,6 +395,7 @@ SCHEMA_COLUMN_MIGRATIONS = {
         ('cierre_motivo', ("ALTER TABLE agenda_actividades ADD COLUMN cierre_motivo VARCHAR(20)",), ("ALTER TABLE agenda_actividades ADD COLUMN cierre_motivo VARCHAR(20) NULL",)),
         ('servicio_id', ("ALTER TABLE agenda_actividades ADD COLUMN servicio_id INTEGER",), ("ALTER TABLE agenda_actividades ADD COLUMN servicio_id INT NULL",)),
         ('servicio_precio_opcion_id', ("ALTER TABLE agenda_actividades ADD COLUMN servicio_precio_opcion_id INTEGER",), ("ALTER TABLE agenda_actividades ADD COLUMN servicio_precio_opcion_id INT NULL",)),
+        ('recordatorio_whatsapp_at', ("ALTER TABLE agenda_actividades ADD COLUMN recordatorio_whatsapp_at DATETIME",), ("ALTER TABLE agenda_actividades ADD COLUMN recordatorio_whatsapp_at DATETIME NULL",)),
     ],
 }
 

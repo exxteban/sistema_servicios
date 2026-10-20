@@ -35,7 +35,7 @@ _SERVICE_CARD_DEFINITIONS = (
     ('servicios_realizados', 'Servicios realizados', 'Ranking de servicios del dia'),
     ('clientes_panel', 'Clientes', 'Resumen comercial de clientes'),
     ('insumos_criticos', 'Insumos criticos', 'Alertas de stock bajo'),
-    # 'comisiones_dia' vuelve cuando exista el cálculo real por profesional (plan_peluqueria.md, Fase 6).
+    ('comisiones_dia', 'Comisiones del dia', 'Comision de cada profesional sobre los servicios cobrados hoy'),
 )
 
 _SERVICE_CARD_ZONES = {
@@ -52,6 +52,7 @@ _SERVICE_CARD_ZONES = {
     'servicios_realizados': 'standard',
     'clientes_panel': 'standard',
     'insumos_criticos': 'standard',
+    'comisiones_dia': 'standard',
 }
 _SERVICE_CARD_ZONE_ORDER = ('locked', 'standard')
 

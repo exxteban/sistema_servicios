@@ -83,19 +83,37 @@ def _servicio_nombre(actividad) -> str:
     return actividad.titulo or 'tu turno'
 
 
-def enlace_whatsapp_turno(actividad, tipo: str) -> str | None:
-    """Enlace wa.me con el mensaje armado. No envía nada: lo abre quien atiende."""
+def telefono_whatsapp_cliente(actividad) -> str | None:
+    """Teléfono del cliente del turno en formato internacional sin '+', o None."""
     cliente = getattr(actividad, 'cliente', None)
     telefono = normalizar_telefono(getattr(cliente, 'telefono', None) or '') if cliente else None
+    return telefono.lstrip('+') if telefono else None
+
+
+def datos_mensaje_turno(actividad) -> dict:
+    cliente = getattr(actividad, 'cliente', None)
+    return {
+        'nombre': ((cliente.nombre or '').split() or [''])[0] if cliente else '',
+        'servicio': _servicio_nombre(actividad),
+        'fecha': local_strftime(actividad.fecha_inicio, '%d/%m'),
+        'hora': local_strftime(actividad.fecha_inicio, '%H:%M'),
+        'profesional': (actividad.usuario.nombre_completo or actividad.usuario.username) if actividad.usuario else '',
+    }
+
+
+def texto_mensaje_turno(actividad, tipo: str) -> str:
+    datos = datos_mensaje_turno(actividad)
+    cuando = f"el {datos['fecha']} a las {datos['hora']}"
+    con = f" con {datos['profesional']}" if datos['profesional'] else ''
+    saludo = f"Hola {datos['nombre']}!" if datos['nombre'] else 'Hola!'
+    if tipo == 'recordatorio':
+        return f"{saludo} Te recordamos tu turno de {datos['servicio']} {cuando}{con}. Te esperamos."
+    return f"{saludo} Te confirmamos tu turno de {datos['servicio']} {cuando}{con}. Cualquier cambio, avisanos por acá."
+
+
+def enlace_whatsapp_turno(actividad, tipo: str) -> str | None:
+    """Enlace wa.me con el mensaje armado. No envía nada: lo abre quien atiende."""
+    telefono = telefono_whatsapp_cliente(actividad)
     if not telefono:
         return None
-    nombre = (cliente.nombre or '').split()[0] if cliente.nombre else ''
-    profesional = actividad.usuario.nombre_completo or actividad.usuario.username if actividad.usuario else ''
-    cuando = f"el {local_strftime(actividad.fecha_inicio, '%d/%m')} a las {local_strftime(actividad.fecha_inicio, '%H:%M')}"
-    con = f' con {profesional}' if profesional else ''
-    saludo = f'Hola {nombre}!' if nombre else 'Hola!'
-    if tipo == 'recordatorio':
-        texto = f'{saludo} Te recordamos tu turno de {_servicio_nombre(actividad)} {cuando}{con}. Te esperamos.'
-    else:
-        texto = f'{saludo} Te confirmamos tu turno de {_servicio_nombre(actividad)} {cuando}{con}. Cualquier cambio, avisanos por acá.'
-    return f"https://wa.me/{telefono.lstrip('+')}?text={quote(texto)}"
+    return f"https://wa.me/{telefono}?text={quote(texto_mensaje_turno(actividad, tipo))}"
