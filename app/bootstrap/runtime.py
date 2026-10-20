@@ -184,6 +184,7 @@ def register_runtime_features(app, db):
             modulo_flujo_caja_activo = True
             modulo_facturacion_electronica_activo = False
             es_usuario_root_actual = False
+        marca_rubro = _marca_rubro(nombre_empresa)
         return {
             'app_brand_name': nombre_empresa,
             'app_brand_logo_path': logo_empresa_path,
@@ -196,7 +197,9 @@ def register_runtime_features(app, db):
             'modulo_flujo_caja_activo': modulo_flujo_caja_activo,
             'modulo_facturacion_electronica_activo': modulo_facturacion_electronica_activo,
             'es_usuario_root_actual': es_usuario_root_actual,
-            'marca_rubro': _marca_rubro(nombre_empresa),
+            'marca_rubro': marca_rubro,
+            # Pantalla de inicio real: en gastronomía main.dashboard redirige a gastronomia.dashboard.
+            'app_dashboard_endpoint': 'gastronomia.dashboard' if marca_rubro.get('es_gastronomia') else 'main.dashboard',
         }
 
     @app.context_processor

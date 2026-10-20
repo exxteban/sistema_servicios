@@ -61,3 +61,51 @@ def test_refresco_silencioso_solo_en_dashboards_que_lo_declaran():
     # La instancia vieja del script de totales suelta sus listeners al quedar sin DOM.
     assert "function unbind()" in totales
     assert "window.removeEventListener('storage', onStorage);" in totales
+
+
+def test_dashboard_gastronomia_es_el_dashboard_de_la_pestana_principal():
+    """En gastronomia '/' redirige a /gastronomia/: el shell debe tratarlo como el
+    dashboard; si no, volver a su pestana hacia una recarga completa (parpadeo)."""
+    from app import create_app
+    from test_gastronomia_permisos import _crear_cliente_usuario, _loguear
+
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_cliente_usuario(app, 'admin_tab_dashboard', 'Administrador')
+    _loguear(client, app, 'admin_tab_dashboard')
+
+    html = client.get('/gastronomia/').get_data(as_text=True)
+
+    assert 'data-page-is-dashboard="1"' in html
+    assert 'const DASHBOARD_URL = "/gastronomia/";' in html
+    assert 'data-dashboard-soft-refresh="1"' in html
+    assert 'window.initGastroDashboardCardOrder?.();' in html
+
+    partial = client.get('/gastronomia/?partial=1').get_data(as_text=True)
+    assert 'id="partial-content"' in partial
+    assert 'data-dashboard-soft-refresh="1"' in partial
+
+
+def test_links_al_dashboard_dentro_de_pestanas_activan_la_principal():
+    source = Path("app/templates/layout/tab_runtime_js_part1.html").read_text(encoding="utf-8")
+    assert "isDashboardUrl(linkUrl.toString()) && window.appNavigateToDashboard" in source
+    assert "window.appNavigateToDashboard = navigateToDashboard;" in RUNTIME.read_text(encoding="utf-8")
+
+
+def test_tarjetas_del_dashboard_gastronomia_abren_en_pestanas():
+    """Navegar con recarga completa dejaba el panel principal sin dashboard y volver
+    a el obligaba a recargar la pagina."""
+    from app import create_app
+    from test_gastronomia_permisos import _crear_cliente_usuario, _loguear
+
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_cliente_usuario(app, 'admin_tab_cards', 'Administrador')
+    _loguear(client, app, 'admin_tab_cards')
+
+    html = client.get('/gastronomia/').get_data(as_text=True)
+
+    assert 'class="app-tab-link gastro-dashboard-card' in html
+    assert 'data-tab-title="Cocina"' in html
+    assert 'data-tab-ignore-click="1"' in html
+    assert 'data-tab-title="Cargar menu"' in html

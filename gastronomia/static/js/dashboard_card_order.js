@@ -1,8 +1,12 @@
-(function () {
+// Idempotente: el dashboard se re-dibuja en segundo plano al volver a su pestaña
+// (refresco silencioso) y el script inline del template vuelve a llamar al init.
+window.initGastroDashboardCardOrder = function () {
+  const grid = document.getElementById('gastro-dashboard-cards');
+  if (!grid || grid.dataset.cardOrderReady === '1') return;
+  grid.dataset.cardOrderReady = '1';
   const csrf = document.getElementById('csrf-token')?.value
     || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
     || '';
-  const grid = document.getElementById('gastro-dashboard-cards');
   let draggedCard = null;
   let armedCard = null;
   let previousOrder = [];
@@ -129,4 +133,6 @@
     draggedCard = null;
     armedCard = null;
   });
-}());
+};
+
+window.initGastroDashboardCardOrder();
