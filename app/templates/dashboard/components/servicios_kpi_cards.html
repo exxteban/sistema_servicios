@@ -92,7 +92,7 @@
                 </span>
                 <div class="min-w-0">
                     <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Cobrado hoy</p>
-                    <p class="mt-0.5 text-xl font-black text-slate-950 dark:text-white">Gs. {{ "{:,.0f}".format(total_cobrado_display or 0).replace(",", ".") }}</p>
+                    <p class="mt-0.5 text-xl font-black text-slate-950 dark:text-white">{{ (total_cobrado_display or 0)|moneda }}</p>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Servicios + productos + propinas</p>
                 </div>
             </div>

@@ -409,6 +409,7 @@
 
                 if (isActive) {
                     setActiveTab(fallbackTabId);
+                    if (fallbackTabId === principalTabId) refreshPrincipalDashboardInPlace();
                 }
 
                 saveState();

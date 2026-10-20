@@ -82,6 +82,54 @@ class TestRevisionPeluqueria(TurnoTestBase):
         self.assertNotIn('name="monto_sena"', html)
         self.assertIn('reprogramalo para registrar una seña', html)
 
+    def test_reprogramar_turno_cancelado_en_atencion_vuelve_agendado(self):
+        from app.services.peluqueria_turno_estado import AGENDADO, estado_turno
+        from app.utils.helpers import today_local
+
+        servicio = self._crear_servicio()
+        turno = self._turno(servicio)
+        self._accion(turno, 'empezar')
+        self._accion(turno, 'cancelar')
+
+        self._accion(turno, 'reprogramar', fecha=today_local().isoformat(), hora='18:00', duracion='30')
+
+        db.session.refresh(turno)
+        self.assertIsNone(turno.atencion_inicio)
+        self.assertEqual(estado_turno(turno), AGENDADO)
+
+    def test_dashboard_servicios_usa_la_moneda_configurada(self):
+        from app.models import Configuracion
+
+        for clave, valor in {'moneda_simbolo': 'R$', 'moneda_decimales': '2', 'moneda_sep_miles': '.',
+                             'moneda_sep_decimal': ',', 'moneda_locale': 'pt-BR'}.items():
+            Configuracion.establecer(clave, valor, 'test')
+        db.session.commit()
+        self._turno(self._crear_servicio(precio=50000))
+
+        html = self.client.get('/').get_data(as_text=True)
+
+        self.assertIn('R$ 50.000,00', html)  # Cobros pendientes
+        self.assertIn('R$ 0,00', html)  # Caja y KPI de cobrado
+        self.assertIn('"simbolo": "R$"', html)  # refresco en vivo de las tarjetas
+        # Lo visible (sin scripts: el de totales es compartido con el dashboard general).
+        import re
+        self.assertNotIn('Gs. ', re.sub(r'<script.*?</script>', '', html, flags=re.S))
+
+    def test_profesional_atendiendo_turno_sin_cliente_figura_ocupado(self):
+        from app.services.dashboard_servicios import obtener_estado_profesionales_dashboard
+        from app.utils.helpers import today_local
+
+        turno = self._turno(self._crear_servicio(nombre='Barba express'))
+        self._accion(turno, 'empezar')
+
+        with self.app.test_request_context('/'):
+            ocupados, detalles = obtener_estado_profesionales_dashboard([self.admin], can_ver_agenda=True, today=today_local())
+
+        self.assertEqual(ocupados, {int(self.admin.id_usuario)})
+        detalle = detalles[str(self.admin.id_usuario)]
+        self.assertEqual(detalle['servicio_nombre'], 'Barba express')
+        self.assertEqual(detalle['cliente_nombre'], 'Consumidor Final')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -5,6 +5,7 @@
 {% block content %}
 <div class="mx-auto w-full max-w-[1440px] space-y-6"
     data-dashboard-range="{{ current_range }}" data-dashboard-desde="{{ date_from }}" data-dashboard-hasta="{{ date_to }}"
+    data-dashboard-soft-refresh="1"
     x-data='serviceDashboardCardsCustomizer({
         availableCards: {{ dashboard_service_cards_available|tojson }},
         visibleCards: {{ dashboard_service_cards_selected|tojson }},

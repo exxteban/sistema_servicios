@@ -101,6 +101,8 @@ def _reprogramar(actividad):
     actividad.fecha_fin = fecha_fin
     actividad.estado = 'pendiente'
     actividad.cierre_motivo = None
+    # Un turno cancelado mientras estaba en atención vuelve como agendado, no "en atención".
+    actividad.atencion_inicio = None
     actividad.recordatorio_whatsapp_at = None
     if actividad.cliente_servicio is not None:
         actividad.cliente_servicio.fecha_programada = fecha_inicio

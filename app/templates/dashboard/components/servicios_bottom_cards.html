@@ -40,7 +40,7 @@
                     </div>
                 </div>
                 <div class="shrink-0 text-right">
-                    <p class="text-sm font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(asignacion.subtotal or 0).replace(",", ".") }}</p>
+                    <p class="text-sm font-bold text-rose-600 dark:text-rose-400">{{ (asignacion.subtotal or 0)|moneda }}</p>
                     <p class="text-[11px] text-slate-400 dark:text-slate-500">{{ asignacion.fecha_solicitud|local_strftime('%d/%m %H:%M') }}</p>
                 </div>
             {% if can_crear_venta %}
@@ -57,7 +57,7 @@
         <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
             <div class="flex items-center justify-between text-sm">
                 <span class="font-semibold text-slate-600 dark:text-slate-400">Total pendientes</span>
-                <span id="dashboard-cobros-pendientes-total-monto" class="font-bold text-rose-600 dark:text-rose-400">Gs. {{ "{:,.0f}".format(dashboard_servicios_cobros_pendientes_total_monto or 0).replace(",", ".") }}</span>
+                <span id="dashboard-cobros-pendientes-total-monto" class="font-bold text-rose-600 dark:text-rose-400">{{ (dashboard_servicios_cobros_pendientes_total_monto or 0)|moneda }}</span>
             </div>
             <p id="dashboard-cobros-pendientes-total-count" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {{ dashboard_servicios_cobros_pendientes_total_count or 0 }} servicio{% if (dashboard_servicios_cobros_pendientes_total_count or 0) != 1 %}s{% endif %} sin cobrar.
@@ -93,7 +93,7 @@
             <div>
                 <div class="flex items-center justify-between text-xs">
                     <span class="truncate pr-3 text-slate-600 dark:text-slate-300">{{ item.nombre }}</span>
-                    <span class="shrink-0 font-bold text-slate-900 dark:text-white">{{ item.cantidad }} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. {{ "{:,.0f}".format(item.total or 0).replace(",", ".") }}</span></span>
+                    <span class="shrink-0 font-bold text-slate-900 dark:text-white">{{ item.cantidad }} <span class="font-normal text-slate-500 dark:text-slate-400">{{ (item.total or 0)|moneda }}</span></span>
                 </div>
                 <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                     <div class="h-full rounded-full {{ item.color_class }}" style="width: {{ item.porcentaje }}%"></div>
@@ -108,7 +108,7 @@
         <div class="border-t border-slate-100 px-5 py-3 dark:border-white/5">
             <div class="flex items-center justify-between text-sm">
                 <span class="font-semibold text-slate-600 dark:text-slate-400">Total</span>
-                <span id="dashboard-servicios-realizados-total" class="font-bold text-slate-900 dark:text-white">{{ dashboard_servicios_realizados_total_count or 0 }} <span class="font-normal text-slate-500 dark:text-slate-400">Gs. {{ "{:,.0f}".format(dashboard_servicios_realizados_total_monto or 0).replace(",", ".") }}</span></span>
+                <span id="dashboard-servicios-realizados-total" class="font-bold text-slate-900 dark:text-white">{{ dashboard_servicios_realizados_total_count or 0 }} <span class="font-normal text-slate-500 dark:text-slate-400">{{ (dashboard_servicios_realizados_total_monto or 0)|moneda }}</span></span>
             </div>
             <p id="dashboard-servicios-realizados-total-meta" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {{ dashboard_servicios_realizados_total_count or 0 }} servicio{% if (dashboard_servicios_realizados_total_count or 0) != 1 %}s{% endif %} realizados hoy.

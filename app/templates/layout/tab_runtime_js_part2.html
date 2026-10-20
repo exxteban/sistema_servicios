@@ -407,10 +407,13 @@
                     && principalPanel.getAttribute('aria-hidden') !== 'true';
             }
 
+            {% include 'layout/_dashboard_soft_refresh_js.html' %}
+
             function navigateToDashboard() {
-                // Si el panel principal no muestra el dashboard (cargó otra página en él),
-                // o si la URL actual no es el dashboard → recarga completa.
-                if (!principalPanelShowsDashboard() || shouldNavigateToDashboard()) {
+                // Si el panel principal no muestra el dashboard (cargó otra página en él)
+                // → recarga completa. La URL del navegador no sirve para decidirlo: al
+                // activar otra pestaña pasa a ser la de esa pestaña.
+                if (!principalPanelShowsDashboard()) {
                     try {
                         setActiveTab(principalTabId);
                         saveState();
@@ -419,9 +422,11 @@
                     return;
                 }
 
-                // El panel principal ya tiene el dashboard: solo activar la pestaña.
-                // setActiveTab es síncrono y suficiente; no hace falta re-verificar después.
+                // El panel principal ya tiene el dashboard: activarlo al instante y
+                // traer los datos nuevos en segundo plano, sin recargar la página.
+                const wasPrincipalActive = isPrincipalTabVisible();
                 setActiveTab(principalTabId);
+                if (!wasPrincipalActive) refreshPrincipalDashboardInPlace();
 
                 // Scroll al botón para que sea visible si hay muchas pestañas
                 if (principalBtn) {
@@ -462,6 +467,8 @@
             syncPrincipalTabLabel();
 
             const currentRequestIsDashboard = isDashboardUrl(window.location.href);
+            // URL con la que se dibujó el dashboard principal (conserva rango/fechas).
+            const principalDashboardUrl = currentRequestIsDashboard ? window.location.href : DASHBOARD_URL;
 
             if (currentRequestIsDashboard) {
                 restoreState();
