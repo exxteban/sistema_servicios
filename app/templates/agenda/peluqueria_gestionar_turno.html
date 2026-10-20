@@ -91,6 +91,8 @@
             {% endif %}
             {% if turno_cobrado %}
             <p class="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600 dark:bg-white/5 dark:text-slate-300">El turno ya fue cobrado.</p>
+            {% elif cerrado %}
+            <p class="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600 dark:bg-white/5 dark:text-slate-300">El turno está cerrado: reprogramalo para registrar una seña.</p>
             {% elif puede_registrar_sena %}
             <form method="POST" action="{{ url_for('agenda.gestionar_turno_peluqueria', id_actividad=actividad.id) }}" class="mt-4 space-y-4">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

@@ -51,6 +51,7 @@ def url_cobro_turno(actividad):
         cliente_id=actividad.cliente_id,
         servicio_catalogo_id=(servicio.id_servicio if servicio else None),
         profesional_id=actividad.usuario_id,
+        manual_price=actividad.precio_manual,
         title=(actividad.titulo if servicio is None else None),
         price_option_id=actividad.servicio_precio_opcion_id,
         actividad_id=actividad.id,

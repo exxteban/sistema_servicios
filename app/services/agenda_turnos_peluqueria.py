@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.models import Servicio, ServicioPrecioOpcion
+from app.utils.helpers import formato_moneda_local
 
 
 SERVICIOS_TURNO_PELUQUERIA_BASE = (
@@ -37,7 +38,7 @@ def _parse_positive_int(value) -> int | None:
 
 
 def _money_label(value) -> str:
-    return f"Gs. {'{:,.0f}'.format(value or 0).replace(',', '.')}"
+    return formato_moneda_local(value or 0)
 
 
 def _catalog_service_price_options(servicio: Servicio | None) -> list[dict[str, Any]]:
@@ -246,6 +247,21 @@ def is_turno_peluqueria_pos_chargeable(servicio: Servicio | None, manual_price=N
     if price_option is not None:
         return is_turno_peluqueria_catalog_price_option_chargeable(price_option)
     return is_turno_peluqueria_catalog_service_chargeable(servicio)
+
+
+def precio_turno_sin_asignacion(actividad, servicio: Servicio | None = None) -> Decimal | None:
+    """Precio a cobrar de un turno sin servicio del cliente: precio manual, variante o precio del servicio."""
+    manual = parse_turno_manual_price(getattr(actividad, 'precio_manual', None))
+    if manual is not None:
+        return manual
+    servicio = servicio if servicio is not None else get_turno_peluqueria_catalog_service(getattr(actividad, 'servicio_id', None))
+    if servicio is None:
+        return None
+    opcion = None
+    if int(getattr(actividad, 'servicio_id', None) or 0) == int(servicio.id_servicio):
+        opcion = get_turno_peluqueria_catalog_price_option(servicio, getattr(actividad, 'servicio_precio_opcion_id', None))
+    precio = Decimal(str((opcion.precio if opcion is not None else servicio.precio) or 0))
+    return precio if precio > 0 else None
 
 
 def build_turno_peluqueria_chargeable_catalog_services() -> list[dict[str, Any]]:

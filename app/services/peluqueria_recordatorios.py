@@ -91,8 +91,10 @@ def enviar_recordatorios_pendientes(ahora_utc: datetime | None = None) -> dict:
         return resumen
     ahora_utc = ahora_utc or datetime.utcnow()
     for actividad in turnos_para_recordar(ahora_utc, config['horas']):
-        actividad.recordatorio_whatsapp_at = ahora_utc
         telefono = telefono_whatsapp_cliente(actividad)
+        # Se marca y se guarda antes de enviar: si el proceso se corta, no se repite el mensaje.
+        actividad.recordatorio_whatsapp_at = ahora_utc
+        db.session.commit()
         if not telefono:
             resumen['sin_telefono'] += 1
             continue
@@ -102,5 +104,4 @@ def enviar_recordatorios_pendientes(ahora_utc: datetime | None = None) -> dict:
             logger.exception('Error enviando recordatorio del turno %s', actividad.id)
             resultado = None
         resumen['enviados' if resultado else 'fallidos'] += 1
-    db.session.commit()
     return resumen

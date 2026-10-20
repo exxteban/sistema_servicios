@@ -275,3 +275,16 @@ Las fases 2, 3 y 4 son independientes entre sí una vez cerrada la Fase 1. Para 
   - Se configura en la pantalla "Horario del local", que avisa si WhatsApp no está configurado.
   - Importante: sin plantilla aprobada por Meta, WhatsApp solo entrega texto a quien escribió en las últimas 24 h. Para que llegue a todos hay que crear la plantilla con 4 variables (nombre, servicio, fecha y hora, profesional) y cargar su nombre.
 - Arreglado aparte: `errores/403.html` no existía, así que Agenda, CRM y WhatsApp daban un error 500 en lugar de un 403 a quien no tenía permiso. Ahora existe la plantilla, recibe el `mensaje` de cada módulo y lo cubre `test_agenda_sin_permiso_403.py`.
+
+### Revisión posterior — hecha (2026-10-20)
+Revisión de punta a punta de las 6 fases. Errores corregidos (cubiertos por `test_peluqueria_revision.py`):
+- **Precio manual perdido en turnos sin cliente:** el "Cambiar precio" solo quedaba en el servicio del cliente; un turno de consumidor final se cobraba después al precio del catálogo. Nueva columna `AgendaActividad.precio_manual` (nulable), que usan "Cobrar" y Cobros pendientes.
+- **Cobros pendientes ignoraba variantes:** un servicio con precio base 0 y precio solo en variantes no aparecía, y el monto mostrado era el del servicio, no el de la variante elegida. El precio sale ahora de `precio_turno_sin_asignacion` (`agenda_turnos_peluqueria.py`): manual → variante → servicio.
+- **Seña mayor al precio en turnos sin cliente:** el control "la seña tiene que ser menor al precio" solo funcionaba con servicio del cliente; ahora usa el mismo precio de arriba.
+- **Turno cobrado por adelantado liberaba el horario:** "Crear y cobrar" deja el turno en `hecha` y el control de choques solo miraba `pendiente`, así que se podía dar otro turno encima (y la agenda del día lo mostraba ocupado). Ahora ocupan también los cobrados sin atención iniciada; un turno terminado sigue liberando su horario.
+- **"Crear y cobrar" con los botones fijos** (catálogo resuelto por tipo) mandaba al POS sin servicio: usa el servicio resuelto, igual que lo que se guarda en el turno.
+- Formulario de seña oculto en turnos cancelados/no-show (el servidor ya lo rechazaba).
+- Recordatorios: cada turno se marca y se guarda antes de enviar, para no repetir mensajes si el proceso se corta a mitad.
+- Los precios de variantes del alta de turno usan `formato_moneda_local` en lugar de "Gs." fijo.
+- Resultado: 493 tests verdes (protección + módulo + reparaciones + peluquería).
+- Queda anotado, sin cambio: Cobros pendientes solo muestra turnos sin cliente **del día**; un turno sin cliente terminado ayer y no cobrado deja de aparecer ahí (sigue visible en la agenda del día de esa fecha).

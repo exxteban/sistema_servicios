@@ -31,7 +31,12 @@ def turno_ya_cobrado(actividad) -> bool:
 def precio_turno(actividad) -> Decimal | None:
     """Precio pactado del servicio del turno, si se conoce."""
     asignacion = getattr(actividad, 'cliente_servicio', None)
-    if asignacion is None or asignacion.precio_pactado is None:
+    if asignacion is None:
+        # Turno sin servicio del cliente (p. ej. consumidor final): precio manual, variante o catálogo.
+        from app.services.agenda_turnos_peluqueria import precio_turno_sin_asignacion
+
+        return precio_turno_sin_asignacion(actividad)
+    if asignacion.precio_pactado is None:
         return None
     precio = Decimal(str(asignacion.precio_pactado)) * max(int(asignacion.cantidad or 1), 1)
     return precio if precio > 0 else None

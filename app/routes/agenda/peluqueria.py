@@ -334,6 +334,8 @@ def crear_turno_peluqueria():
         cliente_servicio_id=(int(asignacion.id_cliente_servicio) if asignacion else None),
         servicio_id=(int(servicio_resuelto.id_servicio) if servicio_resuelto else None),
         servicio_precio_opcion_id=(int(servicio_precio_opcion.id_opcion_precio) if servicio_precio_opcion else None),
+        # Con servicio del cliente el precio ya queda en precio_pactado.
+        precio_manual=(precio_manual if asignacion is None and servicio_resuelto is not None else None),
         origen_modulo='agenda',
         mostrar_agenda_en='solo_responsable',
         recordatorio_a='solo_responsable',
@@ -359,7 +361,7 @@ def crear_turno_peluqueria():
             return _redirect_agenda_dia(actividad.fecha_inicio)
         redirect_params = _build_turno_redirect_pos_params(
             cliente_id=cliente_id,
-            servicio_catalogo_id=request.form.get('servicio_catalogo_id'),
+            servicio_catalogo_id=(int(servicio_resuelto.id_servicio) if servicio_resuelto else None),
             profesional_id=profesional_id,
             manual_price=precio_manual,
             title=(request.form.get('titulo') or '').strip() or turno_data['servicio_nombre'],

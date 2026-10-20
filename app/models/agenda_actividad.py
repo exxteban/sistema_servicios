@@ -60,6 +60,8 @@ class AgendaActividad(db.Model):
     # Servicio del catálogo elegido al dar el turno, para poder cobrarlo después aunque no tenga cliente.
     servicio_id = db.Column(db.Integer, db.ForeignKey('servicios.id_servicio'), nullable=True)
     servicio_precio_opcion_id = db.Column(db.Integer, nullable=True)
+    # Precio cambiado a mano al dar el turno (turnos sin servicio del cliente); nulo = precio del catálogo.
+    precio_manual = db.Column(db.Numeric(12, 2), nullable=True)
     # Cuándo se intentó el recordatorio automático por WhatsApp (uno por turno; se limpia al reprogramar).
     recordatorio_whatsapp_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

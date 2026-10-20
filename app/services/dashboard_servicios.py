@@ -9,7 +9,7 @@ from app.models import AgendaActividad, Cliente, ClienteServicio, DetalleVenta, 
 from app.services.agenda_turnos_peluqueria import (
     TURNO_PELUQUERIA_TIPO_LABELS,
     infer_turno_peluqueria_tipo_from_title,
-    is_turno_peluqueria_catalog_service_chargeable,
+    precio_turno_sin_asignacion,
     resolve_turno_peluqueria_catalog_service,
 )
 from app.utils.helpers import local_strftime, now_local, today_local, utc_bounds_for_local_dates, utc_naive_to_local
@@ -295,7 +295,9 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
     for actividad in agenda_items:
         turno_tipo = infer_turno_peluqueria_tipo_from_title(actividad.titulo)
         servicio = servicios_por_actividad.get(int(actividad.id))
-        if servicio is not None and not is_turno_peluqueria_catalog_service_chargeable(servicio):
+        # Precio manual o de la variante elegida al dar el turno; si no, el del servicio.
+        precio = precio_turno_sin_asignacion(actividad, servicio) if servicio is not None else None
+        if servicio is not None and precio is None:
             continue
         if _consumir_si_turno_ya_fue_cobrado(actividad, servicio, vendidos_por_key):
             continue
@@ -308,6 +310,8 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
             params['agenda_turno_servicio_id'] = int(servicio.id_servicio)
             if actividad.servicio_precio_opcion_id and int(servicio.id_servicio) == int(actividad.servicio_id or 0):
                 params['agenda_turno_precio_opcion_id'] = int(actividad.servicio_precio_opcion_id)
+            if actividad.precio_manual is not None:
+                params['agenda_turno_precio_manual'] = str(actividad.precio_manual)
         else:
             params['agenda_turno_titulo'] = actividad.titulo or TURNO_PELUQUERIA_TIPO_LABELS.get(turno_tipo, 'Turno')
         items_agenda.append({
@@ -316,7 +320,7 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
             'cliente': {'nombre': actividad.cliente.nombre if actividad.cliente else 'Consumidor Final'},
             'servicio': {'nombre': (servicio.nombre if servicio is not None else TURNO_PELUQUERIA_TIPO_LABELS.get(turno_tipo, actividad.titulo or 'Turno'))},
             'estado_display': 'Turno sin cobrar',
-            'subtotal': float(servicio.precio or 0) if servicio is not None else 0,
+            'subtotal': float(precio or 0),
             'fecha_solicitud': actividad.fecha_inicio,
             'cobrar_url': url_for('ventas.pos', **params),
         })

@@ -81,11 +81,18 @@ def horarios_turno_peluqueria(horario: dict | None = None) -> tuple[str, ...]:
 
 
 def query_turnos_solapados(*, profesional_id, fecha_inicio, fecha_fin, excluir_actividad_id=None):
-    """Turnos pendientes del profesional que se cruzan con el rango (fechas UTC naive)."""
+    """Turnos del profesional que ocupan el rango (fechas UTC naive).
+
+    Ocupan los pendientes y también los cobrados por adelantado que todavía no se atendieron
+    (el POS los deja en 'hecha' sin `atencion_inicio`). Un turno terminado libera su horario.
+    """
     query = AgendaActividad.query.filter(
         AgendaActividad.usuario_id == profesional_id,
         AgendaActividad.tipo == 'cita',
-        AgendaActividad.estado == 'pendiente',
+        db.or_(
+            AgendaActividad.estado == 'pendiente',
+            db.and_(AgendaActividad.estado == 'hecha', AgendaActividad.atencion_inicio.is_(None)),
+        ),
         AgendaActividad.fecha_inicio < fecha_fin,
         db.or_(AgendaActividad.fecha_fin.is_(None), AgendaActividad.fecha_fin > fecha_inicio),
     )
