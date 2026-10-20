@@ -1,0 +1,185 @@
+<script>
+// Colores y estilos del alta rápida de turno (se mezclan en peluqueriaTurnoRapido).
+function peluqueriaTurnoRapidoEstilos() {
+    return {
+        modoOscuro: false,
+        observadorTema: null,
+        paleta: [
+            { solid: '#7c3aed', soft: 'rgba(124, 58, 237, 0.12)', border: 'rgba(124, 58, 237, 0.28)', ring: 'rgba(124, 58, 237, 0.18)' },
+            { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.12)', border: 'rgba(37, 99, 235, 0.28)', ring: 'rgba(37, 99, 235, 0.18)' },
+            { solid: '#db2777', soft: 'rgba(219, 39, 119, 0.12)', border: 'rgba(219, 39, 119, 0.28)', ring: 'rgba(219, 39, 119, 0.18)' },
+            { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.28)', ring: 'rgba(234, 88, 12, 0.18)' },
+            { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)', border: 'rgba(8, 145, 178, 0.28)', ring: 'rgba(8, 145, 178, 0.18)' },
+            { solid: '#65a30d', soft: 'rgba(101, 163, 13, 0.12)', border: 'rgba(101, 163, 13, 0.28)', ring: 'rgba(101, 163, 13, 0.18)' },
+            { solid: '#dc2626', soft: 'rgba(220, 38, 38, 0.12)', border: 'rgba(220, 38, 38, 0.28)', ring: 'rgba(220, 38, 38, 0.18)' },
+        ],
+        coloresServicio: {
+            corte: { solid: '#2563eb', soft: 'rgba(37, 99, 235, 0.12)', border: 'rgba(37, 99, 235, 0.28)', ring: 'rgba(37, 99, 235, 0.18)' },
+            barba: { solid: '#16a34a', soft: 'rgba(22, 163, 74, 0.12)', border: 'rgba(22, 163, 74, 0.28)', ring: 'rgba(22, 163, 74, 0.18)' },
+            corte_barba: { solid: '#7c3aed', soft: 'rgba(124, 58, 237, 0.12)', border: 'rgba(124, 58, 237, 0.28)', ring: 'rgba(124, 58, 237, 0.18)' },
+            color: { solid: '#db2777', soft: 'rgba(219, 39, 119, 0.12)', border: 'rgba(219, 39, 119, 0.28)', ring: 'rgba(219, 39, 119, 0.18)' },
+            peinado: { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.28)', ring: 'rgba(234, 88, 12, 0.18)' },
+            lavado: { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)', border: 'rgba(8, 145, 178, 0.28)', ring: 'rgba(8, 145, 178, 0.18)' },
+            otro: { solid: '#475569', soft: 'rgba(71, 85, 105, 0.12)', border: 'rgba(71, 85, 105, 0.28)', ring: 'rgba(71, 85, 105, 0.18)' },
+        },
+        actualizarModoTema() {
+            this.modoOscuro = document.documentElement.classList.contains('dark');
+        },
+        inicializarObservadorTema() {
+            if (this.observadorTema) return;
+            this.observadorTema = new MutationObserver(() => this.actualizarModoTema());
+            this.observadorTema.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        },
+        colorItem(seed) {
+            const valor = String(seed || 'item');
+            let hash = 0;
+            for (let index = 0; index < valor.length; index += 1) {
+                hash = ((hash << 5) - hash) + valor.charCodeAt(index);
+                hash |= 0;
+            }
+            return this.paleta[Math.abs(hash) % this.paleta.length];
+        },
+        estiloTarjetaProfesional(profesional) {
+            const color = this.colorItem(profesional ? profesional.id : 'profesional');
+            if (this.profesionalId === (profesional ? profesional.id : '')) {
+                return {
+                    borderColor: color.border,
+                    backgroundColor: color.soft,
+                    boxShadow: `0 0 0 3px ${color.ring}`,
+                };
+            }
+            return { borderColor: color.ring };
+        },
+        estiloAvatarProfesional(profesional) {
+            const color = this.colorItem(profesional ? profesional.id : 'profesional');
+            return {
+                backgroundColor: color.solid,
+                boxShadow: this.profesionalId === (profesional ? profesional.id : '') ? `0 0 0 4px ${color.ring}` : 'none',
+            };
+        },
+        // Color por tipo rápido (corte, barba...) o, si no tiene, uno fijo calculado del servicio.
+        colorServicio(servicio) {
+            if (!servicio) return this.coloresServicio.corte;
+            const clave = servicio.tipo || servicio.id;
+            return this.coloresServicio[clave] || this.colorItem(`servicio-${servicio.id}`);
+        },
+        colorResumen() {
+            return this.colorServicio(this.servicioSel);
+        },
+        hexToRgba(hex, alpha) {
+            const valor = String(hex || '').replace('#', '');
+            if (valor.length !== 6) return `rgba(124, 58, 237, ${alpha})`;
+            const red = Number.parseInt(valor.slice(0, 2), 16);
+            const green = Number.parseInt(valor.slice(2, 4), 16);
+            const blue = Number.parseInt(valor.slice(4, 6), 16);
+            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+        },
+        estiloResumenPanel() {
+            const color = this.colorResumen();
+            if (this.modoOscuro) {
+                return {
+                    borderColor: color.border,
+                    boxShadow: `0 14px 40px ${this.hexToRgba(color.solid, 0.20)}`,
+                    backgroundImage: `linear-gradient(135deg, #020617 0%, #0f172a 58%, ${this.hexToRgba(color.solid, 0.42)} 100%)`,
+                    color: '#ffffff',
+                };
+            }
+            return {
+                borderColor: color.border,
+                boxShadow: `0 18px 40px ${this.hexToRgba(color.solid, 0.12)}`,
+                backgroundImage: `linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.98) 58%, ${this.hexToRgba(color.solid, 0.14)} 100%)`,
+                color: '#0f172a',
+            };
+        },
+        estiloGlowResumen() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: this.hexToRgba(color.solid, this.modoOscuro ? 0.18 : 0.14),
+            };
+        },
+        estiloTextoResumen() {
+            const color = this.colorResumen();
+            return { color: color.solid };
+        },
+        estiloBadgeResumen() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: this.modoOscuro ? this.hexToRgba(color.solid, 0.14) : this.hexToRgba(color.solid, 0.10),
+                border: `1px solid ${this.hexToRgba(color.solid, this.modoOscuro ? 0.25 : 0.18)}`,
+                color: color.solid,
+            };
+        },
+        estiloPuntoResumen() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: color.solid,
+                boxShadow: `0 0 0 4px ${this.hexToRgba(color.solid, this.modoOscuro ? 0.14 : 0.12)}`,
+            };
+        },
+        estiloIconoResumenCard() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: this.modoOscuro ? this.hexToRgba(color.solid, 0.18) : '#ffffff',
+                color: color.solid,
+                border: `1px solid ${this.hexToRgba(color.solid, this.modoOscuro ? 0.24 : 0.16)}`,
+                boxShadow: this.modoOscuro ? `0 10px 24px ${this.hexToRgba(color.solid, 0.18)}` : `0 10px 24px ${this.hexToRgba(color.solid, 0.10)}`,
+            };
+        },
+        estiloItemResumen() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: this.modoOscuro ? 'rgba(15, 23, 42, 0.34)' : 'rgba(255, 255, 255, 0.72)',
+                borderColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(226, 232, 240, 0.95)',
+                boxShadow: this.modoOscuro ? 'none' : `0 10px 24px ${this.hexToRgba(color.solid, 0.06)}`,
+            };
+        },
+        estiloIconoResumenWrap() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: this.modoOscuro ? this.hexToRgba(color.solid, 0.15) : this.hexToRgba(color.solid, 0.10),
+                border: `1px solid ${this.hexToRgba(color.solid, this.modoOscuro ? 0.20 : 0.12)}`,
+            };
+        },
+        estiloBloqueSecundarioResumen() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.66)',
+                borderColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.10)' : 'rgba(226, 232, 240, 0.9)',
+                boxShadow: this.modoOscuro ? 'none' : `0 12px 30px ${this.hexToRgba(color.solid, 0.08)}`,
+            };
+        },
+        estiloBotonResumen() {
+            const color = this.colorResumen();
+            return {
+                backgroundImage: `linear-gradient(135deg, ${this.hexToRgba(color.solid, 0.92)} 0%, ${color.solid} 100%)`,
+                boxShadow: `0 10px 24px ${this.hexToRgba(color.solid, this.modoOscuro ? 0.24 : 0.20)}`,
+                color: '#ffffff',
+            };
+        },
+        estiloBotonSecundarioResumen() {
+            const color = this.colorResumen();
+            return {
+                backgroundColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.82)',
+                borderColor: this.modoOscuro ? 'rgba(255, 255, 255, 0.14)' : this.hexToRgba(color.solid, 0.16),
+                color: this.modoOscuro ? '#ffffff' : color.solid,
+                boxShadow: this.modoOscuro ? 'none' : `0 10px 24px ${this.hexToRgba(color.solid, 0.08)}`,
+            };
+        },
+        estiloTarjetaServicio(servicio) {
+            const color = this.colorServicio(servicio);
+            if (this.esServicioSeleccionado(servicio)) {
+                return {
+                    borderColor: color.solid,
+                    backgroundColor: color.soft,
+                    boxShadow: `0 0 0 3px ${color.ring}`,
+                };
+            }
+            return { borderColor: color.ring };
+        },
+        estiloIconoServicio(servicio) {
+            const color = this.colorServicio(servicio);
+            return { color: color.solid };
+        },
+    };
+}
+</script>

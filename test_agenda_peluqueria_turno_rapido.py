@@ -46,7 +46,7 @@ class TestAgendaPeluqueriaTurnoRapido(unittest.TestCase):
         self.assertIn('Nuevo turno rápido', html)
         self.assertIn('/agenda/turnos/peluqueria/crear', html)
         self.assertIn('Corte + barba', html)
-        self.assertIn('Elegí la variante exacta para usar su nombre y costo', html)
+        self.assertIn('Cargá tus servicios para verlos acá', html)
         self.assertIn('Crear y cobrar', html)
         self.assertIn('turno_rapido_tipo', self.client.get('/servicios/nuevo').get_data(as_text=True))
 

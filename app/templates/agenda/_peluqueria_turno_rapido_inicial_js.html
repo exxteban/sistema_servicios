@@ -7,20 +7,15 @@ function peluqueriaTurnoRapidoAplicarInicial(vm, inicial) {
     const profesional = vm.profesionales.find((item) => Number(item.id) === Number(inicial.profesional_id));
     if (profesional) vm.seleccionarProfesional(profesional);
 
-    const servicio = vm.servicios.find((item) => item.id === inicial.servicio_turno_id);
+    const servicio = vm.modoCatalogo()
+        ? vm.catalogo.find((item) => Number(item.id) === Number(inicial.servicio_catalogo_id))
+        : vm.tiposBase.find((item) => item.id === inicial.servicio_turno_id);
     if (servicio) {
-        vm.seleccionarServicio(servicio, { abrirModal: false });
-        if (servicio.id === 'otro' && inicial.servicio_turno_nombre && inicial.servicio_turno_nombre !== servicio.nombre) {
+        vm.seleccionarServicio(servicio);
+        if (inicial.servicio_precio_opcion_id) vm.opcionId = String(inicial.servicio_precio_opcion_id);
+        if (vm.esServicioLibre() && inicial.servicio_turno_nombre && inicial.servicio_turno_nombre !== servicio.nombre) {
             vm.servicioPersonalizado = inicial.servicio_turno_nombre;
         }
-        if (!servicio.catalogo_id && inicial.servicio_catalogo_id) {
-            vm.servicioCatalogoManualId = String(inicial.servicio_catalogo_id);
-        }
-        const opciones = vm.opcionesServicioModal();
-        const opcion = inicial.servicio_precio_opcion_id
-            ? opciones.find((item) => !item.es_base && Number(item.id) === Number(inicial.servicio_precio_opcion_id))
-            : opciones.find((item) => item.es_base && Number(item.servicio_id) === Number(inicial.servicio_catalogo_id));
-        if (opcion) vm.seleccionarOpcionServicio(opcion);
     }
 
     if (Number(inicial.duracion) > 0) vm.duracion = Number(inicial.duracion);

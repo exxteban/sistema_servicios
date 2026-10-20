@@ -10,25 +10,18 @@ from app.routes.agenda.actividades import _parse_datetime_local
 from app.routes.agenda.relaciones import _serializar_cliente
 from app.routes.agenda.visibilidad import filtro_mostrar_agenda_para_usuario, usuarios_agenda_visibles_para
 from app.services.agenda_turnos_peluqueria import (
-    build_turno_peluqueria_chargeable_catalog_services,
-    build_turno_peluqueria_services,
+    SERVICIOS_TURNO_PELUQUERIA_BASE,
     catalog_service_requires_price_option,
     get_turno_peluqueria_catalog_service,
     get_turno_peluqueria_catalog_price_option,
-    is_turno_peluqueria_catalog_service_chargeable,
     is_turno_peluqueria_pos_chargeable,
     parse_turno_manual_price,
     resolve_turno_peluqueria_catalog_service,
 )
+from app.services.peluqueria_horario import horarios_turno_peluqueria, obtener_horario_peluqueria, query_turnos_solapados
 from app.services.peluqueria_senas import registrar_sena_turno, resolver_sena_al_cerrar, sena_turno, turno_ya_cobrado
-from app.utils.helpers import utc_naive_to_local
-
-HORARIOS_TURNO_PELUQUERIA = tuple(
-    f'{hora:02d}:{minuto:02d}'
-    for hora in range(8, 21)
-    for minuto in (0, 30)
-)
-
+from app.services.peluqueria_turno_catalogo import build_turno_peluqueria_catalogo
+from app.utils.helpers import today_local, utc_naive_to_local
 
 def _puede_asignar_profesional():
     return current_user.es_admin() or current_user.tiene_permiso('agenda_ver_todas')
@@ -128,19 +121,12 @@ def _crear_cliente_servicio_turno(*, cliente_id, servicio_catalogo_id, fecha_ini
 def _buscar_turno_solapado(*, profesional_id, fecha_inicio, fecha_fin, excluir_actividad_id=None):
     if not profesional_id or not fecha_inicio or not fecha_fin:
         return None
-    query = (
-        AgendaActividad.query
-        .filter(
-            AgendaActividad.usuario_id == profesional_id,
-            AgendaActividad.tipo == 'cita',
-            AgendaActividad.estado == 'pendiente',
-            AgendaActividad.fecha_inicio < fecha_fin,
-            db.or_(AgendaActividad.fecha_fin.is_(None), AgendaActividad.fecha_fin > fecha_inicio),
-        )
+    query = query_turnos_solapados(
+        profesional_id=profesional_id,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        excluir_actividad_id=_parse_positive_int(excluir_actividad_id),
     )
-    actividad_id = _parse_positive_int(excluir_actividad_id)
-    if actividad_id:
-        query = query.filter(AgendaActividad.id != actividad_id)
     return query.order_by(AgendaActividad.fecha_inicio.asc(), AgendaActividad.id.asc()).first()
 
 
@@ -205,12 +191,18 @@ def _redirect_gestion_turno(actividad):
 
 def _render_turno_rapido(inicial=None):
     profesionales = [_serializar_profesional(usuario) for usuario in _obtener_profesionales_disponibles()]
+    catalogo = build_turno_peluqueria_catalogo()
+    horario = obtener_horario_peluqueria()
     return render_template(
         'agenda/peluqueria_turno_rapido.html',
         profesionales=profesionales,
-        servicios=build_turno_peluqueria_services(),
-        servicios_cobrables_catalogo=build_turno_peluqueria_chargeable_catalog_services(),
-        horarios=HORARIOS_TURNO_PELUQUERIA,
+        catalogo=catalogo,
+        tipos_base=([] if catalogo else list(SERVICIOS_TURNO_PELUQUERIA_BASE)),
+        horarios=horarios_turno_peluqueria(horario),
+        intervalo=horario['intervalo'],
+        hoy=today_local().isoformat(),
+        puede_editar_horario=current_user.es_admin(),
+        puede_cargar_servicios=current_user.tiene_permiso('crear_producto'),
         puede_ver_agenda=current_user.tiene_permiso('agenda_acceso'),
         puede_crear_venta=current_user.tiene_permiso('crear_venta'),
         puede_crear_cliente=current_user.tiene_permiso('crear_cliente'),
@@ -422,15 +414,15 @@ def crear_turno_peluqueria():
     servicio_cobrable = is_turno_peluqueria_pos_chargeable(servicio_resuelto, precio_manual, price_option=servicio_precio_opcion)
     if not servicio_cobrable:
         flash(
-            'El turno se creó sin un servicio cobrable vinculado. Configura la opcion en Servicios para que aparezca en Cobros pendientes y se pueda cobrar directo.',
+            'Cargá tus servicios con precio para cobrar el turno directo.' if servicio_resuelto is None
+            else 'Ese servicio no tiene precio cargado. Para cobrarlo, cargá el precio en Servicios o usá "Cambiar precio" al dar el turno.',
             'warning',
         )
     if accion == 'crear_y_cobrar' and current_user.tiene_permiso('crear_venta'):
         if asignacion is not None:
             return redirect(url_for('ventas.pos', cliente_servicio_id=int(asignacion.id_cliente_servicio)))
         if not servicio_cobrable:
-            flash('No se puede abrir POS para este turno porque no tiene un servicio del catalogo con precio valido.', 'warning')
-            return redirect(url_for('agenda.lista_actividades'))
+            return redirect(url_for('main.dashboard'))
         redirect_params = _build_turno_redirect_pos_params(
             cliente_id=cliente_id,
             servicio_catalogo_id=request.form.get('servicio_catalogo_id'),
@@ -442,4 +434,4 @@ def crear_turno_peluqueria():
         )
         return redirect(url_for('ventas.pos', **redirect_params))
 
-    return redirect(url_for('agenda.lista_actividades'))
+    return redirect(url_for('main.dashboard'))
