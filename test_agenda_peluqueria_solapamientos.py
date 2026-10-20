@@ -1,7 +1,7 @@
 import unittest
 
 from app import create_app, db
-from app.models import AgendaActividad, Cliente, ClienteServicio, Configuracion, Servicio, Usuario
+from app.models import AgendaActividad, Cliente, ClienteServicio, Configuracion, MovimientoCaja, Servicio, SesionCaja, Usuario
 from app.services.dashboard_preferences import get_dashboard_service_cards, set_dashboard_service_cards
 from app.utils.helpers import today_local, utc_naive_to_local
 from app.utils.init_db import inicializar_datos_base
@@ -188,7 +188,8 @@ class TestAgendaPeluqueriaSolapamientos(unittest.TestCase):
             activo=True,
             turno_rapido_tipo='color',
         )
-        db.session.add_all([cliente, servicio])
+        sesion = SesionCaja(id_caja=1, id_usuario=self.admin.id_usuario, monto_inicial=0, estado='abierta')
+        db.session.add_all([cliente, servicio, sesion])
         db.session.commit()
 
         self.client.post('/agenda/turnos/peluqueria/crear', data={
@@ -213,7 +214,10 @@ class TestAgendaPeluqueriaSolapamientos(unittest.TestCase):
         )
         self.assertEqual(sena.status_code, 200)
         db.session.refresh(actividad)
-        self.assertIn('Seña registrada: Gs. 20.000 - transferencia', actividad.observaciones or '')
+        self.assertIn('Seña registrada en caja:', actividad.observaciones or '')
+        self.assertIn('20.000 - transferencia', actividad.observaciones or '')
+        self.assertEqual(float(actividad.sena_monto), 20000.0)
+        self.assertEqual(MovimientoCaja.query.filter_by(referencia_tipo='turno_sena', tipo='ingreso').count(), 1)
 
         cancelar = self.client.post(
             f'/agenda/turnos/peluqueria/{actividad.id}/gestionar',

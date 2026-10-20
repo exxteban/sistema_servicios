@@ -7,6 +7,7 @@ from app import db
 from app.models import AgendaActividad, Cliente, ClienteServicio, Usuario
 from app.routes.agenda import agenda_bp
 from app.routes.agenda.actividades import _parse_datetime_local
+from app.routes.agenda.relaciones import _serializar_cliente
 from app.routes.agenda.visibilidad import filtro_mostrar_agenda_para_usuario, usuarios_agenda_visibles_para
 from app.services.agenda_turnos_peluqueria import (
     build_turno_peluqueria_chargeable_catalog_services,
@@ -19,6 +20,7 @@ from app.services.agenda_turnos_peluqueria import (
     parse_turno_manual_price,
     resolve_turno_peluqueria_catalog_service,
 )
+from app.services.peluqueria_senas import registrar_sena_turno, resolver_sena_al_cerrar, sena_turno, turno_ya_cobrado
 from app.utils.helpers import utc_naive_to_local
 
 HORARIOS_TURNO_PELUQUERIA = tuple(
@@ -58,16 +60,19 @@ def _parse_positive_int(value):
     return number if number > 0 else None
 
 
-def _build_turno_redirect_pos_params(*, cliente_id=None, servicio_catalogo_id=None, profesional_id=None, manual_price=None, title=None, price_option_id=None):
+def _build_turno_redirect_pos_params(*, cliente_id=None, servicio_catalogo_id=None, profesional_id=None, manual_price=None, title=None, price_option_id=None, actividad_id=None):
     params = {}
     cliente_id = _parse_positive_int(cliente_id)
     profesional_id = _parse_positive_int(profesional_id)
+    actividad_id = _parse_positive_int(actividad_id)
     servicio = get_turno_peluqueria_catalog_service(servicio_catalogo_id)
     price_option = get_turno_peluqueria_catalog_price_option(servicio, price_option_id)
     if cliente_id:
         params['agenda_turno_cliente_id'] = cliente_id
     if profesional_id:
         params['agenda_turno_vendedor_id'] = profesional_id
+    if actividad_id:
+        params['agenda_turno_actividad_id'] = actividad_id
     if is_turno_peluqueria_pos_chargeable(servicio, manual_price, price_option=price_option):
         params['agenda_turno_servicio_id'] = int(servicio.id_servicio)
     if price_option is not None:
@@ -198,13 +203,7 @@ def _redirect_gestion_turno(actividad):
     return redirect(url_for('agenda.gestionar_turno_peluqueria', id_actividad=int(actividad.id)))
 
 
-@agenda_bp.route('/turnos/peluqueria/nuevo', methods=['GET'])
-@login_required
-def nuevo_turno_peluqueria():
-    if not current_user.tiene_permiso('agenda_crear'):
-        flash('No tienes permiso para crear turnos.', 'danger')
-        return redirect(url_for('agenda.lista_actividades'))
-
+def _render_turno_rapido(inicial=None):
     profesionales = [_serializar_profesional(usuario) for usuario in _obtener_profesionales_disponibles()]
     return render_template(
         'agenda/peluqueria_turno_rapido.html',
@@ -215,7 +214,46 @@ def nuevo_turno_peluqueria():
         puede_ver_agenda=current_user.tiene_permiso('agenda_acceso'),
         puede_crear_venta=current_user.tiene_permiso('crear_venta'),
         puede_crear_cliente=current_user.tiene_permiso('crear_cliente'),
+        turno_inicial=inicial,
     )
+
+
+def _turno_inicial_desde_form(form):
+    """Valores enviados, para volver a mostrar el formulario sin perder lo cargado."""
+    fecha_inicio = (form.get('fecha_inicio') or '').strip()
+    fecha, _, hora = fecha_inicio.partition('T')
+    cliente_id = _parse_positive_int(form.get('cliente_id'))
+    cliente = db.session.get(Cliente, cliente_id) if cliente_id else None
+    return {
+        'profesional_id': _parse_positive_int(form.get('usuario_id')),
+        'servicio_turno_id': (form.get('servicio_turno_id') or '').strip(),
+        'servicio_turno_nombre': (form.get('servicio_turno_nombre') or '').strip(),
+        'servicio_catalogo_id': _parse_positive_int(form.get('servicio_catalogo_id')),
+        'servicio_precio_opcion_id': _parse_positive_int(form.get('servicio_precio_opcion_id')),
+        'precio_manual': (form.get('precio_manual') or '').strip(),
+        'duracion': _parse_positive_int(form.get('duracion')),
+        'fecha': fecha,
+        'hora': hora[:5],
+        'cliente': _serializar_cliente(cliente),
+        'cliente_nuevo_nombre': (form.get('cliente_nuevo_nombre') or '').strip(),
+        'cliente_nuevo_telefono': (form.get('cliente_nuevo_telefono') or '').strip(),
+        'observaciones': (form.get('observaciones') or '').strip(),
+    }
+
+
+def _rechazar_turno_rapido(mensaje):
+    flash(mensaje, 'warning')
+    return _render_turno_rapido(_turno_inicial_desde_form(request.form))
+
+
+@agenda_bp.route('/turnos/peluqueria/nuevo', methods=['GET'])
+@login_required
+def nuevo_turno_peluqueria():
+    if not current_user.tiene_permiso('agenda_crear'):
+        flash('No tienes permiso para crear turnos.', 'danger')
+        return redirect(url_for('agenda.lista_actividades'))
+
+    return _render_turno_rapido()
 
 
 @agenda_bp.route('/turnos/peluqueria/<int:id_actividad>/gestionar', methods=['GET', 'POST'])
@@ -232,6 +270,8 @@ def gestionar_turno_peluqueria(id_actividad):
             puede_reprogramar=current_user.tiene_permiso('agenda_editar'),
             puede_cancelar=current_user.tiene_permiso('agenda_cancelar'),
             puede_registrar_sena=(current_user.tiene_permiso('agenda_editar') or current_user.tiene_permiso('crear_venta')),
+            sena_actual=float(sena_turno(actividad)),
+            turno_cobrado=turno_ya_cobrado(actividad),
         )
 
     accion = (request.form.get('accion') or '').strip().lower()
@@ -268,15 +308,23 @@ def gestionar_turno_peluqueria(id_actividad):
             flash('No tienes permiso para registrar señas.', 'danger')
             return _redirect_gestion_turno(actividad)
         monto = parse_turno_manual_price(request.form.get('monto_sena'))
-        if monto is None:
-            flash('Ingresa un monto de seña mayor a cero.', 'warning')
+        ok, error = registrar_sena_turno(actividad, monto, current_user, request.form.get('nota_sena'))
+        if not ok:
+            db.session.rollback()
+            flash(error, 'warning')
             return _redirect_gestion_turno(actividad)
-        nota = (request.form.get('nota_sena') or '').strip()
-        _append_turno_note(actividad, f'Seña registrada: Gs. {int(monto):,}'.replace(',', '.') + (f' - {nota}' if nota else ''))
-        flash('Seña registrada como nota del turno.', 'success')
+        flash('Seña registrada: entró a tu caja y se descuenta al cobrar el turno.', 'success')
     elif accion in {'cancelar', 'no_show'}:
         if not current_user.tiene_permiso('agenda_cancelar'):
             flash('No tienes permiso para cerrar turnos.', 'danger')
+            return _redirect_gestion_turno(actividad)
+        if turno_ya_cobrado(actividad):
+            flash('Este turno ya fue cobrado; no se puede cancelar desde acá.', 'warning')
+            return _redirect_gestion_turno(actividad)
+        ok, error = resolver_sena_al_cerrar(actividad, current_user, devolver=request.form.get('devolver_sena') == '1')
+        if not ok:
+            db.session.rollback()
+            flash(error, 'warning')
             return _redirect_gestion_turno(actividad)
         motivo = (request.form.get('motivo') or '').strip()
         etiqueta = 'No-show' if accion == 'no_show' else 'Cancelado'
@@ -302,8 +350,7 @@ def crear_turno_peluqueria():
 
     turno_data, error = _validar_datos_turno_rapido(request.form)
     if error:
-        flash(error, 'warning')
-        return redirect(url_for('agenda.nuevo_turno_peluqueria'))
+        return _rechazar_turno_rapido(error)
 
     profesional_id = request.form.get('usuario_id', type=int) or current_user.id_usuario
     if not _puede_asignar_profesional():
@@ -311,8 +358,7 @@ def crear_turno_peluqueria():
 
     profesional = db.session.get(Usuario, profesional_id)
     if profesional is None or not getattr(profesional, 'activo', True):
-        flash('Selecciona un profesional activo para el turno.', 'warning')
-        return redirect(url_for('agenda.nuevo_turno_peluqueria'))
+        return _rechazar_turno_rapido('Selecciona un profesional activo para el turno.')
 
     turno_solapado = _buscar_turno_solapado(
         profesional_id=profesional_id,
@@ -320,8 +366,7 @@ def crear_turno_peluqueria():
         fecha_fin=turno_data['fecha_fin'],
     )
     if turno_solapado is not None:
-        flash('Ese profesional ya tiene un turno en ese horario. Elige otra hora o profesional.', 'warning')
-        return redirect(url_for('agenda.nuevo_turno_peluqueria'))
+        return _rechazar_turno_rapido('Ese profesional ya tiene un turno en ese horario. Elige otra hora o profesional.')
 
     observaciones = (request.form.get('observaciones') or '').strip() or None
     precio_manual = parse_turno_manual_price(request.form.get('precio_manual'))
@@ -333,15 +378,13 @@ def crear_turno_peluqueria():
     )
     servicio_precio_opcion = get_turno_peluqueria_catalog_price_option(servicio_resuelto, servicio_precio_opcion_id)
     if catalog_service_requires_price_option(servicio_resuelto) and servicio_precio_opcion is None:
-        flash('Selecciona el tipo o variante del servicio antes de crear el turno.', 'warning')
-        return redirect(url_for('agenda.nuevo_turno_peluqueria'))
+        return _rechazar_turno_rapido('Selecciona el tipo o variante del servicio antes de crear el turno.')
 
     cliente_id = _parse_positive_int(request.form.get('cliente_id'))
     if not cliente_id:
         cliente_nuevo, error_cliente = _crear_cliente_rapido_turno(request.form)
         if error_cliente:
-            flash(error_cliente, 'warning')
-            return redirect(url_for('agenda.nuevo_turno_peluqueria'))
+            return _rechazar_turno_rapido(error_cliente)
         if cliente_nuevo is not None:
             cliente_id = int(cliente_nuevo.id_cliente)
 
@@ -395,6 +438,7 @@ def crear_turno_peluqueria():
             manual_price=precio_manual,
             title=(request.form.get('titulo') or '').strip() or turno_data['servicio_nombre'],
             price_option_id=servicio_precio_opcion_id,
+            actividad_id=actividad.id,
         )
         return redirect(url_for('ventas.pos', **redirect_params))
 

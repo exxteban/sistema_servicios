@@ -51,6 +51,8 @@ class AgendaActividad(db.Model):
     recordatorio_minutos = db.Column(db.Integer)
     es_todo_el_dia = db.Column(db.Boolean, nullable=False, default=False)
     observaciones = db.Column(db.Text)
+    # Seña cobrada por adelantado (entra a caja al registrarse y se descuenta al cobrar el turno).
+    sena_monto = db.Column(db.Numeric(12, 2), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

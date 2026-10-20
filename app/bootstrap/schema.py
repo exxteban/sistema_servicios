@@ -37,19 +37,6 @@ SCHEMA_COLUMN_MIGRATIONS = {
             ),
         ),
     ],
-    'agenda_actividades': [
-        (
-            'cliente_servicio_id',
-            (
-                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INTEGER",
-                "CREATE INDEX IF NOT EXISTS ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
-            ),
-            (
-                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INT NULL",
-                "CREATE INDEX ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
-            ),
-        ),
-    ],
     'productos': [
         (
             'codigo_barras',
@@ -385,6 +372,23 @@ SCHEMA_COLUMN_MIGRATIONS = {
     'agenda_actividades': [
         ('mostrar_agenda_en', ("ALTER TABLE agenda_actividades ADD COLUMN mostrar_agenda_en VARCHAR(30) NOT NULL DEFAULT 'solo_responsable'",), ("ALTER TABLE agenda_actividades ADD COLUMN mostrar_agenda_en VARCHAR(30) NOT NULL DEFAULT 'solo_responsable'",)),
         ('recordatorio_a', ("ALTER TABLE agenda_actividades ADD COLUMN recordatorio_a VARCHAR(30) NOT NULL DEFAULT 'solo_responsable'",), ("ALTER TABLE agenda_actividades ADD COLUMN recordatorio_a VARCHAR(30) NOT NULL DEFAULT 'solo_responsable'",)),
+        # Antes estaban en otra clave 'agenda_actividades' del dict, que esta pisaba (nunca se aplicaban).
+        (
+            'cliente_servicio_id',
+            (
+                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INTEGER",
+                "CREATE INDEX IF NOT EXISTS ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
+            ),
+            (
+                "ALTER TABLE agenda_actividades ADD COLUMN cliente_servicio_id INT NULL",
+                "CREATE INDEX ix_agenda_actividades_cliente_servicio_id ON agenda_actividades(cliente_servicio_id)",
+            ),
+        ),
+        (
+            'sena_monto',
+            ("ALTER TABLE agenda_actividades ADD COLUMN sena_monto NUMERIC(12, 2)",),
+            ("ALTER TABLE agenda_actividades ADD COLUMN sena_monto DECIMAL(12, 2) NULL",),
+        ),
     ],
 }
 

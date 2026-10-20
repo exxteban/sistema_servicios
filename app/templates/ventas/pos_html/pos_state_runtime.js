@@ -33,7 +33,7 @@
                         }
                     } else if (typeof CLIENTE_SERVICIO_DATA !== 'undefined' && CLIENTE_SERVICIO_DATA && CLIENTE_SERVICIO_DATA.id) {
                         this.cargarDatosClienteServicio();
-                    } else if (typeof AGENDA_TURNO_DATA !== 'undefined' && AGENDA_TURNO_DATA && ((Array.isArray(AGENDA_TURNO_DATA.items) && AGENDA_TURNO_DATA.items.length > 0) || AGENDA_TURNO_DATA.cliente_id || AGENDA_TURNO_DATA.id_usuario_vendedor)) {
+                    } else if (typeof AGENDA_TURNO_DATA !== 'undefined' && AGENDA_TURNO_DATA && ((Array.isArray(AGENDA_TURNO_DATA.items) && AGENDA_TURNO_DATA.items.length > 0) || AGENDA_TURNO_DATA.cliente_id || AGENDA_TURNO_DATA.id_usuario_vendedor || AGENDA_TURNO_DATA.agenda_actividad_id)) {
                         this.cargarDatosAgendaTurno();
                     } else if (typeof COLA_COBRO_DATA !== 'undefined' && COLA_COBRO_DATA && COLA_COBRO_DATA.id) {
                         const colaId = Number(COLA_COBRO_DATA.id) || null;
@@ -436,6 +436,7 @@
                             .catch(e => console.error('Error cargando cliente del servicio:', e));
                     }
 
+                    this.aplicarSenaTurno(CLIENTE_SERVICIO_DATA.sena);
                     this.actualizarTotal();
                     const totalAsignaciones = this.clienteServicioIds.length || (this.clienteServicioId ? 1 : 0);
                     if (totalAsignaciones > 1) {
@@ -512,6 +513,7 @@
                     }
 
                     this.limpiarAgendaTurnoDeUrl();
+                    this.aplicarSenaTurno(AGENDA_TURNO_DATA.sena);
                     this.actualizarTotal();
                     mostrarNotificacion(
                         this.carrito.length > 0
@@ -523,6 +525,14 @@
                     console.error('Error cargando turno de agenda en POS:', e);
                     mostrarNotificacion('Error al cargar el turno en POS', 'error');
                 }
+            },
+
+            // La seña del turno ya entró a caja al registrarse: se descuenta para cobrar solo el saldo.
+            aplicarSenaTurno(sena) {
+                const monto = parseFloat(sena) || 0;
+                if (monto <= 0) return;
+                this.descuento = monto;
+                mostrarNotificacion('Seña del turno aplicada como descuento', 'info');
             },
 
             limpiarColaCobroDeUrl() {

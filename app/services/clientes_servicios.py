@@ -122,10 +122,14 @@ def build_pos_data_from_cliente_servicios(asignaciones):
     if not items:
         return None
 
+    from app.services.peluqueria_senas import sena_para_cobro
+
     return {
         'id': ids[0],
         'ids': ids,
         'cliente_id': cliente_id,
         'observaciones': ' | '.join(observaciones),
         'items': items,
+        # Seña de turnos de agenda ya ingresada a caja: se descuenta al cobrar.
+        'sena': sena_para_cobro(cliente_servicio_ids=ids),
     }

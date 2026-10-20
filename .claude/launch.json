@@ -12,6 +12,18 @@
         "SERVER": "flask",
         "DEBUG": "0"
       }
+    },
+    {
+      "name": "revision-peluqueria",
+      "runtimeExecutable": ".venv313/Scripts/python.exe",
+      "runtimeArgs": ["run.py"],
+      "port": 5056,
+      "env": {
+        "PORT": "5056",
+        "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/C--Users-csarl-Documents-proyectos-saas-sistema-servicios/01dcc636-de24-46bc-9cfa-1b74d83717ed/scratchpad/peluq.db",
+        "SERVER": "flask",
+        "DEBUG": "0"
+      }
     }
   ]
 }

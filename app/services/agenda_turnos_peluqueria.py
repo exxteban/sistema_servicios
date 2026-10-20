@@ -312,9 +312,12 @@ def build_pos_data_from_agenda_turno(*, cliente_id=None, servicio_id=None, vende
     if not items and not cliente_id and not vendedor_id and not actividad_id:
         return None
 
+    from app.services.peluqueria_senas import sena_para_cobro
+
     return {
         'agenda_actividad_id': actividad_id,
         'cliente_id': cliente_id,
         'id_usuario_vendedor': vendedor_id,
         'items': items,
+        'sena': sena_para_cobro(actividad_id=actividad_id),
     }

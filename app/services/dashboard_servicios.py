@@ -266,7 +266,6 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
         AgendaActividad.query.options(joinedload(AgendaActividad.cliente).load_only(Cliente.id_cliente, Cliente.nombre))
         .filter(
             AgendaActividad.tipo == 'cita',
-            AgendaActividad.cliente_id.isnot(None),
             AgendaActividad.cliente_servicio_id.is_(None),
             AgendaActividad.venta_id.is_(None),
             AgendaActividad.estado.in_(['pendiente', 'hecha']),
@@ -299,10 +298,11 @@ def obtener_resumen_cobros_pendientes_dashboard(limit=3) -> dict[str, Any]:
             continue
         if _consumir_si_turno_ya_fue_cobrado(actividad, servicio, vendidos_por_key):
             continue
-        params = {
-            'agenda_turno_cliente_id': int(actividad.cliente_id),
-            'agenda_turno_actividad_id': int(actividad.id),
-        }
+        params = {'agenda_turno_actividad_id': int(actividad.id)}
+        if actividad.cliente_id:
+            params['agenda_turno_cliente_id'] = int(actividad.cliente_id)
+        if actividad.usuario_id:
+            params['agenda_turno_vendedor_id'] = int(actividad.usuario_id)
         if servicio is not None:
             params['agenda_turno_servicio_id'] = int(servicio.id_servicio)
         else:

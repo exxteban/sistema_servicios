@@ -61,6 +61,7 @@ function peluqueriaTurnoRapido(config) {
             this.hora = this.horaInicial(hoy);
             if (this.profesionales.length) this.seleccionarProfesional(this.profesionales[0]);
             if (this.servicios.length) this.seleccionarServicio(this.servicios[0], { abrirModal: false });
+            peluqueriaTurnoRapidoAplicarInicial(this, config.inicial);
         },
         actualizarModoTema() {
             this.modoOscuro = document.documentElement.classList.contains('dark');

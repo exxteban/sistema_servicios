@@ -344,12 +344,9 @@ def _obtener_o_crear_pendiente_cobro_reparacion(reparacion, usuario_actual):
 
 def _sesion_caja_abierta_usuario(usuario):
     """Sesión de caja abierta del usuario que opera (o None)."""
-    if not usuario:
-        return None
-    return SesionCaja.query.filter_by(
-        id_usuario=usuario.id_usuario,
-        estado='abierta',
-    ).first()
+    from app.services.caja_senas import sesion_caja_abierta_usuario
+
+    return sesion_caja_abierta_usuario(usuario)
 
 
 def _registrar_movimiento_abono_reparacion(reparacion, delta, usuario):
@@ -366,36 +363,17 @@ def _registrar_movimiento_abono_reparacion(reparacion, delta, usuario):
     Requiere una caja abierta del usuario que opera.
     """
     from app.routes.caja.constantes import REF_ABONO_REPARACION
+    from app.services.caja_senas import registrar_movimiento_sena
 
-    try:
-        delta = float(delta or 0)
-    except (TypeError, ValueError):
-        delta = 0.0
-    if abs(delta) < 0.005:
-        return True, None
-
-    sesion = _sesion_caja_abierta_usuario(usuario)
-    if not sesion:
-        return False, 'Debe tener una caja abierta para registrar la seña/abono en caja.'
-
-    if delta > 0:
-        tipo = 'ingreso'
-        motivo = f'Seña/abono reparación #{reparacion.id_reparacion}'
-    else:
-        tipo = 'egreso'
-        motivo = f'Ajuste de seña/abono reparación #{reparacion.id_reparacion}'
-
-    movimiento = MovimientoCaja(
-        id_sesion_caja=sesion.id_sesion,
-        id_usuario=usuario.id_usuario,
-        tipo=tipo,
-        monto=abs(delta),
-        motivo=motivo,
+    return registrar_movimiento_sena(
+        delta=delta,
+        usuario=usuario,
         referencia_tipo=REF_ABONO_REPARACION,
         referencia_id=reparacion.id_reparacion,
+        motivo_ingreso=f'Seña/abono reparación #{reparacion.id_reparacion}',
+        motivo_egreso=f'Ajuste de seña/abono reparación #{reparacion.id_reparacion}',
+        mensaje_sin_caja='Debe tener una caja abierta para registrar la seña/abono en caja.',
     )
-    db.session.add(movimiento)
-    return True, None
 
 
 def _a_float_seguro(valor, default=0.0):
