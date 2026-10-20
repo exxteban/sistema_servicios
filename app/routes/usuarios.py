@@ -28,6 +28,12 @@ def _clientes_asignables():
     ).order_by(Cliente.nombre.asc(), Cliente.id_cliente.asc()).all()
 
 
+
+def _aplicar_atiende_clientes(usuario):
+    """Solo se toca si el formulario muestra la opción (instalaciones de servicios)."""
+    if request.form.get('atiende_clientes_presente') == '1':
+        usuario.atiende_clientes = bool(request.form.get('atiende_clientes'))
+
 @usuarios_bp.route('/')
 @login_required
 def listar():
@@ -197,6 +203,7 @@ def nuevo():
             activo=activo
         )
         usuario.set_password(password)
+        _aplicar_atiende_clientes(usuario)
 
         db.session.add(usuario)
         db.session.flush()
@@ -345,6 +352,7 @@ def editar(id):
                 )
             usuario.set_password(password)
 
+        _aplicar_atiende_clientes(usuario)
         if not es_mi_usuario:
             id_rol = request.form.get('id_rol', type=int)
             activo = bool(request.form.get('activo'))

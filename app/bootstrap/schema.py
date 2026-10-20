@@ -25,6 +25,7 @@ SCHEMA_COLUMN_MIGRATIONS = {
         ),
     ],
     'usuarios': [
+        ('atiende_clientes', ("ALTER TABLE usuarios ADD COLUMN atiende_clientes BOOLEAN",), ("ALTER TABLE usuarios ADD COLUMN atiende_clientes TINYINT(1) NULL",)),
         (
             'id_cliente',
             (

@@ -91,6 +91,15 @@
             {% endif %}
         </div>
 
+        {%- if marca_rubro and not marca_rubro.es_gastronomia %}
+        <div class="flex items-center gap-2">
+            <input type="hidden" name="atiende_clientes_presente" value="1">
+            <input type="checkbox" name="atiende_clientes" value="1" class="h-4 w-4" {% if usuario.atiende_clientes %}checked{% endif %}>
+            <span class="text-sm text-gray-700 dark:text-gray-200">Atiende clientes</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">(aparece como profesional en turnos y agenda)</span>
+        </div>
+        {%- endif %}
+
         <div class="flex items-center gap-2">
             <input type="checkbox" name="modo_demo" {% if usuario.modo_demo %}checked{% endif %} class="h-4 w-4" {% if
                 es_mi_usuario %}disabled{% endif %}>

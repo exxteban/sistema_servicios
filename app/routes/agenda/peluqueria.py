@@ -19,6 +19,7 @@ from app.services.agenda_turnos_peluqueria import (
     resolve_turno_peluqueria_catalog_service,
 )
 from app.services.peluqueria_horario import horarios_turno_peluqueria, obtener_horario_peluqueria, query_turnos_solapados
+from app.services.peluqueria_profesionales import filtrar_profesionales
 from app.services.peluqueria_turno_catalogo import build_turno_peluqueria_catalogo
 from app.utils.helpers import today_local, utc_naive_to_local
 
@@ -41,7 +42,10 @@ def _iniciales_usuario(usuario):
 
 
 def _obtener_profesionales_disponibles():
-    return usuarios_agenda_visibles_para(current_user, _puede_asignar_profesional())
+    puede_asignar = _puede_asignar_profesional()
+    usuarios = usuarios_agenda_visibles_para(current_user, puede_asignar)
+    # Quien solo maneja su propia agenda se sigue viendo a sí mismo aunque no esté marcado.
+    return filtrar_profesionales(usuarios) if puede_asignar else usuarios
 
 
 def _parse_positive_int(value):

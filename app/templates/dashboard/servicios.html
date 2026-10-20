@@ -81,54 +81,7 @@
                     </div>
                 </div>
             </div>
-            {% if current_user.tiene_permiso('agenda_crear') %}
-            {% set nuevo_turno_url = url_for('agenda.nuevo_turno_peluqueria') if dashboard_negocio.id == 'peluqueria_barberia' else url_for('agenda.nueva_actividad') %}
-            <a href="{{ nuevo_turno_url }}"
-               data-tab-url="{{ nuevo_turno_url }}"
-               data-tab-title="Nuevo turno" data-tab-icon="fas fa-plus"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-violet-300/60 transition hover:bg-violet-600 dark:border-violet-500/50 dark:bg-violet-600 dark:text-white dark:shadow-none dark:hover:bg-violet-500">
-                <i class="fas fa-plus"></i>Nuevo turno
-            </a>
-            {% endif %}
-            {% if current_user.tiene_permiso('crear_producto') %}
-            <a href="{{ url_for('servicios.nuevo') }}"
-               data-tab-url="{{ url_for('servicios.nuevo') }}"
-               data-tab-title="Nuevo servicio" data-tab-icon="fas fa-concierge-bell"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-300/60 transition hover:bg-emerald-600 dark:border-emerald-500/50 dark:bg-emerald-600 dark:text-white dark:shadow-none dark:hover:bg-emerald-500">
-                <i class="fas fa-concierge-bell"></i>Cargar servicio
-            </a>
-            {% endif %}
-            {% if can_ver_inventario %}
-            <a href="{{ url_for('servicios.listar') }}"
-               data-tab-url="{{ url_for('servicios.listar') }}"
-               data-tab-title="Servicios y costos" data-tab-icon="fas fa-list-ul"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 shadow-sm shadow-amber-200/60 transition hover:border-amber-300 hover:bg-amber-100 dark:border-amber-600/50 dark:bg-amber-700 dark:text-white dark:shadow-none dark:hover:bg-amber-600">
-                <i class="fas fa-list-ul"></i>Servicios y costos
-            </a>
-            {% endif %}
-            {% if can_ver_agenda %}
-            {% set agenda_url = url_for('agenda.agenda_dia_peluqueria') if dashboard_negocio.id == 'peluqueria_barberia' else url_for('agenda.dashboard') %}
-            <a href="{{ agenda_url }}"
-               data-tab-url="{{ agenda_url }}"
-               data-tab-title="Agenda" data-tab-icon="fas fa-calendar-check"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-5 py-2.5 text-sm font-semibold text-cyan-800 shadow-sm shadow-cyan-200/60 transition hover:border-cyan-300 hover:bg-cyan-100 dark:border-cyan-600/50 dark:bg-cyan-700 dark:text-white dark:shadow-none dark:hover:bg-cyan-600">
-                <i class="far fa-calendar"></i>Agenda
-            </a>
-            {% endif %}
-            {% if can_crear_venta %}
-            <a href="{{ url_for('ventas.pos') }}"
-               data-tab-url="{{ url_for('ventas.pos') }}"
-               data-tab-title="Cobrar servicio" data-tab-icon="fas fa-cash-register"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-sm font-semibold text-rose-800 shadow-sm shadow-rose-200/60 transition hover:border-rose-300 hover:bg-rose-100 dark:border-rose-600/50 dark:bg-rose-700 dark:text-white dark:shadow-none dark:hover:bg-rose-600">
-                <i class="fas fa-dollar-sign"></i>Cobrar servicio
-            </a>
-            {% endif %}
-            <a href="{{ url_for('clientes.nuevo') }}"
-               data-tab-url="{{ url_for('clientes.nuevo') }}"
-               data-tab-title="Cliente nuevo" data-tab-icon="fas fa-user-plus"
-               class="app-tab-link inline-flex items-center gap-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-5 py-2.5 text-sm font-semibold text-fuchsia-800 shadow-sm shadow-fuchsia-200/60 transition hover:border-fuchsia-300 hover:bg-fuchsia-100 dark:border-fuchsia-600/50 dark:bg-fuchsia-700 dark:text-white dark:shadow-none dark:hover:bg-fuchsia-600">
-                <i class="fas fa-user-plus"></i>Cliente nuevo
-            </a>
+            {% include "dashboard/components/servicios_acciones.html" %}
         </div>
     </div>
 

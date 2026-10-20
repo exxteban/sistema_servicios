@@ -36,7 +36,7 @@
                                     Sistema de Gestión
                                 </span>
                                 <span class="crm-topnav__title-secondary hidden sm:inline font-light text-sm text-blue-200/80 tracking-widest uppercase truncate leading-tight">
-                                    Gastronomía
+                                    {% if marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.rubro }}{% else %}Gastronomía{% endif %}
                                 </span>
                             </div>
                             {% if app_brand_name %}

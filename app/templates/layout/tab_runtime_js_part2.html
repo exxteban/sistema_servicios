@@ -103,7 +103,7 @@
                             const activeTabId = getActiveTabId();
                             if (activeTabId === tabId) {
                                 const pageTitle = (payload.pageTitle || '').trim();
-                                const appTitle = window.__appBaseTitle || 'Sistema de Gestión Gastronómica';
+                                const appTitle = window.__appBaseTitle || {% if marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.titulo|tojson }}{% else %}'Sistema de Gestión Gastronómica'{% endif %};
                                 const fullTitle = pageTitle ? `${pageTitle} - ${appTitle}` : appTitle;
                                 document.title = fullTitle;
 

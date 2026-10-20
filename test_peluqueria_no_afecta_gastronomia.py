@@ -57,14 +57,24 @@ class TestPeluqueriaNoAfectaGastronomia(unittest.TestCase):
     def test_login_mantiene_marca_gastronomica(self):
         html = self.client.get('/auth/login').get_data(as_text=True)
 
-        self.assertIn('Sistema de Gestion Gastronomica', html)
+        self.assertIn('<title>Iniciar Sesion - Sistema de Gestion Gastronomica</title>', html)
+        self.assertIn('Sistema de Gesti&#243;n para Gastronom&#237;a', html)
 
     def test_layout_mantiene_marca_gastronomica(self):
         self._loguear()
         response = self.client.get('/gastronomia/')
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('Sistema de Gestión Gastronómica', response.get_data(as_text=True))
+        html = response.get_data(as_text=True)
+        self.assertIn('Sistema de Gestión Gastronómica', html)
+        self.assertIn("'Sistema de Gestión Gastronómica'", html)
+
+    def test_formulario_de_usuario_no_muestra_atiende_clientes(self):
+        self._loguear()
+
+        html = self.client.get('/usuarios/nuevo').get_data(as_text=True)
+
+        self.assertNotIn('atiende_clientes', html)
 
     def test_turno_peluqueria_no_cambia_modo_ni_dashboard(self):
         self._loguear()

@@ -79,6 +79,8 @@ def register_runtime_features(app, db):
         'ia_openai_api_key',
         'ia_deepseek_api_key',
         'ia_api_key',
+        'modo_operacion_principal',
+        'dashboard_negocio_activo',
     )
 
     def _obtener_configuracion_ui_mapa():
@@ -99,6 +101,11 @@ def register_runtime_features(app, db):
             valores = {}
         g._runtime_ui_config = valores
         return valores
+
+    def _marca_rubro(nombre_empresa):
+        from app.services.marca_rubro import obtener_marca_rubro
+
+        return obtener_marca_rubro(nombre_empresa, configuraciones=_obtener_configuracion_ui_mapa())
 
     @app.context_processor
     def inject_branding():
@@ -189,6 +196,7 @@ def register_runtime_features(app, db):
             'modulo_flujo_caja_activo': modulo_flujo_caja_activo,
             'modulo_facturacion_electronica_activo': modulo_facturacion_electronica_activo,
             'es_usuario_root_actual': es_usuario_root_actual,
+            'marca_rubro': _marca_rubro(nombre_empresa),
         }
 
     @app.context_processor

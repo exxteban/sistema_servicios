@@ -17,6 +17,7 @@ from app.models import (
     Venta,
 )
 from app.routes.agenda.visibilidad import query_usuarios_agenda_visibles
+from app.services.peluqueria_profesionales import filtrar_query_profesionales
 from app.utils.helpers import today_local, utc_bounds_for_local_dates, parse_iso_date
 from app.services.dashboard_agenda import (
     obtener_resumen_agenda_dashboard,
@@ -312,7 +313,7 @@ def dashboard():
     usuarios_ocupados_ids = set()
     dashboard_profesionales_detalle = {}
     if dashboard_negocio.get('full_template'):
-        profesionales_query = query_usuarios_agenda_visibles()
+        profesionales_query = filtrar_query_profesionales(query_usuarios_agenda_visibles())
         profesionales_activos = profesionales_query.count()
         usuarios_activos_lista = profesionales_query.options(joinedload(Usuario.rol)).limit(5).all()
         usuarios_ocupados_ids, dashboard_profesionales_detalle = obtener_estado_profesionales_dashboard(

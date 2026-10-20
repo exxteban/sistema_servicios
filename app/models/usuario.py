@@ -31,6 +31,8 @@ class Usuario(UserMixin, db.Model):
     nombre_completo = db.Column(db.String(100), nullable=False)
     id_rol = db.Column(db.Integer, db.ForeignKey('roles.id_rol'), nullable=False, default=3)
     activo = db.Column(db.Boolean, default=True)
+    # Peluquería/servicios: si al menos un usuario está marcado, solo los marcados aparecen como profesionales.
+    atiende_clientes = db.Column(db.Boolean, nullable=True)
     dashboard_range_preference = db.Column(db.String(20), default='hoy')  # Preferencia de rango de fecha del dashboard
     ultimo_acceso = db.Column(db.DateTime)
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)

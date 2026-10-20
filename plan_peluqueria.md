@@ -247,3 +247,14 @@ Las fases 2, 3 y 4 son independientes entre sí una vez cerrada la Fase 1. Para 
 - `_sincronizar_cliente_servicio_desde_actividad` pasó de `routes/agenda/formularios.py` a `app/services/agenda_cliente_servicio_sync.py` sin cambiar su lógica.
 - WhatsApp: botones "Confirmar turno" y "Recordar turno" que abren `wa.me` con el mensaje armado. El teléfono se normaliza con `app/utils/phone_utils.normalizar_telefono`. No se envía nada automáticamente; si el cliente no tiene teléfono, se pide cargarlo.
 - Mapa del día y agenda del día muestran "Terminado" (ámbar) aparte de "Cobrado".
+
+### Fase 5 — hecha (2026-10-19)
+- `Usuario.atiende_clientes` (Boolean, nulable). Se marca con el checkbox "Atiende clientes" en alta y edición de usuario, que solo se muestra en instalaciones de servicios; si el formulario no trae el campo, el valor no se toca.
+- `app/services/peluqueria_profesionales.py`: si nadie está marcado aparecen todos; si hay marcados activos, solo esos figuran en el alta de turno, la agenda del día, los horarios ocupados y la tarjeta de profesionales del dashboard de servicios. Quien solo maneja su propia agenda se sigue viendo a sí mismo.
+- Marca según el rubro (`app/services/marca_rubro.py`, expuesta como `marca_rubro` en el contexto de las plantillas):
+  - Gastronomía: las plantillas conservan su markup original en una rama `if`. Una comparación byte a byte de login, gastronomía, usuarios y agenda entre HEAD y el código nuevo dio idéntico, salvo tokens y relojes.
+  - Servicios: el título usa el nombre de la empresa y, si no hay, el texto del rubro ("Sistema de Gestión para Peluquería y Barbería" o "Sistema de Gestión de Servicios"). La barra superior dice "Peluquería · Barbería" o "Servicios" y el login usa el texto del rubro.
+  - También se cubrieron los títulos de respaldo en JS de las pestañas.
+- La marca toma el modo y el dashboard del mapa de configuración que el runtime ya lee en una sola consulta (`modo_operacion_principal` y `dashboard_negocio_activo` se agregaron a esas claves), así que no suma consultas por página (`test_agenda_perf`).
+- Dashboard de peluquería: 3 acciones a la vista (**Nuevo turno**, **Agenda de hoy**, **Cobrar**) y un menú "Más" con `<details>`: Cargar servicio, Servicios y costos, Cliente nuevo y Horario del local. Los botones se movieron a `dashboard/components/servicios_acciones.html`; el dashboard de servicios genérico conserva su bloque tal cual.
+- Nota para tests: `g` se comparte entre requests cuando la clase deja el contexto de app abierto. Las cachés nuevas usan `request.environ`, y el test limpia `g._runtime_ui_config` después de cambiar la configuración.

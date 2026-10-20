@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Iniciar Sesion - Sistema de Gestion Gastronomica</title>
+<title>Iniciar Sesion - {% if marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.titulo }}{% else %}Sistema de Gestion Gastronomica{% endif %}</title>
 <script src="{{ static_url('js/app_zoom_stability.js') }}"></script>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -286,7 +286,7 @@ body{
     </div>
     {% endif %}
     <p class="topbar-sub">Bienvenido a</p>
-    <h1 class="topbar-title">Sistema de Gesti&#243;n para Gastronom&#237;a</h1>
+    <h1 class="topbar-title">{% if marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.subtitulo_login }}{% else %}Sistema de Gesti&#243;n para Gastronom&#237;a{% endif %}</h1>
     <div class="topbar-divider">
       <span class="line"></span>
       <span class="dot">&#9679;</span>
@@ -347,7 +347,7 @@ body{
       </ul>
 
       <div class="brand-footer" style="position:relative;z-index:1">
-        &copy; {{ now().year }} {% if app_brand_name %}{{ app_brand_name }}{% else %}Sistema de Gesti&#243;n Gastron&#243;mica{% endif %}
+        &copy; {{ now().year }} {% if app_brand_name %}{{ app_brand_name }}{% elif marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.titulo }}{% else %}Sistema de Gesti&#243;n Gastron&#243;mica{% endif %}
       </div>
     </div>
 
@@ -416,7 +416,7 @@ body{
         </button>
       </form>
 
-      <p class="form-footer">&copy; {{ now().year }} {% if app_brand_name %}{{ app_brand_name }}{% else %}Sistema de Gesti&#243;n Gastron&#243;mica{% endif %}</p>
+      <p class="form-footer">&copy; {{ now().year }} {% if app_brand_name %}{{ app_brand_name }}{% elif marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.titulo }}{% else %}Sistema de Gesti&#243;n Gastron&#243;mica{% endif %}</p>
     </div>
   </div>
 
