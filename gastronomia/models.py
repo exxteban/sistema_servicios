@@ -2,11 +2,12 @@
 from datetime import datetime
 
 from app import db
+from gastronomia.config_flags import PasteleriaFlagsMixin
 import json
 import secrets
 
 
-class GastronomiaClienteConfig(db.Model):
+class GastronomiaClienteConfig(PasteleriaFlagsMixin, db.Model):
     __tablename__ = 'gastronomia_cliente_config'
 
     id_config = db.Column(db.Integer, primary_key=True)
