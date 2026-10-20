@@ -230,6 +230,8 @@ def completar_actividad(id_actividad: int):
         return redirect(_redirect_agenda_next())
     actividad = _cargar_actividad_visible_o_404(id_actividad)
     estado_alerta = _resolver_estado_alerta(actividad)
+    # Sin atencion_inicio el turno 'hecha' se toma como cobrado por adelantado y sigue ocupando el horario.
+    marcar_inicio_atencion(actividad)
     actividad.estado = 'hecha'
     _sincronizar_cliente_servicio_desde_actividad(actividad, accion='completar')
     db.session.commit()

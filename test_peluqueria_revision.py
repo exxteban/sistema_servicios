@@ -72,6 +72,17 @@ class TestRevisionPeluqueria(TurnoTestBase):
 
         self.assertEqual(AgendaActividad.query.filter_by(tipo='cita').count(), 2)
 
+    def test_turno_completado_desde_la_agenda_libera_el_horario(self):
+        servicio = self._crear_servicio()
+        turno = self._turno(servicio, hora='18:00')
+        self.client.post(f'/agenda/actividades/{turno.id}/completar')
+        db.session.refresh(turno)
+        self.assertEqual(turno.estado, 'hecha')
+
+        self.client.post('/agenda/turnos/peluqueria/crear', data=self._datos_turno(servicio, hora='18:00'))
+
+        self.assertEqual(AgendaActividad.query.filter_by(tipo='cita').count(), 2)
+
     def test_turno_cancelado_no_ofrece_registrar_sena(self):
         servicio = self._crear_servicio()
         turno = self._turno(servicio)

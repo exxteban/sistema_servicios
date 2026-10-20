@@ -194,6 +194,10 @@ SCHEMA_COLUMN_MIGRATIONS = {
         ('factura_imagen_url', ("ALTER TABLE compras ADD COLUMN factura_imagen_url VARCHAR(500)",), ("ALTER TABLE compras ADD COLUMN factura_imagen_url VARCHAR(500) NULL",)),
         ('es_resumida', ("ALTER TABLE compras ADD COLUMN es_resumida BOOLEAN NOT NULL DEFAULT 0",), ("ALTER TABLE compras ADD COLUMN es_resumida TINYINT(1) NOT NULL DEFAULT 0",)),
     ],
+    'detalle_ventas': [
+        # Bases anteriores al catálogo de servicios (migrations/servicios_catalogo.py no corre en update_min).
+        ('id_servicio', ("ALTER TABLE detalle_ventas ADD COLUMN id_servicio INTEGER",), ("ALTER TABLE detalle_ventas ADD COLUMN id_servicio INT NULL",)),
+    ],
     'ventas': [
         (
             'client_request_id',
