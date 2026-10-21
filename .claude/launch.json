@@ -2,6 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "stock-tabs",
+      "runtimeExecutable": ".venv313/Scripts/python.exe",
+      "runtimeArgs": ["run.py"],
+      "port": 5057,
+      "env": {
+        "PORT": "5057",
+        "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/C--Users-csarl-Documents-proyectos-saas-sistema-servicios/0ff89725-f23d-4da4-a4fb-ac6f2dae2cda/scratchpad/stock_tabs.db",
+        "SERVER": "flask",
+        "DEBUG": "0"
+      }
+    },
+    {
       "name": "prueba-fe",
       "runtimeExecutable": "python",
       "runtimeArgs": ["run.py"],

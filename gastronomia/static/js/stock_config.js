@@ -252,11 +252,13 @@
 
   scope.querySelector('#stock-presentation-form').addEventListener('submit', async (event) => {
     event.preventDefault();
+    // currentTarget es null despues del await: guardar la referencia al form antes.
+    const form = event.currentTarget;
     try {
       const item = selectedInsumo();
       if (!item) throw new Error('Selecciona un insumo.');
-      await apiJson(`/api/gastronomia/stock/insumos/${item.id_producto}/presentaciones`, {method: 'POST', body: formObject(event.currentTarget)});
-      event.currentTarget.reset();
+      await apiJson(`/api/gastronomia/stock/insumos/${item.id_producto}/presentaciones`, {method: 'POST', body: formObject(form)});
+      form.reset();
       await loadInsumos();
       showAlert('Presentacion agregada.');
     } catch (error) {
