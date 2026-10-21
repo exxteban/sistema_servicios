@@ -1,0 +1,52 @@
+{# Factura de un pago de gasto corriente, para el crédito fiscal del/la contador/a.
+   Se incluye en la celda del monto de cada pago (`gastos_corrientes/detalle.html`).
+   El formulario abre en una ventana encima: en la tabla no entra. #}
+{% if (pago.estado or '').strip().lower() == 'pagado' and pago.naturaleza_contable != 'retiro_dueno'
+    and puede_cargar_factura_de_gasto is defined and puede_cargar_factura_de_gasto(current_user) %}
+{% set fc = pago.comprobante_fiscal %}
+<div x-data="{ abierto: false }" class="mt-1 text-[11px] font-normal text-gray-500 whitespace-normal">
+    {% if fc %}
+    Factura <span class="font-mono">{{ fc.numero }}</span> · IVA {{ fc.tasa_iva ~ '%' if fc.tasa_iva else 'exenta' }}
+    <button type="button" @click="abierto = true" class="underline">Corregir</button>
+    {% else %}
+    <button type="button" @click="abierto = true" class="underline">Cargar factura (IVA)</button>
+    {% endif %}
+    <div x-show="abierto" x-cloak class="fixed inset-0 flex items-center justify-center p-4" style="z-index: 50" @keydown.escape.window="abierto = false">
+        <div class="absolute inset-0 bg-black/50" data-modal-backdrop @click="abierto = false"></div>
+        <form method="post" action="{{ url_for('contador.gasto_pago_factura', id=pago.id_pago_gasto_corriente) }}"
+            class="relative w-full max-w-lg space-y-3 rounded-xl bg-white p-5 text-sm text-gray-700 shadow-xl">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="text-base font-semibold text-gray-900">Factura del pago de {{ pago.periodo }}</p>
+            <p class="text-xs text-gray-500">Con la factura cargada, el IVA de este pago (Gs. {{ '{:,.0f}'.format(pago.monto_pagado_decimal()).replace(',', '.') }}) suma al crédito fiscal del mes de la factura.</p>
+            <div class="grid grid-cols-2 gap-3">
+                <label class="block">Número
+                    <input type="text" name="numero" value="{{ fc.numero if fc else (pago.numero_comprobante or '') }}" maxlength="80" placeholder="001-001-0000123"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 font-mono"></label>
+                <label class="block">Timbrado
+                    <input type="text" name="timbrado" value="{{ fc.timbrado if fc else '' }}" maxlength="8" inputmode="numeric"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 font-mono"></label>
+                <label class="block">RUC del proveedor
+                    <input type="text" name="ruc" value="{{ fc.ruc if fc else '' }}" maxlength="50" placeholder="80012345-6"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 font-mono"></label>
+                <label class="block">Razón social
+                    <input type="text" name="razon_social" value="{{ fc.razon_social if fc else gasto.nombre }}" maxlength="150"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5"></label>
+                <label class="block">Fecha de la factura
+                    <input type="date" name="fecha" value="{{ fc.fecha.isoformat() if fc else (pago.fecha_pago.isoformat() if pago.fecha_pago else '') }}"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5"></label>
+                <label class="block">IVA
+                    <select name="tasa_iva" class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5">
+                        {% for tasa, etiqueta in ((10, '10%'), (5, '5%'), (0, 'Exenta')) %}
+                        <option value="{{ tasa }}" {% if (fc.tasa_iva if fc else 10) == tasa %}selected{% endif %}>{{ etiqueta }}</option>
+                        {% endfor %}
+                    </select></label>
+            </div>
+            {% if fc %}<p class="text-xs text-gray-500">Dejá el número vacío para quitar la factura.</p>{% endif %}
+            <div class="flex justify-end gap-2">
+                <button type="button" @click="abierto = false" class="rounded-lg px-3 py-1.5 text-gray-600 hover:bg-gray-100">Cancelar</button>
+                <button type="submit" class="rounded-lg bg-blue-600 px-4 py-1.5 font-medium text-white hover:bg-blue-700">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}

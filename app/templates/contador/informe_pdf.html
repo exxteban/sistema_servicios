@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Resumen de IVA {{ i.primero.strftime('%m/%Y') }}</title>
+{# Informe del mes para el/la contador/a (`resumen_contadora_informe`), para xhtml2pdf:
+   sólo tablas y CSS simple. A4 apaisado para que entren las columnas de los anexos. #}
+<style>
+    @page {
+        size: a4 landscape;
+        margin: 1.2cm 1.2cm 1.6cm 1.2cm;
+        @frame pie { -pdf-frame-content: pie; bottom: 0.6cm; margin-left: 1.2cm; margin-right: 1.2cm; height: 0.6cm; }
+    }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1f2937; }
+    h1 { font-size: 17pt; margin: 0 0 2px 0; color: #111827; }
+    h2 { -pdf-keep-with-next: true; font-size: 12pt; margin: 14px 0 6px 0; color: #111827; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; }
+    p { margin: 0 0 4px 0; }
+    .muted { color: #6b7280; font-size: 8pt; }
+    .caja { border: 1px solid #d1d5db; padding: 6px 8px; }
+    .alerta { border: 1px solid #f59e0b; background-color: #fffbeb; padding: 6px 8px; color: #92400e; }
+    .ok { border: 1px solid #10b981; background-color: #ecfdf5; padding: 6px 8px; color: #065f46; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background-color: #f3f4f6; color: #374151; font-size: 8pt; text-align: left; padding: 3px 4px; border-bottom: 1px solid #d1d5db; }
+    td { padding: 3px 4px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+    .num { text-align: right; white-space: nowrap; }
+    .total td { font-weight: bold; background-color: #f9fafb; border-top: 1px solid #9ca3af; }
+    .grande { font-size: 15pt; font-weight: bold; color: #111827; margin: 2px 0 0 0; }
+    .etiqueta { font-size: 8pt; color: #6b7280; margin: 0; }
+    .item { margin: 2px 0 2px 0; }
+    .anexo td, .anexo th { font-size: 7.5pt; }
+    .mono { font-family: Courier, monospace; }
+</style>
+</head>
+<body>
+{# Helvetica no tiene el signo del guaraní: en el PDF va "Gs.". #}
+{% macro gs(valor) %}Gs. {{ "{:,.0f}".format(valor or 0).replace(",", ".") }}{% endmacro %}
+{% set r = i.resumen %}
+{% set c = i.cierre %}
+<div id="pie" class="muted">
+    {{ i.empresa.nombre or 'Resumen de IVA' }} · IVA {{ i.primero.strftime('%m/%Y') }} · generado el {{ i.generado.strftime('%d/%m/%Y %H:%M') }} · página <pdf:pagenumber> de <pdf:pagecount>
+</div>
+
+{# --- Carátula -------------------------------------------------------- #}
+<h1>Resumen de IVA · {{ meses[i.primero.month - 1] }} {{ i.primero.year }}</h1>
+<p>{{ i.empresa.nombre or '—' }}{% if i.empresa.ruc %} · RUC {{ i.empresa.ruc }}{% endif %}</p>
+<p class="muted">Período: del {{ r.desde.strftime('%d/%m/%Y') }} al {{ r.hasta.strftime('%d/%m/%Y') }} ·
+    {% if r.fe_activa %}facturación electrónica (SIFEN){% if r.ambiente == 'test' %} en ambiente de PRUEBA: sin validez fiscal{% endif %}{% else %}facturas en papel (preimpresas o autoimpresor){% endif %}</p>
+<br>
+{% if c.registro and c.registro.presentado %}
+<div class="ok">Presentado el {{ c.registro.presentado_en|local_strftime('%d/%m/%Y') }}{% if c.registro.usuario_presentado %} por {{ c.registro.usuario_presentado.nombre_completo }}{% endif %}.</div>
+{% else %}
+<div class="caja">Mes abierto: todavía no se marcó como presentado.</div>
+{% endif %}
+
+{# --- Los números ----------------------------------------------------- #}
+<h2>Liquidación del mes</h2>
+<table>
+    <tr>
+        <td class="caja" width="25%"><p class="etiqueta">Débito fiscal</p><p class="grande">{{ gs(r.debito) if i.hay_debito else '—' }}</p></td>
+        <td class="caja" width="25%"><p class="etiqueta">Crédito fiscal</p><p class="grande">{{ gs(r.credito) }}</p></td>
+        <td class="caja" width="25%"><p class="etiqueta">Saldo a favor anterior y retenciones</p>
+            <p class="grande">{{ gs(c.saldo_favor_anterior + c.retenciones) }}</p>
+            <p class="etiqueta">anterior {{ gs(c.saldo_favor_anterior) }} · retenciones {{ gs(c.retenciones) }}</p></td>
+        <td class="caja" width="25%"><p class="etiqueta">Saldo del mes</p>
+            {% if i.hay_debito %}<p class="grande">{{ gs(c.saldo_final if c.saldo_final >= 0 else -c.saldo_final) }}</p>
+            <p class="etiqueta">{{ 'a pagar' if c.saldo_final >= 0 else 'a favor para el mes siguiente' }}</p>
+            {% else %}<p class="grande">—</p>{% endif %}</td>
+    </tr>
+</table>
+<p class="muted">Saldo = débito − crédito − saldo a favor del mes anterior − retenciones.</p>
+
+<h2>Cuadro de IVA</h2>
+<table>
+    <tr><th width="26%">Concepto</th><th class="num">Cant.</th><th class="num">Exentas</th><th class="num">Gravadas 5%</th><th class="num">IVA 5%</th>
+        <th class="num">Gravadas 10%</th><th class="num">IVA 10%</th><th class="num">Total</th></tr>
+    {% for f in i.cuadro %}
+    {% if loop.first or f.lado != loop.previtem.lado %}
+    <tr><td colspan="8"><b>{{ 'Débito fiscal (ventas)' if f.lado == 'debito' else 'Crédito fiscal (compras y gastos)' }}</b></td></tr>
+    {% endif %}
+    {% set signo = '− ' if f.resta and f.b.total else '' %}
+    <tr><td>{{ f.concepto }}{% if f.resta %} (resta){% endif %}</td><td class="num">{{ f.b.cantidad }}</td>
+        <td class="num">{{ signo }}{{ gs(f.b.exenta) }}</td><td class="num">{{ signo }}{{ gs(f.b.base5) }}</td><td class="num">{{ signo }}{{ gs(f.b.iva5) }}</td>
+        <td class="num">{{ signo }}{{ gs(f.b.base10) }}</td><td class="num">{{ signo }}{{ gs(f.b.iva10) }}</td><td class="num">{{ signo }}{{ gs(f.b.total) }}</td></tr>
+    {% endfor %}
+</table>
+<p class="muted">Gravadas es el importe sin IVA; IVA es el impuesto sobre ese importe. Total = exentas + gravadas + IVA.
+    {% if not r.fe_activa %}Sólo cuentan las ventas con número de factura cargado.{% endif %}</p>
+
+{# --- Observaciones ---------------------------------------------------- #}
+<h2>Pendientes y observaciones</h2>
+{% if i.pendientes %}
+<table><tr><td class="alerta">
+    <p><b>Pendiente para cerrar el mes ({{ i.pendientes|length }})</b></p>
+    {% for texto in i.pendientes %}<p class="item">• {{ texto }}</p>{% endfor %}
+</td></tr></table>
+{% else %}
+<div class="ok">Nada pendiente para cerrar el mes.</div>
+{% endif %}
+{% if i.avisos %}
+<br>
+<table><tr><td class="caja">
+    <p><b>Para tener en cuenta</b></p>
+    {% for texto in i.avisos %}<p class="item">• {{ texto }}</p>{% endfor %}
+</td></tr></table>
+{% endif %}
+
+{# --- Anexos ---------------------------------------------------------- #}
+{% if con_anexos %}
+{% for d in i.anexos %}
+<pdf:nextpage />
+<h2>Anexo {{ loop.index }} · {{ d.titulo }} ({{ d.filas|length }})</h2>
+{% if d.filas %}
+<table class="anexo" repeat="1">
+    <tr><th width="7%">Fecha</th><th width="13%">Número</th>{% if d.con_timbrado %}<th width="8%">Timbrado</th>{% endif %}
+        <th>{{ 'Proveedor' if d.es_compra else 'Cliente' }}</th><th width="10%">RUC</th>{% if d.es_nota %}<th>Factura que afecta</th>{% endif %}
+        <th class="num">Exentas</th><th class="num">Grav. 5%</th><th class="num">IVA 5%</th><th class="num">Grav. 10%</th><th class="num">IVA 10%</th><th class="num">Total</th></tr>
+    {% for f in d.filas %}
+    <tr><td>{{ f.fecha.strftime('%d/%m/%Y') if f.fecha else '—' }}</td><td class="mono">{{ f.numero }}{% if f.estimada %} *{% endif %}</td>
+        {% if d.con_timbrado %}<td class="mono">{{ f.timbrado or '—' }}</td>{% endif %}
+        <td>{{ f.nombre }}</td><td class="mono">{{ f.ruc or '—' }}</td>{% if d.es_nota %}<td class="mono">{{ f.afecta or '—' }}</td>{% endif %}
+        <td class="num">{{ gs(f.exenta) }}</td><td class="num">{{ gs(f.base5) }}</td><td class="num">{{ gs(f.iva5) }}</td>
+        <td class="num">{{ gs(f.base10) }}</td><td class="num">{{ gs(f.iva10) }}</td><td class="num">{{ gs(f.total) }}</td></tr>
+    {% endfor %}
+    <tr class="total"><td colspan="{{ 4 + (1 if d.con_timbrado else 0) + (1 if d.es_nota else 0) }}">Total</td>
+        <td class="num">{{ gs(d.totales.exenta) }}</td><td class="num">{{ gs(d.totales.base5) }}</td><td class="num">{{ gs(d.totales.iva5) }}</td>
+        <td class="num">{{ gs(d.totales.base10) }}</td><td class="num">{{ gs(d.totales.iva10) }}</td><td class="num">{{ gs(d.totales.total) }}</td></tr>
+</table>
+{% if d.filas|selectattr('estimada')|list %}<p class="muted">* Sin copia local del XML: su IVA se calculó con la venta.</p>{% endif %}
+{% else %}
+<p class="muted">Ninguno en el mes.</p>
+{% endif %}
+{% endfor %}
+
+<pdf:nextpage />
+<h2>Anexo {{ i.anexos|length + 1 }} · Facturas anuladas ({{ i.anuladas.cantidad }})</h2>
+<p class="muted">No suman IVA. Sirven para justificar los números que faltan en la numeración.</p>
+{% if i.anuladas.filas %}
+<table class="anexo" repeat="1">
+    <tr><th>Fecha</th><th>Número</th><th>Detalle</th><th>Qué pasó</th><th class="num">Total</th></tr>
+    {% for f in i.anuladas.filas %}
+    <tr><td>{{ f.fecha.strftime('%d/%m/%Y') if f.fecha else '—' }}</td><td class="mono">{{ f.numero }}</td>
+        <td>{{ f.detalle }}</td><td>{{ f.motivo }}</td><td class="num">{{ gs(f.total) }}</td></tr>
+    {% endfor %}
+</table>
+{% if i.anuladas.cantidad > i.anuladas.filas|length %}<p class="muted">Se muestran {{ i.anuladas.filas|length }} de {{ i.anuladas.cantidad }}.</p>{% endif %}
+{% else %}
+<p class="muted">Ninguna en el mes.</p>
+{% endif %}
+{% endif %}
+</body>
+</html>

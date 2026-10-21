@@ -152,8 +152,8 @@ def detalle_fila(primero, fila, ambiente):
 def tabla(detalle):
     """Encabezados, filas (con la de total) y columnas de montos del detalle.
 
-    La van a usar el .xlsx de una fila y el Excel completo del mes (todavía
-    no portados de sistema_silvio_cel), para que las columnas sean las mismas.
+    La usan el .xlsx de una fila y el Excel completo del mes, para que las
+    columnas sean las mismas en los dos.
     """
     quien = 'Proveedor' if detalle['es_compra'] else 'Cliente'
     headers = ['Fecha', 'Número'] + (['Timbrado'] if detalle['con_timbrado'] else []) + [quien, 'RUC']
@@ -177,4 +177,22 @@ def tabla(detalle):
     return headers, filas, range(primera_monto, len(headers) + 1)
 
 
-__all__ = ['FILAS', 'FILAS_SIFEN', 'FILAS_SIN_SIFEN', 'detalle_fila', 'tabla']
+def excel_detalle(detalle):
+    """El detalle como .xlsx, con las mismas columnas que el modal."""
+    from app.services.reportes_excel import (
+        OPENPYXL_DISPONIBLE,
+        _crear_workbook,
+        _respuesta_excel,
+        _respuesta_no_disponible,
+    )
+
+    if not OPENPYXL_DISPONIBLE:
+        return _respuesta_no_disponible()
+    headers, filas, montos = tabla(detalle)
+    periodo = f"{detalle['desde'].strftime('%d/%m/%Y')} al {detalle['hasta'].strftime('%d/%m/%Y')}"
+    wb = _crear_workbook(detalle['titulo'], f'Período: {periodo}', headers, filas, sheet=detalle['titulo'],
+                         money_cols=montos)
+    return _respuesta_excel(wb, f"iva_{detalle['clave']}_{detalle['desde'].strftime('%Y_%m')}.xlsx")
+
+
+__all__ = ['FILAS', 'FILAS_SIFEN', 'FILAS_SIN_SIFEN', 'detalle_fila', 'excel_detalle', 'tabla']

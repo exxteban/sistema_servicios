@@ -13,6 +13,12 @@
         </p>
     </div>
     <div class="flex items-center gap-2">
+        {% if d.filas %}
+        <a href="{{ url_for('contador.resumen_iva_detalle', mes=mes, fila=d.clave, formato='xlsx') }}" download
+            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+            <i class="fas fa-file-excel"></i> Descargar Excel
+        </a>
+        {% endif %}
         <button type="button" data-detalle-cerrar aria-label="Cerrar"
             class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
             <i class="fas fa-xmark"></i>

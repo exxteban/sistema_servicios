@@ -7,7 +7,7 @@ talonario y avisa de los saltos. Nunca se bloquea una venta.
 
 Portado de sistema_silvio_cel (fase 2: el servicio y lo que lee el resumen).
 La pantalla de talonarios, el número en el POS y la corrección desde la venta
-llegan en la fase 4; el informe descargable, en la fase 3.
+llegan en la fase 4.
 """
 import unittest
 from datetime import date, datetime
@@ -149,6 +149,19 @@ class TestTalonarioFacturas(unittest.TestCase):
         saltos = resumen_del_mes(date(2026, 9, 1), fe_activa=False)['en_papel']['talonario']['saltos']
 
         self.assertEqual(saltos, {'cantidad': 1, 'numeros': ['001-001-0000011']})
+
+    def test_informe_dice_cuantos_saltos_no_se_listan(self):
+        from app.services.resumen_contadora_informe import informe_del_mes
+
+        self._talonario(desde=1, hasta=500)
+        self._venta('001-001-0000001')
+        self._venta('001-001-0000015')                       # 13 números en el medio
+
+        informe = informe_del_mes(date(2026, 9, 1), fe_activa=False)
+
+        aviso = next(a for a in informe['avisos'] if a.startswith('Saltos'))
+        self.assertIn('13 número(s) sin venta', aviso)
+        self.assertIn('y 3 más', aviso)
 
     def test_cambio_de_timbrado_no_es_un_salto(self):
         from app.models import TalonarioFactura

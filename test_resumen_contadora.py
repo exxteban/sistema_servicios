@@ -208,9 +208,14 @@ class TestResumenContadora(BaseProveedorApi):
         html = self._get(f'/contador/iva/detalle?mes={MES}&fila=ventas').get_data(as_text=True)
         self.assertIn('001-001-0000001', html)
         self.assertIn('₲ 10.000', html)
+        self.assertIn('formato=xlsx', html)
         compras = self._get(f'/contador/iva/detalle?mes={MES}&fila=compras').get_data(as_text=True)
         self.assertIn('Distribuidora Sur', compras)
         self.assertEqual(self._get(f'/contador/iva/detalle?mes={MES}&fila=x').status_code, 404)
+
+        excel = self._get(f'/contador/iva/detalle?mes={MES}&fila=ventas&formato=xlsx')
+        self.assertEqual(excel.status_code, 200)
+        self.assertIn('spreadsheetml', excel.headers['Content-Type'])
 
         pantalla = self._get(f'/contador/iva?mes={MES}').get_data(as_text=True)
         self.assertIn("abrir('ventas')", pantalla)

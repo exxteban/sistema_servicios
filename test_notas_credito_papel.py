@@ -259,6 +259,7 @@ class TestNotasCreditoPapel(unittest.TestCase):
 
     def test_devolucion_antigua_excesiva_avisa_sin_reescribir_importes(self):
         from app.services.resumen_contadora import resumen_del_mes
+        from app.services.resumen_contadora_informe import informe_del_mes
 
         venta = self._venta()
         venta.total = 99000
@@ -267,6 +268,7 @@ class TestNotasCreditoPapel(unittest.TestCase):
         self._nc(devolucion)
         avisos = resumen_del_mes(PRIMERO, False)['controles']['conciliacion']['filas']
         self.assertTrue(any('importe devuelto supera' in aviso for aviso in avisos))
+        self.assertTrue(any('importe devuelto supera' in aviso for aviso in informe_del_mes(PRIMERO, False)['pendientes']))
         self.assertEqual(float(devolucion.monto_total), 110000)
         html = self.client.get(f'/contador/iva?mes={MES}').get_data(as_text=True)
         self.assertIn('importe devuelto supera', html)

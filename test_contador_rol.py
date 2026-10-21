@@ -1,7 +1,7 @@
 """Rol "Contador/a": entra al área Contador/a y a nada más del negocio.
 
 `ver_area_contador` se siembra al arrancar y el rol queda listo para asignar.
-Con ese rol se ve el resumen de IVA,
+Con ese rol se ve el resumen de IVA (y se puede marcar el mes presentado),
 pero no la caja, los reportes ni el POS.
 """
 from app import db
@@ -38,7 +38,7 @@ class TestRolContador(BaseProveedorApi):
         self.assertEqual(respuesta.status_code, 200)
         html = respuesta.get_data(as_text=True)
         self.assertIn('data-sidebar-trigger="contador"', html)
-        self.assertIn('Resumen de IVA del mes', html)
+        self.assertIn('Marcar como presentado', html)
         self.assertNotIn('Talonarios de factura', html)       # configurar es del dueño
 
         for url in ('/caja/', '/reportes/', '/ventas/pos'):

@@ -2,6 +2,7 @@ import importlib
 import os
 import platform
 from pathlib import Path
+from io import BytesIO
 
 
 def is_arm_machine() -> bool:
@@ -26,3 +27,21 @@ def import_pisa():
         return importlib.import_module('xhtml2pdf.pisa')
     finally:
         os.chdir(previous_cwd)
+
+
+def generar_pdf_bytes(html: str) -> bytes | None:
+    """Renderiza HTML a bytes PDF. Devuelve None si el entorno ARM no tiene
+    soporte de PDF o si la generacion falla; relanza en entornos no-ARM sin pisa."""
+    try:
+        pisa = import_pisa()
+    except Exception:
+        if not is_arm_machine():
+            raise
+        return None
+
+    pdf_buffer = BytesIO()
+    pisa_status = pisa.CreatePDF(html, dest=pdf_buffer, encoding='UTF-8')
+    if pisa_status.err:
+        return None
+    pdf_buffer.seek(0)
+    return pdf_buffer.read()

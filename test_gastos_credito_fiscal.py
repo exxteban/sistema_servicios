@@ -3,10 +3,6 @@
 Un pago de gasto corriente con su factura (número, timbrado, RUC y tasa) suma
 IVA al crédito fiscal del mes de la factura. Los retiros del dueño no. El
 monto es siempre el del pago; cargar la factura no toca caja ni el gasto.
-
-Portado de sistema_silvio_cel (fase 2: sólo el lado que lee el resumen). El
-formulario de la factura en la ficha del gasto llega en la fase 3: acá se carga
-con el servicio. El Excel del mes, también en la fase 3.
 """
 from datetime import date
 from decimal import Decimal
@@ -47,15 +43,10 @@ class TestGastosCreditoFiscal(BaseProveedorApi):
         return pago
 
     def _factura(self, pago, **cambios):
-        from app.services.gastos_credito_fiscal import registrar
-
         datos = {'numero': '001-002-345', 'timbrado': '15151515', 'ruc': self.ruc, 'razon_social': 'ANDE',
                  'fecha': '2026-09-12', 'tasa_iva': '10'}
         datos.update(cambios)
-        comprobante, error = registrar(pago, datos['numero'], datos['timbrado'], datos['ruc'], datos['razon_social'],
-                                       date.fromisoformat(datos['fecha']), int(datos['tasa_iva']))
-        db.session.commit()
-        return comprobante, error
+        return self.http.post(f'/contador/gasto-pago/{pago.id_pago_gasto_corriente}/factura', data=datos)
 
     def test_factura_del_gasto_suma_al_credito_fiscal(self):
         from app.services.resumen_contadora import resumen_del_mes
@@ -65,7 +56,7 @@ class TestGastosCreditoFiscal(BaseProveedorApi):
         self.assertEqual(r['credito'], 0)
         self.assertEqual(r['gastos_sin_factura'], {'cantidad': 1, 'total': 110000.0})
 
-        self.assertIsNone(self._factura(pago)[1])
+        self.assertEqual(self._factura(pago).status_code, 302)
         comprobante = GastoComprobanteFiscal.query.one()
         self.assertEqual(comprobante.numero, '001-002-0000345')
 
@@ -82,6 +73,8 @@ class TestGastosCreditoFiscal(BaseProveedorApi):
         self.assertIn('001-002-0000345', detalle)
         self.assertIn('15151515', detalle)
         self.assertIn(self.ruc, detalle)
+        excel = self.http.get(f'/contador/iva/detalle?mes={MES}&fila=gastos&formato=xlsx')
+        self.assertEqual(excel.status_code, 200)
 
     def test_tasa_cinco_y_exenta(self):
         from app.services.gastos_credito_fiscal import totales
@@ -91,15 +84,32 @@ class TestGastosCreditoFiscal(BaseProveedorApi):
         self.assertEqual(totales(5000, 0)['iva10'], 0)
 
     def test_facturas_repetidas_avisan_sin_descartar_pagos_parciales(self):
-        from app.services.resumen_contadora import resumen_del_mes
+        from app.services.resumen_contadora_informe import informe_del_mes
 
         self._factura(self._pago(monto=55000))
         self._factura(self._pago(monto=55000))
-        r = resumen_del_mes(PRIMERO, False)
-        self.assertAlmostEqual(r['credito'], 10000)
-        self.assertTrue(any('carga duplicada' in aviso for aviso in r['controles']['conciliacion']['filas']))
+        informe = informe_del_mes(PRIMERO, False)
+        self.assertEqual(informe['resumen']['credito'], 10000)
+        self.assertTrue(any('carga duplicada' in aviso for aviso in informe['pendientes']))
         html = self.http.get(f'/contador/iva?mes={MES}').get_data(as_text=True)
         self.assertIn('pagos parciales', html)
+
+    def test_excel_conserva_precision_para_sumar_comprobantes(self):
+        from io import BytesIO
+        from openpyxl import load_workbook
+        from app.services.resumen_contadora import resumen_del_mes
+
+        for numero in range(3):
+            self._factura(self._pago(monto=5), numero=f'001-001-{numero + 1:07d}')
+        respuesta = self.http.get(f'/contador/iva/excel?mes={MES}')
+        libro = load_workbook(BytesIO(respuesta.data))
+        filas = list(libro['Gastos con factura'].iter_rows(values_only=True))
+        columna_iva = filas[3].index('IVA 10%')
+        self.assertAlmostEqual(sum(f[columna_iva] for f in filas[4:-1]), filas[-1][columna_iva])
+        self.assertAlmostEqual(filas[-1][columna_iva], resumen_del_mes(PRIMERO, False)['credito'])
+        resumen = list(libro['Resumen'].iter_rows(values_only=True))
+        credito = next(f[2] for f in resumen if f[0] == 'Crédito fiscal')
+        self.assertAlmostEqual(credito, filas[-1][columna_iva])
 
     def test_validaciones(self):
         pago = self._pago()
@@ -145,3 +155,11 @@ class TestGastosCreditoFiscal(BaseProveedorApi):
         r = resumen_del_mes(PRIMERO, fe_activa=False)
         self.assertEqual(r['gastos']['cantidad'], 0)
         self.assertEqual(r['credito'], 0)
+
+    def test_ficha_del_gasto_ofrece_cargar_la_factura(self):
+        self._pago()
+        self._pago(naturaleza='retiro_dueno', fecha=date(2026, 9, 13))
+
+        html = self.http.get(f'/gastos-corrientes/{self.gasto.id_gasto_corriente}').get_data(as_text=True)
+
+        self.assertEqual(html.count('Cargar factura (IVA)'), 1)

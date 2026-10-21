@@ -57,6 +57,32 @@ class TestContadorServicios(BaseProveedorApi):
         self.assertIn('data-sidebar-trigger="finanzas"', html)
         self.assertNotIn('data-sidebar-trigger="contador"', html)
 
+        # Tampoco se ofrece cargar la factura de un gasto (IVA paraguayo).
+        from decimal import Decimal
+        from app.models import GastoCorriente, PagoGastoCorriente
+
+        gasto = GastoCorriente(nombre='Luz', categoria='servicios', monto_estimado=Decimal('100'),
+                               dia_vencimiento=10, activo=True)
+        db.session.add(gasto)
+        db.session.flush()
+        pago = PagoGastoCorriente(id_gasto_corriente=gasto.id_gasto_corriente, periodo_anio=2026, periodo_mes=9,
+                                  fecha_vencimiento=date(2026, 9, 10), fecha_pago=date(2026, 9, 12),
+                                  monto_estimado=100, monto_pagado=100, estado='pagado')
+        db.session.add(pago)
+        db.session.commit()
+        ficha = self.http.get(f'/gastos-corrientes/{gasto.id_gasto_corriente}')
+        self.assertEqual(ficha.status_code, 200)
+        self.assertNotIn('Cargar factura (IVA)', ficha.get_data(as_text=True))
+        factura = self.http.post(f'/contador/gasto-pago/{pago.id_pago_gasto_corriente}/factura', data={'numero': '1'})
+        self.assertEqual(factura.status_code, 403)
+
+    def test_informe_aclara_que_el_debito_no_incluye_las_ventas(self):
+        """Sin el número de factura en el POS, un débito de Gs. 0 no debe leerse como "no hubo ventas"."""
+        from app.services.resumen_contadora_informe import VENTAS_SIN_NUMERO_EN_ESTE_SISTEMA, informe_del_mes
+
+        self.assertIn(VENTAS_SIN_NUMERO_EN_ESTE_SISTEMA, informe_del_mes(date(2026, 9, 1), False)['avisos'])
+        self.assertNotIn(VENTAS_SIN_NUMERO_EN_ESTE_SISTEMA, informe_del_mes(date(2026, 9, 1), True)['avisos'])
+
     def _documento(self, numero, estado, ambiente=AMBIENTE_PRODUCCION):
         venta = Venta(id_cliente=self.cliente.id_cliente, id_sesion_caja=self.sesion.id_sesion,
                       subtotal=11000, total=11000, total_iva_10=1000, fecha_venta=EN_EL_MES)

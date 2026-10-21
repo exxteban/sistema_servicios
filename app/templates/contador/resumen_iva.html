@@ -78,6 +78,57 @@
                 </button>
             </form>
         </div>
+        {# Descargas del mes elegido: el PDF para mandar y archivar, el Excel para trabajar.
+           Generarlas tarda unos segundos: se piden con fetch para poder mostrar
+           "Generando…" mientras tanto. Si el servidor no devuelve un archivo (el PDF
+           que no se pudo armar redirige con un aviso), se sigue el enlace normal. #}
+        <div class="flex flex-wrap items-center gap-2 text-sm"
+            x-data="{
+                generando: null,
+                async descargar(evento, cual) {
+                    if (this.generando) return;
+                    const url = evento.currentTarget.href;
+                    this.generando = cual;
+                    try {
+                        const r = await fetch(url, { credentials: 'same-origin', redirect: 'manual' });
+                        const disp = r.ok ? (r.headers.get('Content-Disposition') || '') : '';
+                        if (!disp.includes('attachment')) { window.location.href = url; return; }
+                        const nombre = (disp.match(/filename=&quot;?([^&quot;;]+)&quot;?/) || [])[1] || 'informe';
+                        const enlace = document.createElement('a');
+                        enlace.href = URL.createObjectURL(await r.blob());
+                        enlace.download = nombre;
+                        document.body.appendChild(enlace);
+                        enlace.click();
+                        enlace.remove();
+                        setTimeout(() => URL.revokeObjectURL(enlace.href), 10000);
+                    } catch (e) {
+                        window.location.href = url;
+                    } finally {
+                        this.generando = null;
+                    }
+                }
+            }">
+            <span class="text-xs text-gray-500 dark:text-gray-400">Descargar el mes:</span>
+            <a href="{{ url_for('contador.resumen_iva_pdf', mes=mes) }}" download
+                @click.prevent="descargar($event, 'pdf')" :class="generando && 'pointer-events-none opacity-60'"
+                class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+                <i class="fas fa-file-pdf mr-2 text-red-600"></i>PDF completo
+            </a>
+            <a href="{{ url_for('contador.resumen_iva_pdf', mes=mes, anexos=0) }}" download
+                @click.prevent="descargar($event, 'resumen')" :class="generando && 'pointer-events-none opacity-60'"
+                class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+                <i class="fas fa-file-pdf mr-2 text-red-600"></i>PDF sólo resumen
+            </a>
+            <a href="{{ url_for('contador.resumen_iva_excel', mes=mes) }}" download
+                @click.prevent="descargar($event, 'excel')" :class="generando && 'pointer-events-none opacity-60'"
+                class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+                <i class="fas fa-file-excel mr-2 text-green-600"></i>Excel completo
+            </a>
+            <span x-show="generando" x-cloak role="status" class="inline-flex items-center text-xs font-medium text-blue-700 dark:text-blue-300">
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                <span x-text="generando === 'excel' ? 'Generando el Excel, puede tardar unos segundos…' : 'Generando el PDF, puede tardar unos segundos…'"></span>
+            </span>
+        </div>
         {% if docs and ambiente == 'test' %}
         <p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
             <i class="fas fa-flask mr-1"></i>La facturación electrónica está en ambiente de prueba (TEST): estos documentos no tienen validez fiscal.
@@ -119,6 +170,7 @@
         </div>
         {% include 'contador/_resumen_iva_saldo.html' %}
     </div>
+    {% include 'contador/_resumen_iva_cierre.html' %}
 
     {# --- Pendientes ------------------------------------------------------- #}
     {% if pendientes %}
@@ -165,7 +217,7 @@
             {% endif %}
         </ul>
     </div>
-    {% else %}
+    {% elif not cierre.cambio_desde_presentado %}
     <div class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200">
         <i class="fas fa-circle-check mr-1"></i>Nada pendiente:{% if docs %} todo lo del mes tiene respuesta de SIFEN y{% elif papel %} ningún número de factura de venta está repetido y{% endif %} todas las compras tienen número de factura.
     </div>

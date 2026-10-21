@@ -4,10 +4,19 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.services.contador_meses import _monto
 from app.services.devoluciones import monto_reembolsable, precio_reembolsable
 from app.services.resumen_contadora_ventas import totales_de_la_factura
 from facturacion_electronica.services.nota_credito import precios_facturados
 from facturacion_electronica.services.totales_xml import totales_declarados
+
+
+@pytest.mark.parametrize('texto,esperado', [
+    ('', '0'), ('0', '0'), ('150.000', '150000'), ('150000', '150000'),
+    ('1.234,56', '1234.56'), ('9999999999999,99', '9999999999999.99'),
+])
+def test_importes_locales_validos(texto, esperado):
+    assert _monto(texto) == Decimal(esperado)
 
 
 def _venta(total, *lineas):
