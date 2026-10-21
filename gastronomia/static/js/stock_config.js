@@ -1,13 +1,15 @@
 (function () {
-  const root = document.querySelector('[data-gastro-stock]');
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const root = scope.querySelector('[data-gastro-stock]');
   if (!root) return;
 
-  const csrf = document.getElementById('csrf-token')?.value || '';
-  const alertBox = document.getElementById('gastro-stock-alert');
-  const insumoSelect = document.getElementById('stock-insumo-select');
-  const recipeProduct = document.getElementById('stock-recipe-product');
-  const recipeInsumo = document.getElementById('stock-recipe-insumo');
-  const recipeQuantity = document.getElementById('stock-recipe-quantity');
+  const csrf = scope.querySelector('#csrf-token')?.value || '';
+  const alertBox = scope.querySelector('#gastro-stock-alert');
+  const insumoSelect = scope.querySelector('#stock-insumo-select');
+  const recipeProduct = scope.querySelector('#stock-recipe-product');
+  const recipeInsumo = scope.querySelector('#stock-recipe-insumo');
+  const recipeQuantity = scope.querySelector('#stock-recipe-quantity');
   let insumos = [];
   let recipeItems = [];
   let recipeOptions = [];
@@ -45,9 +47,9 @@
 
   const renderInsumo = () => {
     const item = selectedInsumo();
-    const summary = document.getElementById('stock-insumo-summary');
-    const presentations = document.getElementById('stock-presentations');
-    const entrySelect = document.querySelector('#stock-entry-form [name="presentacion_id"]');
+    const summary = scope.querySelector('#stock-insumo-summary');
+    const presentations = scope.querySelector('#stock-presentations');
+    const entrySelect = scope.querySelector('#stock-entry-form [name="presentacion_id"]');
     if (!item) {
       summary.textContent = 'No hay insumos disponibles.';
       presentations.innerHTML = '';
@@ -55,9 +57,9 @@
       return;
     }
     summary.textContent = `Stock actual: ${item.stock_actual} ${item.unidad_stock}. Minimo: ${item.stock_minimo} ${item.unidad_stock}.`;
-    document.querySelector('#stock-insumo-config [name="unidad_stock"]').value = item.unidad_stock;
-    document.querySelector('#stock-insumo-config [name="stock_minimo"]').value = item.stock_minimo;
-    document.querySelector('#stock-adjust-form [name="stock_fisico"]').value = Math.max(0, Number(item.stock_actual || 0));
+    scope.querySelector('#stock-insumo-config [name="unidad_stock"]').value = item.unidad_stock;
+    scope.querySelector('#stock-insumo-config [name="stock_minimo"]').value = item.stock_minimo;
+    scope.querySelector('#stock-adjust-form [name="stock_fisico"]').value = Math.max(0, Number(item.stock_actual || 0));
     presentations.innerHTML = (item.presentaciones || []).map((row) => `
       <div class="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-gray-900">
         <span><strong>${escapeHtml(row.nombre)}</strong>: ${row.factor_unidad_base} ${escapeHtml(item.unidad_stock)}</span>
@@ -79,10 +81,10 @@
 
   const syncRecipeControls = () => {
     const enabled = Boolean(recipeProduct.value);
-    [recipeInsumo, recipeQuantity, document.getElementById('stock-recipe-add'), document.getElementById('stock-recipe-save')]
+    [recipeInsumo, recipeQuantity, scope.querySelector('#stock-recipe-add'), scope.querySelector('#stock-recipe-save')]
       .forEach((control) => { control.disabled = !enabled; });
     const summary = selectedRecipeSummary();
-    const state = document.getElementById('stock-recipe-state');
+    const state = scope.querySelector('#stock-recipe-state');
     if (!enabled) {
       state.textContent = 'Selecciona un plato de la lista para configurar su receta.';
       return;
@@ -92,7 +94,7 @@
       : `${summary?.producto_nombre || 'Este producto'} todavia no descuenta insumos. Agrega el primer insumo.`;
   };
 
-  const recipeList = document.getElementById('stock-recipe-summary');
+  const recipeList = scope.querySelector('#stock-recipe-summary');
 
   const highlightRecipeRow = () => {
     recipeList?.querySelectorAll('[data-recipe-row]').forEach((row) => {
@@ -112,8 +114,8 @@
     });
     const total = recipeSummaries.length;
     const withRecipe = recipeSummaries.filter((item) => item.receta_activa).length;
-    document.getElementById('stock-recipe-progress-label').textContent = `${withRecipe} de ${total} platos descuentan insumos`;
-    document.getElementById('stock-recipe-progress-bar').style.width = `${total ? Math.round((withRecipe / total) * 100) : 0}%`;
+    scope.querySelector('#stock-recipe-progress-label').textContent = `${withRecipe} de ${total} platos descuentan insumos`;
+    scope.querySelector('#stock-recipe-progress-bar').style.width = `${total ? Math.round((withRecipe / total) * 100) : 0}%`;
     if (recipeList) window.GastroListFilter?.apply(recipeList);
     highlightRecipeRow();
     syncRecipeControls();
@@ -126,7 +128,7 @@
   };
 
   const renderRecipe = () => {
-    const container = document.getElementById('stock-recipe-items');
+    const container = scope.querySelector('#stock-recipe-items');
     container.innerHTML = recipeItems.map((row, index) => `
       <div class="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-gray-900">
         <span><strong>${escapeHtml(row.insumo_nombre)}</strong>: ${row.cantidad} ${escapeHtml(row.unidad_stock)}</span>
@@ -172,7 +174,7 @@
     recipeItems.length > 0);
   };
 
-  document.getElementById('stock-recipe-add').addEventListener('click', async () => {
+  scope.querySelector('#stock-recipe-add').addEventListener('click', async () => {
     if (!recipeProduct.value) return showAlert('Paso 1: selecciona el producto del menu antes de agregar insumos.', false);
     const insumo = selectedRecipeInsumo();
     const cantidad = Math.max(0, Number(recipeQuantity.value || 0));
@@ -196,7 +198,7 @@
     }
   });
 
-  document.getElementById('stock-recipe-items').addEventListener('click', async (event) => {
+  scope.querySelector('#stock-recipe-items').addEventListener('click', async (event) => {
     const button = event.target.closest('[data-delete-recipe-index]');
     if (!button) return;
     recipeItems.splice(Number(button.dataset.deleteRecipeIndex), 1);
@@ -208,7 +210,7 @@
     }
   });
 
-  document.getElementById('stock-recipe-save').addEventListener('click', async () => {
+  scope.querySelector('#stock-recipe-save').addEventListener('click', async () => {
     try {
       await persistRecipe({confirmation: true});
     } catch (error) {
@@ -220,7 +222,7 @@
     recipeProduct.value = row.dataset.editRecipeProduct;
     loadRecipe().catch((error) => showAlert(error.message, false));
     if (window.matchMedia('(max-width: 1023px)').matches) {
-      document.getElementById('stock-recipe-editor').scrollIntoView({behavior: 'smooth', block: 'start'});
+      scope.querySelector('#stock-recipe-editor').scrollIntoView({behavior: 'smooth', block: 'start'});
     }
   };
 
@@ -235,7 +237,7 @@
     selectRecipeProduct(row);
   });
 
-  document.getElementById('stock-insumo-config').addEventListener('submit', async (event) => {
+  scope.querySelector('#stock-insumo-config').addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
       const item = selectedInsumo();
@@ -248,7 +250,7 @@
     }
   });
 
-  document.getElementById('stock-presentation-form').addEventListener('submit', async (event) => {
+  scope.querySelector('#stock-presentation-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
       const item = selectedInsumo();
@@ -262,7 +264,7 @@
     }
   });
 
-  document.getElementById('stock-presentations').addEventListener('click', async (event) => {
+  scope.querySelector('#stock-presentations').addEventListener('click', async (event) => {
     const button = event.target.closest('[data-delete-presentation]');
     if (!button) return;
     try {
@@ -274,7 +276,7 @@
     }
   });
 
-  document.getElementById('stock-entry-form').addEventListener('submit', async (event) => {
+  scope.querySelector('#stock-entry-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
       const item = selectedInsumo();
@@ -287,7 +289,7 @@
     }
   });
 
-  document.getElementById('stock-adjust-form').addEventListener('submit', async (event) => {
+  scope.querySelector('#stock-adjust-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
       const item = selectedInsumo();

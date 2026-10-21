@@ -1,7 +1,9 @@
 (function () {
-  const csrf = document.getElementById('csrf-token')?.value || '';
-  const alertBox = document.getElementById('gastro-menu-alert');
-  const tbody = document.getElementById('categorias-body');
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const csrf = scope.querySelector('#csrf-token')?.value || '';
+  const alertBox = scope.querySelector('#gastro-menu-alert');
+  const tbody = scope.querySelector('#categorias-body');
   let draggedRow = null;
   let armedDragRow = null;
   let previousOrder = [];

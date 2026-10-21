@@ -1,10 +1,12 @@
 // Plantillas de arranque: el usuario elige rubro, tilda productos y pone precios.
 (function () {
-  const raiz = document.getElementById('gastro-plantillas');
-  const dataNode = document.getElementById('gastro-menu-plantillas-data');
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const raiz = scope.querySelector('#gastro-plantillas');
+  const dataNode = scope.querySelector('#gastro-menu-plantillas-data');
   if (!raiz || !dataNode) return;
 
-  const csrf = document.getElementById('csrf-token')?.value || '';
+  const csrf = scope.querySelector('#csrf-token')?.value || '';
   const rubros = raiz.querySelector('[data-plantilla-rubros]');
   const paso2 = raiz.querySelector('[data-plantilla-paso2]');
   const lista = raiz.querySelector('[data-plantilla-lista]');
@@ -23,8 +25,8 @@
   }
 
   const avisar = (mensaje, ok) => {
-    if (typeof window.gastroMenuShowAlert === 'function') {
-      window.gastroMenuShowAlert(mensaje, ok);
+    if (typeof scope.gastroMenuShowAlert === 'function') {
+      scope.gastroMenuShowAlert(mensaje, ok);
     } else {
       window.alert(mensaje);
     }
@@ -154,8 +156,8 @@
       if (data.promo_creada) {
         mensaje += ` La promo "${data.promo_creada}" quedo pausada en Promociones.`;
       }
-      if (typeof window.gastroMenuReload === 'function') {
-        await window.gastroMenuReload({
+      if (typeof scope.gastroMenuReload === 'function') {
+        await scope.gastroMenuReload({
           message: mensaje,
           ok: true,
           state: {mainTab: 'menu-cargado', menuTab: 'productos', editProductId: ''},

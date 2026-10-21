@@ -2,6 +2,8 @@
 // El textarea sigue siendo la fuente que se envia al backend; este editor solo
 // lo lee y lo reescribe, asi el formato del servidor no cambia.
 (function () {
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
   const SEPARADORES = ['|', '=', ':'];
   const TEXTOS = {
     removible: {
@@ -117,5 +119,5 @@
     cargarDesdeTextarea();
   };
 
-  document.querySelectorAll('textarea[data-extras-editor]').forEach(crearEditor);
+  scope.querySelectorAll('textarea[data-extras-editor]').forEach(crearEditor);
 }());

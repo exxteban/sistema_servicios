@@ -1,10 +1,12 @@
 // Paso "Armar combo" del modal Hacer promo: junta productos del menu a un precio.
 (function () {
-  const modal = document.getElementById('gastro-promo-modal');
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const modal = scope.querySelector('#gastro-promo-modal');
   const paso = modal?.querySelector('[data-promo-paso="combo"]');
   if (!modal || !paso) return;
 
-  const csrf = document.getElementById('csrf-token')?.value || '';
+  const csrf = scope.querySelector('#csrf-token')?.value || '';
   const q = (selector) => paso.querySelector(selector);
   const incluidosNode = q('[data-combo-incluidos]');
   const buscar = q('[data-combo-buscar]');
@@ -22,7 +24,7 @@
 
   const formatoGs = (valor) => `Gs. ${Math.round(Number(valor) || 0).toLocaleString('es-PY')}`;
   const numero = (texto) => Number(String(texto || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
-  const error = (mensaje) => window.gastroPromoModal?.mostrarError(mensaje);
+  const error = (mensaje) => scope.gastroPromoModal?.mostrarError(mensaje);
 
   const bebidasElegidas = () => Array.from(bebidasLista.querySelectorAll('input:checked'))
     .map((input) => productos.find((item) => String(item.id) === input.value))
@@ -130,8 +132,8 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.mensaje || 'No se pudo crear el combo.');
-      window.gastroPromoModal?.cerrar();
-      await window.gastroMenuReload?.({
+      scope.gastroPromoModal?.cerrar();
+      await scope.gastroMenuReload?.({
         message: [`Combo "${data.producto.nombre}" creado en la categoria Combos.`, ...(data.avisos || [])].join(' '),
         ok: true,
         state: {mainTab: 'menu-cargado', menuTab: 'productos', editProductId: ''},

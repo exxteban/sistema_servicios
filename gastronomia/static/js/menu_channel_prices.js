@@ -1,6 +1,8 @@
 (function () {
-  const csrf = document.getElementById('csrf-token')?.value || '';
-  const alertBox = document.getElementById('gastro-menu-alert');
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const csrf = scope.querySelector('#csrf-token')?.value || '';
+  const alertBox = scope.querySelector('#gastro-menu-alert');
 
   const showAlert = (message, ok) => {
     if (!alertBox) return;
@@ -8,7 +10,7 @@
     alertBox.className = `rounded-lg border px-4 py-3 text-sm font-semibold ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`;
   };
 
-  document.querySelector('[data-gastro-menu]')?.addEventListener('submit', async (event) => {
+  scope.querySelector('[data-gastro-menu]')?.addEventListener('submit', async (event) => {
     const form = event.target.closest('[data-channel-price-form]');
     if (!form) return;
     event.preventDefault();
