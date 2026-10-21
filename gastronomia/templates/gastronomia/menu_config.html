@@ -76,7 +76,12 @@
                 <form id="producto-form" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <h2 class="text-base font-semibold text-gray-900 dark:text-white">Producto</h2>
                     <input type="hidden" name="id_producto">
+                    <div class="gastro-producto-subtabs mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Secciones del producto">
+                        <button type="button" class="gastro-entry-tab activa" data-producto-subtab="datos" role="tab" aria-selected="true">Datos y extras</button>
+                        <button type="button" class="gastro-entry-tab" data-producto-subtab="publicacion" role="tab" aria-selected="false">Imagen y disponibilidad</button>
+                    </div>
                     <div class="mt-4 space-y-3">
+                        <div data-producto-subtab-panel="datos" class="space-y-3" role="tabpanel">
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
                             Categoria
                             <select name="categoria_id" required
@@ -120,6 +125,8 @@
                                        class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                             </label>
                         </div>
+                        </div>
+                        <div data-producto-subtab-panel="publicacion" class="hidden space-y-3" role="tabpanel">
                         <input type="hidden" name="imagen_url">
                         <div class="rounded-lg border border-dashed border-gray-300 p-4 dark:border-gray-600">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -157,6 +164,7 @@
                                 <input name="stock_disponible" type="number" min="0" value="0"
                                        class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                             </label>
+                        </div>
                         </div>
                         <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
                             <button id="producto-submit" type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
@@ -457,6 +465,7 @@
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/menu_extras_editor.js', v='20261019-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='modificadores-20261019-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_producto_subtabs.js', v='20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_plantillas.js', v='20261019-2') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_promo_rapida.js', v='20261019-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_combo.js', v='20261019-1') }}"></script>
