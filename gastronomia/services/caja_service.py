@@ -22,7 +22,7 @@ from gastronomia.services.encargo_cierre_service import (
     item_encargo_pendiente,
     resumen_encargos_pendientes,
 )
-from gastronomia.services.sena_consultas import saldo_encargo, senas_vigentes_por_pedido
+from gastronomia.services.encargo_consultas import saldo_encargo, senas_vigentes_por_pedido
 from gastronomia.services.pedido_service import obtener_pedido, registrar_evento_pedido
 from gastronomia.services.pedido_stock import consumir_stock_pedido
 from gastronomia.services.venta_integration_service import (

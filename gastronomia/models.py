@@ -337,8 +337,8 @@ class GastronomiaPedido(PedidoEncargoMixin, db.Model):
             'alertas_stock': alertas_stock_pedido(self.id_pedido),
         }
         if self.es_encargo:
-            from gastronomia.services.sena_consultas import datos_sena_encargo
-            data.update(datos_sena_encargo(self))
+            from gastronomia.services.encargo_consultas import datos_encargo
+            data.update(datos_encargo(self))
         return data
 
     @property

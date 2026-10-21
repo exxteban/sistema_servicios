@@ -372,7 +372,7 @@
       <div class="kds-items">
         ${(order.items || []).map(renderItem).join('')}
       </div>
-      ${renderOrderNotes(order)}
+      ${renderOrderNotes(order)}${window.CocinaEncargo?.render(order) || ''}
       ${renderActions(order)}
     </article>
   `;

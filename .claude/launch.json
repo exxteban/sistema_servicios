@@ -36,6 +36,19 @@
         "SERVER": "flask",
         "DEBUG": "0"
       }
+    },
+    {
+      "name": "encargos-tablero",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["run.py"],
+      "port": 5058,
+      "env": {
+        "PORT": "5058",
+        "APP_CONFIG": "development",
+        "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/C--Users-csarl-Documents-proyectos-saas-sistema-servicios/b89fe42c-ef33-4ccd-ab3e-b9a3f55c0646/scratchpad/encargos.db",
+        "SERVER": "flask",
+        "DEBUG": "0"
+      }
     }
   ]
 }

@@ -22,7 +22,7 @@ from gastronomia.encargo_models import (
     GastronomiaPedidoAdelanto,
 )
 from gastronomia.models import GastronomiaPedido
-from gastronomia.services.sena_consultas import saldo_encargo
+from gastronomia.services.encargo_consultas import saldo_encargo
 
 
 ESTADOS_ENCARGO_LISTO = ('listo', 'entregado')

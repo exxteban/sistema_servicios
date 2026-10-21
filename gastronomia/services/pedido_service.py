@@ -260,6 +260,10 @@ def cambiar_estado_pedido(
         db.session.rollback()
         raise
     db.session.commit()
+    if pedido.es_encargo and estado == 'cancelado' and estado_anterior != 'cancelado':
+        from gastronomia.services.encargo_foto_service import eliminar_fotos_encargo  # evita import circular
+
+        eliminar_fotos_encargo(pedido)
     registrar_evento_pedido(pedido, f'pedido_{estado}')
     return pedido
 

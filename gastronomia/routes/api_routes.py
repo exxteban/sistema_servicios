@@ -5,6 +5,7 @@ from flask_login import current_user, login_required
 from app import db
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.dashboard_preferences import set_dashboard_card_order
+from gastronomia.services.encargo_service import encargos_habilitados
 from gastronomia.services.channel_price_service import aplicar_precio_canal, normalizar_canal_precio
 from gastronomia.services.menu_image_service import (
     eliminar_imagen_producto_menu,
@@ -162,6 +163,7 @@ def _permisos_dashboard() -> dict[str, bool]:
         'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
         # Historial de ventas del sistema (/ventas/): anular, factura, NC.
         'ventas': bool(current_user.tiene_permiso('ver_ventas')),
+        'encargos': tiene_permiso_gastronomia(PERMISO_POS) and encargos_habilitados(cliente_id_actual_gastronomia()),
     }
 
 

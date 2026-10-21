@@ -5,6 +5,7 @@ from flask_login import current_user, login_required
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.caja_service import contar_pedidos_caja
 from gastronomia.services.dashboard_preferences import build_dashboard_cards
+from gastronomia.services.encargo_service import encargos_habilitados
 from gastronomia.services.modo_operacion import gastronomia_activa
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
@@ -46,6 +47,8 @@ def dashboard():
         'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
         # Historial de ventas del sistema (/ventas/): anular, factura, NC.
         'ventas': bool(current_user.tiene_permiso('ver_ventas')),
+        # Solo con el flag de encargos encendido (por root): sin flag la tarjeta no existe.
+        'encargos': tiene_permiso_gastronomia(PERMISO_POS) and encargos_habilitados(cliente_id),
     }
     pedidos_pendientes_caja = contar_pedidos_caja(cliente_id) if cliente_id and permisos['caja'] else 0
     pedidos_pendientes_tienda = contar_pedidos_tienda_pendientes(cliente_id) if cliente_id and permisos['pos'] else 0

@@ -1,0 +1,97 @@
+{# Dialogos del tablero de encargos: alta/edicion, sena y cancelacion. #}
+{% set _input = "mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" %}
+{% set _label = "block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300" %}
+{% set _dialog = "w-[min(100%-2rem,44rem)] max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-0 text-gray-800 shadow-xl backdrop:bg-black/50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" %}
+{% set _metodos %}
+    <option value="efectivo">Efectivo</option>
+    <option value="tarjeta">Tarjeta</option>
+    <option value="transferencia">Transferencia</option>
+    <option value="qr">QR</option>
+{% endset %}
+
+<dialog id="encargo-form-dialog" class="{{ _dialog }}">
+    <form id="encargo-form" method="dialog" class="space-y-4 p-5">
+        <div class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-black" data-form-title>Nuevo encargo</h2>
+            <button type="button" data-close class="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Cerrar"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+            <label class="{{ _label }}">Cliente<input name="nombre_cliente" required maxlength="120" class="{{ _input }}"></label>
+            <label class="{{ _label }}">Celular<input name="celular_cliente" type="tel" maxlength="40" class="{{ _input }}"></label>
+            <label class="{{ _label }}">Dia de retiro<input name="fecha" type="date" required class="{{ _input }}"></label>
+            <label class="{{ _label }}">Hora<input name="hora" type="time" required value="15:00" class="{{ _input }}"></label>
+        </div>
+
+        <div class="space-y-2">
+            <div class="flex items-center justify-between">
+                <p class="{{ _label }}">Productos</p>
+                <button type="button" data-add-item class="text-sm font-bold text-violet-700 dark:text-violet-300"><i class="fas fa-plus mr-1"></i>Agregar</button>
+            </div>
+            <div data-items class="space-y-2"></div>
+            <p class="text-right text-sm font-black" data-total>Total: -</p>
+        </div>
+
+        <label class="{{ _label }}">Observaciones<textarea name="notas" rows="2" maxlength="500" class="{{ _input }} h-auto"></textarea></label>
+
+        <fieldset data-sena-block class="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+            <label class="flex items-center gap-2 text-sm font-bold">
+                <input type="checkbox" name="cobrar_sena" class="h-4 w-4 rounded border-gray-300"> Cobrar seña ahora
+            </label>
+            <div data-sena-fields class="hidden grid gap-3 sm:grid-cols-3">
+                <label class="{{ _label }}">Monto<input name="sena_monto" type="number" min="1" step="1" class="{{ _input }}"></label>
+                <label class="{{ _label }}">Metodo<select name="sena_metodo" class="{{ _input }}">{{ _metodos }}</select></label>
+                <label class="{{ _label }}">Referencia<input name="sena_referencia" maxlength="100" class="{{ _input }}" placeholder="Voucher / nro."></label>
+            </div>
+        </fieldset>
+
+        <div data-fotos-block class="space-y-2">
+            <p class="{{ _label }}">Fotos de referencia</p>
+            <div data-fotos class="flex flex-wrap gap-2"></div>
+            <input type="file" name="fotos" accept="image/*" multiple class="block w-full text-sm">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Se reducen antes de subir. Maximo <span data-max-fotos></span> por encargo.</p>
+        </div>
+
+        <p data-form-error class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800"></p>
+        <div class="flex justify-end gap-2">
+            <button type="button" data-close class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold dark:border-gray-700">Cancelar</button>
+            <button type="submit" data-submit class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700">Guardar encargo</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="encargo-sena-dialog" class="{{ _dialog }}">
+    <form id="encargo-sena-form" method="dialog" class="space-y-4 p-5">
+        <h2 class="text-lg font-black">Cobrar seña</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-300" data-sena-resumen></p>
+        <div class="grid gap-3 sm:grid-cols-3">
+            <label class="{{ _label }}">Monto<input name="monto" type="number" min="1" step="1" required class="{{ _input }}"></label>
+            <label class="{{ _label }}">Metodo<select name="metodo_pago" class="{{ _input }}">{{ _metodos }}</select></label>
+            <label class="{{ _label }}">Referencia<input name="referencia" maxlength="100" class="{{ _input }}"></label>
+        </div>
+        <p data-form-error class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800"></p>
+        <div class="flex justify-end gap-2">
+            <button type="button" data-close class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold dark:border-gray-700">Cancelar</button>
+            <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Cobrar seña</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="encargo-cancel-dialog" class="{{ _dialog }}">
+    <form id="encargo-cancel-form" method="dialog" class="space-y-4 p-5">
+        <h2 class="text-lg font-black">Cancelar encargo</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-300" data-cancel-resumen></p>
+        <fieldset data-cancel-opciones class="space-y-2">
+            <legend class="{{ _label }} mb-1">¿Qué hacer con la seña?</legend>
+            <label data-opcion="devolver_todo" class="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="opcion" value="devolver_todo"> Devolver todo</label>
+            <label data-opcion="retener_todo" class="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="opcion" value="retener_todo"> Retener todo</label>
+            <label data-opcion="retener_parcial" class="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="opcion" value="retener_parcial"> Retener una parte (el resto se devuelve)</label>
+            <label data-retener-monto class="hidden {{ _label }}">Monto a retener<input name="monto_retenido" type="number" min="1" step="1" class="{{ _input }}"></label>
+        </fieldset>
+        <label class="{{ _label }}">Motivo<input name="motivo" maxlength="200" class="{{ _input }}"></label>
+        <p data-form-error class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800"></p>
+        <div class="flex justify-end gap-2">
+            <button type="button" data-close class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold dark:border-gray-700">Volver</button>
+            <button type="submit" class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700">Cancelar encargo</button>
+        </div>
+    </form>
+</dialog>

@@ -31,6 +31,16 @@ _DASHBOARD_CARD_DEFINITIONS = (
         'hover_class': 'hover:border-amber-300',
     },
     {
+        'id': 'encargos',
+        'permission': 'encargos',
+        'title': 'Encargos',
+        'description': 'Tortas y pedidos programados: sena, fotos y produccion por dia.',
+        'endpoint': 'gastronomia.encargos',
+        'icon': 'fas fa-cake-candles',
+        'icon_class': 'text-violet-500',
+        'hover_class': 'hover:border-violet-300',
+    },
+    {
         'id': 'delivery',
         'permission': 'pos',
         'title': 'Delivery',

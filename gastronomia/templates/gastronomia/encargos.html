@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Encargos{% endblock %}
+
+{% set _input = "mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" %}
+{% set _label = "block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300" %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-5" data-gastro-encargos
+     data-max-fotos="{{ parametros.max_fotos }}"
+     data-anticipo-horas="{{ parametros.anticipo_horas }}"
+     data-opciones-cancelacion="{{ parametros.opciones_cancelacion|join(',') }}"
+     data-puede-cobrar="{{ 1 if puede_cobrar else 0 }}"
+     data-caja-url="{{ url_for('gastronomia.caja') }}">
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">Gastronomia</p>
+            <h1 class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">Encargos</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Pedidos programados por dia de retiro, con seña, fotos y totales a producir.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" id="encargo-nuevo" class="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700">
+                <i class="fas fa-plus"></i>Nuevo encargo
+            </button>
+            <a href="{{ url_for('gastronomia.dashboard') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left"></i>Volver
+            </a>
+        </div>
+    </div>
+
+    <form id="encargos-filtros" class="flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <button type="button" data-shift="-1" class="h-10 rounded-lg border border-gray-200 px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:text-gray-200" aria-label="Dias anteriores"><i class="fas fa-chevron-left"></i></button>
+        <label class="{{ _label }}">Desde<input name="desde" type="date" class="{{ _input }}"></label>
+        <label class="{{ _label }}">Ver
+            <select name="dias" class="{{ _input }}">
+                <option value="3">3 dias</option>
+                <option value="7" selected>7 dias</option>
+                <option value="14">14 dias</option>
+            </select>
+        </label>
+        <button type="button" data-shift="1" class="h-10 rounded-lg border border-gray-200 px-3 text-sm font-bold text-gray-700 dark:border-gray-700 dark:text-gray-200" aria-label="Dias siguientes"><i class="fas fa-chevron-right"></i></button>
+        <button type="button" data-hoy class="h-10 rounded-lg border border-violet-200 px-4 text-sm font-bold text-violet-700 dark:border-violet-500/30 dark:text-violet-300">Hoy</button>
+    </form>
+
+    <div id="encargos-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold" role="status"></div>
+    <section id="encargos-vencidos" class="hidden"></section>
+    <section id="encargos-dias" class="space-y-4"></section>
+</div>
+
+{% include 'gastronomia/_encargos_dialogs.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/encargos_comun.js', v='20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/encargos_fotos.js', v='20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/encargos_form.js', v='20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/encargos_acciones.js', v='20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/encargos.js', v='20261020-1') }}"></script>
+{% endblock %}
