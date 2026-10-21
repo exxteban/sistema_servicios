@@ -505,7 +505,7 @@ def cerrar():
     except Exception:
         pass
 
-    resumen_gastronomia = resumen_pedidos_gastronomia_cierre()
+    resumen_gastronomia = resumen_pedidos_gastronomia_cierre(sesion)
 
     if request.method == 'POST':
         monto_declarado = request.form.get('monto_declarado', 0, type=float)

@@ -15,6 +15,14 @@ from gastronomia.services.factura_electronica_service import (
     validar_factura_antes_de_cobrar,
 )
 from gastronomia.services.adelanto_service import aplicar_adelantos, sena_vigente
+from gastronomia.services.encargo_cierre_service import (
+    es_encargo_futuro,
+    filtro_visible_en_caja,
+    inicio_manana_local,
+    item_encargo_pendiente,
+    resumen_encargos_pendientes,
+)
+from gastronomia.services.sena_consultas import saldo_encargo, senas_vigentes_por_pedido
 from gastronomia.services.pedido_service import obtener_pedido, registrar_evento_pedido
 from gastronomia.services.pedido_stock import consumir_stock_pedido
 from gastronomia.services.venta_integration_service import (
@@ -46,21 +54,24 @@ def _query_pedidos_caja(cliente_id: int):
 def listar_pedidos_caja(cliente_id: int) -> list[GastronomiaPedido]:
     return (
         _query_pedidos_caja(cliente_id)
+        .filter(filtro_visible_en_caja(inicio_manana_local()))
         .order_by(GastronomiaPedido.fecha_creacion.desc(), GastronomiaPedido.id_pedido.desc())
         .all()
     )
 
 
 def contar_pedidos_caja(cliente_id: int) -> int:
-    return _query_pedidos_caja(cliente_id).count()
+    return _query_pedidos_caja(cliente_id).filter(filtro_visible_en_caja(inicio_manana_local())).count()
 
 
 def resumen_pedidos_impagos_para_cierre(cliente_id: int) -> dict:
     """Agrupa los pedidos cobrables sin pago para advertir al cerrar caja.
 
-    Devuelve dos grupos:
+    Devuelve tres grupos:
     - ``en_curso``: pedidos legitimos en proceso (aviso informativo, no bloquea).
     - ``terminados``: producto ya entregado/listo sin cobrar (confirmacion explicita).
+    - ``encargos_pendientes``: encargos programados para despues de hoy (informativo).
+    En los encargos con sena el monto pendiente es el saldo, no el total.
     """
     pedidos = (
         _query_pedidos_caja(cliente_id)
@@ -70,11 +81,18 @@ def resumen_pedidos_impagos_para_cierre(cliente_id: int) -> dict:
 
     en_curso: list[dict] = []
     terminados: list[dict] = []
+    encargos_pendientes: list[dict] = []
     total_en_curso = Decimal('0.00')
     total_terminados = Decimal('0.00')
+    manana = inicio_manana_local()
+    senas = senas_vigentes_por_pedido(p.id_pedido for p in pedidos if p.es_encargo)
 
     for pedido in pedidos:
-        monto = Decimal(str(pedido.total or 0)).quantize(Decimal('0.01'))
+        sena = senas.get(int(pedido.id_pedido), Decimal('0.00'))
+        if es_encargo_futuro(pedido, manana):
+            encargos_pendientes.append(item_encargo_pendiente(pedido, sena))
+            continue
+        monto = saldo_encargo(pedido.total, sena) if sena else Decimal(str(pedido.total or 0)).quantize(Decimal('0.01'))
         item = {
             'id_pedido': pedido.id_pedido,
             'codigo_entrega': pedido.codigo_entrega,
@@ -98,6 +116,7 @@ def resumen_pedidos_impagos_para_cierre(cliente_id: int) -> dict:
         'total_terminados': float(total_terminados),
         'hay_terminados': bool(terminados),
         'hay_en_curso': bool(en_curso),
+        **resumen_encargos_pendientes(encargos_pendientes),
     }
 
 

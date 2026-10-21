@@ -10,6 +10,7 @@ from gastronomia.models import (
     GastronomiaPedidoPago,
 )
 from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
+from gastronomia.services.sena_consultas import datos_sena_encargo, senas_vigentes_por_pedido
 from gastronomia.services.stock_service import alertas_stock_pedido
 
 
@@ -71,6 +72,8 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
             'subtotal': float(item.subtotal or 0),
             'modificadores': modificadores_por_item.get(int(item.id_item), []),
         }
+        if item.texto_personalizado:
+            item_data['texto_personalizado'] = item.texto_personalizado
         items_por_pedido.setdefault(int(item.pedido_id), []).append(item_data)
 
     ubicaciones_delivery = (
@@ -87,15 +90,19 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
     for ubicacion in ubicaciones_delivery:
         ubicacion_por_pedido.setdefault(int(ubicacion.pedido_id), ubicacion)
 
-    return [
-        _pedido_to_dict_prearmado(
+    senas = senas_vigentes_por_pedido(pedido.id_pedido for pedido in pedidos if pedido.es_encargo)
+    resultado = []
+    for pedido in pedidos:
+        data = _pedido_to_dict_prearmado(
             pedido,
             pago=pagos_por_pedido.get(int(pedido.id_pedido)),
             items=items_por_pedido.get(int(pedido.id_pedido), []),
             ubicacion_delivery=ubicacion_por_pedido.get(int(pedido.id_pedido)),
         )
-        for pedido in pedidos
-    ]
+        if pedido.es_encargo:
+            data.update(datos_sena_encargo(pedido, senas.get(int(pedido.id_pedido), 0)))
+        resultado.append(data)
+    return resultado
 
 
 def _pedido_to_dict_prearmado(
@@ -114,6 +121,8 @@ def _pedido_to_dict_prearmado(
         'usuario_id': pedido.usuario_id,
         'tipo_pedido': pedido.tipo_pedido,
         'origen_pedido': pedido.origen_pedido,
+        'es_encargo': bool(pedido.es_encargo),
+        'fecha_programada': pedido.fecha_programada.isoformat() if pedido.fecha_programada else None,
         'codigo_publico': pedido.codigo_publico,
         'url_seguimiento': url_seguimiento,
         'url_seguimiento_publica': _url_seguimiento_publica(pedido.codigo_publico),

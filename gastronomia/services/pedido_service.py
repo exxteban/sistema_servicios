@@ -41,8 +41,12 @@ def listar_pedidos(
     *,
     estados: list[str] | None = None,
     tipo_pedido: str | None = None,
+    incluir_encargos: bool = False,
 ) -> list[GastronomiaPedido]:
     query = GastronomiaPedido.query.filter(GastronomiaPedido.cliente_id == int(cliente_id))
+    if not incluir_encargos:
+        # Los encargos tienen su propio tablero; el listado operativo no los mezcla.
+        query = query.filter(GastronomiaPedido.es_encargo.is_(False))
     estados_validos = [estado for estado in (estados or []) if estado in ESTADOS_PEDIDO]
     if estados_validos:
         query = query.filter(GastronomiaPedido.estado.in_(estados_validos))
