@@ -4,7 +4,7 @@ from flask_login import current_user, login_required
 
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.access import cliente_id_actual_gastronomia, mensaje_contexto_gastronomia
-from gastronomia.services.menu_service import listar_categorias, listar_productos
+from gastronomia.services.menu_service import agrupar_por_categoria, listar_categorias, listar_productos
 from gastronomia.services.menu_plantillas_service import listar_plantillas
 from gastronomia.services.menu_combo_service import resumen_productos_para_combo
 from gastronomia.services.channel_price_service import CANALES_PRECIOS, listar_precios_canal
@@ -29,6 +29,10 @@ def menu_config():
         canal: listar_precios_canal(cliente_id, canal, productos)
         for canal in CANALES_PRECIOS
     }
+    grupos_precios_canal = {
+        canal: agrupar_por_categoria(categorias, items, lambda item: item['producto'])
+        for canal, items in precios_por_canal.items()
+    }
     menu_tv_config = obtener_o_preparar_config_tv(cliente_id)
     menu_tv_data = serializar_config_tv(menu_tv_config) if menu_tv_config else None
     puede_gestionar_promociones = current_user.es_admin() or current_user.tiene_permiso('editar_configuracion')
@@ -48,6 +52,8 @@ def menu_config():
         menu_productos_combo=resumen_productos_para_combo(productos),
         canales_precios=CANALES_PRECIOS,
         precios_por_canal=precios_por_canal,
+        grupos_precios_canal=grupos_precios_canal,
+        grupos_productos=agrupar_por_categoria(categorias, productos),
         menu_tv_config=menu_tv_data,
         puede_gestionar_promociones=puede_gestionar_promociones,
         promociones=promociones,

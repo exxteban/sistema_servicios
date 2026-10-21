@@ -1,0 +1,49 @@
+{# Barra de busqueda/filtros para listas largas agrupadas por categoria (ver js/menu_list_filter.js). #}
+{% macro list_toolbar(grupos, estados, placeholder='Buscar producto...') %}
+<div class="gastro-list-toolbar">
+    <div class="gastro-list-toolbar-row">
+        <label class="gastro-list-search">
+            <i class="fas fa-search"></i>
+            <input type="search" data-filter-search placeholder="{{ placeholder }}" autocomplete="off"
+                   class="rounded-lg border border-gray-200 py-2 pr-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+        </label>
+        <select data-filter-category aria-label="Filtrar por categoria"
+                class="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+            <option value="">Todas las categorias</option>
+            {% for grupo in grupos %}
+            <option value="{{ grupo.categoria.id_categoria if grupo.categoria else 0 }}">{{ grupo.categoria.nombre if grupo.categoria else 'Sin categoria' }} ({{ grupo['items']|length }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="gastro-list-toolbar-pills">
+        {% for valor, etiqueta in estados %}
+        <button type="button" data-filter-status="{{ valor }}" class="gastro-filter-pill{% if loop.first %} activa{% endif %}">
+            {{ etiqueta }} <span data-filter-status-count class="gastro-filter-pill-count"></span>
+        </button>
+        {% endfor %}
+        <span class="gastro-list-toolbar-expand">
+            <button type="button" data-filter-expand="1" class="text-gray-500 hover:text-amber-700 dark:text-gray-400">Expandir todo</button>
+            <button type="button" data-filter-expand="0" class="text-gray-500 hover:text-amber-700 dark:text-gray-400">Contraer todo</button>
+        </span>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro list_group(grupo) %}
+<details open data-filter-group class="gastro-list-group">
+    <summary>
+        <i class="fas fa-chevron-right gastro-list-group-chevron"></i>
+        <span class="flex-1 truncate">{{ grupo.categoria.nombre if grupo.categoria else 'Sin categoria' }}</span>
+        <span data-filter-group-count class="gastro-filter-pill-count">{{ grupo['items']|length }}</span>
+    </summary>
+    <div class="gastro-list-rows">
+        {{ caller() }}
+    </div>
+</details>
+{% endmacro %}
+
+{% macro list_empty() %}
+<p data-filter-empty class="hidden rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
+    Ningun producto coincide con el filtro.
+</p>
+{% endmacro %}

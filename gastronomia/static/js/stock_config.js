@@ -84,7 +84,7 @@
     const summary = selectedRecipeSummary();
     const state = document.getElementById('stock-recipe-state');
     if (!enabled) {
-      state.textContent = 'Selecciona un producto del menu para configurar su receta.';
+      state.textContent = 'Selecciona un plato de la lista para configurar su receta.';
       return;
     }
     state.textContent = summary?.receta_activa
@@ -92,18 +92,30 @@
       : `${summary?.producto_nombre || 'Este producto'} todavia no descuenta insumos. Agrega el primer insumo.`;
   };
 
+  const recipeList = document.getElementById('stock-recipe-summary');
+
+  const highlightRecipeRow = () => {
+    recipeList?.querySelectorAll('[data-recipe-row]').forEach((row) => {
+      row.classList.toggle('is-selected', row.dataset.recipeRow === String(recipeProduct.value));
+    });
+  };
+
   const renderRecipeSummaries = () => {
-    document.getElementById('stock-recipe-summary').innerHTML = recipeSummaries.map((item) => `
-      <div class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${item.receta_activa ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-400/30 dark:bg-emerald-500/10' : 'border-red-200 bg-red-50 dark:border-red-400/30 dark:bg-red-500/10'}">
-        <div>
-          <strong class="text-gray-900 dark:text-white">${escapeHtml(item.producto_nombre)}</strong>
-          <span class="ml-2 text-xs font-bold ${item.receta_activa ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200'}">
-            ${item.receta_activa ? `${item.cantidad_insumos} insumo(s), receta activa` : 'Sin receta: no descuenta'}
-          </span>
-        </div>
-        <button type="button" data-edit-recipe-product="${item.producto_id}" class="text-xs font-bold text-amber-700 dark:text-amber-200">Configurar</button>
-      </div>
-    `).join('') || '<p class="text-xs font-semibold text-gray-500">No hay productos cargados en el menu.</p>';
+    const byId = new Map(recipeSummaries.map((item) => [String(item.producto_id), item]));
+    recipeList?.querySelectorAll('[data-recipe-row]').forEach((row) => {
+      const item = byId.get(row.dataset.recipeRow);
+      const active = Boolean(item?.receta_activa);
+      row.dataset.flags = active ? 'con-receta' : 'sin-receta';
+      const status = row.querySelector('[data-recipe-status]');
+      status.textContent = active ? `${item.cantidad_insumos} insumo(s)` : 'Sin receta';
+      status.className = `text-xs font-bold ${active ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-600 dark:text-red-300'}`;
+    });
+    const total = recipeSummaries.length;
+    const withRecipe = recipeSummaries.filter((item) => item.receta_activa).length;
+    document.getElementById('stock-recipe-progress-label').textContent = `${withRecipe} de ${total} platos descuentan insumos`;
+    document.getElementById('stock-recipe-progress-bar').style.width = `${total ? Math.round((withRecipe / total) * 100) : 0}%`;
+    if (recipeList) window.GastroListFilter?.apply(recipeList);
+    highlightRecipeRow();
     syncRecipeControls();
   };
 
@@ -124,6 +136,7 @@
   };
 
   const loadRecipe = async () => {
+    highlightRecipeRow();
     if (!recipeProduct.value) {
       recipeItems = [];
       recipeOptions = [];
@@ -203,11 +216,23 @@
     }
   });
 
-  document.getElementById('stock-recipe-summary').addEventListener('click', (event) => {
-    const button = event.target.closest('[data-edit-recipe-product]');
-    if (!button) return;
-    recipeProduct.value = button.dataset.editRecipeProduct;
+  const selectRecipeProduct = (row) => {
+    recipeProduct.value = row.dataset.editRecipeProduct;
     loadRecipe().catch((error) => showAlert(error.message, false));
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      document.getElementById('stock-recipe-editor').scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+  };
+
+  recipeList?.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-edit-recipe-product]');
+    if (row) selectRecipeProduct(row);
+  });
+  recipeList?.addEventListener('keydown', (event) => {
+    const row = event.target.closest('[data-edit-recipe-product]');
+    if (!row || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    selectRecipeProduct(row);
   });
 
   document.getElementById('stock-insumo-config').addEventListener('submit', async (event) => {
