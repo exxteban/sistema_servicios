@@ -1,0 +1,54 @@
+{# Encargos de pasteleria en el cierre: solo informativo, no bloquea el cierre. #}
+{% set _gs = "{:,.0f}" %}
+{% if resumen_gastronomia and resumen_gastronomia.encargos_pendientes %}
+<div class="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
+    <div class="flex items-start">
+        <i class="fas fa-cake-candles text-indigo-500 dark:text-indigo-300 mt-1 mr-3"></i>
+        <div class="text-sm text-indigo-800 dark:text-indigo-200">
+            <p class="font-semibold mb-1">
+                {{ resumen_gastronomia.encargos_pendientes|length }} encargo(s) programado(s) para los próximos días
+                (₲ {{ _gs.format(resumen_gastronomia.total_encargos_pendientes).replace(",", ".") }},
+                seña ₲ {{ _gs.format(resumen_gastronomia.sena_encargos_pendientes).replace(",", ".") }},
+                saldo ₲ {{ _gs.format(resumen_gastronomia.saldo_encargos_pendientes).replace(",", ".") }})
+            </p>
+            <p>Se cobran el día de retiro. No es necesario hacer nada.</p>
+            <ul class="mt-2 space-y-1">
+                {% for p in resumen_gastronomia.encargos_pendientes[:5] %}
+                <li>· {{ p.codigo_entrega }} — {{ p.nombre_cliente }} —
+                    {{ (p.fecha_programada or '')[:16].replace('T', ' ') }} —
+                    saldo ₲ {{ _gs.format(p.saldo).replace(",", ".") }}</li>
+                {% endfor %}
+                {% if resumen_gastronomia.encargos_pendientes|length > 5 %}
+                <li class="opacity-70">… y {{ resumen_gastronomia.encargos_pendientes|length - 5 }} más</li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if resumen_gastronomia and resumen_gastronomia.senas %}
+{% set s = resumen_gastronomia.senas %}
+<div class="bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+    <p class="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
+        <i class="fas fa-hand-holding-dollar mr-2 text-gray-500 dark:text-gray-400"></i>Señas de encargos del turno
+    </p>
+    <dl class="text-sm text-gray-700 dark:text-gray-200 grid grid-cols-2 gap-x-4 gap-y-1">
+        <dt>Recibidas ({{ s.recibidas_cantidad }})</dt>
+        <dd class="text-right">₲ {{ _gs.format(s.recibidas_total).replace(",", ".") }}</dd>
+        {% for m in s.recibidas_por_metodo %}
+        <dt class="pl-3 opacity-70">· {{ m.metodo }}</dt>
+        <dd class="text-right opacity-70">₲ {{ _gs.format(m.monto).replace(",", ".") }}</dd>
+        {% endfor %}
+        <dt>Devueltas ({{ s.devueltas_cantidad }})</dt>
+        <dd class="text-right">₲ {{ _gs.format(s.devueltas_total).replace(",", ".") }}</dd>
+        <dt>Aplicadas al cobrar ({{ s.aplicadas_cantidad }})</dt>
+        <dd class="text-right">₲ {{ _gs.format(s.aplicadas_total).replace(",", ".") }}</dd>
+        <dt class="font-medium">Señas retenidas ({{ s.retenidas_cantidad }})</dt>
+        <dd class="text-right font-medium">₲ {{ _gs.format(s.retenidas_total).replace(",", ".") }}</dd>
+    </dl>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+        Solo las señas en efectivo forman parte del efectivo esperado. Las retenidas no son ventas.
+    </p>
+</div>
+{% endif %}

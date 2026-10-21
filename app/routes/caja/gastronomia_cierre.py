@@ -1,11 +1,12 @@
 from flask import current_app
 
 
-def resumen_pedidos_gastronomia_cierre():
-    """Obtiene pedidos gastronomicos impagos relevantes para el cierre."""
+def resumen_pedidos_gastronomia_cierre(sesion=None):
+    """Obtiene pedidos gastronomicos impagos y las senas de encargos del turno para el cierre."""
     try:
         from gastronomia.services.access import cliente_id_actual_gastronomia
         from gastronomia.services.caja_service import resumen_pedidos_impagos_para_cierre
+        from gastronomia.services.encargo_cierre_service import informe_senas_sesion
     except Exception:
         return None
 
@@ -22,9 +23,18 @@ def resumen_pedidos_gastronomia_cierre():
         current_app.logger.exception('No se pudo calcular pedidos gastronomicos impagos para el cierre de caja')
         return None
 
-    if not resumen.get('hay_en_curso') and not resumen.get('hay_terminados'):
-        return None
-    return resumen
+    resumen['senas'] = None
+    if sesion is not None:
+        try:
+            resumen['senas'] = informe_senas_sesion(cliente_id, sesion.id_sesion)
+        except Exception:
+            current_app.logger.exception('No se pudo calcular el informe de senas de encargos para el cierre de caja')
+
+    hay_algo = (
+        resumen.get('hay_en_curso') or resumen.get('hay_terminados')
+        or resumen.get('hay_encargos_pendientes') or resumen.get('senas')
+    )
+    return resumen if hay_algo else None
 
 
 def resumen_pedidos_gastronomia_texto(pedidos):

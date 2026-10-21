@@ -5,6 +5,7 @@ from gastronomia.services.pedido_service import serializar_pedidos
 
 
 _CLAVES_PRIVADAS_COCINA = {
+    'adelantos',
     'alertas_stock',
     'costo_envio',
     'descuento_linea',
@@ -15,6 +16,9 @@ _CLAVES_PRIVADAS_COCINA = {
     'precio_delta',
     'precio_original',
     'precio_unitario',
+    'saldo',
+    'sena_total_cobrada',
+    'sena_vigente',
     'subtotal',
     'total',
     'total_cobrado',

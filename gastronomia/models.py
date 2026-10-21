@@ -296,7 +296,7 @@ class GastronomiaPedido(PedidoEncargoMixin, db.Model):
     def to_dict(self):
         from gastronomia.services.stock_service import alertas_stock_pedido
 
-        return {
+        data = {
             'id_pedido': self.id_pedido,
             'codigo_entrega': self.codigo_entrega,
             'cliente_id': self.cliente_id,
@@ -336,6 +336,10 @@ class GastronomiaPedido(PedidoEncargoMixin, db.Model):
             'items': [item.to_dict() for item in self.items.order_by(GastronomiaPedidoItem.id_item.asc()).all()],
             'alertas_stock': alertas_stock_pedido(self.id_pedido),
         }
+        if self.es_encargo:
+            from gastronomia.services.sena_consultas import datos_sena_encargo
+            data.update(datos_sena_encargo(self))
+        return data
 
     @property
     def codigo_entrega(self):

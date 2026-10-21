@@ -26,7 +26,9 @@ def pos():
     pedido_id = request.args.get('pedido', type=int)
     if pedido_id:
         pedido = obtener_pedido(cliente_id, pedido_id)
-        if pedido and pedido.estado == 'abierto' and not pedido.pago:
+        if pedido and pedido.es_encargo:
+            flash('Los encargos se editan desde la pantalla de encargos.', 'warning')
+        elif pedido and pedido.estado == 'abierto' and not pedido.pago:
             pedido_inicial = pedido
         else:
             flash('Solo se pueden editar pedidos abiertos pendientes de cobro.', 'warning')

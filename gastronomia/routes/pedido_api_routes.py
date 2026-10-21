@@ -56,7 +56,8 @@ def pedidos():
     if not estados and request.args.get('estados'):
         estados = [estado.strip() for estado in request.args.get('estados').split(',') if estado.strip()]
     tipo_pedido = request.args.get('tipo_pedido') or request.args.get('tipo')
-    items = listar_pedidos(cliente_id, estados=estados, tipo_pedido=tipo_pedido)
+    incluir_encargos = request.args.get('incluir_encargos') in {'1', 'true'}
+    items = listar_pedidos(cliente_id, estados=estados, tipo_pedido=tipo_pedido, incluir_encargos=incluir_encargos)
     return jsonify({'ok': True, 'pedidos': ocultar_localizacion_pedidos(serializar_pedidos(items), current_user)})
 
 
@@ -94,6 +95,10 @@ def actualizar(pedido_id):
     cliente_id, error = _cliente_o_error()
     if error:
         return error
+    existente = obtener_pedido(cliente_id, pedido_id)
+    if existente is not None and existente.es_encargo:
+        # Fecha, anticipo y sena se validan en encargo_service: no se edita por la ruta generica.
+        return jsonify({'error': 'validation_error', 'mensaje': 'Los encargos se editan desde la pantalla de encargos.'}), 400
     try:
         pedido = actualizar_pedido_abierto(cliente_id, pedido_id, _payload())
     except ValueError as exc:

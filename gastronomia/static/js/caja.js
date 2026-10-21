@@ -116,7 +116,7 @@
   const applyOrderSnapshot = (order) => {
     const orderId = Number(order.id_pedido);
     const index = orders.findIndex((item) => Number(item.id_pedido) === orderId);
-    const visible = cashStates.has(order.estado) && !order.pagado;
+    const visible = cashStates.has(order.estado) && !order.pagado && !isFutureEncargo(order);
     if (!visible) {
       if (index === -1) return false;
       orders.splice(index, 1);
@@ -126,6 +126,19 @@
     else orders[index] = order;
     return true;
   };
+  // Un encargo para otro dia se cobra recien cuando esta listo o llega su fecha (igual que el servidor).
+  const isFutureEncargo = (order) => {
+    if (!order.es_encargo || !order.fecha_programada || ['listo', 'entregado'].includes(order.estado)) return false;
+    const tomorrow = new Date();
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return new Date(order.fecha_programada).getTime() >= tomorrow.getTime();
+  };
+  const orderSena = (order) => (order.es_encargo ? Math.max(0, Number(order.sena_vigente || 0)) : 0);
+  const encargoInfo = (order) => (order.es_encargo ? `
+    <p class="mt-1 text-xs font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+      Encargo${orderSena(order) ? ` - Sena ${money(orderSena(order))} - Saldo ${money(order.saldo)}` : ''}
+    </p>` : '');
   const sortOrders = () => {
     orders.sort((a, b) => {
       const dateDiff = new Date(b.fecha_creacion || 0).getTime() - new Date(a.fecha_creacion || 0).getTime();
@@ -148,6 +161,7 @@
           ${formatSentAt(order.fecha_creacion) ? `<p class="mt-1 text-xs font-semibold text-gray-500"><i class="far fa-clock mr-1"></i>Enviado a caja: ${formatSentAt(order.fecha_creacion)}</p>` : ''}
           ${order.referencia_entrega ? `<p class="mt-1 text-xs font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">${escapeHtml(order.referencia_entrega)}</p>` : ''}
           ${(order.tipo_pedido || '').toLowerCase() === 'delivery' ? `<p class="mt-1 text-xs font-bold text-gray-500">Envio: ${money(order.costo_envio || 0)}</p>` : ''}
+          ${encargoInfo(order)}
         </div>
         <strong class="text-xl text-emerald-700 dark:text-emerald-300">${money(order.total)}</strong>
       </div>
@@ -191,7 +205,7 @@
     }
     const shippingCost = isDelivery ? Math.max(0, Number(shippingInput?.value || order.costo_envio || 0)) : 0;
     const subtotal = Number(order.subtotal || 0);
-    const total = Math.max(0, subtotal + shippingCost - discount);
+    const total = Math.max(0, subtotal + shippingCost - discount - orderSena(order));
     selectedSummary.innerHTML = `
       <div class="flex items-center justify-between gap-3">
         <strong class="text-gray-900 dark:text-white">Pedido ${deliveryCode(order)}</strong>
@@ -199,6 +213,7 @@
       </div>
       <p class="mt-2 text-sm text-gray-500">${escapeHtml(order.tipo_pedido)}${order.mesa ? ` - Mesa ${escapeHtml(order.mesa)}` : ''}${order.referencia_entrega ? ` - ${escapeHtml(order.referencia_entrega)}` : ''}</p>
       ${isDelivery ? `<p class="mt-2 text-xs font-semibold text-gray-500">Productos ${money(subtotal)} + envio ${money(shippingCost)}</p>` : ''}
+      ${orderSena(order) ? `<p class="mt-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300">Sena ya cobrada: -${money(orderSena(order))}</p>` : ''}
     `;
     paymentTotal.textContent = money(total);
     updateChargeButton();
