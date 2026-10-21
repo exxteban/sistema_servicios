@@ -9,7 +9,19 @@
             <i class="fas fa-exchange-alt text-blue-600 dark:text-blue-400 mr-2"></i>Movimiento de Caja
         </h1>
 
-        <form method="POST" action="{{ url_for('caja.registrar_movimiento') }}" class="space-y-6">
+        <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+            <p class="font-semibold"><i class="fas fa-exclamation-triangle mr-1"></i>Esto no registra una venta</p>
+            <p class="mt-1">
+                Usalo solo para plata que entra o sale de la caja sin ser venta (cambio, aporte, retiro).
+                Una venta cargada acá no aparece en el historial de ventas, no descuenta stock ni suma en los reportes.
+            </p>
+            {% set es_gastronomia = marca_rubro and marca_rubro.get('es_gastronomia') %}
+            <a href="{{ url_for('gastronomia.pos') if es_gastronomia else url_for('ventas.pos') }}" class="mt-2 inline-block font-semibold text-amber-900 underline dark:text-amber-100">
+                <i class="fas fa-cash-register mr-1"></i>{{ 'Ir al POS' if es_gastronomia else 'Ir a Nueva Venta' }}
+            </a>
+        </div>
+
+        <form id="form-movimiento-caja" method="POST" action="{{ url_for('caja.registrar_movimiento') }}" class="space-y-6">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Tipo de
@@ -60,4 +72,27 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Un ingreso cuyo motivo parece una venta casi seguro debia cargarse como venta.
+    (function () {
+        var form = document.getElementById('form-movimiento-caja');
+        if (!form) return;
+        var PARECE_VENTA = /\b(venta|ventas|vend\w*|planilla|cobro|hamburguesas?|pedido)\b/i;
+        form.addEventListener('submit', function (event) {
+            var tipo = form.querySelector('input[name="tipo"]:checked');
+            var motivo = (form.querySelector('input[name="motivo"]').value || '').trim();
+            if (!tipo || tipo.value !== 'ingreso' || !PARECE_VENTA.test(motivo)) return;
+            var seguir = window.confirm(
+                'El motivo parece una venta.\n\n' +
+                'Si es una venta, cargala desde {{ 'el POS' if marca_rubro and marca_rubro.get('es_gastronomia') else 'Nueva Venta' }}: un ingreso de caja no aparece en ventas, ' +
+                'no descuenta stock ni suma en los reportes.\n\n' +
+                '¿Guardar igual como ingreso de caja?'
+            );
+            if (!seguir) event.preventDefault();
+        });
+    })();
+</script>
 {% endblock %}
