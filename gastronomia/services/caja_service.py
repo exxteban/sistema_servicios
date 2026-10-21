@@ -32,11 +32,11 @@ from gastronomia.services.venta_integration_service import (
 
 
 METODOS_PAGO = {'efectivo', 'tarjeta', 'transferencia', 'qr', 'mixto'}
-ESTADOS_COBRABLES = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado'}
+ESTADOS_COBRABLES = {'abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino', 'entregado'}
 # Pedidos que todavia estan en curso: es normal que existan al cerrar turno.
 ESTADOS_EN_CURSO = {'abierto', 'enviado_cocina', 'preparando'}
 # Pedidos cuyo producto ya salio pero siguen sin cobrar: requieren atencion al cerrar.
-ESTADOS_TERMINADOS_SIN_COBRO = {'listo', 'entregado'}
+ESTADOS_TERMINADOS_SIN_COBRO = {'listo', 'en_camino', 'entregado'}
 
 
 def _query_pedidos_caja(cliente_id: int):
