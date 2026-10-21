@@ -1,0 +1,63 @@
+{% from "gastronomia/_menu_list_toolbar.html" import list_toolbar, list_group, list_empty %}
+<div data-menu-tab-panel="productos" class="hidden" role="tabpanel">
+    {% if grupos_productos %}
+    <div data-list-filter class="space-y-3">
+        {{ list_toolbar(grupos_productos, [
+            ('', 'Todos'),
+            ('agotado', 'Agotados'),
+            ('oculto', 'Ocultos en menu'),
+            ('oculto-tv', 'Ocultos en TV'),
+            ('fuera-tienda', 'Fuera de tienda'),
+        ]) }}
+        {% for grupo in grupos_productos %}
+        {% call list_group(grupo) %}
+            {% for producto in grupo['items'] %}
+            <div data-filter-item data-product-card="{{ producto.id_producto }}"
+                 data-search="{{ producto.nombre|lower }}" data-category="{{ producto.categoria_id or 0 }}"
+                 class="gastro-list-row">
+                <div class="gastro-list-row-main">
+                    <p class="truncate font-semibold text-gray-900 dark:text-white" title="{{ producto.nombre }}">{{ producto.nombre }}</p>
+                    <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        <span class="text-emerald-700 dark:text-emerald-300">Gs. {{ "{:,.0f}".format(producto.precio or 0).replace(",", ".") }}</span>
+                        {% if producto.control_stock_venta %}
+                        &middot; <span data-product-badge="stock">Stock: {{ producto.stock_disponible or 0 }}</span>
+                        {% endif %}
+                        <span class="gastro-soldout-label">&middot; Agotado</span>
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for campo, etiqueta, flag in [
+                        ('visible', 'Menu', 'oculto'),
+                        ('visible_en_tv', 'TV', 'oculto-tv'),
+                        ('publicado_tienda', 'Tienda', 'fuera-tienda'),
+                        ('disponible', 'Disponible', 'agotado'),
+                    ] %}
+                    <label class="gastro-chip-toggle" title="{{ etiqueta }}">
+                        <input type="checkbox" data-toggle-product-field="{{ campo }}" data-filter-flag-off="{{ flag }}"
+                               data-product-id="{{ producto.id_producto }}" {% if producto[campo] %}checked{% endif %}>
+                        <span>{{ etiqueta }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="flex shrink-0 gap-1">
+                    <button type="button" data-promo-producto="{{ producto.id_producto }}" title="Hacer promo" aria-label="Hacer promo de {{ producto.nombre }}"
+                            class="gastro-icon-button text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10">
+                        <i class="fas fa-tags"></i>
+                    </button>
+                    <button type="button" data-edit-product="{{ producto.id_producto }}" title="Editar producto" aria-label="Editar {{ producto.nombre }}"
+                            class="gastro-icon-button text-amber-700 hover:bg-amber-50 dark:text-amber-200 dark:hover:bg-amber-500/10">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        {% endcall %}
+        {% endfor %}
+        {{ list_empty() }}
+    </div>
+    {% else %}
+    <div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
+        Sin productos.
+    </div>
+    {% endif %}
+</div>

@@ -1,38 +1,50 @@
+{% from "gastronomia/_menu_list_toolbar.html" import list_toolbar, list_group, list_empty %}
 {% for canal, canal_label in canales_precios.items() %}
 <div data-menu-tab-panel="{{ canal }}" class="hidden" role="tabpanel">
     <div class="mb-4">
         <h3 class="font-semibold text-gray-900 dark:text-white">Precios exclusivos de {{ canal_label }}</h3>
         <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
-            Todos los productos aparecen juntos. Cambiar estos importes no modifica el precio normal.
+            Cambiar estos importes no modifica el precio normal.
         </p>
     </div>
-    <div class="grid gap-3 md:grid-cols-2">
-        {% for item in precios_por_canal[canal] %}
-        {% set producto = item.producto %}
-        <form data-channel-price-form data-channel="{{ canal }}" data-product-id="{{ producto.id_producto }}"
-              class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-            <div class="flex items-start justify-between gap-3">
-                <div>
-                    <h4 class="font-semibold text-gray-900 dark:text-white">{{ producto.nombre }}</h4>
-                    <p class="mt-1 text-xs text-gray-500">Precio normal: Gs. {{ "{:,.0f}".format(producto.precio or 0).replace(",", ".") }}</p>
+    {% if grupos_precios_canal[canal] %}
+    <div data-list-filter class="space-y-3">
+        {{ list_toolbar(grupos_precios_canal[canal], [
+            ('', 'Todos'),
+            ('distinto', 'Precio distinto al normal'),
+            ('igual', 'Igual al normal'),
+        ]) }}
+        {% for grupo in grupos_precios_canal[canal] %}
+        {% call list_group(grupo) %}
+            {% for item in grupo['items'] %}
+            {% set producto = item.producto %}
+            <form data-channel-price-form data-channel="{{ canal }}" data-product-id="{{ producto.id_producto }}"
+                  data-filter-item data-search="{{ producto.nombre|lower }}" data-category="{{ producto.categoria_id or 0 }}"
+                  data-flags="{{ 'igual' if (item.precio_canal.precio or 0) == (producto.precio or 0) else 'distinto' }}"
+                  class="gastro-list-row">
+                <div class="gastro-list-row-main">
+                    <p class="truncate font-semibold text-gray-900 dark:text-white" title="{{ producto.nombre }}">{{ producto.nombre }}</p>
+                    <p class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Precio normal: Gs. {{ "{:,.0f}".format(producto.precio or 0).replace(",", ".") }}</p>
                 </div>
-                <span class="rounded-full bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700 dark:bg-orange-500/10 dark:text-orange-200">{{ canal_label }}</span>
-            </div>
-            <div class="mt-3 flex gap-2">
-                <input name="precio" type="text" inputmode="decimal" required
-                       value="{{ "{:,.0f}".format(item.precio_canal.precio or 0).replace(",", ".") }}"
-                       aria-label="Precio {{ canal_label }} de {{ producto.nombre }}"
-                       class="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                <button type="submit" class="rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white hover:bg-orange-700">
-                    Guardar
-                </button>
-            </div>
-        </form>
-        {% else %}
-        <div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700 md:col-span-2">
-            Sin productos.
-        </div>
+                <div class="gastro-channel-price-input">
+                    <input name="precio" type="text" inputmode="decimal" required
+                           value="{{ "{:,.0f}".format(item.precio_canal.precio or 0).replace(",", ".") }}"
+                           aria-label="Precio {{ canal_label }} de {{ producto.nombre }}"
+                           class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                    <button type="submit" class="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-700">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+            {% endfor %}
+        {% endcall %}
         {% endfor %}
+        {{ list_empty() }}
     </div>
+    {% else %}
+    <div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
+        Sin productos.
+    </div>
+    {% endif %}
 </div>
 {% endfor %}

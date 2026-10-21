@@ -1,0 +1,326 @@
+/* Listas compactas agrupadas por categoria: productos, precios por canal y recetas. */
+.gastro-list-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 0.96);
+    padding: 0.75rem;
+    backdrop-filter: blur(4px);
+}
+.gastro-list-toolbar-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.gastro-list-search {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.gastro-list-search i {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 0.75rem;
+    color: rgb(156 163 175);
+}
+.gastro-list-search input {
+    width: 100%;
+    padding-left: 2rem;
+}
+.gastro-list-toolbar-pills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+.gastro-list-toolbar-expand {
+    display: flex;
+    gap: 0.75rem;
+    margin-left: auto;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.gastro-list-rows > * + * {
+    border-top: 1px solid rgb(243 244 246);
+}
+.gastro-list-row-main {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+.gastro-channel-price-input {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+}
+.gastro-channel-price-input input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.gastro-recipe-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.gastro-recipe-progress-box {
+    width: 100%;
+}
+.gastro-recipe-layout {
+    display: grid;
+    gap: 1.25rem;
+    margin-top: 1rem;
+}
+.gastro-recipe-list-scroll {
+    max-height: 34rem;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+.gastro-recipe-editor {
+    align-self: start;
+}
+.gastro-recipe-add-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 80px;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+.gastro-recipe-add-grid > button {
+    grid-column: span 2;
+}
+.gastro-insumo-movements {
+    display: grid;
+    gap: 1rem;
+    align-self: start;
+    margin-top: 1.25rem;
+    border-top: 1px solid rgb(243 244 246);
+    padding-top: 1rem;
+}
+@media (min-width: 640px) {
+    .gastro-list-toolbar-row,
+    .gastro-recipe-header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .gastro-channel-price-input {
+        width: 16rem;
+    }
+    .gastro-recipe-progress-box {
+        width: 18rem;
+    }
+    .gastro-insumo-movements {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (min-width: 1024px) {
+    .gastro-recipe-layout {
+        grid-template-columns: minmax(0, 1fr) 380px;
+    }
+    .gastro-recipe-editor {
+        position: sticky;
+        top: 1rem;
+    }
+}
+@media (min-width: 1280px) {
+    .gastro-insumo-layout {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 1.5rem;
+    }
+    .gastro-insumo-movements {
+        margin-top: 1rem;
+        border-top: 0;
+        padding-top: 0;
+    }
+}
+.gastro-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 999px;
+    background: white;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgb(75 85 99);
+}
+.gastro-filter-pill.activa {
+    border-color: rgb(245 158 11);
+    background: rgb(255 251 235);
+    color: rgb(146 64 14);
+}
+.gastro-filter-pill-count {
+    min-width: 1.4rem;
+    border-radius: 999px;
+    background: rgb(243 244 246);
+    padding: 0 0.4rem;
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: rgb(75 85 99);
+}
+.gastro-list-group {
+    overflow: hidden;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+}
+.gastro-list-group > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    list-style: none;
+    background: rgb(249 250 251);
+    padding: 0.6rem 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: rgb(55 65 81);
+}
+.gastro-list-group > summary::-webkit-details-marker {
+    display: none;
+}
+.gastro-list-group-chevron {
+    font-size: 0.65rem;
+    color: rgb(156 163 175);
+    transition: transform 150ms ease;
+}
+.gastro-list-group[open] .gastro-list-group-chevron {
+    transform: rotate(90deg);
+}
+.gastro-list-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.9rem;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.875rem;
+}
+.gastro-list-row:hover {
+    background: rgb(249 250 251);
+}
+.gastro-list-row.is-selected {
+    background: rgb(255 251 235);
+    box-shadow: inset 3px 0 0 rgb(245 158 11);
+}
+.gastro-soldout-label {
+    display: none;
+    color: rgb(185 28 28);
+    font-weight: 800;
+}
+.gastro-list-row:has([data-toggle-product-field="disponible"]:not(:checked)) {
+    background: rgb(254 242 242);
+}
+.gastro-list-row:has([data-toggle-product-field="disponible"]:not(:checked)) .gastro-soldout-label {
+    display: inline;
+}
+.gastro-chip-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 999px;
+    background: rgb(249 250 251);
+    padding: 0.25rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: rgb(107 114 128);
+    user-select: none;
+}
+.gastro-chip-toggle input {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+.gastro-chip-toggle:has(input:checked) {
+    border-color: rgb(167 243 208);
+    background: rgb(236 253 245);
+    color: rgb(4 120 87);
+}
+.gastro-chip-toggle:has(input:disabled) {
+    opacity: 0.6;
+}
+.gastro-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+}
+.gastro-recipe-progress {
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgb(254 226 226);
+}
+.gastro-recipe-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: rgb(16 185 129);
+    transition: width 200ms ease;
+}
+
+.dark .gastro-list-toolbar {
+    border-color: rgb(75 85 99);
+    background: rgb(31 41 55 / 0.96);
+}
+.dark .gastro-filter-pill {
+    border-color: rgb(75 85 99);
+    background: rgb(17 24 39);
+    color: rgb(209 213 219);
+}
+.dark .gastro-filter-pill.activa {
+    border-color: rgb(251 191 36);
+    background: rgb(120 53 15 / 0.45);
+    color: rgb(253 230 138);
+}
+.dark .gastro-filter-pill-count {
+    background: rgb(55 65 81);
+    color: rgb(229 231 235);
+}
+.dark .gastro-list-group {
+    border-color: rgb(75 85 99);
+}
+.dark .gastro-list-rows > * + *,
+.dark .gastro-insumo-movements {
+    border-color: rgb(55 65 81);
+}
+.dark .gastro-list-group > summary {
+    background: rgb(17 24 39);
+    color: rgb(229 231 235);
+}
+.dark .gastro-list-row:hover {
+    background: rgb(17 24 39 / 0.6);
+}
+.dark .gastro-list-row.is-selected {
+    background: rgb(120 53 15 / 0.3);
+}
+.dark .gastro-list-row:has([data-toggle-product-field="disponible"]:not(:checked)) {
+    background: rgb(127 29 29 / 0.25);
+}
+.dark .gastro-soldout-label {
+    color: rgb(252 165 165);
+}
+.dark .gastro-chip-toggle {
+    border-color: rgb(75 85 99);
+    background: rgb(17 24 39);
+    color: rgb(156 163 175);
+}
+.dark .gastro-chip-toggle:has(input:checked) {
+    border-color: rgb(6 95 70);
+    background: rgb(6 78 59 / 0.4);
+    color: rgb(167 243 208);
+}
+.dark .gastro-recipe-progress {
+    background: rgb(127 29 29 / 0.4);
+}

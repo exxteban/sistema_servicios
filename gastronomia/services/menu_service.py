@@ -98,6 +98,23 @@ def listar_productos(
     return query.order_by(GastronomiaProducto.orden.asc(), GastronomiaProducto.nombre.asc()).all()
 
 
+def agrupar_por_categoria(categorias, items, producto_de=lambda item: item) -> list[dict]:
+    """Agrupa items en el orden de las categorias; omite grupos vacios."""
+    grupos = {int(categoria.id_categoria): [] for categoria in categorias}
+    sin_categoria = []
+    for item in items:
+        grupo = grupos.get(int(producto_de(item).categoria_id or 0))
+        (grupo if grupo is not None else sin_categoria).append(item)
+    resultado = [
+        {'categoria': categoria, 'items': grupos[int(categoria.id_categoria)]}
+        for categoria in categorias
+        if grupos[int(categoria.id_categoria)]
+    ]
+    if sin_categoria:
+        resultado.append({'categoria': None, 'items': sin_categoria})
+    return resultado
+
+
 def obtener_categoria(cliente_id: int, categoria_id: int) -> GastronomiaCategoria | None:
     return GastronomiaCategoria.query.filter(
         GastronomiaCategoria.cliente_id == int(cliente_id),
