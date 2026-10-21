@@ -41,6 +41,16 @@ _DASHBOARD_CARD_DEFINITIONS = (
         'hover_class': 'hover:border-violet-300',
     },
     {
+        'id': 'produccion',
+        'permission': 'produccion',
+        'title': 'Produccion',
+        'description': 'Tandas del dia, abrir tortas en porciones, cierre y merma.',
+        'endpoint': 'gastronomia.produccion',
+        'icon': 'fas fa-bread-slice',
+        'icon_class': 'text-amber-600',
+        'hover_class': 'hover:border-amber-300',
+    },
+    {
         'id': 'delivery',
         'permission': 'pos',
         'title': 'Delivery',

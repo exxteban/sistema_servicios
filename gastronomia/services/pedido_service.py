@@ -232,6 +232,9 @@ def cambiar_estado_pedido(
     estado_anterior = pedido.estado
     if pedido.estado == 'cobrado' and estado != 'cobrado':
         raise ValueError('No se puede modificar un pedido cobrado.')
+    # Cobrado solo sale del cobro en caja: marcarlo a mano dejaria el pedido sin venta.
+    if estado == 'cobrado' and estado_anterior != 'cobrado' and not pedido.pago:
+        raise ValueError('Para marcar el pedido como cobrado, cobralo desde la caja.')
     if estado == 'cancelado' and estado_anterior != 'cancelado' and pedido.pago:
         raise ValueError(
             'No se puede cancelar un pedido ya cobrado. '

@@ -191,7 +191,12 @@
         Ingresos y Egresos reúnen todo el dinero registrado del período (caja, transferencias y otros métodos).
         El Resultado Operativo mide el rendimiento del mes: ventas menos compras y gastos.
     </p>
-    {% if resultado_caja_mes >= 0 and ganancia_neta_mes < 0 %}
+    {% if not ventas_emitidas and total_ingresos > 0 %}
+    <p>
+        No hay ventas registradas en el período: los ingresos vienen de movimientos de caja
+        (señas o ingresos cargados a mano), que no cuentan como venta. Revisalos en "Detalle de movimientos".
+    </p>
+    {% elif resultado_caja_mes >= 0 and ganancia_neta_mes < 0 %}
     <p>
         El movimiento neto fue positivo, pero el Resultado Operativo quedó negativo. Puede ocurrir por cobros de créditos
         o ingresos manuales (por ejemplo, inicio de caja) que aumentan la caja pero no cuentan como ganancia operativa.

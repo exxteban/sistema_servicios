@@ -1,7 +1,8 @@
 """Configuracion de pasteleria/cafeteria que solo root puede cambiar.
 
-Expone encargos (Fase 1) y venta por peso (Fase 2): los demas flags existen en
-la tabla pero sus funciones todavia no estan construidas, asi que no se ofrecen.
+Expone encargos (Fase 1), venta por peso (Fase 2) y produccion diaria (Fase 3):
+los demas flags existen en la tabla pero sus funciones todavia no estan
+construidas, asi que no se ofrecen.
 Ver plan_pasteleria.md, decision 2.
 """
 from __future__ import annotations
@@ -11,6 +12,7 @@ from app.models import Cliente
 from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.config_flags import (
     FLAG_ENCARGOS,
+    FLAG_PRODUCCION_DIARIA,
     FLAG_VENTA_POR_PESO,
     FOTOS_ENCARGO_DEFAULT,
     OPCIONES_CANCELACION,
@@ -48,6 +50,7 @@ def listar_configs_pasteleria() -> list[dict]:
             'parametros': parametros_encargos(config.cliente_id),
             'venta_por_peso_activa': bool(config.venta_por_peso_activa),
             'peso_atajos_kg': config.peso_atajos_kg or PESO_ATAJOS_DEFAULT,
+            'produccion_diaria_activa': bool(config.produccion_diaria_activa),
         })
     return resultado
 
@@ -106,6 +109,28 @@ def guardar_config_venta_por_peso(cliente_id: int, data, *, usuario_id: int | No
         referencia_id=int(config.id_config),
         datos_anteriores=anterior,
         datos_nuevos={'venta_por_peso_activa': bool(config.venta_por_peso_activa), 'peso_atajos_kg': config.peso_atajos_kg},
+        commit=False,
+    )
+    db.session.commit()
+    return config
+
+
+def guardar_config_produccion(cliente_id: int, data, *, usuario_id: int | None = None) -> GastronomiaClienteConfig:
+    config = GastronomiaClienteConfig.query.filter_by(cliente_id=int(cliente_id)).first()
+    if not config or not config.gastronomia_activo:
+        raise ValueError('Este negocio no tiene Gastronomia activa.')
+    anterior = {FLAG_PRODUCCION_DIARIA: bool(config.produccion_diaria_activa)}
+    config.produccion_diaria_activa = _bool(data.get(FLAG_PRODUCCION_DIARIA))
+    if usuario_id:
+        config.actualizado_por_id = int(usuario_id)
+    registrar_auditoria(
+        accion='configurar_produccion_diaria_gastronomia',
+        modulo='gastronomia',
+        descripcion=f'Configuracion de produccion diaria del cliente #{cliente_id}',
+        referencia_tipo='gastronomia_cliente_config',
+        referencia_id=int(config.id_config),
+        datos_anteriores=anterior,
+        datos_nuevos={FLAG_PRODUCCION_DIARIA: bool(config.produccion_diaria_activa)},
         commit=False,
     )
     db.session.commit()

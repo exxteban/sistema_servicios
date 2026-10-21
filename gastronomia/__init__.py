@@ -11,6 +11,7 @@ from gastronomia.routes.menu_tv_api_routes import gastronomia_menu_tv_api_bp
 from gastronomia.routes.menu_plantillas_api_routes import gastronomia_menu_plantillas_api_bp
 from gastronomia.routes.menu_combo_api_routes import gastronomia_menu_combo_api_bp
 from gastronomia.routes.pedido_api_routes import gastronomia_pedidos_api_bp
+from gastronomia.routes.produccion_api_routes import gastronomia_produccion_api_bp
 from gastronomia.routes.reportes_api_routes import gastronomia_reportes_api_bp
 from gastronomia.routes.salon_api_routes import gastronomia_salon_api_bp
 from gastronomia.routes.stock_api_routes import gastronomia_stock_api_bp
@@ -22,6 +23,7 @@ from gastronomia.routes import entregas_routes as _entregas_routes  # noqa: F401
 from gastronomia.routes import menu_routes as _menu_routes  # noqa: F401
 from gastronomia.routes import menu_tv_routes as _menu_tv_routes  # noqa: F401
 from gastronomia.routes import pos_routes as _pos_routes  # noqa: F401
+from gastronomia.routes import produccion_routes as _produccion_routes  # noqa: F401
 from gastronomia.routes import public_routes as _public_routes  # noqa: F401
 from gastronomia.routes import reportes_routes as _reportes_routes  # noqa: F401
 from gastronomia.routes import salon_routes as _salon_routes  # noqa: F401
@@ -41,6 +43,7 @@ __all__ = [
     'gastronomia_menu_plantillas_api_bp',
     'gastronomia_menu_combo_api_bp',
     'gastronomia_pedidos_api_bp',
+    'gastronomia_produccion_api_bp',
     'gastronomia_reportes_api_bp',
     'gastronomia_salon_api_bp',
     'gastronomia_stock_api_bp',

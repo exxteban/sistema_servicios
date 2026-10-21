@@ -107,6 +107,33 @@
             </button>
         </div>
     </form>
+
+    <form method="POST" action="{{ url_for('usuarios.modulos_sistema_pasteleria_produccion', cliente_id=cfg.cliente_id) }}"
+          class="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700" data-pasteleria-produccion="{{ cfg.cliente_id }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Producción diaria · {{ cfg.cliente_nombre }}</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Tandas del día, abrir tortas en porciones, cierre con sobrante y reporte de merma. Usa el stock de los productos que "agotan por ventas".
+                </p>
+            </div>
+            <div class="flex items-center">
+                <input type="checkbox" id="produccion_diaria_{{ cfg.cliente_id }}" name="produccion_diaria_activa" value="1"
+                       class="config-switch-input" {% if cfg.produccion_diaria_activa %}checked{% endif %}>
+                <label for="produccion_diaria_{{ cfg.cliente_id }}" class="config-switch-track cursor-pointer" aria-label="Alternar producción diaria de {{ cfg.cliente_nombre }}">
+                    <span class="config-switch-thumb"></span>
+                </label>
+            </div>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Apagarlo solo oculta la pantalla: no cambia el stock ni borra los registros.</p>
+        <div class="flex justify-end">
+            <button type="submit"
+                class="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600">
+                <i class="fas fa-save"></i>Guardar producción
+            </button>
+        </div>
+    </form>
     {% endfor %}
 </section>
 {% endif %}

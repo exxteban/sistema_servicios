@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Produccion{% endblock %}
+
+{% set _input = "mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" %}
+{% set _label = "block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300" %}
+{% set _th = "px-3 py-2 text-left text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300" %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-5" data-gastro-produccion
+     data-puede-configurar="{{ 1 if puede_configurar else 0 }}">
+    <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
+
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300">Gastronomia</p>
+            <h1 class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">Produccion del dia</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Carga lo que se horneo, abri tortas en porciones y al cierre declara lo que sobro.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" id="produccion-cierre" class="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white hover:bg-amber-600">
+                <i class="fas fa-moon"></i>Cierre del dia
+            </button>
+            <a href="{{ url_for('gastronomia.dashboard') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                <i class="fas fa-arrow-left"></i>Volver
+            </a>
+        </div>
+    </div>
+
+    <div id="produccion-alert" class="hidden rounded-lg border px-4 py-3 text-sm font-semibold" role="status"></div>
+
+    <section class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-900/40">
+                <tr>
+                    <th class="{{ _th }}">Producto</th>
+                    <th class="{{ _th }} text-right">Stock</th>
+                    <th class="{{ _th }} text-right">Producido</th>
+                    <th class="{{ _th }} text-right">Vendido</th>
+                    <th class="{{ _th }} text-right">Merma</th>
+                    <th class="{{ _th }} text-right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="produccion-filas" class="divide-y divide-gray-100 dark:divide-gray-700"></tbody>
+        </table>
+        <p id="produccion-vacio" class="hidden p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Ningun producto controla stock todavia. Activa "Agotar automaticamente por ventas" en el menu para los productos que se hornean por tanda.
+        </p>
+    </section>
+
+    {% if puede_ver_reporte %}
+    <section class="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+                <h2 class="text-base font-black text-gray-900 dark:text-white">Merma</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Producto terminado descartado, valorizado al costo de receta del momento.</p>
+            </div>
+            <form id="merma-filtros" class="flex flex-wrap items-end gap-2">
+                <label class="{{ _label }}">Desde<input name="desde" type="date" class="{{ _input }}"></label>
+                <label class="{{ _label }}">Hasta<input name="hasta" type="date" class="{{ _input }}"></label>
+                <button type="submit" class="h-10 rounded-lg border border-amber-200 px-4 text-sm font-bold text-amber-700 dark:border-amber-500/30 dark:text-amber-300">Ver</button>
+            </form>
+        </div>
+        <div id="merma-reporte" class="text-sm"></div>
+    </section>
+    {% endif %}
+</div>
+
+{% include 'gastronomia/_produccion_dialogs.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('gastronomia.static', filename='js/encargos_comun.js', v='20261021-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/produccion_cierre.js', v='20261021-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/produccion.js', v='20261021-1') }}"></script>
+{% endblock %}

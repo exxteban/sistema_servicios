@@ -68,12 +68,16 @@ def ensure_pasteleria_schema():
 
 def _crear_tablas():
     from gastronomia.encargo_models import GastronomiaPedidoAdelanto, GastronomiaPedidoFoto
+    from gastronomia.produccion_models import GastronomiaProduccionRegistro, GastronomiaProductoPorcion
 
     if not _tabla_existe(ORDER_TABLE):
         # Base sin pedidos todavia: las tablas nuevas dependen de ella.
         return
     GastronomiaPedidoAdelanto.__table__.create(bind=db.engine, checkfirst=True)
     GastronomiaPedidoFoto.__table__.create(bind=db.engine, checkfirst=True)
+    # Fase 3: produccion diaria, porciones y merma.
+    GastronomiaProduccionRegistro.__table__.create(bind=db.engine, checkfirst=True)
+    GastronomiaProductoPorcion.__table__.create(bind=db.engine, checkfirst=True)
 
 
 def _tabla_existe(table: str) -> bool:

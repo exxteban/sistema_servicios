@@ -402,6 +402,7 @@ def create_app(config_name='default'):
         gastronomia_menu_plantillas_api_bp,
         gastronomia_menu_combo_api_bp,
         gastronomia_pedidos_api_bp,
+        gastronomia_produccion_api_bp,
         gastronomia_reportes_api_bp,
         gastronomia_salon_api_bp,
         gastronomia_stock_api_bp,
@@ -469,6 +470,7 @@ def create_app(config_name='default'):
     app.register_blueprint(gastronomia_menu_plantillas_api_bp, url_prefix='/api/gastronomia')
     app.register_blueprint(gastronomia_menu_combo_api_bp, url_prefix='/api/gastronomia')
     app.register_blueprint(gastronomia_pedidos_api_bp, url_prefix='/api/gastronomia')
+    app.register_blueprint(gastronomia_produccion_api_bp, url_prefix='/api/gastronomia')
     app.register_blueprint(gastronomia_reportes_api_bp, url_prefix='/api/gastronomia')
     app.register_blueprint(gastronomia_salon_api_bp, url_prefix='/api/gastronomia')
     app.register_blueprint(gastronomia_stock_api_bp, url_prefix='/api/gastronomia')

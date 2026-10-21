@@ -253,6 +253,8 @@ Una torta pesada se vende como **1 unidad cuyo precio resulta de peso × precio 
 
 ## Fase 3 — Producción diaria, porciones y merma
 
+> **Diseño detallado:** [docs/pasteleria_fase3_diseno.md](docs/pasteleria_fase3_diseno.md). Manda sobre este plan; corrige en particular que la tanda **suma** al stock en lugar de fijarlo.
+
 ### Alcance
 
 1. **Producción por tanda.** Registrar "hoy hice 24 medialunas" que fija `stock_disponible` del producto (ya existe y ya se descuenta al vender) y deja un registro con fecha y usuario. No se crea un segundo mecanismo de stock.

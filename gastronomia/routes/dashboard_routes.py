@@ -17,6 +17,7 @@ from gastronomia.services.permisos import (
     PERMISO_SALON,
     tiene_permiso_gastronomia,
 )
+from gastronomia.services.produccion_service import produccion_habilitada
 from gastronomia.services.tienda_pedido_service import contar_pedidos_tienda_pendientes
 
 
@@ -49,6 +50,7 @@ def dashboard():
         'ventas': bool(current_user.tiene_permiso('ver_ventas')),
         # Solo con el flag de encargos encendido (por root): sin flag la tarjeta no existe.
         'encargos': tiene_permiso_gastronomia(PERMISO_POS) and encargos_habilitados(cliente_id),
+        'produccion': tiene_permiso_gastronomia(PERMISO_POS, PERMISO_COCINA) and produccion_habilitada(cliente_id),
     }
     pedidos_pendientes_caja = contar_pedidos_caja(cliente_id) if cliente_id and permisos['caja'] else 0
     pedidos_pendientes_tienda = contar_pedidos_tienda_pendientes(cliente_id) if cliente_id and permisos['pos'] else 0
