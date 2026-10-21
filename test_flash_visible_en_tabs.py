@@ -13,13 +13,13 @@ Dos formas en que se perdían (portado de sistema_silvio_cel):
 import unittest
 from pathlib import Path
 
+from tab_runtime_testing import tab_runtime_source
+
 
 LAYOUT = Path('app/templates/layout_refactored.html')
 OVERLAY = Path('app/templates/layout/flash_overlay_script.html')
 RECUPERO = Path('app/templates/layout/tab_runtime_flash_recovery.html')
 APP_SHELL = Path('app/templates/layout/app_shell.html')
-PART1 = Path('app/templates/layout/tab_runtime_js_part1.html')
-PART2 = Path('app/templates/layout/tab_runtime_js_part2.html')
 
 
 class TestFlashOverlay(unittest.TestCase):
@@ -51,14 +51,13 @@ class TestFlashOverlay(unittest.TestCase):
 
     def test_el_redirect_de_un_formulario_recupera_los_flashes(self):
         self.assertIn('window.appInjectFlashesFromHtml = function', RECUPERO.read_text(encoding='utf-8'))
-        part1 = PART1.read_text(encoding='utf-8')
-        despues_de_recargar = part1.split('await loadContent(response.url);', 1)[1][:300]
+        runtime = tab_runtime_source()
+        despues_de_recargar = runtime.split('await loadContent(response.url);', 1)[1][:300]
         self.assertIn('window.appInjectFlashesFromHtml(panel, rawHtml)', despues_de_recargar)
         # Redirect a una pestaña que ya estaba abierta: formulario y navegación.
-        for source in (part1, PART2.read_text(encoding='utf-8')):
-            self.assertIn(
-                'window.appInjectFlashesFromHtml(tabPanelsById.get(existingId), rawHtml)', source,
-            )
+        self.assertEqual(
+            runtime.count('window.appInjectFlashesFromHtml(tabPanelsById.get(existingId), rawHtml)'), 2,
+        )
 
     def test_los_templates_compilan(self):
         from app import create_app

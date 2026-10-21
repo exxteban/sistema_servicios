@@ -1,11 +1,10 @@
 from pathlib import Path
 
-
-RUNTIME = Path("app/templates/layout/tab_runtime_js_part2.html")
+from tab_runtime_testing import tab_runtime_source
 
 
 def test_dashboard_reload_forces_principal_tab_after_restoring_saved_tabs():
-    source = RUNTIME.read_text(encoding="utf-8")
+    source = tab_runtime_source()
 
     restore_guard = (
         "const currentRequestIsDashboard = isDashboardUrl(window.location.href);"
@@ -23,7 +22,7 @@ def test_dashboard_reload_forces_principal_tab_after_restoring_saved_tabs():
 
 
 def test_dashboard_click_saves_principal_before_full_reload():
-    source = RUNTIME.read_text(encoding="utf-8")
+    source = tab_runtime_source()
 
     reload_branch = "if (!principalPanelShowsDashboard()) {"
     save_principal = (
@@ -42,7 +41,7 @@ def test_dashboard_click_saves_principal_before_full_reload():
 def test_volver_al_dashboard_no_recarga_por_la_url_de_otra_pestana():
     """Al activar otra pestana la URL del navegador pasa a ser la suya; volver al
     Dashboard no debe decidir una recarga completa por eso (causaba un pestaneo)."""
-    source = RUNTIME.read_text(encoding="utf-8")
+    source = tab_runtime_source()
     inicio = source.index("function navigateToDashboard()")
     cuerpo = source[inicio:source.index("if (principalBtn) {", inicio)]
 
@@ -55,7 +54,7 @@ def test_refresco_silencioso_solo_en_dashboards_que_lo_declaran():
     servicios = Path("app/templates/dashboard/servicios.html").read_text(encoding="utf-8")
     totales = Path("app/templates/dashboard/_refresh_totals_js.html").read_text(encoding="utf-8")
 
-    assert "{% include 'layout/_dashboard_soft_refresh_js.html' %}" in RUNTIME.read_text(encoding="utf-8")
+    assert "{% include 'layout/_dashboard_soft_refresh_js.html' %}" in tab_runtime_source()
     assert 'data-dashboard-soft-refresh="1"' in soft
     assert 'data-dashboard-soft-refresh="1"' in servicios
     # La instancia vieja del script de totales suelta sus listeners al quedar sin DOM.
@@ -87,9 +86,9 @@ def test_dashboard_gastronomia_es_el_dashboard_de_la_pestana_principal():
 
 
 def test_links_al_dashboard_dentro_de_pestanas_activan_la_principal():
-    source = Path("app/templates/layout/tab_runtime_js_part1.html").read_text(encoding="utf-8")
+    source = tab_runtime_source()
     assert "isDashboardUrl(linkUrl.toString()) && window.appNavigateToDashboard" in source
-    assert "window.appNavigateToDashboard = navigateToDashboard;" in RUNTIME.read_text(encoding="utf-8")
+    assert "window.appNavigateToDashboard = navigateToDashboard;" in tab_runtime_source()
 
 
 def test_tarjetas_del_dashboard_gastronomia_abren_en_pestanas():
@@ -109,3 +108,38 @@ def test_tarjetas_del_dashboard_gastronomia_abren_en_pestanas():
     assert 'data-tab-title="Cocina"' in html
     assert 'data-tab-ignore-click="1"' in html
     assert 'data-tab-title="Cargar menu"' in html
+
+
+def test_carga_completa_de_otra_pantalla_la_muda_a_su_propia_pestana():
+    """El panel principal es del Dashboard y de nadie mas.
+
+    Una carga completa de otra URL (link sin app-tab-link, redirect de POST, F5)
+    renderiza esa pantalla dentro del panel principal. Antes se quedaba ahi con la
+    pestana rotulada "Dashboard"; ahora se muda a una pestana propia.
+    """
+    source = tab_runtime_source()
+
+    relocate = (
+        "restoreState({ activate: false, skipKey: window.location.href });\n"
+        "                const adoptedTabId = relocatePrincipalIntoTab();\n"
+        "                if (!adoptedTabId) setActiveTab(principalTabId);"
+    )
+
+    assert relocate in source
+    assert "openTab(url, title, iconClass, { adoptContent: nodes, activate: true });" in source
+    assert "renderDashboardIntoPrincipal();" in source
+
+
+def test_el_contenido_adoptado_se_mueve_sin_volver_a_pedirlo():
+    """Se mueven los nodos ya renderizados: nada de un segundo fetch de la misma URL."""
+    source = tab_runtime_source()
+
+    assert "if (!adoptContent) {\n                    (async () => {\n                        await loadContent(url);" in source
+    assert "adoptContent.forEach((node) => adoptedDiv.appendChild(node));" in source
+    assert "wireTabContent(adoptedDiv);" in source
+
+
+def test_runtime_de_pestanas_respeta_limite_de_lineas():
+    for name in ("part1", "open_tab", "wire_content", "part2", "bootstrap"):
+        lines = Path(f"app/templates/layout/tab_runtime_js_{name}.html").read_text(encoding="utf-8").splitlines()
+        assert len(lines) <= 600, name
