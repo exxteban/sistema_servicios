@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from app import db
+from gastos_corrientes.naturaleza import NATURALEZA_GASTO_NEGOCIO
 
 
 class GastoCorriente(db.Model):
@@ -11,6 +12,14 @@ class GastoCorriente(db.Model):
     cliente_id = db.Column(db.Integer, nullable=True, index=True)
     nombre = db.Column(db.String(120), nullable=False, index=True)
     categoria = db.Column(db.String(30), nullable=False, default='otros', index=True)
+    # Si el pago es gasto del negocio o retiro del dueño (ver `naturaleza`).
+    # Todavía no se elige en el formulario: todos quedan como gasto del negocio.
+    naturaleza_contable = db.Column(
+        db.String(30),
+        nullable=False,
+        default=NATURALEZA_GASTO_NEGOCIO,
+        server_default=NATURALEZA_GASTO_NEGOCIO,
+    )
     descripcion = db.Column(db.Text, nullable=True)
     monto_estimado = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     dia_vencimiento = db.Column(db.Integer, nullable=False, default=1)
@@ -68,6 +77,13 @@ class PagoGastoCorriente(db.Model):
     fecha_pago = db.Column(db.Date, nullable=True, index=True)
     monto_estimado = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     monto_pagado = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    # Snapshot: editar el gasto recurrente no puede reescribir meses ya pagados.
+    naturaleza_contable = db.Column(
+        db.String(30),
+        nullable=False,
+        default=NATURALEZA_GASTO_NEGOCIO,
+        server_default=NATURALEZA_GASTO_NEGOCIO,
+    )
     estado = db.Column(db.String(20), nullable=False, default='pendiente', index=True)
     pagado_desde_caja = db.Column(db.Boolean, nullable=False, default=False)
     id_sesion_caja = db.Column(

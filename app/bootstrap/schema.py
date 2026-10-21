@@ -200,6 +200,11 @@ SCHEMA_COLUMN_MIGRATIONS = {
     ],
     'ventas': [
         (
+            'numero_factura',
+            ("ALTER TABLE ventas ADD COLUMN numero_factura VARCHAR(80)",),
+            ("ALTER TABLE ventas ADD COLUMN numero_factura VARCHAR(80) NULL",),
+        ),
+        (
             'client_request_id',
             (
                 "ALTER TABLE ventas ADD COLUMN client_request_id VARCHAR(64)",

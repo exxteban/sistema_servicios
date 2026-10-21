@@ -46,9 +46,14 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"># Factura</label>
-                    <input type="text" name="numero_factura"
-                        class="w-full border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"># Factura y timbrado</label>
+                    {# El timbrado lo pide el/la contador/a para deducir el IVA de la compra. #}
+                    <div class="flex gap-2">
+                        <input type="text" name="numero_factura" placeholder="001-001-0000123"
+                            class="min-w-0 flex-1 border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                        <input type="text" name="timbrado" placeholder="Timbrado"
+                            maxlength="20" inputmode="numeric" class="w-28 min-w-0 border-2 border-gray-200 dark:border-gray-700 rounded-lg py-2 px-3 bg-white dark:bg-gray-900 text-gray-800 dark:text-white">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Fecha</label>

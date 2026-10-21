@@ -188,6 +188,8 @@
 
             {% include 'layout/_financial_menu.html' %}
 
+            {% include 'layout/_contador_menu.html' %}
+
             {% if modulo_servicio_tecnico_activo %}
             <a href="{{ url_for('reparaciones.listar') }}" data-tab-url="{{ url_for('reparaciones.listar') }}"
                 data-tab-title="Servicio Técnico" data-tab-icon="fas fa-tools"

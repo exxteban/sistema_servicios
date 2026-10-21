@@ -66,6 +66,9 @@ from pedidos.models import PedidoCliente, PedidoClienteDetalle, PedidoClienteHis
 from cobranzas.models import PlanCreditoVenta, CuotaCreditoVenta, PagoCuentaCobrarAplicacion
 from flujo_caja.models import FlujoCajaMovimiento, FlujoCajaPlantilla, FlujoCajaSemana
 from gastos_corrientes.models import GastoCorriente, PagoGastoCorriente
+from app.models.talonario_factura import TalonarioFactura
+from app.models.nota_credito_papel import NotaCreditoPapel
+from app.models.gasto_comprobante_fiscal import GastoComprobanteFiscal
 
 __all__ = [
     'Usuario', 'PreferenciaUsuario', 'Rol', 'Permiso', 'Autorizacion', 'Auditoria',
@@ -103,4 +106,5 @@ __all__ = [
     'PlanCreditoVenta', 'CuotaCreditoVenta', 'PagoCuentaCobrarAplicacion',
     'FlujoCajaSemana', 'FlujoCajaMovimiento', 'FlujoCajaPlantilla',
     'GastoCorriente', 'PagoGastoCorriente',
+    'TalonarioFactura', 'NotaCreditoPapel', 'GastoComprobanteFiscal',
 ]
