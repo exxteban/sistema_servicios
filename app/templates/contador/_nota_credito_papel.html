@@ -1,0 +1,37 @@
+{# Nota de crédito en papel de una devolución (sin facturación electrónica).
+   Se incluye por cada devolución en `ventas/_devoluciones.html`. Sólo registra
+   el comprobante: la devolución ya movió caja y stock. #}
+{% if dev.estado != 'anulada' and (venta.numero_factura or '').strip()
+    and not (modulo_facturacion_electronica_activo|default(false))
+    and puede_corregir_numero_factura is defined and puede_corregir_numero_factura(current_user) %}
+{% set nc = dev.nota_credito_papel %}
+<div x-data="{ editando: false }" class="w-full text-xs text-gray-600 dark:text-gray-300">
+    <div x-show="!editando">
+        {% if nc %}
+        Nota de crédito <span class="font-mono">{{ nc.numero }}</span>{% if nc.timbrado %} · timbrado <span class="font-mono">{{ nc.timbrado }}</span>{% endif %}
+        · {{ nc.fecha.strftime('%d/%m/%Y') }}
+        {% if venta.estado != 'anulada' %}<button type="button" @click="editando = true" class="ml-1 underline">Corregir</button>{% endif %}
+        {% elif venta.estado != 'anulada' %}
+        <span class="font-semibold text-amber-600 dark:text-amber-400">Sin nota de crédito:</span> su IVA no se descuenta.
+        <button type="button" @click="editando = true" class="ml-1 underline">Cargar nota de crédito</button>
+        {% endif %}
+        {% if venta.estado == 'anulada' %}<span>Venta anulada: esta devolución no descuenta IVA del resumen.</span>{% endif %}
+    </div>
+    {% if venta.estado != 'anulada' %}
+    <form x-show="editando" x-cloak method="post" action="{{ url_for('contador.devolucion_nota_credito', id=dev.id_devolucion) }}"
+        class="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="numero" value="{{ nc.numero if nc else '' }}" maxlength="80" placeholder="Nº 001-001-0000045"
+            class="w-44 rounded-lg border border-gray-300 px-2 py-1 text-sm font-mono dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+        <input type="text" name="timbrado" value="{{ nc.timbrado if nc and nc.timbrado else (venta.timbrado or '') }}" maxlength="20" placeholder="Timbrado"
+            class="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm font-mono dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+        <input type="date" name="fecha" required
+            value="{{ nc.fecha.isoformat() if nc else (dev.fecha_devolucion|local_strftime('%Y-%m-%d') if dev.fecha_devolucion else '') }}"
+            class="rounded-lg border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+        <button type="submit" class="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700">Guardar</button>
+        <button type="button" @click="editando = false" class="underline text-gray-500 dark:text-gray-400">Cancelar</button>
+        {% if nc %}<span class="text-gray-500 dark:text-gray-400">Dejá el número vacío para quitarla.</span>{% endif %}
+    </form>
+    {% endif %}
+</div>
+{% endif %}

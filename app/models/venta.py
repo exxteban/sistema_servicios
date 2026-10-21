@@ -31,6 +31,9 @@ class Venta(db.Model):
     # Comprobante
     tipo_comprobante = db.Column(db.String(20), nullable=False, default='ticket')
     numero_comprobante = db.Column(db.String(50))
+    # Factura en papel (talonario o autoimpresor): de acá sale el débito fiscal
+    # del resumen para el/la contador/a cuando no hay facturación electrónica.
+    numero_factura = db.Column(db.String(80))
     timbrado = db.Column(db.String(20))
     
     # Relaciones principales

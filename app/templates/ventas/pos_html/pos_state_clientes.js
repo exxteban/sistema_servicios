@@ -18,6 +18,7 @@
     const CAJA_EXIGIR_CAJERO_PARA_COBRO = {{ (caja_exigir_cajero_para_cobro if caja_exigir_cajero_para_cobro is defined else False)|tojson }};
     const PUEDE_COBRAR_POS_DIRECTO = {{ (puede_cobrar_pos_directo if puede_cobrar_pos_directo is defined else False)|tojson }};
     const SOLO_REGISTRO_VENDEDOR = {{ (solo_registro_vendedor if solo_registro_vendedor is defined else False)|tojson }};
+    const POS_MOSTRAR_NUMERO_FACTURA = {{ (mostrar_numero_factura_pos if mostrar_numero_factura_pos is defined else False)|tojson }};
     const POS_VENTAS_CREDITO_ACTIVO = {{ (ventas_credito_activo if ventas_credito_activo is defined else False)|tojson }};
     const POS_METODO_CREDITO = {{ (metodo_credito_pos if metodo_credito_pos is defined else None)|tojson }};
     const POS_PUEDE_CREAR_PRODUCTO_RAPIDO = {{ (puede_crear_producto_rapido if puede_crear_producto_rapido is defined else False)|tojson }};
@@ -89,6 +90,11 @@
             puedeCobrarPosDirecto: !!PUEDE_COBRAR_POS_DIRECTO,
             soloRegistroVendedor: !!SOLO_REGISTRO_VENDEDOR,
             ventasCreditoActivo: !!POS_VENTAS_CREDITO_ACTIVO,
+            // Nº de la factura en papel (talonario o autoimpresor): el débito fiscal del resumen para el/la contador/a.
+            mostrarNumeroFactura: !!POS_MOSTRAR_NUMERO_FACTURA,
+            numeroFactura: (POS_MOSTRAR_NUMERO_FACTURA && POS_INITIAL_STATE && typeof POS_INITIAL_STATE.numeroFactura === 'string')
+                ? POS_INITIAL_STATE.numeroFactura
+                : '',
             creditoMetodoPagoId: POS_METODO_CREDITO ? Number(POS_METODO_CREDITO.id_metodo_pago || 0) : null,
             creditoMetodoPagoNombre: POS_METODO_CREDITO ? String(POS_METODO_CREDITO.nombre || 'Credito Tienda') : 'Credito Tienda',
             condicionVenta: (POS_INITIAL_STATE && POS_INITIAL_STATE.condicionVenta === 'credito' && POS_VENTAS_CREDITO_ACTIVO && POS_METODO_CREDITO)

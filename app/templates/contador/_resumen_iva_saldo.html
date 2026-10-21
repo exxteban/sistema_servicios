@@ -1,0 +1,19 @@
+{# Tarjeta del saldo del mes: débito − crédito − saldo a favor anterior − retenciones
+   (`contador_meses`). Va dentro de la grilla de los tres números. #}
+{% set fin = cierre.saldo_final %}
+<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+    <p class="text-xs text-gray-500 dark:text-gray-400">Saldo del mes</p>
+    {% if hay_debito %}
+    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ gs(fin if fin >= 0 else -fin) }}</p>
+    <p class="text-xs text-gray-500 dark:text-gray-400">{{ 'a pagar' if fin >= 0 else 'a favor para el mes siguiente' }}</p>
+    {% if cierre.saldo_favor_anterior or cierre.retenciones %}
+    <p class="text-xs text-gray-500 dark:text-gray-400">
+        Débito − crédito ({{ gs(saldo) }}) − saldo a favor anterior ({{ gs(cierre.saldo_favor_anterior) }}) − retenciones ({{ gs(cierre.retenciones) }})
+    </p>
+    {% else %}
+    <p class="text-xs text-gray-500 dark:text-gray-400">Sin saldo a favor anterior ni retenciones cargados.</p>
+    {% endif %}
+    {% else %}
+    <p class="text-2xl font-bold text-gray-900 dark:text-white">—</p>
+    {% endif %}
+</div>

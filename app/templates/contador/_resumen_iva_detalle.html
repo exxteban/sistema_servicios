@@ -1,0 +1,98 @@
+{# Contenido del modal de detalle del resumen para el/la contador/a. Se pide
+   con fetch y se inyecta en el modal de `resumen_iva.html`. Las
+   filas y el total salen de los mismos generadores que la fila del cuadro. #}
+{% macro gs(valor) -%}
+₲ {{ "{:,.0f}".format(valor or 0).replace(",", ".") }}
+{%- endmacro %}
+{% set d = detalle %}
+<div class="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-700">
+    <div>
+        <p class="text-lg font-bold text-gray-900 dark:text-white">{{ d.titulo }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+            Del {{ d.desde.strftime('%d/%m/%Y') }} al {{ d.hasta.strftime('%d/%m/%Y') }} · {{ d.filas|length }} documento(s)
+        </p>
+    </div>
+    <div class="flex items-center gap-2">
+        {% if d.filas %}
+        <a href="{{ url_for('contador.resumen_iva_detalle', mes=mes, fila=d.clave, formato='xlsx') }}" download
+            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+            <i class="fas fa-file-excel"></i> Descargar Excel
+        </a>
+        {% endif %}
+        <button type="button" data-detalle-cerrar aria-label="Cerrar"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
+            <i class="fas fa-xmark"></i>
+        </button>
+    </div>
+</div>
+{% if d.filas %}
+<div class="overflow-auto max-h-[65vh]">
+    <table class="min-w-full text-sm">
+        <thead class="sticky top-0 bg-gray-50 dark:bg-gray-700">
+            <tr class="text-left text-xs font-semibold text-gray-600 dark:text-gray-300">
+                <th class="px-3 py-2">Fecha</th>
+                <th class="px-3 py-2">Número</th>
+                {% if d.con_timbrado %}<th class="px-3 py-2">Timbrado</th>{% endif %}
+                <th class="px-3 py-2">{{ 'Proveedor' if d.es_compra else 'Cliente' }}</th>
+                <th class="px-3 py-2">RUC</th>
+                {% if d.es_nota %}<th class="px-3 py-2">Factura que afecta</th>{% endif %}
+                <th class="px-3 py-2 text-right">Exentas</th>
+                <th class="px-3 py-2 text-right">Gravadas 5%</th>
+                <th class="px-3 py-2 text-right">IVA 5%</th>
+                <th class="px-3 py-2 text-right">Gravadas 10%</th>
+                <th class="px-3 py-2 text-right">IVA 10%</th>
+                <th class="px-3 py-2 text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+            {% for f in d.filas %}
+            <tr class="text-gray-800 dark:text-gray-100">
+                <td class="px-3 py-2 whitespace-nowrap">{{ f.fecha.strftime('%d/%m/%Y') if f.fecha else '—' }}</td>
+                <td class="px-3 py-2 whitespace-nowrap font-mono">
+                    {% if f.id_venta %}
+                    {% set url = url_for('ventas.detalle', id=f.id_venta) %}
+                    <a href="{{ url }}" data-tab-url="{{ url }}" data-tab-title="Venta #{{ f.id_venta }}" data-tab-icon="fas fa-receipt"
+                        class="app-tab-link underline">{{ f.numero }}</a>
+                    {% elif f.id_compra %}
+                    {% set url = url_for('compras.detalle', id=f.id_compra) %}
+                    <a href="{{ url }}" data-tab-url="{{ url }}" data-tab-title="Compra #{{ f.id_compra }}" data-tab-icon="fas fa-truck"
+                        class="app-tab-link underline">{{ f.numero }}</a>
+                    {% elif f.id_gasto %}
+                    {% set url = url_for('gastos_corrientes.detalle', id_gasto_corriente=f.id_gasto) %}
+                    <a href="{{ url }}" data-tab-url="{{ url }}" data-tab-title="Gasto corriente" data-tab-icon="fas fa-file-invoice-dollar"
+                        class="app-tab-link underline">{{ f.numero }}</a>
+                    {% else %}{{ f.numero }}{% endif %}
+                    {% if f.estimada %}<span class="ml-1 text-amber-600 dark:text-amber-400" title="Sin copia local del XML: el IVA se calculó con la venta">*</span>{% endif %}
+                </td>
+                {% if d.con_timbrado %}<td class="px-3 py-2 whitespace-nowrap font-mono text-xs">{{ f.timbrado or '—' }}</td>{% endif %}
+                <td class="px-3 py-2">{{ f.nombre }}</td>
+                <td class="px-3 py-2 whitespace-nowrap font-mono text-xs">{{ f.ruc or '—' }}</td>
+                {% if d.es_nota %}<td class="px-3 py-2 whitespace-nowrap font-mono text-xs">{{ f.afecta or '—' }}</td>{% endif %}
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(f.exenta) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(f.base5) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap font-semibold">{{ gs(f.iva5) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(f.base10) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap font-semibold">{{ gs(f.iva10) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(f.total) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="sticky bottom-0 bg-gray-50 dark:bg-gray-700">
+            <tr class="font-semibold text-gray-900 dark:text-white">
+                <td class="px-3 py-2" colspan="{{ 4 + (1 if d.es_nota else 0) + (1 if d.con_timbrado else 0) }}">Total</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(d.totales.exenta) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(d.totales.base5) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(d.totales.iva5) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(d.totales.base10) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(d.totales.iva10) }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ gs(d.totales.total) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% if d.filas|selectattr('estimada')|list %}
+<p class="px-5 py-2 text-xs text-gray-500 dark:text-gray-400">* Sin copia local del XML: su IVA se calculó con la venta y puede diferir en unos guaraníes de lo declarado.</p>
+{% endif %}
+{% else %}
+<p class="px-5 py-6 text-sm text-gray-500 dark:text-gray-400">No hay documentos en esta fila para el mes.</p>
+{% endif %}

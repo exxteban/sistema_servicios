@@ -183,6 +183,8 @@ def inicializar_datos_base(config_name=None):
         {'codigo': 'gastronomia_delivery_gps', 'nombre': 'Gastronomia - GPS Delivery', 'descripcion': 'Permite registrar ubicacion GPS desde la hoja de ruta del repartidor', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
         {'codigo': 'gastronomia_reportes', 'nombre': 'Gastronomia - Reportes', 'descripcion': 'Permite ver reportes y metricas gastronomicas', 'modulo': 'gastronomia', 'requiere_autorizacion': False},
     ]
+    from app.services.contador_permisos import PERMISOS_CONTADOR, ensure_rol_contador
+    permisos.extend(dict(p) for p in PERMISOS_CONTADOR)
     for p in permisos:
         existe = Permiso.query.filter_by(codigo=p['codigo']).first()
         if not existe:
@@ -585,5 +587,6 @@ def inicializar_datos_base(config_name=None):
                 continue
             raise
     
+    ensure_rol_contador(commit=False)
     db.session.commit()
     print("[OK] Datos base inicializados correctamente")

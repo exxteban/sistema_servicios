@@ -40,6 +40,7 @@
             <div>
                 <p class="text-sm text-gray-500 dark:text-gray-400"># Factura</p>
                 <p class="font-semibold text-gray-800 dark:text-white">{{ compra.numero_factura or '-' }}</p>
+                {% if compra.timbrado %}<p class="text-xs text-gray-500 dark:text-gray-400">Timbrado <span class="font-mono">{{ compra.timbrado }}</span></p>{% endif %}
             </div>
             <div>
                 <p class="text-sm text-gray-500 dark:text-gray-400">Tipo</p>

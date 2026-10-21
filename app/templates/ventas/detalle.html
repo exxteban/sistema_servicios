@@ -35,6 +35,33 @@
                 <p class="font-semibold text-gray-800 dark:text-white">{{ venta.tipo_comprobante }}</p>
             </div>
             <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Nº Factura</p>
+                <p class="font-semibold text-gray-800 dark:text-white">
+                    {% if fe and fe.documento and fe.documento.numero %}
+                    <span class="font-mono">{{ fe.documento.numero_formateado }}</span>
+                    <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ fe.documento.estado }}</span>
+                    {% else %}{{ venta.numero_factura or '—' }}{% endif %}
+                </p>
+                {# Factura en papel: cargar el número si no se puso al vender, o corregirlo
+                   (lo piden los pendientes del resumen para el/la contador/a). #}
+                {% if not (fe and fe.documento and fe.documento.numero) and not (modulo_facturacion_electronica_activo|default(false))
+                    and puede_corregir_numero_factura is defined and puede_corregir_numero_factura(current_user) %}
+                <div x-data="{ editando: false }" class="mt-1">
+                    {% if venta.timbrado %}<p class="text-xs text-gray-500 dark:text-gray-400">Timbrado <span class="font-mono">{{ venta.timbrado }}</span></p>{% endif %}
+                    <button type="button" x-show="!editando" @click="editando = true" class="text-xs underline text-gray-600 dark:text-gray-300">
+                        {{ 'Corregir' if venta.numero_factura else 'Cargar' }} número
+                    </button>
+                    <form x-show="editando" x-cloak method="post" action="{{ url_for('contador.venta_numero_factura', id=venta.id_venta) }}" class="flex items-center gap-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="text" name="numero_factura" value="{{ venta.numero_factura or '' }}" maxlength="80" placeholder="001-001-0000123"
+                            class="w-44 rounded-lg border border-gray-300 px-2 py-1 text-sm font-mono dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        <button type="submit" class="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700">Guardar</button>
+                        <button type="button" @click="editando = false" class="text-xs underline text-gray-500 dark:text-gray-400">Cancelar</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            <div>
                 <p class="text-sm text-gray-500 dark:text-gray-400">Beneficio aplicado</p>
                 <p class="font-semibold text-gray-800 dark:text-white">{{ venta.beneficio_fidelizacion_descripcion or 'Sin beneficio' }}</p>
             </div>

@@ -1,0 +1,406 @@
+{% extends "base.html" %}
+
+{% block title %}Resumen para el/la contador/a{% endblock %}
+
+{% macro gs(valor) -%}
+₲ {{ "{:,.0f}".format(valor or 0).replace(",", ".") }}
+{%- endmacro %}
+
+{# `signo` sólo en los montos distintos de cero: "−₲ 0" confunde. #}
+{% macro monto(valor, signo) -%}
+{{ signo if valor else '' }}{{ gs(valor) }}
+{%- endmacro %}
+
+{# Con `clave`, la fila abre su detalle (las facturas o compras que la suman). #}
+{% macro fila_iva(etiqueta, b, signo='', clave=None) -%}
+<tr {% if clave %}role="button" tabindex="0" title="Ver el detalle"
+    @click="abrir('{{ clave }}')" @keydown.enter="abrir('{{ clave }}')"
+    class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"{% endif %}>
+    <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ etiqueta }}{% if clave %} <i class="fas fa-magnifying-glass text-xs text-gray-400 ml-1"></i>{% endif %}</td>
+    <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ b.cantidad }}</td>
+    <td class="px-4 py-3 text-right whitespace-nowrap text-gray-800 dark:text-gray-100">{{ monto(b.exenta, signo) }}</td>
+    <td class="px-4 py-3 text-right whitespace-nowrap text-gray-800 dark:text-gray-100">{{ monto(b.base5, signo) }}</td>
+    <td class="px-4 py-3 text-right whitespace-nowrap font-semibold text-gray-900 dark:text-white">{{ monto(b.iva5, signo) }}</td>
+    <td class="px-4 py-3 text-right whitespace-nowrap text-gray-800 dark:text-gray-100">{{ monto(b.base10, signo) }}</td>
+    <td class="px-4 py-3 text-right whitespace-nowrap font-semibold text-gray-900 dark:text-white">{{ monto(b.iva10, signo) }}</td>
+    <td class="px-4 py-3 text-right whitespace-nowrap text-gray-800 dark:text-gray-100">{{ monto(b.total, signo) }}</td>
+</tr>
+{%- endmacro %}
+
+{% block content %}
+{% set ve_documentos = current_user.es_admin() or current_user.tiene_permiso('editar_configuracion') or current_user.tiene_permiso('ver_reportes') %}
+{% set docs = documentos %}
+{# Sin facturación electrónica el débito sale de las ventas con factura en papel. #}
+{% set papel = en_papel %}
+{% set hay_debito = docs or papel %}
+{% set hay_anuladas = anulados is not none or papel %}
+{% set cantidad_anuladas = anulados.cantidad if anulados is not none else (papel.anuladas.cantidad if papel else 0) %}
+{# Dos pestañas: el IVA del mes y las anuladas. `vista` viaja en el
+   formulario del mes para que las flechas no te devuelvan a la primera. #}
+<div class="max-w-6xl mx-auto space-y-6" style="font-variant-numeric: tabular-nums"
+    x-data="{ vista: '{{ vista if hay_anuladas else 'iva' }}' }">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 space-y-4">
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-user-tie text-emerald-600 dark:text-emerald-400 mr-2"></i>Resumen para el/la contador/a
+                </h1>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    IVA del mes y lo que falta resolver para cerrarlo. Del {{ desde.strftime('%d/%m/%Y') }} al {{ hasta.strftime('%d/%m/%Y') }}.
+                </p>
+            </div>
+            {# Las flechas cargan el mes y envían el mismo formulario: así pasan
+               por el submit que las pestañas ya interceptan, sin otro camino. #}
+            <form method="get" class="flex items-end gap-2">
+                <input type="hidden" name="vista" :value="vista" value="{{ vista }}">
+                {# Las flechas van en la misma fila que el campo (items-stretch): toman
+                   su alto y quedan centradas con él, sin depender de un alto fijo. #}
+                <div>
+                    <label for="contadora-mes" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Mes</label>
+                    <div class="flex items-stretch gap-1">
+                        <button type="button" title="Mes anterior" aria-label="Mes anterior"
+                            onclick="this.form.elements.mes.value='{{ mes_anterior }}'; (this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit());"
+                            class="inline-flex items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700" style="width: 2.25rem">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <input type="month" id="contadora-mes" name="mes" value="{{ mes }}"
+                            class="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+                        <button type="button" title="Mes siguiente" aria-label="Mes siguiente"
+                            onclick="this.form.elements.mes.value='{{ mes_siguiente }}'; (this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit());"
+                            class="inline-flex items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700" style="width: 2.25rem">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit"
+                    class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
+                    <i class="fas fa-filter mr-2"></i>Ver
+                </button>
+            </form>
+        </div>
+        {# Descargas del mes elegido: el PDF para mandar y archivar, el Excel para trabajar.
+           Generarlas tarda unos segundos: se piden con fetch para poder mostrar
+           "Generando…" mientras tanto. Si el servidor no devuelve un archivo (el PDF
+           que no se pudo armar redirige con un aviso), se sigue el enlace normal. #}
+        <div class="flex flex-wrap items-center gap-2 text-sm"
+            x-data="{
+                generando: null,
+                async descargar(evento, cual) {
+                    if (this.generando) return;
+                    const url = evento.currentTarget.href;
+                    this.generando = cual;
+                    try {
+                        const r = await fetch(url, { credentials: 'same-origin', redirect: 'manual' });
+                        const disp = r.ok ? (r.headers.get('Content-Disposition') || '') : '';
+                        if (!disp.includes('attachment')) { window.location.href = url; return; }
+                        const nombre = (disp.match(/filename=&quot;?([^&quot;;]+)&quot;?/) || [])[1] || 'informe';
+                        const enlace = document.createElement('a');
+                        enlace.href = URL.createObjectURL(await r.blob());
+                        enlace.download = nombre;
+                        document.body.appendChild(enlace);
+                        enlace.click();
+                        enlace.remove();
+                        setTimeout(() => URL.revokeObjectURL(enlace.href), 10000);
+                    } catch (e) {
+                        window.location.href = url;
+                    } finally {
+                        this.generando = null;
+                    }
+                }
+            }">
+            <span class="text-xs text-gray-500 dark:text-gray-400">Descargar el mes:</span>
+            <a href="{{ url_for('contador.resumen_iva_pdf', mes=mes) }}" download
+                @click.prevent="descargar($event, 'pdf')" :class="generando && 'pointer-events-none opacity-60'"
+                class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+                <i class="fas fa-file-pdf mr-2 text-red-600"></i>PDF completo
+            </a>
+            <a href="{{ url_for('contador.resumen_iva_pdf', mes=mes, anexos=0) }}" download
+                @click.prevent="descargar($event, 'resumen')" :class="generando && 'pointer-events-none opacity-60'"
+                class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+                <i class="fas fa-file-pdf mr-2 text-red-600"></i>PDF sólo resumen
+            </a>
+            <a href="{{ url_for('contador.resumen_iva_excel', mes=mes) }}" download
+                @click.prevent="descargar($event, 'excel')" :class="generando && 'pointer-events-none opacity-60'"
+                class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+                <i class="fas fa-file-excel mr-2 text-green-600"></i>Excel completo
+            </a>
+            <span x-show="generando" x-cloak role="status" class="inline-flex items-center text-xs font-medium text-blue-700 dark:text-blue-300">
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                <span x-text="generando === 'excel' ? 'Generando el Excel, puede tardar unos segundos…' : 'Generando el PDF, puede tardar unos segundos…'"></span>
+            </span>
+        </div>
+        {% if docs and ambiente == 'test' %}
+        <p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+            <i class="fas fa-flask mr-1"></i>La facturación electrónica está en ambiente de prueba (TEST): estos documentos no tienen validez fiscal.
+        </p>
+        {% endif %}
+    </div>
+
+    {% if hay_anuladas %}
+    {# El subrayado es un span: en tema oscuro custom.css le saca el borde a todo botón con !important. #}
+    <div class="flex gap-1 border-b border-gray-200 dark:border-gray-700" role="tablist">
+        <button type="button" role="tab" @click="vista = 'iva'" :aria-selected="vista === 'iva'"
+            :class="vista === 'iva' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'"
+            class="relative px-4 py-2 text-sm font-semibold transition">
+            <span x-show="vista === 'iva'" aria-hidden="true"
+                style="position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: currentColor"></span>
+            <i class="fas fa-receipt mr-1"></i>IVA del mes
+        </button>
+        <button type="button" role="tab" @click="vista = 'anuladas'" :aria-selected="vista === 'anuladas'"
+            :class="vista === 'anuladas' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'"
+            class="relative px-4 py-2 text-sm font-semibold transition">
+            <span x-show="vista === 'anuladas'" aria-hidden="true"
+                style="position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: currentColor"></span>
+            <i class="fas fa-ban mr-1"></i>Facturas anuladas
+            <span class="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200">{{ cantidad_anuladas }}</span>
+        </button>
+    </div>
+    {% endif %}
+
+    <div x-show="vista === 'iva'" class="space-y-6">
+    {# --- Los tres números ------------------------------------------------ #}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Débito fiscal (IVA de ventas menos notas de crédito)</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ gs(debito) if hay_debito else '—' }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Crédito fiscal (IVA de compras y gastos con factura)</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ gs(credito) }}</p>
+        </div>
+        {% include 'contador/_resumen_iva_saldo.html' %}
+    </div>
+    {% include 'contador/_resumen_iva_cierre.html' %}
+
+    {# --- Pendientes ------------------------------------------------------- #}
+    {% if pendientes %}
+    <div class="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2 dark:border-red-900 dark:bg-red-900/20">
+        <p class="text-sm font-semibold text-red-700 dark:text-red-300">
+            <i class="fas fa-triangle-exclamation mr-1"></i>Pendiente para cerrar el mes
+        </p>
+        <ul class="space-y-1 text-sm text-gray-800 dark:text-gray-100">
+            {% if docs and docs.rechazados %}
+            <li>{{ docs.rechazados }} documento(s) rechazado(s) o con error: no entran en el resumen hasta que SIFEN los apruebe.
+                {% if ve_documentos %}<a class="underline" href="{{ url_for('facturacion_electronica.documentos', estado='atencion', desde=desde.isoformat(), hasta=hasta.isoformat(), ambiente=ambiente) }}">Ver cuáles</a>{% endif %}</li>
+            {% endif %}
+            {% if docs and docs.sin_respuesta %}
+            <li>{{ docs.sin_respuesta }} documento(s) sin respuesta de SIFEN todavía.
+                {% if ve_documentos %}<a class="underline" href="{{ url_for('facturacion_electronica.documentos', estado='sin_enviar', desde=desde.isoformat(), hasta=hasta.isoformat(), ambiente=ambiente) }}">Ver cuáles</a>{% endif %}</li>
+            {% endif %}
+            {% if docs and docs.ventas_estimadas %}
+            <li>{{ docs.ventas_estimadas }} factura(s) sin copia local del XML (las emitidas por la API se copian de a poco): su IVA se calculó con la venta y puede diferir en unos guaraníes de lo declarado.</li>
+            {% endif %}
+            {% if docs and docs.nc_estimadas %}
+            <li>{{ docs.nc_estimadas }} nota(s) de crédito sin copia local del XML: su IVA se estimó en proporción a la venta.</li>
+            {% endif %}
+            {% if papel %}{% for r in papel.repetidos %}
+            <li>El número de factura {{ r.numero }} está cargado en {{ r.ventas|length }} ventas
+                ({% for id in r.ventas %}<a class="underline" href="{{ url_for('ventas.detalle', id=id) }}">#{{ id }}</a>{{ ', ' if not loop.last }}{% endfor %}):
+                todas suman al débito. Corregí el número en la que esté mal.</li>
+            {% endfor %}{% endif %}
+            {% if papel and papel.sin_nota_credito.cantidad %}
+            {% set sin_nc = papel.sin_nota_credito %}
+            <li>{{ sin_nc.cantidad }} devolución(es) de ventas con factura por {{ gs(sin_nc.monto) }} sin nota de crédito cargada:
+                su IVA no se descuenta del débito. Cargala en la venta:
+                {% for f in sin_nc.filas %}<a class="underline" href="{{ url_for('ventas.detalle', id=f.id_venta) }}">{{ f.factura }}</a>{{ ', ' if not loop.last }}{% endfor %}{% if sin_nc.cantidad > sin_nc.filas|length %}…{% endif %}</li>
+            {% endif %}
+            {% if papel and papel.talonario and papel.talonario.fuera_de_talonario %}
+            {% set fuera = papel.talonario.fuera_de_talonario %}
+            <li>{{ fuera|length }} venta(s) con un número que no corresponde a ningún talonario vigente en esa fecha
+                (número mal tipeado, fuera del rango o timbrado vencido):
+                {% for f in fuera[:10] %}<a class="underline" href="{{ url_for('ventas.detalle', id=f.id_venta) }}">{{ f.numero }}</a>{{ ', ' if not loop.last }}{% endfor %}{% if fuera|length > 10 %}…{% endif %}</li>
+            {% endif %}
+            {% include 'contador/_resumen_iva_controles.html' %}
+            {% if sin_comprobante.cantidad %}
+            <li>{{ sin_comprobante.cantidad }} compra(s) sin número de factura por {{ gs(sin_comprobante.total) }}:
+                {{ gs(sin_comprobante.iva_en_riesgo) }} de IVA que no se puede deducir sin el comprobante. Detalle abajo.</li>
+            {% endif %}
+        </ul>
+    </div>
+    {% elif not cierre.cambio_desde_presentado %}
+    <div class="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-200">
+        <i class="fas fa-circle-check mr-1"></i>Nada pendiente:{% if docs %} todo lo del mes tiene respuesta de SIFEN y{% elif papel %} ningún número de factura de venta está repetido y{% endif %} todas las compras tienen número de factura.
+    </div>
+    {% endif %}
+
+    {# --- Detalle del IVA -------------------------------------------------- #}
+    {# El modal no lleva id: la pantalla puede estar abierta en dos pestañas.
+       Su contenido lo arma el servidor (`_contadora_detalle.html`). #}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700"
+        x-data="{
+            abierto: false,
+            cargando: false,
+            html: '',
+            base: '{{ url_for('contador.resumen_iva_detalle', mes=mes) }}',
+            async abrir(fila) {
+                this.abierto = true;
+                this.cargando = true;
+                this.html = '';
+                try {
+                    const respuesta = await fetch(`${this.base}&fila=${fila}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    this.html = respuesta.ok ? await respuesta.text()
+                        : '<p class=&quot;px-5 py-6 text-sm text-red-600&quot;>No se pudo cargar el detalle.</p>';
+                } catch (e) {
+                    this.html = '<p class=&quot;px-5 py-6 text-sm text-red-600&quot;>No se pudo cargar el detalle.</p>';
+                }
+                this.cargando = false;
+            },
+            cerrar() { this.abierto = false; },
+        }"
+        @keydown.escape.window="cerrar()">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr class="text-left text-xs font-semibold text-gray-600 dark:text-gray-300">
+                        <th class="px-4 py-3">Concepto</th>
+                        <th class="px-4 py-3 text-right">Cant.</th>
+                        <th class="px-4 py-3 text-right">Exentas</th>
+                        <th class="px-4 py-3 text-right">Gravadas 5%</th>
+                        <th class="px-4 py-3 text-right">IVA 5%</th>
+                        <th class="px-4 py-3 text-right">Gravadas 10%</th>
+                        <th class="px-4 py-3 text-right">IVA 10%</th>
+                        <th class="px-4 py-3 text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% if docs %}
+                    {{ fila_iva('Facturas electrónicas aprobadas', docs.ventas, clave='ventas') }}
+                    {{ fila_iva('Notas de crédito aprobadas', docs.notas_credito, '−', clave='notas') }}
+                    {% elif papel %}
+                    {{ fila_iva('Ventas con número de factura', papel.ventas, clave='ventas_factura') }}
+                    {{ fila_iva('Notas de crédito', papel.notas_credito, '−', clave='notas_papel') }}
+                    {% endif %}
+                    {{ fila_iva('Compras con número de factura', compras, clave='compras') }}
+                    {{ fila_iva('Gastos con factura', gastos, clave='gastos') }}
+                </tbody>
+            </table>
+        </div>
+        {# "Gravadas" se leía como IVA, y el total facturado como "lo que se
+           vendió": la leyenda está para que nadie le pase al/la contador/a el
+           número equivocado. #}
+        <p class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700">
+            <span class="font-semibold">Gravadas</span> es el importe sin IVA; <span class="font-semibold">IVA</span> es el impuesto
+            que va sobre ese importe (10% o 5% según el producto). Total = exentas + gravadas + IVA.
+            {% if docs %}Solo cuenta las ventas con factura electrónica aprobada, no todas las ventas del mes.{% endif %}
+            {% if papel %}Solo cuenta las ventas con el número de factura cargado, no todas las ventas del mes.
+            Si la venta tuvo descuento, el IVA se calcula sobre lo cobrado.{% endif %}
+        </p>
+        {% if docs and (docs.canceladas or docs.inutilizados) %}
+        <p class="px-4 pb-3 text-xs text-gray-500 dark:text-gray-400">
+            No suman: {{ docs.canceladas }} documento(s) cancelado(s) y {{ docs.inutilizados }} número(s) inutilizado(s) en el mes.
+            <button type="button" class="underline" @click="vista = 'anuladas'">Ver en Facturas anuladas</button>
+        </p>
+        {% endif %}
+        {% include 'contador/_resumen_iva_ventas_aviso.html' %}
+        {% if gastos_sin_factura.cantidad %}
+        <p class="px-4 pb-3 text-xs text-gray-500 dark:text-gray-400">
+            {{ gastos_sin_factura.cantidad }} pago(s) de gastos corrientes del mes por {{ gs(gastos_sin_factura.total) }} sin factura cargada.
+            Si tienen factura, cargala en el pago (Gastos corrientes) y su IVA suma al crédito fiscal.
+        </p>
+        {% endif %}
+        <p class="px-4 pb-3 text-xs text-gray-500 dark:text-gray-400"><i class="fas fa-magnifying-glass mr-1"></i>Tocá una fila para ver qué documentos la suman.</p>
+
+        <div x-show="abierto" x-cloak class="fixed inset-0 flex items-center justify-center p-4" style="z-index: 50">
+            <div class="absolute inset-0 bg-black/50" data-modal-backdrop @click="cerrar()"></div>
+            <div class="relative w-full max-w-6xl rounded-xl bg-white shadow-xl dark:bg-gray-800"
+                @click="if ($event.target.closest('[data-detalle-cerrar]')) cerrar()">
+                <p x-show="cargando" class="px-5 py-6 text-sm text-gray-500 dark:text-gray-400">
+                    <i class="fas fa-spinner fa-spin mr-1"></i>Cargando…
+                </p>
+                <div x-show="!cargando" x-html="html"></div>
+            </div>
+        </div>
+    </div>
+
+    {# --- Compras sin comprobante ----------------------------------------- #}
+    {% if sin_comprobante.cantidad %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
+        <p class="px-4 pt-4 text-sm font-semibold text-gray-900 dark:text-white">Compras sin número de factura</p>
+        <p class="px-4 pb-2 text-xs text-gray-500 dark:text-gray-400">Cargá el número en la compra cuando aparezca el comprobante.</p>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr class="text-left text-xs font-semibold text-gray-600 dark:text-gray-300">
+                        <th class="px-4 py-3">Fecha</th>
+                        <th class="px-4 py-3">Compra</th>
+                        <th class="px-4 py-3">Proveedor</th>
+                        <th class="px-4 py-3 text-right">Total</th>
+                        <th class="px-4 py-3 text-right">IVA</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for c in sin_comprobante.filas %}
+                    <tr>
+                        <td class="px-4 py-3 whitespace-nowrap text-gray-800 dark:text-gray-100">{{ c.fecha.strftime('%d/%m/%Y') }}</td>
+                        <td class="px-4 py-3 font-mono">
+                            <a class="text-gray-900 dark:text-white hover:underline" href="{{ url_for('compras.detalle', id=c.id_compra) }}">#{{ c.id_compra }}</a>
+                        </td>
+                        <td class="px-4 py-3 text-gray-800 dark:text-gray-100">{{ c.proveedor }}</td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap text-gray-800 dark:text-gray-100">{{ gs(c.total) }}</td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap text-gray-800 dark:text-gray-100">{{ gs(c.iva) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if sin_comprobante.cantidad > sin_comprobante.filas|length %}
+        <p class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">Se muestran las primeras {{ sin_comprobante.filas|length }} de {{ sin_comprobante.cantidad }}.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+    </div>
+
+    {# --- Anuladas del mes ------------------------------------------------- #}
+    {% if papel %}{% include 'contador/_resumen_iva_anuladas_papel.html' %}{% endif %}
+    {% if anulados is not none %}
+    <div x-show="vista === 'anuladas'" x-cloak class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
+        <div class="px-4 pt-4 pb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">Facturas anuladas del mes ({{ anulados.cantidad }})</p>
+            {% if ve_documentos and anulados.cantidad %}
+            <a class="text-xs underline text-gray-600 dark:text-gray-300" href="{{ url_for('facturacion_electronica.documentos', estado='anulado', desde=desde.isoformat(), hasta=hasta.isoformat(), ambiente=ambiente) }}">Ver en Facturas electrónicas</a>
+            {% endif %}
+        </div>
+        <p class="px-4 pb-2 text-xs text-gray-500 dark:text-gray-400">
+            Canceladas en SIFEN o con el número inutilizado: no suman IVA. Las anuladas con nota de crédito
+            siguen aprobadas y se restan en la fila de notas de crédito.
+        </p>
+        {% if anulados.filas %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700/60">
+                    <tr class="text-left text-xs font-semibold text-gray-600 dark:text-gray-300">
+                        <th class="px-4 py-2">Fecha</th>
+                        <th class="px-4 py-2">Número</th>
+                        <th class="px-4 py-2">Tipo</th>
+                        <th class="px-4 py-2">Cliente</th>
+                        <th class="px-4 py-2 text-right">Total</th>
+                        <th class="px-4 py-2">Qué pasó</th>
+                        <th class="px-4 py-2">Motivo</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for f in anulados.filas %}
+                    <tr class="text-gray-800 dark:text-gray-100">
+                        <td class="px-4 py-2 whitespace-nowrap">{{ f.fecha.strftime('%d/%m/%Y') if f.fecha else '—' }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap font-mono">{{ f.numero }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">{{ f.tipo }}</td>
+                        <td class="px-4 py-2">{{ f.cliente }}</td>
+                        <td class="px-4 py-2 text-right whitespace-nowrap">{{ gs(f.total) }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">{{ 'Cancelada en SIFEN' if f.estado == 'cancelado' else 'Número inutilizado' }}</td>
+                        <td class="px-4 py-2 text-xs text-gray-600 dark:text-gray-300">{{ f.documento.motivo_cancelacion or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if anulados.cantidad > anulados.filas|length %}
+        <p class="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">Se muestran {{ anulados.filas|length }} de {{ anulados.cantidad }}.</p>
+        {% endif %}
+        {% else %}
+        <p class="px-4 pb-4 text-sm text-gray-500 dark:text-gray-400">Ninguna en el mes.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

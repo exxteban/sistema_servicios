@@ -55,11 +55,18 @@
                     const partialScripts = doc.getElementById('partial-scripts');
                     if (partialScripts) inlineScripts.push(partialScripts.innerHTML || '');
 
+                    // El bloque extra_css queda fuera de #partial-content: se conserva
+                    // para que los estilos propios del dashboard no se pierdan.
+                    const pageStyles = Array.from(doc.querySelectorAll('style, link[rel="stylesheet"]'))
+                        .filter((node) => !content.contains(node))
+                        .map((node) => node.outerHTML)
+                        .join('');
+
                     const scrollTop = panel.scrollTop;
                     Array.from(panel.children).forEach((child) => {
                         try { window.Alpine?.destroyTree?.(child); } catch { }
                     });
-                    panel.innerHTML = content.innerHTML;
+                    panel.innerHTML = pageStyles + content.innerHTML;
                     // Los scripts van antes de initTree: definen las funciones x-data.
                     runInlineScripts(panel, inlineScripts.join('\n'));
                     try { window.Alpine?.initTree?.(panel); } catch { }

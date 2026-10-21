@@ -98,6 +98,7 @@
             id_cliente: this.clienteId,
             beneficio_fidelizacion_id: this.beneficioFidelizacionId || null,
             id_usuario_vendedor: this.vendedorId,
+            numero_factura: this.mostrarNumeroFactura ? (String(this.numeroFactura || '').trim() || null) : undefined,
             usar_precio_mayorista: this.usaPrecioMayorista() === true,
             forzar_precio_mayorista: this.forzarPrecioMayorista === true,
             descuento: parseFloat(this.descuento) || 0,
@@ -355,6 +356,7 @@
         const moneda = '₲';
         const clienteNombre = this.clienteSeleccionado ? this.clienteSeleccionado.nombre : 'Consumidor Final';
         const clienteRuc = this.clienteSeleccionado ? (this.clienteSeleccionado.ruc_ci || 'Sin RUC') : '44444401-7';
+        const numeroFactura = this.escapeHtml((this.numeroFactura || '').trim());
         const origenGastronomia = !!(this.colaCobroId && this.gastronomiaPedidoId && this.gastronomiaCodigoEntrega);
         const origenEntrega = this.gastronomiaMesa
             ? `Mesa ${this.escapeHtml(this.gastronomiaMesa)}`
@@ -451,6 +453,7 @@
     <div>Fecha: <span style="white-space:nowrap;">${this.escapeHtml(fecha)}</span></div>
     <div>Cliente: ${this.escapeHtml(clienteNombre)}</div>
     <div>RUC/CI: ${this.escapeHtml(clienteRuc)}</div>
+    ${numeroFactura ? `<div>Nº Factura: ${numeroFactura}</div>` : ``}
   </div>
   <div class="sep"></div>
   <table>
@@ -500,6 +503,7 @@
         this.descuento = 0;
         this.pagos = [];
         this.beneficioFidelizacionId = null;
+        this.numeroFactura = '';
         this.condicionVenta = 'contado';
         this.creditoModo = 'cuenta_corriente';
         this.creditoCuotas = 3;

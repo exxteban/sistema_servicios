@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import func
+
 from app import db
 from gastronomia.models import GastronomiaMesa, GastronomiaPedido, GastronomiaPedidoPago
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
@@ -44,6 +46,8 @@ def guardar_mesa(cliente_id: int, data: dict, *, mesa: GastronomiaMesa | None = 
     if existente and (mesa is None or existente.id_mesa != mesa.id_mesa):
         raise ValueError('Ya existe una mesa con ese nombre.')
 
+    if mesa is not None and mesa.nombre and mesa.nombre != nombre:
+        _renombrar_mesa_en_pedidos_activos(cliente_id, mesa.nombre, nombre)
     mesa = mesa or GastronomiaMesa(cliente_id=int(cliente_id))
     mesa.nombre = nombre
     mesa.capacidad = max(1, parse_int(data.get('capacidad'), 4))
@@ -101,6 +105,16 @@ def liberar_mesa_pedido(cliente_id: int, pedido_id: int) -> GastronomiaPedido:
     db.session.commit()
     registrar_evento_pedido(pedido, 'mesa_liberada')
     return pedido
+
+
+def _renombrar_mesa_en_pedidos_activos(cliente_id: int, nombre_anterior: str, nombre_nuevo: str) -> None:
+    """Los pedidos referencian la mesa por nombre: al renombrarla, las cuentas abiertas la siguen."""
+    GastronomiaPedido.query.filter(
+        GastronomiaPedido.cliente_id == int(cliente_id),
+        GastronomiaPedido.tipo_pedido == 'mesa',
+        func.lower(func.trim(GastronomiaPedido.mesa)) == nombre_anterior.strip().lower(),
+        GastronomiaPedido.estado.in_(ESTADOS_ACTIVOS),
+    ).update({GastronomiaPedido.mesa: nombre_nuevo}, synchronize_session=False)
 
 
 def _pedidos_activos_por_mesa(cliente_id: int) -> dict[str, list[GastronomiaPedido]]:

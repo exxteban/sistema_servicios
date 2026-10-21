@@ -1,0 +1,68 @@
+{# Lo que se carga a mano para cerrar el mes y la marca de presentado
+   (`contador_meses`). Marcar presentado guarda una foto del débito y el
+   crédito: si después cambian, se avisa acá. No bloquea nada. #}
+{% set r = cierre.registro %}
+{% set monto_input = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100' %}
+{% macro miles(valor) %}{{ ("{:,.0f}" if valor == valor|round else "{:,.2f}").format(valor or 0).replace(",", "_").replace(".", ",").replace("_", ".") }}{% endmacro %}
+<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 space-y-3"
+    x-data="{ ajustando: false }">
+    {% if r and r.presentado %}
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-green-700 dark:text-green-300">
+            <i class="fas fa-circle-check mr-1"></i>Presentado el {{ r.presentado_en|local_strftime('%d/%m/%Y') }}{% if r.usuario_presentado %} por {{ r.usuario_presentado.nombre_completo }}{% endif %}.
+        </p>
+        <form method="post" action="{{ url_for('contador.resumen_iva_presentado') }}"
+            onsubmit="return confirm('¿Volver a abrir el mes? Se borra la foto de lo presentado.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="mes" value="{{ mes }}">
+            <input type="hidden" name="presentado" value="0">
+            <button type="submit" class="text-xs underline text-gray-600 dark:text-gray-300">Volver a abrir</button>
+        </form>
+    </div>
+    {% if cierre.cambio_desde_presentado %}
+    {% set c = cierre.cambio_desde_presentado %}
+    <p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+        <i class="fas fa-triangle-exclamation mr-1"></i>Cambió después de presentado: débito {{ gs(c.debito_antes) }} → {{ gs(debito) }},
+        crédito {{ gs(c.credito_antes) }} → {{ gs(credito) }}. Alguien cargó o corrigió algo de este mes: revisalo con el/la contador/a
+        por si hay que rectificar la declaración.
+    </p>
+    {% endif %}
+    {% else %}
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-gray-600 dark:text-gray-300">Cuando el/la contador/a presente el IVA de este mes, marcalo: si después algo cambia, se avisa acá.</p>
+        <form method="post" action="{{ url_for('contador.resumen_iva_presentado') }}"
+            onsubmit="return confirm('¿Marcar el IVA de este mes como presentado?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="mes" value="{{ mes }}">
+            <input type="hidden" name="presentado" value="1">
+            <button type="submit" class="inline-flex items-center rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700">
+                <i class="fas fa-check mr-1"></i>Marcar como presentado
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if r and r.presentado %}
+    <p class="text-xs text-gray-500 dark:text-gray-400">Para corregir el saldo anterior o las retenciones, volvé a abrir el mes y marcalo como presentado después de revisarlo.</p>
+    {% else %}
+    <button type="button" x-show="!ajustando" @click="ajustando = true" class="text-xs underline text-gray-600 dark:text-gray-300">
+        Cargar saldo a favor del mes anterior y retenciones
+    </button>
+    <form x-show="ajustando" x-cloak method="post" action="{{ url_for('contador.resumen_iva_ajustes') }}" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="mes" value="{{ mes }}">
+        <label class="block text-xs text-gray-500 dark:text-gray-400">Saldo a favor del mes anterior (₲)
+            <input type="text" inputmode="numeric" name="saldo_favor_anterior" value="{{ miles(cierre.saldo_favor_anterior) }}" class="mt-1 {{ monto_input }}">
+            {% if cierre.saldo_favor_sugerido is not none %}<span class="block mt-1">Sugerido: lo que quedó a favor en el mes anterior presentado.</span>{% endif %}
+        </label>
+        <label class="block text-xs text-gray-500 dark:text-gray-400">Retenciones de IVA del mes (₲)
+            <input type="text" inputmode="numeric" name="retenciones" value="{{ miles(cierre.retenciones) }}" class="mt-1 {{ monto_input }}">
+            <span class="block mt-1">Las que te hicieron tus clientes (comprobantes de retención).</span>
+        </label>
+        <div class="flex gap-2">
+            <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Guardar</button>
+            <button type="button" @click="ajustando = false" class="text-xs underline text-gray-500 dark:text-gray-400">Cancelar</button>
+        </div>
+    </form>
+    {% endif %}
+</div>

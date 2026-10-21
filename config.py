@@ -144,6 +144,8 @@ class TestingConfig(Config):
     """Configuración de testing"""
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    # scrypt tarda ~0,15 s por hash y cada create_app siembra usuarios: en tests no hace falta.
+    PASSWORD_HASH_METHOD = 'pbkdf2:sha256:1000'
 
 
 config = {

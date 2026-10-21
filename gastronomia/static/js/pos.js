@@ -389,6 +389,8 @@
     }
     if (resetAfterCreate) {
       resetDraft();
+      // resetDraft limpia el id; se conserva para poder enviarlo a cocina o cobrarlo despues.
+      lastOrderId = savedOrderId;
     } else {
       hydrateOrder(data.pedido);
     }
@@ -437,8 +439,11 @@
     editingItemKey = null;
   };
 
+  // Bloqueo compartido: evita que Guardar / Enviar a cocina / Cobrar corran a la vez y dupliquen pedidos.
+  let busyActionRunning = false;
   const runBusyAction = async (button, busyText, action) => {
-    if (button?.disabled) return;
+    if (button?.disabled || busyActionRunning) return;
+    busyActionRunning = true;
     const originalText = button?.textContent;
     if (button) {
       button.disabled = true;
@@ -455,6 +460,7 @@
       }
       showAlert(error.message, false);
     } finally {
+      busyActionRunning = false;
       if (button) {
         button.disabled = false;
         button.textContent = originalText;

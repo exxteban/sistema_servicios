@@ -2,6 +2,7 @@
 Modelo de Usuario
 """
 from datetime import datetime
+from flask import current_app, has_app_context
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login_manager
@@ -61,7 +62,12 @@ class Usuario(UserMixin, db.Model):
         self.id_cliente = value
     
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        # En testing se usa un hash barato (ver TestingConfig); en el resto, el default de werkzeug.
+        metodo = current_app.config.get('PASSWORD_HASH_METHOD') if has_app_context() else None
+        if metodo:
+            self.password_hash = generate_password_hash(password, method=metodo)
+        else:
+            self.password_hash = generate_password_hash(password)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)

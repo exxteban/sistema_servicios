@@ -17,7 +17,7 @@
   let lastEventId = 0;
   let pollTimer = null;
   let chargeBusy = false;
-  const cashStates = new Set(['abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado']);
+  const cashStates = new Set(['abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino', 'entregado']);
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const showAlert = (message, ok) => {

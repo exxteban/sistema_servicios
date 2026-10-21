@@ -11,7 +11,7 @@ Una venta facturada al día siguiente figura en el día de la venta.
 import csv
 import io
 
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import joinedload
 
 from app.models import Venta
@@ -37,8 +37,12 @@ POR_PAGINA = 50
 FILTROS_ESTADO = {
     'aprobado': (ESTADO_APROBADO,),
     'sin_enviar': (ESTADO_GENERADO, ESTADO_FIRMADO, ESTADO_ENVIADO),
+    # Lo que cuenta como pendiente el resumen para el/la contador/a.
+    'atencion': (ESTADO_RECHAZADO, ESTADO_ERROR),
     'rechazado': (ESTADO_RECHAZADO,),
     'error': (ESTADO_ERROR,),
+    # Lo que se dejó sin efecto: lo pide el/la contador/a para cuadrar la numeración.
+    'anulado': (ESTADO_CANCELADO, ESTADO_INUTILIZADO),
     'cancelado': (ESTADO_CANCELADO,),
     'inutilizado': (ESTADO_INUTILIZADO,),
 }
@@ -46,8 +50,10 @@ ETIQUETAS_FILTRO = (
     ('', 'Todos'),
     ('aprobado', 'Aprobados'),
     ('sin_enviar', 'Sin respuesta de SIFEN'),
+    ('atencion', 'Rechazados o con error'),
     ('rechazado', 'Rechazados'),
     ('error', 'Con error'),
+    ('anulado', 'Anulados (cancelados o inutilizados)'),
     ('cancelado', 'Cancelados'),
     ('inutilizado', 'Inutilizados'),
 )
@@ -64,7 +70,7 @@ def _fecha_fiscal():
     )
 
 
-def _consulta(desde, hasta, estado='', tipo=''):
+def consulta_documentos(desde, hasta, estado='', tipo='', ambiente=''):
     inicio, fin = utc_bounds_for_local_dates(desde, hasta)
     fecha = _fecha_fiscal()
     consulta = (
@@ -78,7 +84,14 @@ def _consulta(desde, hasta, estado='', tipo=''):
         consulta = consulta.filter(func.coalesce(DocumentoElectronico.tipo_documento, 1) == 1)
     elif tipo == 'nota_credito':
         consulta = consulta.filter(DocumentoElectronico.tipo_documento == TIPO_NOTA_CREDITO)
+    if ambiente:
+        consulta = consulta.filter(_del_ambiente(ambiente))
     return consulta, fecha
+
+
+def _del_ambiente(ambiente):
+    # Los documentos viejos sin ambiente guardado cuentan como del actual.
+    return or_(DocumentoElectronico.ambiente == ambiente, DocumentoElectronico.ambiente.is_(None))
 
 
 def _totales_nc(documentos):
@@ -120,7 +133,7 @@ def _fila(documento, totales_nc):
 
 def _resumen(desde, hasta, tipo):
     """Cantidad por estado del período (sin el filtro de estado) y el monto aprobado."""
-    consulta, _fecha = _consulta(desde, hasta, tipo=tipo)
+    consulta, _fecha = consulta_documentos(desde, hasta, tipo=tipo)
     por_estado = dict(
         consulta.with_entities(DocumentoElectronico.estado, func.count(DocumentoElectronico.id))
         .group_by(DocumentoElectronico.estado).all()
@@ -138,9 +151,9 @@ def _resumen(desde, hasta, tipo):
     }
 
 
-def listar_documentos(desde, hasta, estado='', tipo='', pagina=1):
+def listar_documentos(desde, hasta, estado='', tipo='', pagina=1, ambiente=''):
     """Página del listado más el resumen del período. Más nuevos primero."""
-    consulta, fecha = _consulta(desde, hasta, estado, tipo)
+    consulta, fecha = consulta_documentos(desde, hasta, estado, tipo, ambiente)
     cantidad = consulta.count()
     pagina = max(1, int(pagina or 1))
     documentos = (
@@ -160,7 +173,7 @@ def listar_documentos(desde, hasta, estado='', tipo='', pagina=1):
 
 def csv_documentos(desde, hasta, estado='', tipo=''):
     """El mismo listado, completo, como CSV (separador `;`, lo que abre Excel en es-PY)."""
-    consulta, fecha = _consulta(desde, hasta, estado, tipo)
+    consulta, fecha = consulta_documentos(desde, hasta, estado, tipo)
     documentos = (
         consulta.options(joinedload(DocumentoElectronico.venta).joinedload(Venta.cliente))
         .order_by(fecha.asc(), DocumentoElectronico.id.asc()).all()
@@ -190,6 +203,7 @@ def periodo_por_defecto(hoy):
 __all__ = [
     'ETIQUETAS_FILTRO',
     'POR_PAGINA',
+    'consulta_documentos',
     'csv_documentos',
     'listar_documentos',
     'periodo_por_defecto',

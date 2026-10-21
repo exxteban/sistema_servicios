@@ -4,8 +4,13 @@ from .anulacion_caja import revertir_caja_de_venta
 from .respuestas import _venta_descartada_response, _venta_existente_response
 from app.models import ClienteServicio
 from app.services.clientes_fidelizacion import revertir_fidelizacion_por_anulacion_venta
-from app.services.devoluciones_calculo import calculate_refund_subtotal
-from app.services.devoluciones_lineas import lineas_devolubles
+from app.services.devoluciones import (
+    devueltos_por_detalle as devueltos_por_detalle_venta,
+    lineas_devolubles,
+    monto_reembolsable,
+    precio_reembolsable,
+    precios_reembolsables,
+)
 from app.services.fe_anulacion import error_anulacion_por_factura_electronica
 from app.services.fe_venta_contexto import contexto_factura_electronica_venta
 from cobranzas.services.cuenta_service import anular_cuenta_por_cobrar
@@ -406,26 +411,12 @@ def crear_devolucion(id):
 
         detalles_venta_por_id = {int(d.id_detalle_venta): d for d in venta.detalles.all()}
         detalle_ids = sorted(int(x) for x in cantidades_por_detalle.keys())
-        devueltos_rows = (
-            db.session.query(
-                DetalleDevolucion.id_detalle_venta_original,
-                func.coalesce(func.sum(DetalleDevolucion.cantidad), 0),
-                func.coalesce(func.sum(DetalleDevolucion.subtotal), 0),
-            )
-            .join(Devolucion, DetalleDevolucion.id_devolucion == Devolucion.id_devolucion)
-            .filter(
-                Devolucion.id_venta == venta.id_venta,
-                Devolucion.estado != 'anulada',
-                DetalleDevolucion.id_detalle_venta_original.in_(detalle_ids),
-            )
-            .group_by(DetalleDevolucion.id_detalle_venta_original)
-            .all()
-        )
-        devueltos_por_detalle = {
-            int(r[0]): {'cantidad': int(r[1] or 0), 'subtotal': Decimal(str(r[2] or 0))}
-            for r in devueltos_rows
-            if r and r[0] is not None
-        }
+        # El mismo cálculo que alimenta la pantalla: una pantalla más permisiva
+        # que esta validación sería la forma de devolver dos veces el mismo ítem.
+        devueltos_por_detalle = devueltos_por_detalle_venta(venta, detalle_ids)
+        # Lo que se cobró por unidad, con el descuento global de la venta: el
+        # mismo precio que la factura (y su nota de crédito).
+        precios = precios_reembolsables(venta)
 
         monto_total = Decimal('0')
         items_auditoria = []
@@ -438,22 +429,15 @@ def crear_devolucion(id):
                 return jsonify({'error': f'Detalle de venta no encontrado: {id_detalle_venta}'}), 400
 
             cantidad_original = int(detalle_venta.cantidad)
-            devuelto = devueltos_por_detalle.get(id_detalle_venta) or {}
-            cantidad_devuelta = int(devuelto.get('cantidad') or 0)
+            cantidad_devuelta = int(devueltos_por_detalle.get(id_detalle_venta) or 0)
             disponible = cantidad_original - cantidad_devuelta
             if disponible <= 0:
                 return jsonify({'error': f'No hay cantidad disponible para devolver en detalle {id_detalle_venta}'}), 400
             if cantidad > disponible:
                 return jsonify({'error': f'Cantidad inválida para detalle {id_detalle_venta}. Disponible: {disponible}'}), 400
 
-            subtotal = calculate_refund_subtotal(
-                line_subtotal=detalle_venta.subtotal,
-                original_quantity=cantidad_original,
-                returned_quantity=cantidad_devuelta,
-                returned_subtotal=devuelto.get('subtotal') or 0,
-                quantity=cantidad,
-            )
-            precio_unitario = (subtotal / Decimal(str(cantidad))).quantize(Decimal('0.01'))
+            precio_unitario = precio_reembolsable(venta, detalle_venta, precios)
+            subtotal = monto_reembolsable(precio_unitario, cantidad, cantidad_devuelta)
             monto_total += subtotal
             items_normalizados.append((detalle_venta, cantidad, precio_unitario, subtotal))
 

@@ -1,0 +1,24 @@
+{# Controles de datos (`resumen_contadora_controles`): lo que el/la contador/a
+   no podría cargar en Marangatu. Va dentro de la lista de pendientes. #}
+{% set c = controles %}
+{% for aviso in c.conciliacion.filas %}
+<li>{{ aviso }}</li>
+{% endfor %}
+{% if c.conciliacion.cantidad > c.conciliacion.filas|length %}
+<li>Hay {{ c.conciliacion.cantidad - c.conciliacion.filas|length }} avisos más de conciliación. Revisá los comprobantes del detalle.</li>
+{% endif %}
+{% macro mas(bloque) %}{% if bloque.cantidad > bloque.filas|length %} y {{ bloque.cantidad - bloque.filas|length }} más{% endif %}{% endmacro %}
+{% if c.compras_sin_timbrado.cantidad %}
+<li>{{ c.compras_sin_timbrado.cantidad }} compra(s) con factura sin timbrado: sin él no se deduce su IVA. Cargalo en la compra:
+    {% for f in c.compras_sin_timbrado.filas %}<a class="underline" href="{{ url_for('compras.editar', id=f.id_compra) }}">{{ f.numero }}</a>{{ ', ' if not loop.last }}{% endfor %}{{ mas(c.compras_sin_timbrado) }}.</li>
+{% endif %}
+{% if c.iva_no_cierra.cantidad %}
+<li>{{ c.iva_no_cierra.cantidad }} compra(s) con más IVA del que el total permite (gravadas + IVA mayor que el total): revisá cómo se cargó.
+    {% for f in c.iva_no_cierra.filas %}<a class="underline" href="{{ url_for('compras.detalle', id=f.id_compra) }}">#{{ f.id_compra }}</a>{{ ', ' if not loop.last }}{% endfor %}{{ mas(c.iva_no_cierra) }}</li>
+{% endif %}
+{% if c.ruc_invalidos.cantidad %}
+<li>{{ c.ruc_invalidos.cantidad }} RUC con el dígito verificador mal (el número después del guion no corresponde):
+    {% for f in c.ruc_invalidos.filas %}{{ f.tipo }} {{ f.nombre }}
+    {% if f.id_cliente %}<a class="underline font-mono" href="{{ url_for('clientes.editar', id=f.id_cliente) }}">{{ f.ruc }}</a>
+    {% else %}<a class="underline font-mono" href="{{ url_for('compras.detalle', id=f.id_compra) }}">{{ f.ruc }}</a>{% endif %}{{ '; ' if not loop.last }}{% endfor %}{{ mas(c.ruc_invalidos) }}</li>
+{% endif %}

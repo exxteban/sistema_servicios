@@ -67,6 +67,42 @@
                     </label>
                 </div>
             </div>
+
+            {% if numero_factura_disponible %}
+            <div class="mt-4 flex items-center justify-between gap-4">
+                <div>
+                    <div class="text-sm font-medium text-gray-800 dark:text-gray-100">
+                        Mostrar campo Nº Factura en ventas
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Estado actual:
+                        <span class="font-semibold {% if mostrar_numero_factura_pos %}text-green-600 dark:text-green-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                            {% if mostrar_numero_factura_pos %}Activado{% else %}Desactivado{% endif %}
+                        </span>.
+                        {% if numero_factura_bloqueado_por_fe %}
+                        Con facturación electrónica activa el número lo asigna SIFEN, así que este campo no se usa.
+                        {% else %}
+                        Activado: el POS y el registro vendedor muestran un campo opcional para guardar el número de factura.
+                        Es lo que usa el resumen para el/la contador/a para calcular el IVA de ventas.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="relative inline-flex items-center">
+                    <input type="hidden" name="mostrar_numero_factura_pos" value="0">
+                    <input id="mostrar_numero_factura_pos"
+                           type="checkbox"
+                           name="mostrar_numero_factura_pos"
+                           value="1"
+                           class="config-switch-input"
+                           onchange="this.form.submit()"
+                           {% if numero_factura_bloqueado_por_fe %}disabled{% endif %}
+                           {% if mostrar_numero_factura_pos %}checked{% endif %}>
+                    <label for="mostrar_numero_factura_pos" class="config-switch-track {{ 'cursor-not-allowed opacity-50' if numero_factura_bloqueado_por_fe else 'cursor-pointer' }}" aria-label="Mostrar campo de número de factura en POS">
+                        <span class="config-switch-thumb"></span>
+                    </label>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">

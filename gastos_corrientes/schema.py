@@ -60,6 +60,18 @@ def ensure_gastos_corrientes_schema() -> None:
             "ALTER TABLE gastos_corrientes ADD COLUMN dias_anticipacion_alerta INTEGER NOT NULL DEFAULT 3",
         ),
         (
+            'gastos_corrientes',
+            'naturaleza_contable',
+            "ALTER TABLE gastos_corrientes ADD COLUMN naturaleza_contable VARCHAR(30) NOT NULL DEFAULT 'gasto_negocio'",
+            "ALTER TABLE gastos_corrientes ADD COLUMN naturaleza_contable VARCHAR(30) NOT NULL DEFAULT 'gasto_negocio'",
+        ),
+        (
+            'pagos_gastos_corrientes',
+            'naturaleza_contable',
+            "ALTER TABLE pagos_gastos_corrientes ADD COLUMN naturaleza_contable VARCHAR(30) NOT NULL DEFAULT 'gasto_negocio'",
+            "ALTER TABLE pagos_gastos_corrientes ADD COLUMN naturaleza_contable VARCHAR(30) NOT NULL DEFAULT 'gasto_negocio'",
+        ),
+        (
             'pagos_gastos_corrientes',
             'id_sesion_caja',
             "ALTER TABLE pagos_gastos_corrientes ADD COLUMN id_sesion_caja INTEGER",

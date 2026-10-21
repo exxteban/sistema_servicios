@@ -1,0 +1,41 @@
+{# Nº de la factura en papel (talonario o autoimpresor), portado de sistema_silvio_cel.
+   Sólo sin facturación electrónica y en guaraníes (`pos_pide_numero_factura`). #}
+<div x-show="mostrarNumeroFactura" x-cloak class="mt-2.5 space-y-2.5" style="display: none;">
+    <div>
+        <label for="pos_numero_factura" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Nro. Factura
+        </label>
+        <input id="pos_numero_factura"
+            type="text"
+            x-model="numeroFactura"
+            maxlength="80"
+            placeholder="Ej: 001-001-0001234"
+            class="w-full rounded-lg border-2 border-gray-200 bg-white px-3 py-2 text-gray-800 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400">
+        {# Talonario en papel: el número siguiente, a un toque. Se vuelve a pedir
+           cada vez que el campo queda vacío (p. ej. al terminar una venta). #}
+        <div x-data="{
+                sugerencias: [],
+                async traerSugerencias() {
+                    try {
+                        const r = await fetch('{{ url_for('contador.talonario_siguiente') }}', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                        this.sugerencias = r.ok ? ((await r.json()).sugerencias || []) : [];
+                    } catch (e) { this.sugerencias = []; }
+                },
+            }"
+            x-init="traerSugerencias(); $watch('numeroFactura', v => { if (!String(v || '').trim()) traerSugerencias(); })">
+            <template x-for="s in sugerencias" :key="s.timbrado + (s.numero || '')">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <template x-if="s.numero && !String(numeroFactura || '').trim()">
+                        <button type="button" @click="numeroFactura = s.numero" class="font-semibold text-blue-600 underline dark:text-blue-400">
+                            Usar siguiente: <span class="font-mono" x-text="s.numero"></span>
+                        </button>
+                    </template>
+                    <span x-show="!s.numero" class="font-semibold text-red-600 dark:text-red-400">Se terminó el talonario.</span>
+                    Timbrado <span class="font-mono" x-text="s.timbrado"></span> · vence <span x-text="s.vence"></span>
+                    <span x-show="s.dias_para_vencer <= 30" class="font-semibold text-amber-600 dark:text-amber-400">(faltan <span x-text="s.dias_para_vencer"></span> días)</span>
+                </p>
+            </template>
+        </div>
+    </div>
+
+</div>

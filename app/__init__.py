@@ -359,6 +359,7 @@ def create_app(config_name='default'):
     from app.routes.servicios import servicios_bp
     from app.routes.ventas import ventas_bp
     from app.routes.caja import caja_bp
+    from app.routes.contador import contador_bp
     from app.routes.compras import compras_bp
     from app.routes import compras_edicion as _compras_edicion  # noqa: F401
     from app.routes.clientes import clientes_bp
@@ -426,6 +427,7 @@ def create_app(config_name='default'):
     app.register_blueprint(servicios_bp, url_prefix='/servicios')
     app.register_blueprint(ventas_bp, url_prefix='/ventas')
     app.register_blueprint(caja_bp, url_prefix='/caja')
+    app.register_blueprint(contador_bp, url_prefix='/contador')
     app.register_blueprint(compras_bp, url_prefix='/compras')
     app.register_blueprint(clientes_bp, url_prefix='/clientes')
     app.register_blueprint(clientes_servicios_bp, url_prefix='/clientes')

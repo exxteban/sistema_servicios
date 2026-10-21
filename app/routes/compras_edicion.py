@@ -58,6 +58,7 @@ def _compra_auditoria_data(compra: Compra) -> dict:
         'id_proveedor': compra.id_proveedor,
         'proveedor': compra.proveedor.nombre if compra.proveedor else None,
         'numero_factura': compra.numero_factura,
+        'timbrado': compra.timbrado,
         'fecha_compra': compra.fecha_compra.isoformat() if compra.fecha_compra else None,
         'hora_compra': compra.hora_compra.strftime('%H:%M') if compra.hora_compra else None,
         'factura_imagen_url': compra.factura_imagen_url,
@@ -107,6 +108,7 @@ def editar(id):
                 else:
                     compra.id_proveedor = proveedor.id_proveedor
                     compra.numero_factura = numero_factura
+                    compra.timbrado = (request.form.get('timbrado') or '').strip()[:20] or None
                     compra.fecha_compra = fecha_compra
                     compra.hora_compra = hora_compra
                     compra.observaciones = observaciones

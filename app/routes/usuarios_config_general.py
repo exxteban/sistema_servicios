@@ -4,7 +4,13 @@ from flask_login import current_user, login_required
 
 from app.models import Configuracion
 from app.routes.usuarios import usuarios_bp
+from app.services.contador_permisos import instalacion_paraguaya
 from app.services.ia_backoffice.security import es_usuario_root, puede_gestionar_asistente_ia
+from app.services.pos_numero_factura import (
+    CLAVE_POS_MOSTRAR_NUMERO_FACTURA,
+    facturacion_electronica_activa,
+    pos_pide_numero_factura,
+)
 from app.services.ia_backoffice.settings import obtener_configuracion_asistente
 from app.services.usuarios_branding import guardar_logo_empresa
 from app.utils.public_url import CLAVE_URL_PUBLICA_SISTEMA, DESC_URL_PUBLICA_SISTEMA
@@ -17,6 +23,7 @@ from gastronomia.services.delivery_privacy import (
 
 CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS = 'pos_ocultar_selector_vendedor_cajero'
 DESC_OCULTAR_SELECTOR_VENDEDOR_POS = 'Muestra selector de vendedor/cajero en POS (desactivado: usa usuario actual)'
+DESC_POS_MOSTRAR_NUMERO_FACTURA = 'Muestra campo opcional Nro Factura al registrar ventas'
 CLAVE_CAJA_FLUJO_ENVIADO = 'caja_flujo_enviado_desde_vendedor'
 DESC_CAJA_FLUJO_ENVIADO = 'Habilita flujo vendedor -> caja para cobro final'
 CLAVE_CAJA_ALERTA_PENDIENTES = 'caja_alerta_pendientes_activa'
@@ -64,6 +71,10 @@ def configuracion():
         'usuarios/configuracion.html',
         active_tab='configuracion',
         mostrar_selector_vendedor_pos=(not _ocultar_selector_vendedor_pos()),
+        # El Nº de factura en papel es paraguayo (timbrado): en otra moneda no se ofrece.
+        numero_factura_disponible=instalacion_paraguaya(),
+        mostrar_numero_factura_pos=pos_pide_numero_factura(),
+        numero_factura_bloqueado_por_fe=facturacion_electronica_activa(),
         modo_cobro_exclusivo_cajero=_modo_cobro_exclusivo_cajero_activo(),
         caja_flujo_enviado_activo=Configuracion.obtener_bool(CLAVE_CAJA_FLUJO_ENVIADO, default=False),
         caja_alerta_pendientes_activa=Configuracion.obtener_bool(CLAVE_CAJA_ALERTA_PENDIENTES, default=False),
@@ -88,6 +99,11 @@ def _guardar_configuracion_general():
     logo_empresa_archivo = request.files.get('logo_empresa_ui')
 
     Configuracion.establecer_bool(CLAVE_OCULTAR_SELECTOR_VENDEDOR_POS, mostrar_selector, DESC_OCULTAR_SELECTOR_VENDEDOR_POS)
+    # Con facturación electrónica (o fuera de Paraguay) el switch no viaja: no pisar lo guardado.
+    if 'mostrar_numero_factura_pos' in request.form and instalacion_paraguaya() and not facturacion_electronica_activa():
+        Configuracion.establecer_bool(CLAVE_POS_MOSTRAR_NUMERO_FACTURA,
+                                      _leer_toggle('mostrar_numero_factura_pos', default=False),
+                                      DESC_POS_MOSTRAR_NUMERO_FACTURA)
     Configuracion.establecer_bool(CLAVE_CAJA_FLUJO_ENVIADO, modo_cobro_exclusivo_cajero, DESC_CAJA_FLUJO_ENVIADO)
     Configuracion.establecer_bool(CLAVE_CAJA_ALERTA_PENDIENTES, caja_alerta_pendientes, DESC_CAJA_ALERTA_PENDIENTES)
     Configuracion.establecer_bool(CLAVE_CAJA_EXIGIR_CAJERO, modo_cobro_exclusivo_cajero, DESC_CAJA_EXIGIR_CAJERO)

@@ -65,6 +65,7 @@
                 this.$watch('vendedorId', () => this.guardarEstado());
                 this.$watch('descuento', () => this.guardarEstado());
                 this.$watch('beneficioFidelizacionId', () => this.guardarEstado());
+                this.$watch('numeroFactura', () => this.guardarEstado());
                 this.$watch('pagos', () => this.guardarEstado(), { deep: true });
                 this.$watch('alertaClienteFielActiva', () => this.guardarEstado());
                 this.$watch('condicionVenta', () => this.guardarEstado());
@@ -206,6 +207,7 @@
                     this.condicionVenta = 'contado';
                     this.creditoModo = 'cuenta_corriente';
                     this.beneficioFidelizacionId = null;
+                    this.numeroFactura = '';
                     this.reparacionId = REPARACION_DATA.id || null;
                     this.clienteServicioId = null;
                     this.clienteServicioIds = [];
@@ -299,6 +301,7 @@
                     this.agendaActividadId = Number(COLA_COBRO_DATA.agenda_actividad_id || 0) || null;
                     this.colaCobroId = Number(COLA_COBRO_DATA.id) || null;
                     this.beneficioFidelizacionId = Number(COLA_COBRO_DATA.beneficio_fidelizacion_id || 0) || null;
+                    this.numeroFactura = this.mostrarNumeroFactura ? String(COLA_COBRO_DATA.numero_factura || '').trim() : '';
                     this.gastronomiaPedidoId = Number(COLA_COBRO_DATA.gastronomia_pedido_id || 0) || null;
                     this.gastronomiaCodigoEntrega = String(COLA_COBRO_DATA.gastronomia_codigo_entrega || '');
                     this.gastronomiaReferenciaEntrega = String(COLA_COBRO_DATA.gastronomia_referencia_entrega || '');
@@ -386,6 +389,7 @@
                     this.reparacionId = null;
                     this.colaCobroId = null;
                     this.beneficioFidelizacionId = null;
+                    this.numeroFactura = '';
                     this.agendaActividadId = null;
                     this.gastronomiaPedidoId = null;
                     this.gastronomiaCodigoEntrega = '';
@@ -467,6 +471,7 @@
                     this.agendaActividadId = Number(AGENDA_TURNO_DATA.agenda_actividad_id || 0) || null;
                     this.colaCobroId = null;
                     this.beneficioFidelizacionId = null;
+                    this.numeroFactura = '';
                     this.gastronomiaPedidoId = null;
                     this.gastronomiaCodigoEntrega = '';
                     this.gastronomiaReferenciaEntrega = '';

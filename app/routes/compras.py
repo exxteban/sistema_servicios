@@ -224,7 +224,7 @@ def nueva():
                 compra = Compra(
                     id_proveedor=id_proveedor,
                     id_usuario=current_user.id_usuario,
-                    numero_factura=numero_factura,
+                    numero_factura=numero_factura, timbrado=(request.form.get('timbrado') or '').strip()[:20] or None,
                     fecha_compra=fecha_compra,
                     hora_compra=hora_compra,
                     tipo_compra=tipo_compra,

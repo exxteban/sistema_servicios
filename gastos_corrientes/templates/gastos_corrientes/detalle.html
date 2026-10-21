@@ -112,7 +112,9 @@
                         <td class="px-4 py-3 align-top text-sm text-gray-700">{{ pago.periodo }}</td>
                         <td class="px-4 py-3 align-top text-sm text-gray-700">{{ pago.fecha_vencimiento.strftime('%d/%m/%Y') if pago.fecha_vencimiento else '-' }}</td>
                         <td class="px-4 py-3 align-top text-sm text-gray-700">{{ pago.fecha_pago.strftime('%d/%m/%Y') if pago.fecha_pago else '-' }}</td>
-                        <td class="px-4 py-3 align-top text-sm font-semibold text-gray-900 whitespace-nowrap">Gs. {{ '{:,.0f}'.format(pago.monto_pagado_decimal()).replace(',', '.') }}</td>
+                        <td class="px-4 py-3 align-top text-sm font-semibold text-gray-900 whitespace-nowrap">Gs. {{ '{:,.0f}'.format(pago.monto_pagado_decimal()).replace(',', '.') }}
+                            {% include 'contador/_gasto_factura.html' %}
+                        </td>
                         <td class="px-4 py-3 align-top text-sm text-gray-700">
                             {% if pago.pagado_desde_caja %}
                             Sí{% if pago.id_movimiento_caja %} · mov. #{{ pago.id_movimiento_caja }}{% endif %}

@@ -1,0 +1,31 @@
+{# Sin facturación electrónica: lo que no entra al débito y por qué. No son
+   pendientes (un ticket no lleva factura), pero la persona tiene que saber
+   que esas ventas no están en el número de arriba. #}
+{% if papel %}
+{% if not pos_pide_numero_factura %}
+<p class="mx-4 mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+    <i class="fas fa-circle-info mr-1"></i>El POS no está pidiendo el número de factura, así que las ventas nuevas no van a sumar acá.
+    Activá <span class="font-semibold">Mostrar campo de número de factura en POS</span>
+    {% if current_user.es_admin() or current_user.tiene_permiso('editar_configuracion') %}en <a class="underline" href="{{ url_for('usuarios.configuracion') }}">Configuración</a>{% else %}en Configuración (lo hace un administrador){% endif %}.
+</p>
+{% endif %}
+{% if papel.talonario is none and puede_gestionar_talonarios(current_user) %}
+<p class="px-4 pb-3 text-xs text-gray-500 dark:text-gray-400">
+    <i class="fas fa-book mr-1"></i>Cargá tu <a class="underline" href="{{ url_for('contador.talonarios') }}">talonario de facturas</a>
+    para que el POS ofrezca el número siguiente y acá se controle el timbrado y los saltos de numeración.
+</p>
+{% endif %}
+{% if papel.talonario and papel.talonario.saltos.cantidad %}
+<p class="px-4 pb-3 text-xs text-gray-500 dark:text-gray-400">
+    Saltos en la numeración: {{ papel.talonario.saltos.cantidad }} número(s) sin ninguna venta
+    ({{ papel.talonario.saltos.numeros|join(', ') }}{% if papel.talonario.saltos.cantidad > papel.talonario.saltos.numeros|length %}…{% endif %}).
+    Si se anularon a mano, guardá el original y las copias; si no, cargá el número en la venta que corresponda.
+</p>
+{% endif %}
+{% if papel.sin_numero.cantidad %}
+<p class="px-4 pb-3 text-xs text-gray-500 dark:text-gray-400">
+    No suman: {{ papel.sin_numero.cantidad }} venta(s) sin número de factura por {{ gs(papel.sin_numero.total) }}.
+    Si alguna se facturó, cargale el número en la venta para que entre.
+</p>
+{% endif %}
+{% endif %}
