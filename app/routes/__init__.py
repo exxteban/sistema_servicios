@@ -16,6 +16,7 @@ from app.routes import usuarios_config_general
 from app.routes import usuarios_config_ia
 from app.routes import usuarios_config_ia_backoffice
 from app.routes import usuarios_config_modulos
+from app.routes import usuarios_config_pasteleria
 from app.routes.tienda_api import tienda_api_bp
 from app.routes.tienda_promociones_api import tienda_promociones_api_bp
 from app.routes.tienda_admin import tienda_admin_bp

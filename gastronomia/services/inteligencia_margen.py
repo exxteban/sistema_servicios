@@ -18,7 +18,7 @@ def productos_alto_volumen_bajo_margen(cliente_id: int, periodo: dict, limite: i
     if not ventas:
         return []
 
-    costos_unitarios = _costos_unitarios_receta(cliente_id, [item['producto_id'] for item in ventas])
+    costos_unitarios = costos_unitarios_receta(cliente_id, [item['producto_id'] for item in ventas])
     promedio_unidades = sum(item['cantidad'] for item in ventas) / max(len(ventas), 1)
     umbral_volumen = max(3, promedio_unidades)
     candidatos = []
@@ -65,7 +65,7 @@ def _ventas_producto(cliente_id: int, periodo: dict) -> list[dict]:
     } for producto_id, nombre, cantidad, total in filas if int(producto_id or 0) > 0]
 
 
-def _costos_unitarios_receta(cliente_id: int, producto_ids: list[int]) -> dict[int, float]:
+def costos_unitarios_receta(cliente_id: int, producto_ids: list[int]) -> dict[int, float]:
     if not producto_ids:
         return {}
     filas = (

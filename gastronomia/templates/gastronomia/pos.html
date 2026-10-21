@@ -202,6 +202,7 @@
                 <button type="button" id="close-modal" class="pos-modal-close rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:text-gray-200">Cerrar</button>
             </div>
             <div id="modifier-groups" class="mt-5 space-y-4"></div>
+            {% include 'gastronomia/_pos_peso_modal.html' %}
             <div class="mt-5 grid gap-3 sm:grid-cols-[140px_1fr]">
                 <label class="pos-modal-field block text-sm font-semibold text-gray-700 dark:text-gray-200">
                     Cantidad
@@ -275,6 +276,8 @@
 <script src="{{ url_for('gastronomia.static', filename='js/pos_delivery_location.js', v='20260605-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_table_warnings.js', v='20260603-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_cart_modifiers.js', v='modificadores-20260728-3') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='modificadores-20260728-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos_modifier_groups.js', v='peso-20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos_peso.js', v='peso-20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='peso-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

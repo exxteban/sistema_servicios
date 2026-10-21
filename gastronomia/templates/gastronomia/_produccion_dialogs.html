@@ -1,0 +1,73 @@
+{# Dialogos de produccion: tanda, merma, porciones y cierre del dia. #}
+{% set _input = "mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" %}
+{% set _label = "block text-[11px] font-black uppercase tracking-wide text-gray-500 dark:text-gray-300" %}
+{% set _dialog = "w-[min(100%-2rem,32rem)] max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-0 text-gray-800 shadow-xl backdrop:bg-black/50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100" %}
+{% set _cerrar %}<button type="button" data-close class="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Cerrar"><i class="fas fa-xmark"></i></button>{% endset %}
+{% set _error = "hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" %}
+{% set _ok = "rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white hover:bg-amber-600" %}
+
+<dialog id="produccion-tanda-dialog" class="{{ _dialog }}">
+    <form method="dialog" class="space-y-4 p-5" data-form="tanda">
+        <div class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-black">Cargar tanda · <span data-producto></span></h2>
+            {{ _cerrar }}
+        </div>
+        <label class="{{ _label }}">Unidades producidas<input name="cantidad" type="number" min="1" max="10000" required class="{{ _input }}"></label>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Se suman al stock actual (lo que quedo de ayer sigue contando).</p>
+        <p data-error class="{{ _error }}"></p>
+        <div class="flex justify-end"><button type="submit" class="{{ _ok }}">Guardar tanda</button></div>
+    </form>
+</dialog>
+
+<dialog id="produccion-merma-dialog" class="{{ _dialog }}">
+    <form method="dialog" class="space-y-4 p-5" data-form="merma">
+        <div class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-black">Registrar merma · <span data-producto></span></h2>
+            {{ _cerrar }}
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+            <label class="{{ _label }}">Unidades<input name="cantidad" type="number" min="1" max="10000" required class="{{ _input }}"></label>
+            <label class="{{ _label }}">Motivo
+                <select name="motivo" required class="{{ _input }}">
+                    <option value="">Elegir...</option>
+                    {% for clave, etiqueta in motivos.items() %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </label>
+        </div>
+        <label class="{{ _label }}">Observacion<input name="observacion" maxlength="255" class="{{ _input }}"></label>
+        <p data-error class="{{ _error }}"></p>
+        <div class="flex justify-end"><button type="submit" class="{{ _ok }}">Registrar merma</button></div>
+    </form>
+</dialog>
+
+<dialog id="produccion-porciones-dialog" class="{{ _dialog }}">
+    <form method="dialog" class="space-y-4 p-5" data-form="porciones">
+        <div class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-black">Porciones · <span data-producto></span></h2>
+            {{ _cerrar }}
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+            <label class="{{ _label }}">Producto porcion<select name="producto_porcion_id" required class="{{ _input }}"></select></label>
+            <label class="{{ _label }}">Porciones por entero<input name="porciones" type="number" min="1" max="100" required value="12" class="{{ _input }}"></label>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Solo aparecen productos que controlan stock. "Abrir" resta 1 entero y suma estas porciones.</p>
+        <p data-error class="{{ _error }}"></p>
+        <div class="flex justify-between gap-2">
+            <button type="button" data-quitar class="hidden rounded-lg border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 dark:border-rose-500/30 dark:text-rose-300">Quitar porciones</button>
+            <button type="submit" class="{{ _ok }} ml-auto">Guardar</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="produccion-cierre-dialog" class="{{ _dialog }}">
+    <form method="dialog" class="space-y-4 p-5" data-form="cierre">
+        <div class="flex items-center justify-between gap-3">
+            <h2 class="text-lg font-black">Cierre del dia</h2>
+            {{ _cerrar }}
+        </div>
+        <p class="text-sm text-gray-600 dark:text-gray-300">Conta lo que quedo de cada producto. Si falta respecto del sistema, la diferencia queda como merma "faltante". Deja vacio lo que no quieras cerrar.</p>
+        <div data-cierre-filas class="space-y-2"></div>
+        <p data-error class="{{ _error }}"></p>
+        <div class="flex justify-end"><button type="submit" class="{{ _ok }}">Cerrar dia</button></div>
+    </form>
+</dialog>

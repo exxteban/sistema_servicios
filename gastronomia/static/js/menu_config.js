@@ -320,6 +320,7 @@
     }
     productoForm.dispatchEvent(new CustomEvent('gastro:extras-refresh'));
     productoForm.precio.value = producto.precio || 0;
+    if (productoForm.unidad_venta) productoForm.unidad_venta.value = producto.unidad_venta || 'unidad';
     productoForm.orden.value = producto.orden || 0;
     productoForm.imagen_url.value = producto.imagen_url || '';
     productoForm.disponible.checked = Boolean(producto.disponible);

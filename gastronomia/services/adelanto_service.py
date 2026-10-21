@@ -50,14 +50,19 @@ def adelantos_pedido(pedido: GastronomiaPedido, *, estado: str | None = None) ->
     return consulta.order_by(GastronomiaPedidoAdelanto.id_adelanto.asc()).all()
 
 
+def disponible(adelanto: GastronomiaPedidoAdelanto) -> Decimal:
+    """Lo que sigue a cuenta del encargo (un ajuste de peso puede haber devuelto una parte)."""
+    return Decimal(str(adelanto.monto or 0)) - Decimal(str(adelanto.monto_devuelto or 0))
+
+
 def sena_vigente(pedido: GastronomiaPedido) -> Decimal:
-    return _sumar(adelanto.monto for adelanto in adelantos_pedido(pedido, estado=ADELANTO_VIGENTE))
+    return _sumar(disponible(adelanto) for adelanto in adelantos_pedido(pedido, estado=ADELANTO_VIGENTE))
 
 
 def resumen_sena(pedido: GastronomiaPedido) -> dict:
     """Totales de seña de un encargo (los usa el tablero, nunca la cocina)."""
     adelantos = adelantos_pedido(pedido)
-    vigente = _sumar(a.monto for a in adelantos if a.estado == ADELANTO_VIGENTE)
+    vigente = _sumar(disponible(a) for a in adelantos if a.estado == ADELANTO_VIGENTE)
     total = Decimal(str(pedido.total or 0))
     return {
         'sena_vigente': float(vigente),
@@ -171,7 +176,7 @@ def _resolver_adelantos(cliente_id, usuario_id, pedido, adelantos, *, opcion, mo
     if opcion not in permitidas:
         raise ValueError('Elegi que hacer con la sena: ' + ', '.join(permitidas).replace('_', ' ') + '.')
 
-    total = _sumar(a.monto for a in adelantos)
+    total = _sumar(disponible(a) for a in adelantos)
     retenido = _monto_a_retener(opcion, total, monto_retenido)
     usuario = _usuario(usuario_id)
     sesion = sesion_caja_abierta_usuario(usuario)
@@ -182,9 +187,9 @@ def _resolver_adelantos(cliente_id, usuario_id, pedido, adelantos, *, opcion, mo
     por_retener = retenido
     reparto = []
     for adelanto in adelantos:
-        retiene = min(Decimal(str(adelanto.monto)), por_retener)
+        retiene = min(disponible(adelanto), por_retener)
         por_retener -= retiene
-        reparto.append((adelanto, retiene, Decimal(str(adelanto.monto)) - retiene))
+        reparto.append((adelanto, retiene, disponible(adelanto) - retiene))
 
     efectivo_a_devolver = _sumar(devuelve for adelanto, _, devuelve in reparto if adelanto.id_movimiento_caja)
     movimiento = None
@@ -206,7 +211,7 @@ def _resolver_adelantos(cliente_id, usuario_id, pedido, adelantos, *, opcion, mo
     nota = (motivo or '').strip()[:200]
     for adelanto, retiene, devuelve in reparto:
         adelanto.estado = ADELANTO_RETENIDO if retiene > 0 else ADELANTO_DEVUELTO
-        adelanto.monto_devuelto = devuelve
+        adelanto.monto_devuelto = Decimal(str(adelanto.monto_devuelto or 0)) + devuelve
         if movimiento is not None and devuelve > 0 and adelanto.id_movimiento_caja:
             adelanto.id_movimiento_devolucion = int(movimiento.id_movimiento_caja)
         adelanto.fecha_resolucion = ahora
@@ -245,7 +250,48 @@ def aplicar_adelantos(pedido: GastronomiaPedido, id_venta: int) -> Decimal:
     for adelanto in adelantos:
         adelanto.estado = ADELANTO_APLICADO
         adelanto.id_venta = int(id_venta)
-    return _sumar(adelanto.monto for adelanto in adelantos)
+    return _sumar(disponible(adelanto) for adelanto in adelantos)
+
+
+def devolver_excedente_sena(pedido: GastronomiaPedido, excedente: Decimal, usuario_id: int, motivo: str) -> Decimal:
+    """Devuelve la parte de la sena que supera el nuevo total (ajuste de peso). No hace commit.
+
+    Sale de los adelantos mas recientes; el efectivo genera un egreso de caja.
+    Un adelanto que queda en cero pasa a `devuelto`; los demas siguen `vigente`.
+    """
+    restante = Decimal(str(excedente or 0)).quantize(CENTAVOS)
+    if restante <= 0:
+        return Decimal('0.00')
+    reparto = []
+    for adelanto in reversed(adelantos_pedido(pedido, estado=ADELANTO_VIGENTE)):
+        devuelve = min(disponible(adelanto), restante)
+        if devuelve > 0:
+            reparto.append((adelanto, devuelve))
+            restante -= devuelve
+    efectivo = _sumar(devuelve for adelanto, devuelve in reparto if adelanto.id_movimiento_caja)
+    movimiento = None
+    if efectivo > 0:
+        movimiento, error = crear_movimiento_sena(
+            delta=-efectivo,
+            usuario=_usuario(usuario_id),
+            referencia_tipo=REF_SENA_ENCARGO,
+            referencia_id=int(pedido.id_pedido),
+            motivo_ingreso=f'Sena encargo #{pedido.id_pedido}',
+            motivo_egreso=f'Devolucion excedente sena encargo #{pedido.id_pedido} ({motivo})'[:255],
+            mensaje_sin_caja=MENSAJE_SIN_CAJA_RESOLVER,
+        )
+        if error:
+            raise ValueError(error)
+        db.session.flush()
+    for adelanto, devuelve in reparto:
+        adelanto.monto_devuelto = Decimal(str(adelanto.monto_devuelto or 0)) + devuelve
+        if movimiento is not None and adelanto.id_movimiento_caja:
+            adelanto.id_movimiento_devolucion = int(movimiento.id_movimiento_caja)
+        if disponible(adelanto) <= 0:
+            adelanto.estado = ADELANTO_DEVUELTO
+            adelanto.fecha_resolucion = datetime.utcnow()
+            adelanto.usuario_resolucion_id = int(usuario_id)
+    return _sumar(devuelve for _, devuelve in reparto)
 
 
 def revertir_adelantos_aplicados(pedido: GastronomiaPedido) -> None:

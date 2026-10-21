@@ -10,7 +10,7 @@ from gastronomia.models import (
     GastronomiaPedidoPago,
 )
 from gastronomia.services.delivery_gps import ubicacion_delivery_publicable_filter
-from gastronomia.services.sena_consultas import datos_sena_encargo, senas_vigentes_por_pedido
+from gastronomia.services.encargo_consultas import datos_encargo, fotos_por_pedido, senas_vigentes_por_pedido
 from gastronomia.services.stock_service import alertas_stock_pedido
 
 
@@ -69,6 +69,7 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
             'promocion_descripcion': item.promocion_descripcion,
             'cantidad_bonificada': int(item.cantidad_bonificada or 0),
             'notas': item.notas,
+            **item.datos_peso(),
             'subtotal': float(item.subtotal or 0),
             'modificadores': modificadores_por_item.get(int(item.id_item), []),
         }
@@ -90,7 +91,9 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
     for ubicacion in ubicaciones_delivery:
         ubicacion_por_pedido.setdefault(int(ubicacion.pedido_id), ubicacion)
 
-    senas = senas_vigentes_por_pedido(pedido.id_pedido for pedido in pedidos if pedido.es_encargo)
+    encargo_ids = [int(pedido.id_pedido) for pedido in pedidos if pedido.es_encargo]
+    senas = senas_vigentes_por_pedido(encargo_ids)
+    fotos = fotos_por_pedido(encargo_ids)
     resultado = []
     for pedido in pedidos:
         data = _pedido_to_dict_prearmado(
@@ -100,7 +103,8 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
             ubicacion_delivery=ubicacion_por_pedido.get(int(pedido.id_pedido)),
         )
         if pedido.es_encargo:
-            data.update(datos_sena_encargo(pedido, senas.get(int(pedido.id_pedido), 0)))
+            pedido_id = int(pedido.id_pedido)
+            data.update(datos_encargo(pedido, sena=senas.get(pedido_id, 0), fotos=fotos.get(pedido_id, [])))
         resultado.append(data)
     return resultado
 

@@ -4,6 +4,7 @@ from datetime import datetime
 from app import db
 from gastronomia.config_flags import PasteleriaFlagsMixin, PasteleriaParametrosMixin
 from gastronomia.encargo_models import PedidoEncargoMixin, PedidoItemEncargoMixin
+from gastronomia.peso_models import PedidoItemPesoMixin, ProductoPesoMixin
 import json
 import secrets
 
@@ -79,7 +80,7 @@ class GastronomiaCategoria(db.Model):
         return data
 
 
-class GastronomiaProducto(db.Model):
+class GastronomiaProducto(ProductoPesoMixin, db.Model):
     __tablename__ = 'gastronomia_productos'
 
     id_producto = db.Column(db.Integer, primary_key=True)
@@ -124,12 +125,14 @@ class GastronomiaProducto(db.Model):
             'stock_disponible': self.stock_disponible,
             'activo': bool(self.activo),
             'orden': int(self.orden or 0),
+            **self.datos_peso(),
         }
         from app.services.tienda_promociones import (
             attach_gastronomia_promotion_to_product_data,
             get_active_gastronomia_product_promotion,
         )
-        promotion = get_active_gastronomia_product_promotion(self.cliente_id, self.id_producto)
+        # Un producto por kilo nunca recibe promociones (ver docs/pasteleria_fase2_diseno.md).
+        promotion = None if self.se_vende_por_peso else get_active_gastronomia_product_promotion(self.cliente_id, self.id_producto)
         return attach_gastronomia_promotion_to_product_data(self, data, promotion)
 
 
@@ -337,8 +340,8 @@ class GastronomiaPedido(PedidoEncargoMixin, db.Model):
             'alertas_stock': alertas_stock_pedido(self.id_pedido),
         }
         if self.es_encargo:
-            from gastronomia.services.sena_consultas import datos_sena_encargo
-            data.update(datos_sena_encargo(self))
+            from gastronomia.services.encargo_consultas import datos_encargo
+            data.update(datos_encargo(self))
         return data
 
     @property
@@ -422,7 +425,7 @@ class GastronomiaDeliveryUbicacion(db.Model):
         }
 
 
-class GastronomiaPedidoItem(PedidoItemEncargoMixin, db.Model):
+class GastronomiaPedidoItem(PedidoItemEncargoMixin, PedidoItemPesoMixin, db.Model):
     __tablename__ = 'gastronomia_pedido_items'
 
     id_item = db.Column(db.Integer, primary_key=True)
@@ -469,6 +472,7 @@ class GastronomiaPedidoItem(PedidoItemEncargoMixin, db.Model):
             'cantidad_bonificada': int(self.cantidad_bonificada or 0),
             'notas': self.notas,
             'texto_personalizado': self.texto_personalizado,
+            **self.datos_peso(),
             'subtotal': float(self.subtotal or 0),
             'modificadores': [
                 item.to_dict()

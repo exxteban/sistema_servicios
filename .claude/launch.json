@@ -4,7 +4,9 @@
     {
       "name": "stock-tabs",
       "runtimeExecutable": ".venv313/Scripts/python.exe",
-      "runtimeArgs": ["run.py"],
+      "runtimeArgs": [
+        "run.py"
+      ],
       "port": 5057,
       "env": {
         "PORT": "5057",
@@ -16,7 +18,9 @@
     {
       "name": "prueba-fe",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["run.py"],
+      "runtimeArgs": [
+        "run.py"
+      ],
       "port": 5055,
       "env": {
         "PORT": "5055",
@@ -28,11 +32,28 @@
     {
       "name": "revision-peluqueria",
       "runtimeExecutable": ".venv313/Scripts/python.exe",
-      "runtimeArgs": ["run.py"],
+      "runtimeArgs": [
+        "run.py"
+      ],
       "port": 5056,
       "env": {
         "PORT": "5056",
         "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/C--Users-csarl-Documents-proyectos-saas-sistema-servicios/01dcc636-de24-46bc-9cfa-1b74d83717ed/scratchpad/peluq.db",
+        "SERVER": "flask",
+        "DEBUG": "0"
+      }
+    },
+    {
+      "name": "encargos-tablero",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "run.py"
+      ],
+      "port": 5058,
+      "env": {
+        "PORT": "5058",
+        "APP_CONFIG": "development",
+        "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/C--Users-csarl-Documents-proyectos-saas-sistema-servicios/b89fe42c-ef33-4ccd-ab3e-b9a3f55c0646/scratchpad/encargos.db",
         "SERVER": "flask",
         "DEBUG": "0"
       }

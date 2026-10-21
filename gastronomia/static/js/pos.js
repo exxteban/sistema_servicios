@@ -111,7 +111,7 @@
           ${product.disponible ? '' : '<span class="pos-soldout-badge">Agotado</span>'}
         </span>
         <span class="mt-1.5 line-clamp-2 block min-h-8 text-xs text-gray-600 dark:text-gray-400">${escapeHtml(product.descripcion || 'Toca para configurar el item.')}</span>
-        <span class="mt-3 block text-lg font-black text-orange-600 dark:text-orange-300">${money(product.precio)}</span>
+        <span class="mt-3 block text-lg font-black text-orange-600 dark:text-orange-300">${window.PosPeso?.priceLabel(product, money) || money(product.precio)}</span>
         ${product.promocion_activa?.etiqueta ? `<span class="mt-1 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-black text-emerald-700">${escapeHtml(product.promocion_activa.etiqueta)}</span>` : ''}
       </button>
     `).join('') || `
@@ -170,6 +170,7 @@
       precio_base: Number(item.precio_original || item.precio_unitario || 0),
       promocion_activa: null,
       subtotal_guardado: Number(item.subtotal || 0),
+      peso_kg: item.peso_kg ?? null,
       opciones: modifiers.map((modifier) => Number(modifier.opcion_id)).filter(Boolean),
       selecciones: modifiers.map((modifier) => ({
         ...modifier,
@@ -244,6 +245,7 @@
     editingItemKey = item?.key || null;
     modalName.textContent = product.nombre;
     modalPrice.textContent = money(product.precio);
+    window.PosPeso?.prepare(product, item, money);
     modalQty.value = item?.cantidad || 1;
     modalNote.value = item?.notas || '';
     modalGroups.innerHTML = (product.grupos_opciones || [])
@@ -258,31 +260,9 @@
     modal.classList.remove('hidden');
     modal.classList.add('flex');
   };
-  const renderGroup = (group, selectedOptions = []) => {
-    const isRemovable = group.tipo === 'ingrediente_removible';
-    const inputType = isRemovable ? 'checkbox' : (group.max_selecciones === 1 ? 'radio' : 'checkbox');
-    const helper = isRemovable ? 'Marca los ingredientes que NO debe llevar.' : 'Selecciona las opciones para este item.';
-    return `
-      <section class="pos-modifier-group rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-        <div class="pos-modifier-group-head flex items-center justify-between gap-3">
-          <h3 class="font-bold text-gray-900 dark:text-white">${escapeHtml(group.nombre)}</h3>
-          <span class="pos-modifier-group-limit text-xs font-semibold text-gray-500">${group.min_selecciones || 0}-${group.max_selecciones || 0}</span>
-        </div>
-        <p class="pos-modifier-group-helper mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">${helper}</p>
-        <div class="pos-modifier-group-options mt-3 grid gap-2 sm:grid-cols-2">
-          ${(group.opciones || []).map((option) => `
-            <label class="pos-modifier-option rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold dark:border-gray-700 dark:text-gray-100">
-              <span class="pos-modifier-option-copy">
-                <input type="${inputType}" name="group-${group.id_grupo}" value="${option.id_opcion}" class="pos-modifier-option-input" ${selectedOptions.includes(Number(option.id_opcion)) ? 'checked' : ''}>
-                <span class="pos-modifier-option-name">${escapeHtml(formatModifierName({...option, tipo_grupo: group.tipo}))}</span>
-              </span>
-              <span class="pos-modifier-option-price">${option.precio_delta > 0 ? `+${money(option.precio_delta)}` : option.precio_delta < 0 ? `-${money(Math.abs(option.precio_delta))}` : 'Sin costo'}</span>
-            </label>
-          `).join('')}
-        </div>
-      </section>
-    `;
-  };
+  const renderGroup = (group, selectedOptions = []) => (
+    window.PosModifierGroups.render(group, selectedOptions, {escapeHtml, money, formatModifierName})
+  );
   const addConfiguredProduct = async () => {
     window.GastronomiaChannelPrices?.ensureCanAdd(cart, activeProduct);
     const selectedOptions = Array.from(modal.querySelectorAll('#modifier-groups input:checked')).map((input) => Number(input.value));
@@ -303,6 +283,7 @@
       selecciones: validation.selecciones || [],
       notas: modalNote.value.trim(),
     };
+    window.PosPeso?.apply(configuredItem, activeProduct);
     if (editingItemKey) {
       cart = cart.map((item) => item.key === editingItemKey ? configuredItem : item);
     } else {
@@ -376,6 +357,7 @@
       producto_id: item.producto_id,
       canal_precio: item.canal_precio || null,
       cantidad: item.cantidad,
+      peso_kg: item.peso_kg ?? null,
       opciones: item.opciones,
       notas: item.notas,
     })),

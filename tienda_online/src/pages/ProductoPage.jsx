@@ -6,6 +6,7 @@ import SocialSideRails from '../components/layout/SocialSideRails'
 import { useTiendaConfig } from '../hooks/useTiendaConfig'
 import { tiendaApi } from '../services/tiendaApi'
 import ImageGallery from '../components/ui/ImageGallery'
+import { TEXTO_POR_PESO, esPorPeso } from '../utils/ventaPorPeso'
 import ProductoPageSkeleton from '../components/ui/ProductoPageSkeleton'
 import ProductPriceBlock from '../components/ui/ProductPriceBlock'
 import ProductoCard from '../components/ui/ProductoCard'
@@ -137,6 +138,10 @@ export default function ProductoPage() {
 
   const handleAddToOrder = () => {
     if (!producto) return
+    if (esPorPeso(producto)) {
+      setOrderNotice(TEXTO_POR_PESO)
+      return
+    }
     if (hasProductOptions || selectedModifiers.length > 0) {
       addCustomizedItem(producto, selectedModifiers, productTotal, 1)
     } else {
@@ -273,9 +278,10 @@ export default function ProductoPage() {
                 type="button"
                 className={btnClass}
                 onClick={handleAddToOrder}
+                disabled={esPorPeso(producto)}
                 style={{ width: '100%', padding: '16px 24px', fontSize: '1.1rem', ...btnStyle }}
               >
-                Agregar al pedido
+                {esPorPeso(producto) ? TEXTO_POR_PESO : 'Agregar al pedido'}
               </button>
               {orderNotice ? <p className="product-detail-order-box__notice">{orderNotice}</p> : null}
               <Link to={`/tienda/${slug}`} className="product-detail-order-box__continue">

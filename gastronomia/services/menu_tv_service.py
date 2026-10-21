@@ -162,8 +162,10 @@ def _producto_tv(producto: GastronomiaProducto, promotion=None) -> dict:
         'imagen_url': producto.imagen_url,
         'disponible': bool(producto.disponible),
         'orden': int(producto.orden or 0),
+        'unidad_venta': producto.unidad_venta or 'unidad',
     }
-    return attach_gastronomia_promotion_to_product_data(producto, data, promotion)
+    # Por kilo no hay promociones (docs/pasteleria_fase2_diseno.md).
+    return attach_gastronomia_promotion_to_product_data(producto, data, None if producto.se_vende_por_peso else promotion)
 
 
 def _clean_text(value, limit: int) -> str | None:
