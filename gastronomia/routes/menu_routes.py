@@ -10,6 +10,7 @@ from gastronomia.services.menu_combo_service import resumen_productos_para_combo
 from gastronomia.services.channel_price_service import CANALES_PRECIOS, listar_precios_canal
 from gastronomia.services.menu_tv_service import obtener_o_preparar_config_tv, serializar_config_tv
 from gastronomia.services.permisos import PERMISO_MENU, requiere_permiso_gastronomia
+from gastronomia.services.peso_service import venta_por_peso_habilitada
 
 
 @gastronomia_bp.route('/menu')
@@ -46,6 +47,7 @@ def menu_config():
         ]
     return render_template(
         'gastronomia/menu_config.html',
+        venta_por_peso=venta_por_peso_habilitada(cliente_id),
         categorias=categorias,
         productos=productos,
         menu_plantillas=listar_plantillas(),

@@ -18,7 +18,10 @@ def senas_vigentes_por_pedido(pedido_ids) -> dict[int, Decimal]:
     if not ids:
         return {}
     filas = (
-        db.session.query(GastronomiaPedidoAdelanto.pedido_id, db.func.sum(GastronomiaPedidoAdelanto.monto))
+        db.session.query(
+            GastronomiaPedidoAdelanto.pedido_id,
+            db.func.sum(GastronomiaPedidoAdelanto.monto - GastronomiaPedidoAdelanto.monto_devuelto),
+        )
         .filter(
             GastronomiaPedidoAdelanto.pedido_id.in_(ids),
             GastronomiaPedidoAdelanto.estado == ADELANTO_VIGENTE,

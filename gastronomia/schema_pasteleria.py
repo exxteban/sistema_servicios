@@ -6,7 +6,12 @@ engordar `gastronomia/schema.py`. Mismo patron que alla: SQLite y MySQL.
 from sqlalchemy import text
 
 from app import db
-from gastronomia.config_flags import FOTOS_ENCARGO_DEFAULT, OPCIONES_CANCELACION_DEFAULT, PASTELERIA_FLAGS
+from gastronomia.config_flags import (
+    FOTOS_ENCARGO_DEFAULT,
+    OPCIONES_CANCELACION_DEFAULT,
+    PASTELERIA_FLAGS,
+    PESO_ATAJOS_DEFAULT,
+)
 from gastronomia.schema import (
     _declares_nullability_or_default,
     _mysql_column_exists,
@@ -27,6 +32,7 @@ CONFIG_COLUMN_MIGRATIONS = tuple(
     ('encargos_max_por_dia', 'INTEGER'),
     ('encargos_max_fotos', f'INTEGER NOT NULL DEFAULT {FOTOS_ENCARGO_DEFAULT}'),
     ('encargos_cancelacion_opciones', f"VARCHAR(120) NOT NULL DEFAULT '{OPCIONES_CANCELACION_DEFAULT}'"),
+    ('peso_atajos_kg', f"VARCHAR(60) NOT NULL DEFAULT '{PESO_ATAJOS_DEFAULT}'"),
 )
 
 # Fase 1: encargos.
@@ -36,6 +42,13 @@ ORDER_COLUMN_MIGRATIONS = (
 )
 ORDER_ITEM_COLUMN_MIGRATIONS = (
     ('texto_personalizado', 'VARCHAR(240)'),
+    # Fase 2: venta por peso.
+    ('peso_kg', 'NUMERIC(10,3)'),
+    ('precio_por_kg', 'NUMERIC(15,2)'),
+)
+PRODUCT_TABLE = 'gastronomia_productos'
+PRODUCT_COLUMN_MIGRATIONS = (
+    ('unidad_venta', "VARCHAR(10) NOT NULL DEFAULT 'unidad'"),
 )
 ORDER_SCHEDULE_INDEX = 'ix_gastronomia_pedidos_fecha_programada'
 ADELANTO_TABLE = 'gastronomia_pedido_adelantos'
@@ -74,6 +87,7 @@ def _ensure_sqlite_columns():
     _ensure_sqlite_table_columns(ORDER_TABLE, ORDER_COLUMN_MIGRATIONS)
     _ensure_sqlite_table_columns(ORDER_ITEM_TABLE, ORDER_ITEM_COLUMN_MIGRATIONS)
     _ensure_sqlite_table_columns(ADELANTO_TABLE, ADELANTO_COLUMN_MIGRATIONS)
+    _ensure_sqlite_table_columns(PRODUCT_TABLE, PRODUCT_COLUMN_MIGRATIONS)
     if _sqlite_table_exists(ORDER_TABLE):
         db.session.execute(text(
             f'CREATE INDEX IF NOT EXISTS {ORDER_SCHEDULE_INDEX} ON {ORDER_TABLE}(fecha_programada)'
@@ -86,6 +100,7 @@ def _ensure_mysql_columns():
     _ensure_mysql_table_columns(ORDER_TABLE, ORDER_COLUMN_MIGRATIONS)
     _ensure_mysql_table_columns(ORDER_ITEM_TABLE, ORDER_ITEM_COLUMN_MIGRATIONS)
     _ensure_mysql_table_columns(ADELANTO_TABLE, ADELANTO_COLUMN_MIGRATIONS)
+    _ensure_mysql_table_columns(PRODUCT_TABLE, PRODUCT_COLUMN_MIGRATIONS)
     if _mysql_table_exists(ORDER_TABLE) and not _mysql_index_exists(ORDER_TABLE, ORDER_SCHEDULE_INDEX):
         db.session.execute(text(f'CREATE INDEX {ORDER_SCHEDULE_INDEX} ON {ORDER_TABLE}(fecha_programada)'))
     db.session.commit()

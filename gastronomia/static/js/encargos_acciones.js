@@ -94,5 +94,37 @@
     }
   });
 
-  window.EncargoAcciones = {openSena, openCancel};
+  const pesoDialog = document.getElementById('encargo-peso-dialog');
+  const pesoForm = document.getElementById('encargo-peso-form');
+  ui.closeOnButtons(pesoDialog);
+  let pesoItem = null;
+
+  const openPeso = (encargo, item, callback) => {
+    current = encargo;
+    pesoItem = item;
+    onDone = callback;
+    pesoForm.reset();
+    ui.showError(pesoForm.querySelector('[data-form-error]'), '');
+    pesoForm.querySelector('[data-peso-resumen]').textContent = (
+      `${item.nombre_producto}: ${ui.money(item.precio_por_kg)} / kg. Seña ${ui.money(encargo.sena_vigente)}.`
+    );
+    pesoDialog.showModal();
+  };
+
+  pesoForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      const data = await ui.apiJson(`/api/gastronomia/encargos/${current.id_pedido}/items/${pesoItem.id_item}/peso`, {
+        method: 'POST',
+        body: JSON.stringify({peso_kg: pesoForm.peso_kg.value.trim().replace(',', '.')}),
+      });
+      pesoDialog.close();
+      const devuelta = Number(data.sena_devuelta || 0);
+      onDone(devuelta > 0 ? `Peso ajustado. Se devolvieron ${ui.money(devuelta)} de seña.` : 'Peso ajustado.', true);
+    } catch (error) {
+      ui.showError(pesoForm.querySelector('[data-form-error]'), error.message);
+    }
+  });
+
+  window.EncargoAcciones = {openSena, openCancel, openPeso};
 })();

@@ -124,6 +124,7 @@
                                 <input name="orden" type="number" value="0"
                                        class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                             </label>
+                            {% if venta_por_peso %}{% include 'gastronomia/_menu_unidad_venta.html' %}{% endif %}
                         </div>
                         </div>
                         <div data-producto-subtab-panel="publicacion" class="hidden space-y-3" role="tabpanel">

@@ -16,6 +16,7 @@ from gastronomia.models import (
 from gastronomia.services.mesa_lookup import obtener_mesa_activa_por_nombre
 from gastronomia.services.menu_service import parse_int
 from gastronomia.services.modificadores_service import validar_selecciones_producto
+from gastronomia.services.peso_service import linea_por_peso
 from gastronomia.services.pedido_validation_utils import (
     coords_from_location_text,
     parse_estimated_minutes,
@@ -394,19 +395,21 @@ def _crear_item_desde_payload(
         raise ValueError(f'El producto "{producto.get("nombre")}" no esta disponible.')
     precio_base = money(producto.get('precio_base', producto['precio']))
     modificadores = money(validado['total_modificadores'])
-    promotion = None if canal_precio else get_active_gastronomia_product_promotion(cliente_id, producto['id_producto'])
+    peso = linea_por_peso(producto, item_data, modificadores)  # None si se vende por unidad
+    promotion = None if canal_precio or peso else get_active_gastronomia_product_promotion(cliente_id, producto['id_producto'])
+    cantidad = peso['cantidad'] if peso else cantidad
     metrics = calculate_promotion_totals(precio_base, cantidad, promotion)
-    subtotal = money(metrics['subtotal_base'] + (modificadores * cantidad))
+    subtotal = peso['subtotal'] if peso else money(metrics['subtotal_base'] + (modificadores * cantidad))
     precio_unitario = money(subtotal / cantidad)
     item = GastronomiaPedidoItem(
         pedido_id=pedido_id,
         cliente_id=int(cliente_id),
         producto_id=int(producto['id_producto']),
         canal_precio=canal_precio,
-        nombre_producto=producto['nombre'],
+        nombre_producto=peso['nombre_producto'] if peso else producto['nombre'],
         cantidad=cantidad,
         precio_unitario=precio_unitario,
-        precio_original=money(precio_base + modificadores),
+        precio_original=subtotal if peso else money(precio_base + modificadores),
         descuento_linea=metrics['descuento_linea'],
         id_promocion_aplicada=getattr(promotion, 'id_promocion', None),
         promocion_descripcion=metrics['descripcion'],
@@ -414,6 +417,8 @@ def _crear_item_desde_payload(
         notas=(item_data.get('notas') or '').strip() or None,
         texto_personalizado=(item_data.get('texto_personalizado') or '').strip()[:240] or None,
         subtotal=subtotal,
+        peso_kg=peso['peso_kg'] if peso else None,
+        precio_por_kg=peso['precio_por_kg'] if peso else None,
     )
     db.session.add(item)
     db.session.flush()

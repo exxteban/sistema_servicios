@@ -73,7 +73,7 @@
     const previousPrice = product.precio_anterior
       ? `<span class="menu-tv-price-old">${money(product.precio_anterior)}</span>`
       : '';
-    const price = config.mostrar_precios ? `${previousPrice}<strong class="menu-tv-price">${money(product.precio)}</strong>` : '';
+    const price = config.mostrar_precios ? `${previousPrice}<strong class="menu-tv-price">${money(product.precio)}${product.unidad_venta === 'kg' ? ' / kg' : ''}</strong>` : '';
     const promotionBadge = product.promocion_activa?.etiqueta
       ? `<span class="menu-tv-promo-badge">${escapeHtml(product.promocion_activa.etiqueta)}</span>`
       : '';

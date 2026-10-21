@@ -172,10 +172,24 @@ def guardar_producto(cliente_id: int, data: dict, producto: GastronomiaProducto 
     producto.control_stock_venta = parse_bool(data.get('control_stock_venta'), False)
     producto.stock_disponible = _stock_disponible_desde_payload(data) if producto.control_stock_venta else None
     producto.orden = parse_int(data.get('orden'), 0)
+    producto.unidad_venta = _unidad_venta_desde_payload(cliente_id, data, producto)
     db.session.add(producto)
     _commit_or_raise_duplicate('Ya existe un producto con ese nombre.')
     asegurar_precios_producto(producto)
     return producto
+
+
+def _unidad_venta_desde_payload(cliente_id: int, data: dict, producto: GastronomiaProducto) -> str:
+    """Solo con venta por peso habilitada se cambia la unidad; si no, se conserva la actual."""
+    from gastronomia.services.peso_service import normalizar_unidad_menu, venta_por_peso_habilitada
+
+    actual = producto.unidad_venta or 'unidad'
+    if 'unidad_venta' not in data:
+        return actual
+    pedida = normalizar_unidad_menu(data.get('unidad_venta'))
+    if pedida != actual and not venta_por_peso_habilitada(cliente_id):
+        raise ValueError('La venta por peso no esta habilitada para este local.')
+    return pedida
 
 
 def actualizar_estado_producto(cliente_id: int, producto_id: int, data: dict) -> GastronomiaProducto | None:

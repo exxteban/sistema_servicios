@@ -3,6 +3,7 @@ import ProductPriceBlock from './ProductPriceBlock'
 import { promotionBadge } from '../../utils/promotions'
 import StoreImage from './StoreImage'
 import { buildProductPath } from '../../utils/storeFormatting'
+import { TEXTO_POR_PESO, esPorPeso } from '../../utils/ventaPorPeso'
 
 export default function ProductoCard({
   slug,
@@ -69,7 +70,9 @@ export default function ProductoCard({
         <div className="product-action">
           <ProductPriceBlock producto={producto} compact />
 
-          {quickOrderEnabled ? (
+          {quickOrderEnabled && esPorPeso(producto) ? (
+            <p className="product-quick-order__hint">{TEXTO_POR_PESO}</p>
+          ) : quickOrderEnabled ? (
             <div className="product-quick-order">
               {requiresCustomization ? (
                 <Link

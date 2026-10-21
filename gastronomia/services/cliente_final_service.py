@@ -62,6 +62,9 @@ def crear_pedido_publico_gastronomia(cliente_id: int, data: dict) -> dict:
         'origen_pedido': 'tienda_online',
         'items': _normalizar_items_carrito(data.get('items') or []),
     }
+    from gastronomia.services.peso_service import rechazar_por_peso_en_pedido_web
+
+    rechazar_por_peso_en_pedido_web(cliente_id, pedido_payload['items'])
     pedido = crear_pedido(cliente_id, usuario_id, pedido_payload)
     _registrar_actividad_cliente(cliente_final, pedido, data)
     return {

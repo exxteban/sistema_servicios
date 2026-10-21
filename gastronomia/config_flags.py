@@ -37,6 +37,8 @@ OPCION_RETENER_PARCIAL = 'retener_parcial'
 OPCIONES_CANCELACION = (OPCION_DEVOLVER_TODO, OPCION_RETENER_TODO, OPCION_RETENER_PARCIAL)
 OPCIONES_CANCELACION_DEFAULT = ','.join(OPCIONES_CANCELACION)
 FOTOS_ENCARGO_DEFAULT = 5
+# Atajos del modal de peso (kg), separados por coma.
+PESO_ATAJOS_DEFAULT = '1,1.5,2'
 
 
 class PasteleriaParametrosMixin:
@@ -52,4 +54,7 @@ class PasteleriaParametrosMixin:
         nullable=False,
         default=OPCIONES_CANCELACION_DEFAULT,
         server_default=OPCIONES_CANCELACION_DEFAULT,
+    )
+    peso_atajos_kg = db.Column(
+        db.String(60), nullable=False, default=PESO_ATAJOS_DEFAULT, server_default=PESO_ATAJOS_DEFAULT,
     )

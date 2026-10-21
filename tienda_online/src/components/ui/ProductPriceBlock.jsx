@@ -1,4 +1,5 @@
 import { formatGs } from '../../utils/storeFormatting'
+import { esPorPeso } from '../../utils/ventaPorPeso'
 
 export default function ProductPriceBlock({ producto, compact = false }) {
   const precioActual = formatGs(producto?.precio)
@@ -8,7 +9,7 @@ export default function ProductPriceBlock({ producto, compact = false }) {
   return (
     <div className={`price-block ${compact ? 'price-block-compact' : ''}`}>
       <div className="price-block-main">
-        <span className="price-block-current">{precioActual}</span>
+        <span className="price-block-current">{precioActual}{esPorPeso(producto) ? ' / kg' : ''}</span>
         {producto?.descuento_porcentaje ? (
           <span className="price-block-discount">-{producto.descuento_porcentaje}%</span>
         ) : null}

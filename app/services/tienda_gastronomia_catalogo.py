@@ -218,8 +218,10 @@ def _serializar_producto_card(producto: GastronomiaProducto, config: TiendaConfi
         'es_oferta': False,
         'promocion_activa': None,
         'tipo_catalogo': 'gastronomia',
+        # Por kilo: precio por kg, sin promociones ni carrito web (docs/pasteleria_fase2_diseno.md).
+        'unidad_venta': producto.unidad_venta or 'unidad',
     }
-    return attach_gastronomia_promotion_to_product_data(producto, data, promotion)
+    return attach_gastronomia_promotion_to_product_data(producto, data, None if producto.se_vende_por_peso else promotion)
 
 
 def _imagenes_producto(producto: GastronomiaProducto) -> list[dict]:

@@ -11,6 +11,7 @@ from app.models.cliente import Cliente
 from app.models.servicio import Servicio
 from app.models.venta import DetalleVenta, MetodoPago, PagoVenta, Ticket, Venta
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem, GastronomiaPedidoPago
+from gastronomia.services.peso_service import nombre_servicio_item
 
 
 METODO_BUSQUEDAS = {
@@ -471,10 +472,11 @@ def _servicio_para_item(item) -> Servicio:
     codigo = f'GASTRO-{int(item.cliente_id)}-{int(item.producto_id)}'
     servicio = Servicio.query.filter_by(codigo=codigo).first()
     precio = Decimal(str(item.precio_unitario or 0)).quantize(Decimal('0.01'))
+    nombre = nombre_servicio_item(item)
     if not servicio:
         servicio = Servicio(
             codigo=codigo,
-            nombre=item.nombre_producto,
+            nombre=nombre,
             categoria='Gastronomia',
             descripcion='Servicio generado automaticamente desde menu gastronomico.',
             costo=Decimal('0.00'),
@@ -486,10 +488,11 @@ def _servicio_para_item(item) -> Servicio:
         db.session.add(servicio)
         db.session.flush()
         return servicio
-    servicio.nombre = item.nombre_producto
+    servicio.nombre = nombre
     servicio.precio = precio
     servicio.activo = True
     return servicio
+
 
 
 def _servicio_envio_para_pedido(pedido: GastronomiaPedido) -> Servicio:

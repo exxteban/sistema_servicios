@@ -69,6 +69,7 @@ def serializar_pedidos(pedidos: list[GastronomiaPedido]) -> list[dict]:
             'promocion_descripcion': item.promocion_descripcion,
             'cantidad_bonificada': int(item.cantidad_bonificada or 0),
             'notas': item.notas,
+            **item.datos_peso(),
             'subtotal': float(item.subtotal or 0),
             'modificadores': modificadores_por_item.get(int(item.id_item), []),
         }

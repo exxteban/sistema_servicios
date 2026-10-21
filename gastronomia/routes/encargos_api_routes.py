@@ -23,6 +23,7 @@ from gastronomia.services.encargo_service import (
     encargos_habilitados,
     obtener_encargo,
 )
+from gastronomia.services.encargo_peso_service import DevolucionNoPermitidaError, ajustar_peso_encargo
 from gastronomia.services.encargo_tablero_service import crear_encargo_desde_tablero, tablero_encargos
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
@@ -56,16 +57,21 @@ def _pedido_data(pedido) -> dict:
     return ocultar_localizacion_pedido(pedido.to_dict(), current_user)
 
 
+def _respuesta_error(exc: ValueError):
+    """Traduce los errores de los servicios de encargos a HTTP."""
+    if isinstance(exc, DevolucionNoPermitidaError):
+        return jsonify({'error': 'Sin permisos', 'mensaje': str(exc)}), 403
+    if isinstance(exc, EncargosDeshabilitadosError) or str(exc) in {'Encargo no encontrado.', 'Pedido no encontrado.'}:
+        return _no_encontrado()
+    return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+
+
 def _ejecutar(accion, *, status=200):
     """Corre una accion de encargo y traduce los errores del servicio a HTTP."""
     try:
         resultado = accion()
-    except EncargosDeshabilitadosError:
-        return _no_encontrado()
     except ValueError as exc:
-        if str(exc) in {'Encargo no encontrado.', 'Pedido no encontrado.'}:
-            return _no_encontrado()
-        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+        return _respuesta_error(exc)
     return jsonify({'ok': True, **resultado}), status
 
 
@@ -162,6 +168,25 @@ def cancelar(pedido_id):
         monto_retenido=data.get('monto_retenido'),
         motivo=data.get('motivo') or '',
     ))})
+
+
+@gastronomia_encargos_api_bp.route('/encargos/<int:pedido_id>/items/<int:item_id>/peso', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_POS)
+def ajustar_peso(pedido_id, item_id):
+    """Peso real de una torta por kilo; si baja de la sena, devolver el excedente exige permiso de caja."""
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+
+    def accion():
+        resultado = ajustar_peso_encargo(
+            cliente_id, current_user.id_usuario, pedido_id, item_id, _payload().get('peso_kg'),
+            puede_devolver=tiene_permiso_gastronomia(PERMISO_CAJA),
+        )
+        return {'pedido': _pedido_data(resultado['pedido']), 'sena_devuelta': float(resultado['sena_devuelta'])}
+
+    return _ejecutar(accion)
 
 
 @gastronomia_encargos_api_bp.route('/encargos/<int:pedido_id>/fotos', methods=['GET'])

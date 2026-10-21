@@ -1,0 +1,12 @@
+{# Venta por peso (Fase 2 pasteleria): lo maneja js/pos_peso.js; oculto para productos por unidad. #}
+<div id="modal-peso" class="hidden mt-5 rounded-lg border border-violet-200 p-4 dark:border-violet-500/30"
+     data-atajos="{{ peso_atajos|default([])|join(',') }}">
+    <label class="pos-modal-field block text-sm font-semibold text-gray-700 dark:text-gray-200">
+        Peso de la pieza (kg)
+        <input id="modal-peso-kg" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 1,250"
+               class="pos-modal-input mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 text-lg font-bold dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+    </label>
+    <div id="modal-peso-atajos" class="mt-2 flex flex-wrap gap-2"></div>
+    <p id="modal-peso-total" class="mt-2 text-sm font-bold text-violet-700 dark:text-violet-300"></p>
+    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Sin balanza: el peso se carga a mano. Cada pieza va en una línea.</p>
+</div>

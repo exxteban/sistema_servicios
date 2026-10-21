@@ -51,8 +51,10 @@
     return items.join('');
   };
 
+  const ajustable = (e, item) => item.peso_kg && ['abierto', 'enviado_cocina', 'preparando', 'listo', 'entregado'].includes(e.estado);
   const itemsHtml = (e) => (e.items || []).map((item) => `
     <li>
+      ${ajustable(e, item) ? `<button type="button" data-action="peso" data-id="${e.id_pedido}" data-item="${item.id_item}" class="float-right rounded-lg border border-violet-300 px-2 py-1 text-xs font-bold text-violet-700 dark:text-violet-300">Ajustar peso</button>` : ''}
       <span class="font-bold">${Number(item.cantidad || 0)} x ${ui.escapeHtml(item.nombre_producto)}</span>
       ${(item.modificadores || []).length ? `<span class="text-gray-500"> (${item.modificadores.map((m) => ui.escapeHtml(m.nombre_opcion)).join(', ')})</span>` : ''}
       ${item.texto_personalizado ? `<span class="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-bold text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">"${ui.escapeHtml(item.texto_personalizado)}"</span>` : ''}
@@ -137,6 +139,10 @@
     if (action === 'editar') window.EncargoForm.open(encargo, recargar);
     if (action === 'sena') window.EncargoAcciones.openSena(encargo, recargar);
     if (action === 'cancelar') window.EncargoAcciones.openCancel(encargo, recargar);
+    if (action === 'peso') {
+      const item = (encargo.items || []).find((i) => String(i.id_item) === button.dataset.item);
+      if (item) window.EncargoAcciones.openPeso(encargo, item, recargar);
+    }
     if (action === 'produccion') {
       button.disabled = true;
       try {

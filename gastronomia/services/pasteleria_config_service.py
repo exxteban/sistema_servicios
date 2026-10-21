@@ -1,7 +1,7 @@
 """Configuracion de pasteleria/cafeteria que solo root puede cambiar.
 
-Por ahora expone solo los encargos (Fase 1): los demas flags existen en la
-tabla pero sus funciones todavia no estan construidas, asi que no se ofrecen.
+Expone encargos (Fase 1) y venta por peso (Fase 2): los demas flags existen en
+la tabla pero sus funciones todavia no estan construidas, asi que no se ofrecen.
 Ver plan_pasteleria.md, decision 2.
 """
 from __future__ import annotations
@@ -9,7 +9,13 @@ from __future__ import annotations
 from app import db
 from app.models import Cliente
 from app.utils.auditoria_utils import registrar_auditoria
-from gastronomia.config_flags import FLAG_ENCARGOS, FOTOS_ENCARGO_DEFAULT, OPCIONES_CANCELACION
+from gastronomia.config_flags import (
+    FLAG_ENCARGOS,
+    FLAG_VENTA_POR_PESO,
+    FOTOS_ENCARGO_DEFAULT,
+    OPCIONES_CANCELACION,
+    PESO_ATAJOS_DEFAULT,
+)
 from gastronomia.models import GastronomiaClienteConfig
 from gastronomia.services.pasteleria_flags import parametros_encargos
 
@@ -40,6 +46,8 @@ def listar_configs_pasteleria() -> list[dict]:
             'cliente_nombre': getattr(cliente, 'nombre', None) or f'Cliente #{config.cliente_id}',
             'encargos_activo': bool(config.encargos_activo),
             'parametros': parametros_encargos(config.cliente_id),
+            'venta_por_peso_activa': bool(config.venta_por_peso_activa),
+            'peso_atajos_kg': config.peso_atajos_kg or PESO_ATAJOS_DEFAULT,
         })
     return resultado
 
@@ -68,6 +76,36 @@ def guardar_config_encargos(cliente_id: int, data, *, usuario_id: int | None = N
         referencia_id=int(config.id_config),
         datos_anteriores=anterior,
         datos_nuevos=_snapshot(config),
+        commit=False,
+    )
+    db.session.commit()
+    return config
+
+
+def guardar_config_venta_por_peso(cliente_id: int, data, *, usuario_id: int | None = None) -> GastronomiaClienteConfig:
+    from gastronomia.services.peso_service import parsear_atajos
+
+    config = GastronomiaClienteConfig.query.filter_by(cliente_id=int(cliente_id)).first()
+    if not config or not config.gastronomia_activo:
+        raise ValueError('Este negocio no tiene Gastronomia activa.')
+    texto = str(data.get('peso_atajos_kg') or '').strip() or PESO_ATAJOS_DEFAULT
+    try:
+        atajos = parsear_atajos(texto)
+    except ValueError as exc:
+        raise ValueError(f'Atajos de peso: {exc} Usa kg separados por coma, por ejemplo 1,1.5,2.')
+    anterior = {'venta_por_peso_activa': bool(config.venta_por_peso_activa), 'peso_atajos_kg': config.peso_atajos_kg}
+    config.venta_por_peso_activa = _bool(data.get(FLAG_VENTA_POR_PESO))
+    config.peso_atajos_kg = ','.join(f'{atajo:g}' for atajo in atajos)
+    if usuario_id:
+        config.actualizado_por_id = int(usuario_id)
+    registrar_auditoria(
+        accion='configurar_venta_por_peso_gastronomia',
+        modulo='gastronomia',
+        descripcion=f'Configuracion de venta por peso del cliente #{cliente_id}',
+        referencia_tipo='gastronomia_cliente_config',
+        referencia_id=int(config.id_config),
+        datos_anteriores=anterior,
+        datos_nuevos={'venta_por_peso_activa': bool(config.venta_por_peso_activa), 'peso_atajos_kg': config.peso_atajos_kg},
         commit=False,
     )
     db.session.commit()

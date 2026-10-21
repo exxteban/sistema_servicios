@@ -30,9 +30,20 @@
   };
 
   const opcionesProductos = (selectedId) => productos.map((p) => `
-    <option value="${p.id_producto}" data-precio="${Number(p.precio || 0)}" ${Number(p.id_producto) === Number(selectedId) ? 'selected' : ''}>
-      ${ui.escapeHtml(p.nombre)} - ${ui.money(p.precio)}
+    <option value="${p.id_producto}" data-precio="${Number(p.precio_base ?? p.precio ?? 0)}" data-unidad="${p.unidad_venta || 'unidad'}" ${Number(p.id_producto) === Number(selectedId) ? 'selected' : ''}>
+      ${ui.escapeHtml(p.nombre)} - ${ui.money(p.precio_base ?? p.precio)}${p.unidad_venta === 'kg' ? ' / kg' : ''}
     </option>`).join('');
+
+  // Producto por kilo: se pide el peso (estimado) y la cantidad queda en 1.
+  const esPorPeso = (row) => row.querySelector('[data-producto]').selectedOptions[0]?.dataset.unidad === 'kg';
+  const syncPeso = (row) => {
+    const porPeso = esPorPeso(row);
+    row.querySelector('[data-peso-wrap]').classList.toggle('hidden', !porPeso);
+    const cantidad = row.querySelector('[data-cantidad]');
+    cantidad.disabled = porPeso;
+    if (porPeso) cantidad.value = 1;
+  };
+  const pesoDe = (row) => Number(String(row.querySelector('[data-peso]').value || '').replace(',', '.')) || 0;
 
   const itemRow = (item = {}) => {
     const row = document.createElement('div');
@@ -45,6 +56,9 @@
       </select>
       <input data-cantidad type="number" min="1" step="1" value="${Number(item.cantidad || 1)}" aria-label="Cantidad"
              class="h-10 rounded-lg border border-gray-200 px-2 text-sm dark:border-gray-700 dark:bg-gray-900">
+      <label data-peso-wrap class="hidden text-xs font-bold text-gray-500 sm:col-span-3">Peso pedido (kg, estimado)
+        <input data-peso inputmode="decimal" placeholder="Ej: 1,5" value="${item.peso_kg ? String(item.peso_kg).replace('.', ',') : ''}"
+               class="mt-1 h-10 w-full rounded-lg border border-gray-200 px-2 text-sm dark:border-gray-700 dark:bg-gray-900"></label>
       <button type="button" data-remove class="h-10 rounded-lg px-3 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10" aria-label="Quitar"><i class="fas fa-trash"></i></button>
       <input data-texto maxlength="240" placeholder='Texto en la torta (ej. "Feliz cumple Ana")' value="${ui.escapeHtml(item.texto_personalizado || '')}"
              class="h-10 rounded-lg border border-gray-200 px-2 text-sm dark:border-gray-700 dark:bg-gray-900 sm:col-span-3">
@@ -53,15 +67,17 @@
     `;
     row.querySelector('[data-remove]').addEventListener('click', () => { row.remove(); actualizarTotal(); });
     row.addEventListener('input', actualizarTotal);
-    row.addEventListener('change', actualizarTotal);
+    row.addEventListener('change', () => { syncPeso(row); actualizarTotal(); });
+    syncPeso(row);
     return row;
   };
 
   const actualizarTotal = () => {
     let total = 0;
     itemsEl.querySelectorAll('[data-producto]').forEach((select) => {
+      const row = select.parentElement;
       const precio = Number(select.selectedOptions[0]?.dataset.precio || 0);
-      const cantidad = Math.max(1, Number(select.parentElement.querySelector('[data-cantidad]').value || 1));
+      const cantidad = esPorPeso(row) ? pesoDe(row) : Math.max(1, Number(row.querySelector('[data-cantidad]').value || 1));
       total += precio * cantidad;
     });
     totalEl.textContent = `Total estimado: ${ui.money(total)}`;
@@ -73,7 +89,8 @@
     const opciones = String(productoId) === row.dataset.productoOriginal ? JSON.parse(row.dataset.opciones || '[]') : [];
     return {
       producto_id: productoId,
-      cantidad: Math.max(1, Number(row.querySelector('[data-cantidad]').value || 1)),
+      cantidad: esPorPeso(row) ? 1 : Math.max(1, Number(row.querySelector('[data-cantidad]').value || 1)),
+      peso_kg: esPorPeso(row) ? row.querySelector('[data-peso]').value.trim().replace(',', '.') : null,
       texto_personalizado: row.querySelector('[data-texto]').value.trim(),
       notas: row.querySelector('[data-notas]').value.trim(),
       opciones,

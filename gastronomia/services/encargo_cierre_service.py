@@ -106,7 +106,7 @@ def informe_senas_sesion(cliente_id: int, id_sesion: int) -> dict | None:
             sum((_monto(a.monto) - _monto(a.monto_devuelto) for a in retenidas), Decimal('0.00'))
         ),
         'retenidas_cantidad': len(retenidas),
-        'aplicadas_total': float(sum((_monto(a.monto) for a in aplicadas), Decimal('0.00'))),
+        'aplicadas_total': float(sum((_monto(a.monto) - _monto(a.monto_devuelto) for a in aplicadas), Decimal('0.00'))),
         'aplicadas_cantidad': len(aplicadas),
     }
 
