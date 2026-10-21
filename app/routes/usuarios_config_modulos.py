@@ -14,6 +14,7 @@ from gastronomia.services.modo_operacion import (
     establecer_modo_operacion,
     obtener_modo_operacion,
 )
+from gastronomia.services.pasteleria_config_service import ETIQUETAS_CANCELACION, listar_configs_pasteleria
 
 
 def _checkbox_bool(form_key: str, default: bool = False) -> bool:
@@ -61,6 +62,8 @@ def modulos_sistema():
         dashboards_negocio=listar_dashboards_negocio(),
         dashboard_negocio_actual=obtener_dashboard_negocio_actual(),
         modo_operacion_gastronomia=obtener_modo_operacion(),
+        configs_pasteleria=listar_configs_pasteleria(),
+        etiquetas_cancelacion=ETIQUETAS_CANCELACION,
     )
 
 
