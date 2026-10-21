@@ -2,6 +2,8 @@
 // Cada item declara data-search, data-category y data-flags; los checkbox con
 // data-filter-flag-off agregan su flag cuando estan desmarcados.
 (function () {
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
   const itemFlags = (item) => {
     const flags = new Set((item.dataset.flags || '').split(' ').filter(Boolean));
     item.querySelectorAll('[data-filter-flag-off]').forEach((input) => {
@@ -81,5 +83,5 @@
   };
 
   window.GastroListFilter = {apply: init};
-  document.querySelectorAll('[data-list-filter]').forEach(init);
+  scope.querySelectorAll('[data-list-filter]').forEach(init);
 }());

@@ -1,23 +1,25 @@
 (function () {
-  const csrf = document.getElementById('csrf-token')?.value || '';
-  const alertBox = document.getElementById('gastro-menu-alert');
-  const categoriaForm = document.getElementById('categoria-form');
-  const productoForm = document.getElementById('producto-form');
-  const menuTvForm = document.getElementById('menu-tv-form');
-  const categoriaSubmit = document.getElementById('categoria-submit');
-  const categoriaCancelEdit = document.getElementById('categoria-cancel-edit');
-  const productoSubmit = document.getElementById('producto-submit');
-  const productoCancelEdit = document.getElementById('producto-cancel-edit');
-  const productoImageInput = document.getElementById('producto-imagen-archivo');
-  const productoImagePreview = document.getElementById('producto-imagen-preview');
-  const productoImageEmpty = document.getElementById('producto-imagen-empty');
-  const productoImageName = document.getElementById('producto-imagen-nombre');
-  const mainTabButtons = Array.from(document.querySelectorAll('[data-main-tab]'));
-  const mainTabPanels = Array.from(document.querySelectorAll('[data-main-tab-panel]'));
-  const entryTabButtons = Array.from(document.querySelectorAll('[data-entry-tab]'));
-  const entryTabPanels = Array.from(document.querySelectorAll('[data-entry-tab-panel]'));
-  const tabButtons = Array.from(document.querySelectorAll('[data-menu-tab]'));
-  const tabPanels = Array.from(document.querySelectorAll('[data-menu-tab-panel]'));
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const csrf = scope.querySelector('#csrf-token')?.value || '';
+  const alertBox = scope.querySelector('#gastro-menu-alert');
+  const categoriaForm = scope.querySelector('#categoria-form');
+  const productoForm = scope.querySelector('#producto-form');
+  const menuTvForm = scope.querySelector('#menu-tv-form');
+  const categoriaSubmit = scope.querySelector('#categoria-submit');
+  const categoriaCancelEdit = scope.querySelector('#categoria-cancel-edit');
+  const productoSubmit = scope.querySelector('#producto-submit');
+  const productoCancelEdit = scope.querySelector('#producto-cancel-edit');
+  const productoImageInput = scope.querySelector('#producto-imagen-archivo');
+  const productoImagePreview = scope.querySelector('#producto-imagen-preview');
+  const productoImageEmpty = scope.querySelector('#producto-imagen-empty');
+  const productoImageName = scope.querySelector('#producto-imagen-nombre');
+  const mainTabButtons = Array.from(scope.querySelectorAll('[data-main-tab]'));
+  const mainTabPanels = Array.from(scope.querySelectorAll('[data-main-tab-panel]'));
+  const entryTabButtons = Array.from(scope.querySelectorAll('[data-entry-tab]'));
+  const entryTabPanels = Array.from(scope.querySelectorAll('[data-entry-tab-panel]'));
+  const tabButtons = Array.from(scope.querySelectorAll('[data-menu-tab]'));
+  const tabPanels = Array.from(scope.querySelectorAll('[data-menu-tab-panel]'));
   const menuStateParamKeys = {
     mainTab: 'gastro_main_tab',
     entryTab: 'gastro_entry_tab',
@@ -26,7 +28,7 @@
   };
   const allowedMainTabs = new Set(['menu', 'menu-cargado', 'stock']);
   const allowedEntryTabs = new Set(['plantilla', 'categoria', 'producto']);
-  const defaultEntryTab = document.querySelector('[data-gastro-menu]')?.dataset?.defaultEntryTab || 'categoria';
+  const defaultEntryTab = scope.querySelector('[data-gastro-menu]')?.dataset?.defaultEntryTab || 'categoria';
   const allowedMenuTabs = new Set(['categorias', 'productos', 'pedidosya', 'monchis', 'promociones', 'tv']);
   const persistedAlertKey = 'gastro-menu-alert';
   let productoImageObjectUrl = '';
@@ -468,7 +470,7 @@
       data.menu_tv_mostrar_precios = event.currentTarget.menu_tv_mostrar_precios.checked;
       data.menu_tv_mostrar_agotados = Boolean(event.currentTarget.menu_tv_mostrar_agotados?.checked);
       const response = await apiJson('/api/gastronomia/menu-tv/config', {method: 'PUT', body: data});
-      const urlInput = document.getElementById('menu-tv-url');
+      const urlInput = scope.querySelector('#menu-tv-url');
       if (urlInput) urlInput.value = response.public_url || urlInput.value;
       showAlert('Configuracion de pantalla TV guardada.', true);
     } catch (error) {
@@ -489,25 +491,25 @@
     renderImagePreview({emptyText: 'La imagen actual se quitara al guardar.'});
   });
 
-  document.querySelector('.gastro-menu-tabs')?.addEventListener('click', (event) => {
+  scope.querySelector('.gastro-menu-tabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-menu-tab]');
     if (!button) return;
     switchTab(button.dataset.menuTab);
   });
 
-  document.querySelector('.gastro-entry-tabs')?.addEventListener('click', (event) => {
+  scope.querySelector('.gastro-entry-tabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-entry-tab]');
     if (!button) return;
     switchEntryTab(button.dataset.entryTab);
   });
 
-  document.querySelector('.gastro-main-tabs')?.addEventListener('click', (event) => {
+  scope.querySelector('.gastro-main-tabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-main-tab]');
     if (!button) return;
     switchMainTab(button.dataset.mainTab);
   });
 
-  document.querySelector('[data-gastro-menu]')?.addEventListener('click', (event) => {
+  scope.querySelector('[data-gastro-menu]')?.addEventListener('click', (event) => {
     const toggle = event.target.closest('[data-toggle-product-field]');
     if (toggle) {
       toggleProductoEstado(toggle).catch((error) => showAlert(error.message, false));
@@ -538,8 +540,8 @@
     await cargarProductoParaEditar(initialState.editProductId);
   };
 
-  window.gastroMenuReload = reloadMenuView;
-  window.gastroMenuShowAlert = showAlert;
+  scope.gastroMenuReload = reloadMenuView;
+  scope.gastroMenuShowAlert = showAlert;
   renderImagePreview({emptyText: 'Sin imagen'});
   restorePersistedAlert();
   restoreMenuState().catch((error) => showAlert(error.message, false));

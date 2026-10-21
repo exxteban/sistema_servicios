@@ -1,5 +1,7 @@
 (function () {
-  const form = document.getElementById('producto-form');
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const form = scope.querySelector('#producto-form');
   if (!form) return;
 
   const buttons = Array.from(form.querySelectorAll('[data-producto-subtab]'));

@@ -1,10 +1,12 @@
 // Modal "Hacer promo": elige entre promo sobre el producto o combo (menu_combo.js).
 // La promo se guarda con la API de promociones existente (/api/tienda/admin/promociones).
 (function () {
-  const modal = document.getElementById('gastro-promo-modal');
+  // En el sistema de pestanas la pagina puede estar cargada dos veces: trabajar solo sobre la copia propia.
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const modal = scope.querySelector('#gastro-promo-modal');
   if (!modal) return;
 
-  const csrf = document.getElementById('csrf-token')?.value || '';
+  const csrf = scope.querySelector('#csrf-token')?.value || '';
   const puedePromos = modal.dataset.puedePromos === '1';
   const q = (selector) => modal.querySelector(selector);
   const pasos = Array.from(modal.querySelectorAll('[data-promo-paso]'));
@@ -21,7 +23,7 @@
   };
   let productos = [];
   try {
-    productos = JSON.parse(document.getElementById('gastro-promo-productos-data')?.textContent || '[]');
+    productos = JSON.parse(scope.querySelector('#gastro-promo-productos-data')?.textContent || '[]');
   } catch (_error) {
     productos = [];
   }
@@ -143,7 +145,7 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(ERRORES[data.error] || data.mensaje || 'No se pudo crear la promo.');
       cerrar();
-      await window.gastroMenuReload?.({
+      await scope.gastroMenuReload?.({
         message: `Promo "${payload.nombre}" creada y activa.`,
         ok: true,
         state: {mainTab: 'menu-cargado', menuTab: 'promociones', editProductId: ''},
@@ -153,7 +155,7 @@
     }
   };
 
-  document.addEventListener('click', (event) => {
+  scope.addEventListener('click', (event) => {
     const boton = event.target.closest('[data-promo-producto]');
     if (boton) abrir(boton.dataset.promoProducto);
   });
@@ -181,5 +183,5 @@
     if (event.key === 'Escape' && !modal.classList.contains('hidden')) cerrar();
   });
 
-  window.gastroPromoModal = {cerrar, mostrarError};
+  scope.gastroPromoModal = {cerrar, mostrarError};
 }());
