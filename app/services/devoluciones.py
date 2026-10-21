@@ -5,6 +5,12 @@ se desincronicen: si la pantalla ofreciera devolver más de lo que el endpoint
 acepta, el usuario carga la devolución entera y recién al confirmar se entera
 de que una línea no entraba. Y al revés es peor: una pantalla más permisiva que
 la validación es la forma de devolver dos veces el mismo ítem.
+
+Portado de sistema_silvio_cel. Lo propio de este sistema: puede correr con una
+moneda con centavos (R$ en Brasil). El reparto de la factura electrónica
+redondea cada línea a guaraníes enteros, así que sólo se usa con moneda sin
+decimales; con centavos el descuento global se reparte en proporción y el
+redondeo es a los decimales de la moneda.
 """
 from decimal import Decimal
 
@@ -57,7 +63,29 @@ def precios_reembolsables(venta):
 
     if float(venta.total or 0) <= 0:
         return {detalle.id_detalle_venta: 0.0 for detalle in venta.detalles}
+    if _decimales_moneda() > 0:
+        return _precios_con_descuento_proporcional(venta)
     return precios_facturados(venta)
+
+
+def _decimales_moneda():
+    from app.utils.helpers import config_moneda
+
+    return int(config_moneda().get('decimales') or 0)
+
+
+def _precios_con_descuento_proporcional(venta):
+    """Precio neto por unidad con el descuento global repartido sin redondear."""
+    detalles = list(venta.detalles)
+    bruto = sum(float(d.subtotal or 0) for d in detalles)
+    total = float(venta.total or 0)
+    factor = total / bruto if 0 < total < bruto else 1.0
+    precios = {}
+    for detalle in detalles:
+        cantidad = float(detalle.cantidad or 0)
+        neto = float(detalle.subtotal or 0) / cantidad if cantidad else float(detalle.precio_unitario or 0)
+        precios[detalle.id_detalle_venta] = neto * factor
+    return precios
 
 
 def precio_reembolsable(venta, detalle, precios=None):
@@ -78,12 +106,14 @@ def precio_reembolsable(venta, detalle, precios=None):
 def monto_reembolsable(precio, cantidad, ya_devuelta=0):
     """Redondeo acumulado: fraccionar una devolución no aumenta el reembolso.
 
-    En guaraníes enteros, como las líneas de la factura: devolver una línea
-    entera, de una vez o en partes, reembolsa exactamente lo facturado.
+    A los decimales de la moneda (guaraníes enteros, como las líneas de la
+    factura): devolver una línea entera, de una vez o en partes, reembolsa
+    exactamente lo facturado.
     """
+    paso = Decimal(1).scaleb(-_decimales_moneda())
     anterior = precio * Decimal(str(ya_devuelta))
     actual = anterior + precio * Decimal(str(cantidad))
-    return actual.quantize(Decimal('1')) - anterior.quantize(Decimal('1'))
+    return actual.quantize(paso) - anterior.quantize(paso)
 
 
 def lineas_devolubles(venta):
@@ -100,16 +130,16 @@ def lineas_devolubles(venta):
     precios = precios_reembolsables(venta)
     lineas = []
     for detalle in venta.detalles:
-        original = Decimal(str(detalle.cantidad or 0))
-        devuelto = devueltos.get(int(detalle.id_detalle_venta), Decimal('0'))
+        # En este sistema las cantidades vendidas son enteras (también los servicios).
+        original = int(detalle.cantidad or 0)
+        devuelto = int(devueltos.get(int(detalle.id_detalle_venta), Decimal('0')))
         disponible = original - devuelto
         lineas.append({
             'id_detalle_venta': int(detalle.id_detalle_venta),
-            'nombre': getattr(detalle.producto, 'nombre', 'Producto'),
-            'unidad': getattr(detalle.producto, 'unidad_venta', 'unidad') or 'unidad',
-            'cantidad': float(original),
-            'devuelto': float(devuelto),
-            'disponible': float(disponible if disponible > 0 else 0),
+            'nombre': detalle.item_nombre,
+            'cantidad': original,
+            'devuelto': devuelto,
+            'disponible': disponible if disponible > 0 else 0,
             'precio_unitario': float(precio_reembolsable(venta, detalle, precios)),
         })
     return lineas

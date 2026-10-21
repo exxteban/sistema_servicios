@@ -7,8 +7,8 @@ Una devolución sin NC es un pendiente. La devolución en sí no cambia.
 
 Portado de sistema_silvio_cel (fase 2: sólo el lado que lee el resumen). El
 formulario para cargar la NC desde la venta llega en la fase 4: acá se carga
-con el servicio. Fuera por ahora: el endpoint de devolución que prorratea el
-descuento (en este sistema la devolución todavía reembolsa el precio de lista).
+con el servicio. La devolución reembolsa lo cobrado con el descuento global,
+como la factura; con una moneda con centavos (R$), redondeado a centavos.
 """
 import unittest
 from datetime import date, datetime
@@ -206,6 +206,56 @@ class TestNotasCreditoPapel(unittest.TestCase):
         db.session.delete(devolucion.nota_credito_papel)
         db.session.commit()
         self.assertEqual(resumen_del_mes(PRIMERO, False)['en_papel']['sin_nota_credito']['cantidad'], 0)
+
+    def test_devolucion_descontada_cierra_caja_factura_y_nota(self):
+        from app.models import Devolucion, MovimientoCaja
+        from app.services.devoluciones import lineas_devolubles
+        from app.services.resumen_contadora import resumen_del_mes
+
+        venta = self._venta()
+        venta.total = 99000
+        venta.descuento_monto = 11000
+        db.session.commit()
+        self.assertEqual(lineas_devolubles(venta)[0]['precio_unitario'], 99000)
+        respuesta = self._devolver(venta, 1)
+        self.assertEqual(respuesta.get_json()['monto_total'], 99000)
+        devolucion = db.session.get(Devolucion, respuesta.get_json()['id_devolucion'])
+        movimiento = MovimientoCaja.query.filter_by(
+            referencia_tipo='devolucion', referencia_id=devolucion.id_devolucion).one()
+        self.assertEqual(float(movimiento.monto), 99000)
+        self._nc(devolucion)
+        r = resumen_del_mes(PRIMERO, False)
+        self.assertEqual(r['en_papel']['notas_credito']['iva10'], 9000)
+        self.assertEqual(r['debito'], 0)
+
+    def _devolver(self, venta, cantidad):
+        respuesta = self.client.post(f'/ventas/{venta.id_venta}/devolucion', json={
+            'items': [{'id_detalle_venta': venta.detalles.first().id_detalle_venta, 'cantidad': cantidad}],
+            'motivo': 'Falla', 'accion_stock': 'retorno_stock', 'metodo_reembolso': 'efectivo'})
+        self.assertEqual(respuesta.status_code, 200, respuesta.get_data(as_text=True))
+        return respuesta
+
+    def test_con_centavos_el_descuento_se_reparte_sin_redondear_a_enteros(self):
+        """Instalación en R$: el reembolso va a centavos y en partes suma lo cobrado."""
+        from app.models import Configuracion, DetalleVenta, Venta
+
+        Configuracion.establecer('moneda_simbolo', 'R$')
+        Configuracion.establecer('moneda_decimales', '2')
+        venta = Venta(id_cliente=self.cliente.id_cliente, id_sesion_caja=self.sesion.id_sesion,
+                      subtotal=100, total=95, descuento_monto=5, estado='completada', fecha_venta=EN_EL_MES)
+        db.session.add(venta)
+        db.session.flush()
+        db.session.add(DetalleVenta(id_venta=venta.id_venta, id_producto=self.producto.id_producto, cantidad=3,
+                                    precio_unitario=100 / 3, precio_original=100 / 3, porcentaje_iva=10,
+                                    monto_iva=0, subtotal=100))
+        db.session.commit()
+
+        primera = self._devolver(venta, 1).get_json()['monto_total']
+        resto = self._devolver(venta, 2).get_json()['monto_total']
+
+        self.assertAlmostEqual(primera, 31.67)
+        self.assertAlmostEqual(resto, 63.33)
+        self.assertAlmostEqual(primera + resto, 95.00)
 
     def test_devolucion_antigua_excesiva_avisa_sin_reescribir_importes(self):
         from app.services.resumen_contadora import resumen_del_mes
