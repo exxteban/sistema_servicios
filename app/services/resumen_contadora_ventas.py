@@ -75,12 +75,28 @@ def iva_por_venta_con_factura(desde, hasta):
 
 
 def _repetidos(filas):
-    """Números que aparecen en más de una venta, con las ventas de cada uno."""
+    """Números que aparecen en más de una venta del mismo timbrado, con las ventas de cada uno.
+
+    Un timbrado nuevo vuelve a empezar la numeración: el mismo número con otro
+    timbrado es otra factura. Una venta sin timbrado (no cae en ningún
+    talonario) no se puede distinguir, así que choca con cualquiera de su número.
+    """
     por_numero = {}
     for fila in filas:
-        por_numero.setdefault(fila['numero'], []).append(fila['id_venta'])
-    return [{'numero': numero, 'ventas': ventas}
-            for numero, ventas in sorted(por_numero.items()) if len(ventas) > 1]
+        por_numero.setdefault(fila['numero'], []).append(fila)
+    repetidos = []
+    for numero, del_numero in sorted(por_numero.items()):
+        if len(del_numero) < 2:
+            continue
+        if any(not f['timbrado'] for f in del_numero):
+            repetidos.append({'numero': numero, 'ventas': [f['id_venta'] for f in del_numero]})
+            continue
+        por_timbrado = {}
+        for fila in del_numero:
+            por_timbrado.setdefault(fila['timbrado'], []).append(fila['id_venta'])
+        repetidos.extend({'numero': numero, 'ventas': ventas}
+                         for _, ventas in sorted(por_timbrado.items()) if len(ventas) > 1)
+    return repetidos
 
 
 def _sin_numero(desde, hasta):

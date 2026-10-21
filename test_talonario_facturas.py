@@ -277,5 +277,42 @@ class TestTalonarioFacturas(unittest.TestCase):
         self.assertIn('/contador/talonarios', html)
 
 
+    def _timbrado_siguiente(self):
+        from app.models import TalonarioFactura
+
+        self._talonario(desde=1, hasta=100, vence=date(2026, 9, 10))
+        nuevo = TalonarioFactura(
+            timbrado='87654321', vigencia_desde=date(2026, 9, 11), vigencia_hasta=date(2027, 9, 30),
+            establecimiento='001', punto_expedicion='001', numero_desde=1, numero_hasta=100, activo=True)
+        db.session.add(nuevo)
+        db.session.commit()
+        return nuevo
+
+    def test_timbrado_nuevo_empieza_de_cero_aunque_el_anterior_se_haya_terminado(self):
+        from app.services.talonario_facturas import siguiente
+
+        nuevo = self._timbrado_siguiente()
+        self._venta('001-001-0000100', fecha=datetime(2026, 9, 8, 15, 0), timbrado='12345678')
+        self._venta('001-001-0000099', fecha=datetime(2026, 9, 7, 15, 0))   # histórica sin timbrado
+
+        self.assertEqual(siguiente(nuevo), 1)
+        self._venta('001-001-0000001', fecha=datetime(2026, 9, 15, 15, 0), timbrado='87654321')
+        self.assertEqual(siguiente(nuevo), 2)
+
+    def test_mismo_numero_con_otro_timbrado_no_es_repetido(self):
+        from app.services.resumen_contadora import resumen_del_mes
+
+        self._timbrado_siguiente()
+        self._venta('001-001-0000001', fecha=datetime(2026, 9, 8, 15, 0), timbrado='12345678')
+        self._venta('001-001-0000001', fecha=datetime(2026, 9, 15, 15, 0), timbrado='87654321')
+        self.assertEqual(resumen_del_mes(date(2026, 9, 1), False)['en_papel']['repetidos'], [])
+
+        otra = self._venta('001-001-0000001', fecha=datetime(2026, 9, 16, 15, 0), timbrado='87654321')
+        repetidos = resumen_del_mes(date(2026, 9, 1), False)['en_papel']['repetidos']
+        self.assertEqual(len(repetidos), 1)
+        self.assertIn(otra.id_venta, repetidos[0]['ventas'])
+        self.assertEqual(len(repetidos[0]['ventas']), 2)
+
+
 if __name__ == '__main__':
     unittest.main()

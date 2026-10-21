@@ -84,6 +84,15 @@ class TestContadorPos(unittest.TestCase):
         venta = db.session.get(Venta, cobro.get_json()['id_venta'])
         self.assertEqual((venta.numero_factura, venta.timbrado), ('001-001-0000007', '12345678'))
 
+    def test_el_cajero_puede_borrar_el_numero_del_vendedor(self):
+        from app.services.pos_numero_factura import numero_factura_del_pedido
+
+        pendiente = {'numero_factura': '123'}
+        self.assertEqual(numero_factura_del_pedido({'numero_factura': ''}, pendiente), (None, None))
+        self.assertEqual(numero_factura_del_pedido({'numero_factura': None}, pendiente), (None, None))
+        self.assertEqual(numero_factura_del_pedido({'numero_factura': '9'}, pendiente), ('9', None))
+        self.assertEqual(numero_factura_del_pedido({}, pendiente), ('123', None))   # el POS no muestra el campo
+
     def test_numero_demasiado_largo_no_se_acepta(self):
         respuesta = self.http.post('/ventas/enviar-a-caja', headers=JSON, json={
             'id_cliente': int(self.cliente.id_cliente), 'id_usuario_vendedor': int(self.admin.id_usuario),

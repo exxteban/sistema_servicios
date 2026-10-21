@@ -53,12 +53,14 @@ LARGO_MAXIMO = 80
 def numero_factura_del_pedido(data, cola_cobro_data=None):
     """El Nº Factura que manda el POS o, si no vino, el del pendiente de caja.
 
+    Que no venga la clave (el POS no muestra el campo) no es lo mismo que venga
+    vacía: eso es el cajero borrando el número del vendedor, y se respeta.
+
     Devuelve `(numero, error)`. Vive acá y no en la ruta de ventas para no
     sumarle lógica a un archivo que ya es largo.
     """
-    numero = (data.get('numero_factura') or '').strip() or None
-    if not numero and cola_cobro_data:
-        numero = (cola_cobro_data.get('numero_factura') or '').strip() or None
+    origen = data if 'numero_factura' in data or not cola_cobro_data else cola_cobro_data
+    numero = (origen.get('numero_factura') or '').strip() or None
     if numero and len(numero) > LARGO_MAXIMO:
         return None, 'Nº Factura inválido'
     return numero, None

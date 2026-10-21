@@ -276,5 +276,22 @@ class TestNotasCreditoPapel(unittest.TestCase):
         self.assertIn('importe devuelto supera', html)
 
 
+    def test_no_se_quita_el_numero_de_una_venta_con_nota_de_credito(self):
+        from app.services.resumen_contadora import resumen_del_mes
+
+        venta = self._venta()
+        self.assertEqual(self._nc(self._devolucion(venta, montos=[55000])).status_code, 302)
+        self.assertEqual(resumen_del_mes(PRIMERO, False)['debito'], 5000)
+
+        self.client.post(f'/contador/venta/{venta.id_venta}/numero-factura', data={'numero_factura': ''})
+        db.session.refresh(venta)
+        self.assertEqual(venta.numero_factura, '001-001-0000050')
+        self.assertEqual(resumen_del_mes(PRIMERO, False)['debito'], 5000)
+
+        self.client.post(f'/contador/venta/{venta.id_venta}/numero-factura', data={'numero_factura': '001-001-0000051'})
+        db.session.refresh(venta)
+        self.assertEqual(venta.numero_factura, '001-001-0000051')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -8,7 +8,7 @@ from flask import abort, flash, jsonify, redirect, render_template, request, url
 from flask_login import current_user, login_required
 
 from app import db
-from app.models import TalonarioFactura, Venta
+from app.models import Devolucion, NotaCreditoPapel, TalonarioFactura, Venta
 from app.routes.contador import contador_bp, puede_corregir_numero_factura, puede_gestionar_talonarios
 from app.services.pos_numero_factura import facturacion_electronica_activa
 from app.services.talonario_facturas import completar_venta, crear_talonario, siguiente, sugerencias
@@ -89,6 +89,11 @@ def talonario_siguiente():
     return jsonify({'sugerencias': sugerencias()})
 
 
+def _tiene_notas_credito(venta):
+    return NotaCreditoPapel.query.join(Devolucion, Devolucion.id_devolucion == NotaCreditoPapel.id_devolucion) \
+        .filter(Devolucion.id_venta == venta.id_venta).first() is not None
+
+
 @contador_bp.route('/venta/<int:id>/numero-factura', methods=['POST'])
 @login_required
 def venta_numero_factura(id):
@@ -101,6 +106,10 @@ def venta_numero_factura(id):
     nuevo = (request.form.get('numero_factura') or '').strip()
     if len(nuevo) > 80:
         flash('El número de factura es demasiado largo.', 'danger')
+        return redirect(url_for('ventas.detalle', id=id))
+    if not nuevo and _tiene_notas_credito(venta):
+        # Sin número la venta sale del débito, pero su NC seguiría restando IVA.
+        flash('La venta tiene notas de crédito cargadas: quitalas antes de quitar el número de factura.', 'danger')
         return redirect(url_for('ventas.detalle', id=id))
     anterior = {'numero_factura': venta.numero_factura, 'timbrado': venta.timbrado}
     venta.numero_factura = nuevo or None

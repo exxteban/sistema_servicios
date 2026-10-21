@@ -93,13 +93,26 @@ def normalizar_numero(texto, fecha):
     return texto
 
 
+def _es_del_talonario(talonario, timbrado, fecha):
+    """La venta usó este talonario: mismo timbrado o, sin timbrado guardado, fecha en su vigencia.
+
+    Un timbrado nuevo vuelve a empezar la numeración con el mismo prefijo: las
+    facturas del anterior no cuentan.
+    """
+    timbrado = (timbrado or '').strip()
+    if timbrado:
+        return timbrado == talonario.timbrado
+    return fecha is not None and _cubre(talonario, utc_naive_to_local(fecha).date())
+
+
 def _correlativos_usados(talonario):
     numeros = Venta.query.filter(Venta.numero_factura.like(f'{talonario.prefijo}%')) \
-        .with_entities(Venta.numero_factura).all()
+        .with_entities(Venta.numero_factura, Venta.timbrado, Venta.fecha_venta).all()
     usados = set()
-    for (numero,) in numeros:
+    for numero, timbrado, fecha in numeros:
         partes = parsear(numero)
-        if partes and talonario.numero_desde <= partes[2] <= talonario.numero_hasta:
+        if (partes and talonario.numero_desde <= partes[2] <= talonario.numero_hasta
+                and _es_del_talonario(talonario, timbrado, fecha)):
             usados.add(partes[2])
     return usados
 
