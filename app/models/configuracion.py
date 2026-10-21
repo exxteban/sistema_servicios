@@ -19,7 +19,7 @@ class Configuracion(db.Model):
         return config.valor if config else default
     
     @classmethod
-    def establecer(cls, clave, valor, descripcion=None):
+    def establecer(cls, clave, valor, descripcion=None, *, commit=True):
         """Establece un valor de configuración"""
         from datetime import datetime
         config = db.session.get(cls, clave)
@@ -29,7 +29,8 @@ class Configuracion(db.Model):
         else:
             config = cls(clave=clave, valor=valor, descripcion=descripcion)
             db.session.add(config)
-        db.session.commit()
+        if commit:
+            db.session.commit()
         return config
     
     @classmethod
@@ -58,10 +59,10 @@ class Configuracion(db.Model):
         return default
 
     @classmethod
-    def establecer_bool(cls, clave, valor, descripcion=None):
+    def establecer_bool(cls, clave, valor, descripcion=None, *, commit=True):
         """Establece un valor booleano persistido como '1' o '0'."""
         normalizado = cls.parse_bool(valor, default=False)
-        return cls.establecer(clave, '1' if normalizado else '0', descripcion=descripcion)
+        return cls.establecer(clave, '1' if normalizado else '0', descripcion=descripcion, commit=commit)
     
     @classmethod
     def obtener_int(cls, clave, default=0):

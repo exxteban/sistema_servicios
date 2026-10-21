@@ -3,9 +3,6 @@
 El cálculo vive en `app.services.resumen_contadora`. Con facturación
 electrónica el débito sale de SIFEN; sin ella, de las ventas con número de
 factura en papel.
-
-Portado de sistema_silvio_cel. Sin el aviso del campo "Nº Factura" del POS:
-en este sistema ese campo llega con los talonarios (fase 4).
 """
 from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -13,6 +10,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.routes.contador import contador_bp, puede_ver_area_contador
 from app.services.contador_meses import estado_del_mes, guardar_ajustes, marcar_presentado
+from app.services.pos_numero_factura import pos_pide_numero_factura
 from app.services.resumen_contadora import mes_por_defecto, mes_vecino, parse_mes, resumen_del_mes
 from app.services.resumen_contadora_detalle import FILAS_SIFEN, FILAS_SIN_SIFEN, detalle_fila, excel_detalle
 from app.services.resumen_contadora_exportar import respuesta_excel, respuesta_pdf
@@ -39,6 +37,8 @@ def resumen_iva():
         mes_anterior=mes_vecino(primero, -1).strftime('%Y-%m'),
         mes_siguiente=mes_vecino(primero, 1).strftime('%Y-%m'),
         vista='anuladas' if request.args.get('vista') == 'anuladas' else 'iva',
+        # Sin el campo "Nº Factura" en el POS no hay dónde cargar la factura en papel.
+        pos_pide_numero_factura=pos_pide_numero_factura(),
         cierre=estado_del_mes(primero, resumen['debito'], resumen['credito']),
         **resumen,
     )

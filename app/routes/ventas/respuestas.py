@@ -68,6 +68,7 @@ def _venta_existente_response(venta):
     return {
         'success': True,
         'id_venta': venta.id_venta,
+        'numero_factura': (venta.numero_factura or '').strip(),
         'total': total,
         'pagado': total_pagado,
         'vuelto': float(vuelto),

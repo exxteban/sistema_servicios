@@ -9,6 +9,7 @@ from app.services.clientes_servicios import (
 )
 from app.services.agenda_turnos_peluqueria import build_pos_data_from_agenda_turno
 from app.services.fe_pos import contexto_factura_electronica_pos
+from app.services.pos_numero_factura import pos_pide_numero_factura
 from cobranzas import CLAVE_VENTAS_CREDITO_ACTIVO, DIAS_VENCIMIENTO_CUENTA_CORRIENTE
 
 
@@ -210,6 +211,7 @@ def _render_pos_interface(sesion=None, solo_registro_vendedor=False):
         vendedores_cajeros=vendedores_cajeros_data,
         vendedor_default_id=vendedor_default_id,
         ocultar_selector_vendedor_pos=ocultar_selector_vendedor_pos,
+        mostrar_numero_factura_pos=pos_pide_numero_factura(),
         caja_flujo_enviado_activo=caja_flujo_enviado_activo,
         caja_exigir_cajero_para_cobro=caja_exigir_cajero_para_cobro,
         modo_cobro_exclusivo_cajero=modo_cobro_exclusivo_cajero,

@@ -21,6 +21,17 @@ PERMISOS_CONTADOR = (
     },
 )
 
+SIMBOLOS_GUARANI = ('₲', 'Gs', 'Gs.')
+
+
+def instalacion_paraguaya():
+    """El área Contador/a es IVA paraguayo: con otra moneda (R$ en Brasil) no aplica."""
+    from app.utils.helpers import config_moneda
+
+    moneda = config_moneda()
+    return moneda.get('locale') == 'es-PY' and moneda.get('simbolo') in SIMBOLOS_GUARANI
+
+
 ROL_CONTADOR = 'Contador/a'
 DESCRIPCION_ROL_CONTADOR = ('Profesional de afuera: ve el resumen de IVA del mes y su detalle. '
                             'No vende ni ve la caja ni los reportes del negocio.')
@@ -41,4 +52,4 @@ def ensure_rol_contador(*, commit=True):
     return rol
 
 
-__all__ = ['PERMISOS_CONTADOR', 'PERMISO_AREA_CONTADOR', 'ROL_CONTADOR', 'ensure_rol_contador']
+__all__ = ['PERMISOS_CONTADOR', 'PERMISO_AREA_CONTADOR', 'ROL_CONTADOR', 'ensure_rol_contador', 'instalacion_paraguaya']

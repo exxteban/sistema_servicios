@@ -76,13 +76,6 @@ class TestContadorServicios(BaseProveedorApi):
         factura = self.http.post(f'/contador/gasto-pago/{pago.id_pago_gasto_corriente}/factura', data={'numero': '1'})
         self.assertEqual(factura.status_code, 403)
 
-    def test_informe_aclara_que_el_debito_no_incluye_las_ventas(self):
-        """Sin el número de factura en el POS, un débito de Gs. 0 no debe leerse como "no hubo ventas"."""
-        from app.services.resumen_contadora_informe import VENTAS_SIN_NUMERO_EN_ESTE_SISTEMA, informe_del_mes
-
-        self.assertIn(VENTAS_SIN_NUMERO_EN_ESTE_SISTEMA, informe_del_mes(date(2026, 9, 1), False)['avisos'])
-        self.assertNotIn(VENTAS_SIN_NUMERO_EN_ESTE_SISTEMA, informe_del_mes(date(2026, 9, 1), True)['avisos'])
-
     def _documento(self, numero, estado, ambiente=AMBIENTE_PRODUCCION):
         venta = Venta(id_cliente=self.cliente.id_cliente, id_sesion_caja=self.sesion.id_sesion,
                       subtotal=11000, total=11000, total_iva_10=1000, fecha_venta=EN_EL_MES)

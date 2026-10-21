@@ -34,15 +34,39 @@ def _prender_una_vez():
 
 
 def pos_pide_numero_factura():
-    """Lo que usa el POS, el registro vendedor y el resumen del/la contador/a."""
-    if facturacion_electronica_activa():
+    """Lo que usa el POS, el registro vendedor y el resumen del/la contador/a.
+
+    En este sistema además sólo en instalaciones en guaraníes: la factura con
+    timbrado es paraguaya (en Brasil, con R$, el campo no aparece).
+    """
+    from app.services.contador_permisos import instalacion_paraguaya
+
+    if facturacion_electronica_activa() or not instalacion_paraguaya():
         return False
     _prender_una_vez()
     return Configuracion.obtener_bool(CLAVE_POS_MOSTRAR_NUMERO_FACTURA, default=True)
 
 
+LARGO_MAXIMO = 80
+
+
+def numero_factura_del_pedido(data, cola_cobro_data=None):
+    """El Nº Factura que manda el POS o, si no vino, el del pendiente de caja.
+
+    Devuelve `(numero, error)`. Vive acá y no en la ruta de ventas para no
+    sumarle lógica a un archivo que ya es largo.
+    """
+    numero = (data.get('numero_factura') or '').strip() or None
+    if not numero and cola_cobro_data:
+        numero = (cola_cobro_data.get('numero_factura') or '').strip() or None
+    if numero and len(numero) > LARGO_MAXIMO:
+        return None, 'Nº Factura inválido'
+    return numero, None
+
+
 __all__ = [
     'CLAVE_POS_MOSTRAR_NUMERO_FACTURA',
     'facturacion_electronica_activa',
+    'numero_factura_del_pedido',
     'pos_pide_numero_factura',
 ]

@@ -1,8 +1,11 @@
 {# Área "Contador/a": apartado propio porque la contadora suele tener sólo
    `ver_reportes` y no ve Finanzas. Va a crecer: cada pantalla nueva para el/la
-   contador/a (talonarios, cierre del mes) se suma como ítem de este menú. #}
+   contador/a se suma como ítem de este menú. #}
 {% set ve_resumen_contador = puede_ver_area_contador is defined and puede_ver_area_contador(current_user) %}
-{% if ve_resumen_contador %}
+{# Talonarios en papel: sólo sin facturación electrónica (con SIFEN no se usan). #}
+{% set ve_talonarios = puede_gestionar_talonarios is defined and puede_gestionar_talonarios(current_user)
+    and not (modulo_facturacion_electronica_activo|default(false)) %}
+{% if ve_resumen_contador or ve_talonarios %}
 <div class="relative group w-12">
     <button type="button"
         @click.stop.prevent="$dispatch('sidebar-menu-toggle', { name: 'contador' })"
@@ -26,6 +29,7 @@
             Contador/a
         </div>
 
+        {% if ve_resumen_contador %}
         <a href="{{ url_for('contador.resumen_iva') }}"
             data-tab-url="{{ url_for('contador.resumen_iva') }}" data-tab-title="Resumen para el/la contador/a" data-tab-icon="fas fa-user-tie"
             class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
@@ -34,6 +38,17 @@
             </div>
             <span class="text-sm font-medium">Resumen de IVA del mes</span>
         </a>
+        {% endif %}
+        {% if ve_talonarios %}
+        <a href="{{ url_for('contador.talonarios') }}"
+            data-tab-url="{{ url_for('contador.talonarios') }}" data-tab-title="Talonarios de factura" data-tab-icon="fas fa-book"
+            class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover/item:bg-amber-500 group-hover/item:text-white transition-colors">
+                <i class="fas fa-book text-sm"></i>
+            </div>
+            <span class="text-sm font-medium">Talonarios de factura</span>
+        </a>
+        {% endif %}
     </div>
     </template>
 </div>

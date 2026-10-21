@@ -5,7 +5,7 @@
                 const vendedorInicial = (typeof VENDEDOR_ID_INICIAL !== 'undefined' && VENDEDOR_ID_INICIAL !== null)
                     ? Number(VENDEDOR_ID_INICIAL)
                     : null;
-                if (this.carrito.length === 0 && this.pagos.length === 0 && this.descuento === 0 && !this.beneficioFidelizacionId && this.clienteId === 1 && this.alertaClienteFielActiva === true && (
+                if (this.carrito.length === 0 && this.pagos.length === 0 && this.descuento === 0 && !this.beneficioFidelizacionId && this.clienteId === 1 && this.alertaClienteFielActiva === true && !(this.numeroFactura || '').trim() && (
                     this.vendedorId === vendedorInicial || !this.vendedorId
                 ) && this.condicionVenta === 'contado') {
                     sessionStorage.removeItem(POS_STATE_KEY);
@@ -28,6 +28,7 @@
                     vendedorId: this.vendedorId,
                     alertaClienteFielActiva: this.alertaClienteFielActiva === true,
                     descuento: this.descuento,
+                    numeroFactura: (this.numeroFactura || '').trim(),
                     condicionVenta: this.condicionVenta,
                     creditoModo: this.creditoModo,
                     creditoCuotas: this.creditoCuotas,
@@ -89,6 +90,9 @@
                     }
 
                     // Restaurar descuento
+                    if (this.mostrarNumeroFactura && typeof estado.numeroFactura === 'string') {
+                        this.numeroFactura = estado.numeroFactura;
+                    }
                     if (estado.descuento) {
                         this.descuento = estado.descuento;
                     }

@@ -41,5 +41,5 @@ class TestRolContador(BaseProveedorApi):
         self.assertIn('Marcar como presentado', html)
         self.assertNotIn('Talonarios de factura', html)       # configurar es del dueño
 
-        for url in ('/caja/', '/reportes/', '/ventas/pos'):
+        for url in ('/caja/', '/reportes/', '/ventas/pos', '/contador/talonarios'):
             self.assertEqual(http.get(url).status_code, 302, url)

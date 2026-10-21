@@ -24,6 +24,8 @@ from app.services.clientes_fidelizacion import (
 )
 from app.services.clientes_servicios import get_cliente_servicios_cobrables, parse_cliente_servicio_ids
 from app.services.agenda_cobros import vincular_venta_a_agenda_cobrada
+from app.services.pos_numero_factura import numero_factura_del_pedido
+from app.services.talonario_facturas import completar_venta as completar_venta_en_papel
 
 
 def _procesar_venta_payload(data):
@@ -159,6 +161,10 @@ def _procesar_venta_payload(data):
                     if int(reparacion_id) != int(reparacion_id_cola):
                         return {'error': 'El pendiente no corresponde a la reparaci?n indicada'}, 400
                 reparacion_id = reparacion_id_cola
+
+    numero_factura, error_numero_factura = numero_factura_del_pedido(data, cola_cobro_data)
+    if error_numero_factura:
+        return {'error': error_numero_factura}, 400
 
     modo_cobro_exclusivo_cajero = _modo_cobro_exclusivo_cajero_activo()
     if modo_cobro_exclusivo_cajero and not current_user.es_admin():
@@ -382,8 +388,11 @@ def _procesar_venta_payload(data):
         total_iva_5=total_iva_5,
         total_exenta=total_exenta,
         total=total,
-        observaciones=observaciones
+        observaciones=observaciones,
+        numero_factura=numero_factura,
     )
+    # Sin facturación electrónica: número completo y timbrado del talonario.
+    completar_venta_en_papel(venta)
     if monto_financiado > 0:
         venta.tipo_venta = 'credito'
         venta.saldo_pendiente = monto_financiado
@@ -544,6 +553,7 @@ def _procesar_venta_payload(data):
                     'total_exenta': float(total_exenta or 0),
                     'total_pagado': float(total_pagado or 0),
                     'vuelto': float(vuelto or 0),
+                    'numero_factura': venta.numero_factura,
                     'observaciones': observaciones,
                     'numero_ticket': numero_ticket,
                     'items': items_auditoria,
@@ -637,6 +647,7 @@ def _procesar_venta_payload(data):
         metadata_cola = cola_metadata or cola_cobro.get_metadata()
         metadata_cola['venta_id'] = int(venta.id_venta)
         metadata_cola['cerrado_por_usuario'] = int(current_user.id_usuario)
+        metadata_cola['numero_factura'] = venta.numero_factura
         id_origen_cola = cola_cobro.id_origen
         if cola_cobro.tipo_origen == 'venta':
             id_origen_cola = venta.id_venta
@@ -729,6 +740,7 @@ def _procesar_venta_payload(data):
     response_data = {
         'success': True,
         'id_venta': venta.id_venta,
+        'numero_factura': venta.numero_factura,
         'tipo_venta': venta.tipo_venta,
         'credito_modo': plan_credito_ctx.get('modo') if monto_financiado > 0 else None,
         'credito_tasa_interes_pct': float(plan_credito_ctx.get('tasa_interes_pct') or 0) if monto_financiado > 0 else 0,

@@ -574,6 +574,7 @@
                 id_cliente: this.clienteId,
                 beneficio_fidelizacion_id: this.beneficioFidelizacionId || null,
                 id_usuario_vendedor: this.vendedorId,
+                numero_factura: this.mostrarNumeroFactura ? (String(this.numeroFactura || '').trim() || null) : null,
                 forzar_precio_mayorista: this.forzarPrecioMayorista === true,
                 descuento: this.descuento,
                 client_request_id: this.generarClientRequestId(),

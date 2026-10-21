@@ -384,6 +384,7 @@ def _build_pos_data_from_cola_cobro(item_cola):
         'descuento': float(metadata.get('descuento') or 0),
         'beneficio_fidelizacion_id': metadata.get('beneficio_fidelizacion_id'),
         'observaciones': (metadata.get('observaciones') or '').strip(),
+        'numero_factura': (metadata.get('numero_factura') or '').strip(),
         'gastronomia_pedido_id': metadata.get('gastronomia_pedido_id'),
         'gastronomia_codigo_entrega': (metadata.get('gastronomia_codigo_entrega') or '').strip(),
         'gastronomia_referencia_entrega': (metadata.get('gastronomia_referencia_entrega') or '').strip(),

@@ -3,9 +3,6 @@
 La mayoría de las instalaciones factura con talonario o autoimpresor y carga
 el número en el campo "Nº Factura" del POS. Esas ventas son el débito fiscal;
 las que no tienen número no suman, y un número repetido es un pendiente.
-
-Portado de sistema_silvio_cel. En este sistema el POS todavía no tiene el
-campo (fase 4): los tests cargan `Venta.numero_factura` directo.
 """
 import unittest
 from datetime import date, datetime
@@ -125,12 +122,21 @@ class TestContadorVentasPapel(BaseProveedorApi):
 
         self.assertEqual(respuesta.status_code, 404)
 
-    def test_avisa_que_las_ventas_todavia_no_guardan_la_factura(self):
-        """En este sistema el POS no carga el número todavía (fase 4): se avisa."""
+    def test_campo_prendido_por_defecto_no_avisa(self):
         html = self._get(f'/contador/iva?mes={MES}').get_data(as_text=True)
 
-        self.assertIn('todavía no guardan el número de la factura en papel', html)
         self.assertNotIn('El POS no está pidiendo el número de factura', html)
+
+    def test_si_alguien_apago_el_campo_avisa(self):
+        from app.services.pos_numero_factura import CLAVE_PRENDIDO_SIN_FE
+
+        Configuracion.establecer(CLAVE_PRENDIDO_SIN_FE, '1')
+        Configuracion.establecer('pos_mostrar_numero_factura', '0')
+        db.session.commit()
+
+        html = self._get(f'/contador/iva?mes={MES}').get_data(as_text=True)
+
+        self.assertIn('El POS no está pidiendo el número de factura', html)
 
     def test_menu_lateral_tiene_el_apartado_contador(self):
         html = self._get(f'/contador/iva?mes={MES}').get_data(as_text=True)

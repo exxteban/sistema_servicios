@@ -2,6 +2,7 @@
 from .parte1 import *
 from app.services.clientes_fidelizacion import resolver_descuento_beneficio_pos
 from app.services.clientes_servicios import get_cliente_servicios_cobrables, parse_cliente_servicio_ids
+from app.services.pos_numero_factura import numero_factura_del_pedido
 
 
 @ventas_bp.route('/enviar-a-caja', methods=['POST'])
@@ -55,6 +56,9 @@ def enviar_a_caja():
 
         if client_request_id and len(client_request_id) > 64:
             return jsonify({'error': 'client_request_id inválido'}), 400
+        numero_factura, error_numero_factura = numero_factura_del_pedido(data)
+        if error_numero_factura:
+            return jsonify({'error': error_numero_factura}), 400
 
         if beneficio_fidelizacion_id not in (None, '', 0, '0'):
             try:
@@ -143,6 +147,7 @@ def enviar_a_caja():
             'usar_precio_mayorista': bool(usar_precio_mayorista),
             'forzar_precio_mayorista': bool(usar_precio_mayorista),
             'observaciones': observaciones,
+            'numero_factura': numero_factura,
             'items': items_normalizados,
         }
 

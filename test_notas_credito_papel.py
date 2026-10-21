@@ -5,10 +5,8 @@ nota de crédito en papel. Se carga desde la venta; su IVA sale de las líneas
 devueltas (cada una con su porcentaje) y resta del débito del mes de la NC.
 Una devolución sin NC es un pendiente. La devolución en sí no cambia.
 
-Portado de sistema_silvio_cel (fase 2: sólo el lado que lee el resumen). El
-formulario para cargar la NC desde la venta llega en la fase 4: acá se carga
-con el servicio. La devolución reembolsa lo cobrado con el descuento global,
-como la factura; con una moneda con centavos (R$), redondeado a centavos.
+Portado de sistema_silvio_cel, más un caso propio: con una moneda con centavos
+(R$) la devolución redondea a centavos.
 """
 import unittest
 from datetime import date, datetime
@@ -92,11 +90,8 @@ class TestNotasCreditoPapel(unittest.TestCase):
         return devolucion
 
     def _nc(self, devolucion, numero='001-001-0000045', fecha='2026-09-20'):
-        from app.services.notas_credito_papel import registrar
-
-        nota, error = registrar(devolucion, numero, '87654321', date.fromisoformat(fecha), self.admin.id_usuario)
-        db.session.commit()
-        return nota, error
+        return self.client.post(f'/contador/devolucion/{devolucion.id_devolucion}/nota-credito',
+                                data={'numero': numero, 'timbrado': '87654321', 'fecha': fecha})
 
     def test_iva_de_la_devolucion_sale_de_cada_linea(self):
         from app.services.notas_credito_papel import totales_de_devolucion
@@ -112,7 +107,7 @@ class TestNotasCreditoPapel(unittest.TestCase):
         self.assertAlmostEqual(t['total'], 136000)
 
     def test_devolucion_sin_nc_es_pendiente_y_con_nc_resta_del_debito(self):
-        from app.models import NotaCreditoPapel
+        from app.models import Auditoria, NotaCreditoPapel
         from app.services.resumen_contadora import resumen_del_mes
 
         venta = self._venta()
@@ -122,10 +117,14 @@ class TestNotasCreditoPapel(unittest.TestCase):
         self.assertAlmostEqual(r['debito'], 10000)
         self.assertEqual(r['en_papel']['sin_nota_credito']['cantidad'], 1)
         self.assertEqual(r['pendientes'], 1)
-        _, error = self._nc(devolucion, numero='001-001-45')
-        self.assertIsNone(error)
+        html = self.client.get(f'/ventas/{venta.id_venta}').get_data(as_text=True)
+        self.assertIn('Cargar nota de crédito', html)
+
+        respuesta = self._nc(devolucion, numero='001-001-45')
+        self.assertEqual(respuesta.status_code, 302)
         nota = NotaCreditoPapel.query.one()
         self.assertEqual((nota.numero, nota.timbrado, nota.fecha), ('001-001-0000045', '87654321', date(2026, 9, 20)))
+        self.assertIsNotNone(Auditoria.query.filter_by(accion='nota_credito_papel').first())
 
         r = resumen_del_mes(PRIMERO, fe_activa=False)
         self.assertAlmostEqual(r['en_papel']['notas_credito']['iva10'], 5000)
@@ -138,6 +137,8 @@ class TestNotasCreditoPapel(unittest.TestCase):
         self.assertIn('001-001-0000045', detalle)
         self.assertIn('001-001-0000050', detalle)            # la factura que afecta
         self.assertIn('87654321', detalle)
+        excel = self.client.get(f'/contador/iva/detalle?mes={MES}&fila=notas_papel&formato=xlsx')
+        self.assertEqual(excel.status_code, 200)
 
     def test_nc_cuenta_en_el_mes_de_su_fecha(self):
         from app.services.resumen_contadora import resumen_del_mes
@@ -166,9 +167,9 @@ class TestNotasCreditoPapel(unittest.TestCase):
         primera = self._devolucion(self._venta(numero='001-001-0000070'))
         segunda = self._devolucion(self._venta(numero='001-001-0000071'))
         self._nc(primera)
-        _, error = self._nc(segunda)
+        respuesta = self._nc(segunda)
         self.assertEqual(NotaCreditoPapel.query.count(), 1)
-        self.assertIn('ya está cargada', error)
+        self.assertEqual(respuesta.status_code, 302)                          # vuelve con el aviso
 
         self._nc(primera, numero='')
         self.assertEqual(NotaCreditoPapel.query.count(), 0)
@@ -217,7 +218,10 @@ class TestNotasCreditoPapel(unittest.TestCase):
         venta.descuento_monto = 11000
         db.session.commit()
         self.assertEqual(lineas_devolubles(venta)[0]['precio_unitario'], 99000)
-        respuesta = self._devolver(venta, 1)
+        respuesta = self.client.post(f'/ventas/{venta.id_venta}/devolucion', json={
+            'items': [{'id_detalle_venta': venta.detalles.first().id_detalle_venta, 'cantidad': 1}],
+            'motivo': 'Falla', 'accion_stock': 'retorno_stock', 'metodo_reembolso': 'efectivo'})
+        self.assertEqual(respuesta.status_code, 200, respuesta.get_data(as_text=True))
         self.assertEqual(respuesta.get_json()['monto_total'], 99000)
         devolucion = db.session.get(Devolucion, respuesta.get_json()['id_devolucion'])
         movimiento = MovimientoCaja.query.filter_by(
@@ -258,17 +262,15 @@ class TestNotasCreditoPapel(unittest.TestCase):
         self.assertAlmostEqual(primera + resto, 95.00)
 
     def test_devolucion_antigua_excesiva_avisa_sin_reescribir_importes(self):
-        from app.services.resumen_contadora import resumen_del_mes
         from app.services.resumen_contadora_informe import informe_del_mes
 
         venta = self._venta()
         venta.total = 99000
         db.session.commit()
-        devolucion = self._devolucion(venta)  # devuelve 110.000, sin el descuento
+        devolucion = self._devolucion(venta)  # legado: devuelve 110.000
         self._nc(devolucion)
-        avisos = resumen_del_mes(PRIMERO, False)['controles']['conciliacion']['filas']
-        self.assertTrue(any('importe devuelto supera' in aviso for aviso in avisos))
-        self.assertTrue(any('importe devuelto supera' in aviso for aviso in informe_del_mes(PRIMERO, False)['pendientes']))
+        informe = informe_del_mes(PRIMERO, False)
+        self.assertTrue(any('importe devuelto supera' in aviso for aviso in informe['pendientes']))
         self.assertEqual(float(devolucion.monto_total), 110000)
         html = self.client.get(f'/contador/iva?mes={MES}').get_data(as_text=True)
         self.assertIn('importe devuelto supera', html)

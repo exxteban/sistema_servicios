@@ -11,10 +11,6 @@ from app.services.resumen_contadora import resumen_del_mes
 from app.services.resumen_contadora_detalle import detalle_fila
 from app.utils.helpers import now_local
 
-VENTAS_SIN_NUMERO_EN_ESTE_SISTEMA = (
-    'Las ventas todavía no registran el número de la factura en papel: el débito fiscal '
-    'de este informe no incluye las ventas del mes. El crédito fiscal y los controles están completos.')
-
 
 def _gs(valor):
     # "Gs." y no "₲": la fuente del PDF no tiene el signo del guaraní.
@@ -55,10 +51,6 @@ def _observaciones(r, cierre):
             pendientes.append(f"{docs['ventas_estimadas'] + docs['nc_estimadas']} documento(s) sin copia local del XML: "
                               'su IVA se calculó con la venta y puede diferir en unos guaraníes.')
     if papel:
-        # En este sistema el POS todavía no carga el número de factura en papel
-        # (llega con los talonarios): sin esta aclaración un débito de Gs. 0 en
-        # el informe se lee como "no hubo ventas".
-        avisos.append(VENTAS_SIN_NUMERO_EN_ESTE_SISTEMA)
         for rep in papel['repetidos']:
             pendientes.append(f"El número de factura {rep['numero']} está cargado en {len(rep['ventas'])} ventas: todas suman al débito.")
         sin_nc = papel['sin_nota_credito']

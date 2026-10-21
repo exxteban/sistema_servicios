@@ -4,10 +4,6 @@ Sin facturación electrónica el POS ofrece el número que sigue, completa lo
 que se tipea ("124" → "001-001-0000124") y cada venta guarda su timbrado.
 El resumen para el/la contador/a marca los números que no caen en ningún
 talonario y avisa de los saltos. Nunca se bloquea una venta.
-
-Portado de sistema_silvio_cel (fase 2: el servicio y lo que lee el resumen).
-La pantalla de talonarios, el número en el POS y la corrección desde la venta
-llegan en la fase 4.
 """
 import unittest
 from datetime import date, datetime
@@ -115,6 +111,97 @@ class TestTalonarioFacturas(unittest.TestCase):
 
     # --- POS -----------------------------------------------------------------
 
+    def test_pos_ofrece_el_siguiente_y_la_venta_guarda_numero_completo_y_timbrado(self):
+        from app.models import Categoria, Producto, Venta
+
+        self._talonario(desde=120, hasta=500)
+        sugerencia = self.client.get('/contador/talonarios/siguiente').get_json()['sugerencias'][0]
+        self.assertEqual(sugerencia['numero'], '001-001-0000120')
+        self.assertEqual(sugerencia['timbrado'], '12345678')
+
+        categoria = Categoria(nombre='Talonario', activo=True)
+        db.session.add(categoria)
+        db.session.flush()
+        producto = Producto(codigo='TAL-1', nombre='Funda', id_categoria=categoria.id_categoria,
+                            precio_compra=1000, precio_venta=11000, porcentaje_iva=10,
+                            stock_actual=10, stock_minimo=1, es_servicio=False, activo=True)
+        db.session.add(producto)
+        db.session.commit()
+
+        respuesta = self.client.post('/ventas/procesar', json={
+            'items': [{'id_producto': producto.id_producto, 'cantidad': 1}],
+            'pagos': [{'id_metodo_pago': self.efectivo.id_metodo_pago, 'monto': 11000}],
+            'id_cliente': self.cliente.id_cliente, 'id_usuario_vendedor': self.admin.id_usuario,
+            'client_request_id': 'talonario-120', 'numero_factura': '120',
+        })
+
+        self.assertEqual(respuesta.status_code, 200, respuesta.get_data(as_text=True))
+        self.assertEqual(respuesta.get_json()['numero_factura'], '001-001-0000120')
+        venta = Venta.query.filter_by(client_request_id='talonario-120').one()
+        self.assertEqual((venta.numero_factura, venta.timbrado), ('001-001-0000120', '12345678'))
+        siguiente = self.client.get('/contador/talonarios/siguiente').get_json()['sugerencias'][0]
+        self.assertEqual(siguiente['numero'], '001-001-0000121')
+
+    def test_con_facturacion_electronica_no_hay_sugerencias_ni_correccion(self):
+        from app.models import Configuracion
+
+        self._talonario()
+        venta = self._venta('001-001-0000001')
+        Configuracion.establecer(CLAVE_FACTURACION_ELECTRONICA_ACTIVO, 'true')
+        db.session.commit()
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion['_user_id'] = str(self.admin.id_usuario)
+            sesion['_fresh'] = True
+
+        self.assertEqual(cliente.get('/contador/talonarios/siguiente').get_json(), {'sugerencias': []})
+        respuesta = cliente.post(f'/contador/venta/{venta.id_venta}/numero-factura', data={'numero_factura': '2'})
+        self.assertEqual(respuesta.status_code, 404)
+
+    # --- Pantallas -----------------------------------------------------------
+
+    def test_pantalla_de_talonarios_crea_y_desactiva(self):
+        from app.models import TalonarioFactura
+
+        respuesta = self.client.post('/contador/talonarios', data={
+            'timbrado': '12345678', 'vigencia_desde': '2026-01-01', 'vigencia_hasta': '2026-12-31',
+            'establecimiento': '1', 'punto_expedicion': '1', 'numero_desde': '1', 'numero_hasta': '500',
+        })
+        self.assertEqual(respuesta.status_code, 302)
+        talonario = TalonarioFactura.query.one()
+        html = self.client.get('/contador/talonarios').get_data(as_text=True)
+        self.assertIn('001-001-0000001 al 0000500', html)
+
+        error = self.client.post('/contador/talonarios', data={
+            'timbrado': '99', 'vigencia_desde': '2026-01-01', 'vigencia_hasta': '2026-12-31',
+            'establecimiento': '1', 'punto_expedicion': '1', 'numero_desde': '1', 'numero_hasta': '5',
+        }).get_data(as_text=True)
+        self.assertIn('8 números', error)
+        self.assertEqual(TalonarioFactura.query.count(), 1)
+
+        self.client.post(f'/contador/talonarios/{talonario.id}/activo')
+        self.assertFalse(db.session.get(TalonarioFactura, talonario.id).activo)
+
+    def test_corregir_numero_desde_la_venta_asigna_timbrado_y_audita(self):
+        from app.models import Auditoria
+
+        self._talonario()
+        venta = self._venta(None)
+
+        html = self.client.get(f'/ventas/{venta.id_venta}').get_data(as_text=True)
+        self.assertIn('Cargar número', html)
+
+        self.client.post(f'/contador/venta/{venta.id_venta}/numero-factura', data={'numero_factura': '33'})
+        db.session.refresh(venta)
+        self.assertEqual((venta.numero_factura, venta.timbrado), ('001-001-0000033', '12345678'))
+        self.assertIsNotNone(Auditoria.query.filter_by(accion='corregir_numero_factura').first())
+
+        self.client.post(f'/contador/venta/{venta.id_venta}/numero-factura', data={'numero_factura': ''})
+        db.session.refresh(venta)
+        self.assertEqual((venta.numero_factura, venta.timbrado), (None, None))
+
+    # --- Resumen para el/la contador/a ---------------------------------------
+
     def test_resumen_marca_fuera_de_talonario_y_saltos(self):
         from app.services.resumen_contadora import resumen_del_mes
 
@@ -180,6 +267,14 @@ class TestTalonarioFacturas(unittest.TestCase):
         saltos = resumen_del_mes(date(2026, 9, 1), fe_activa=False)['en_papel']['talonario']['saltos']
 
         self.assertEqual(saltos['cantidad'], 0)
+
+    def test_sin_talonario_invita_a_cargarlo(self):
+        self._venta('001-001-0000010')
+
+        html = self.client.get(f'/contador/iva?mes={MES}').get_data(as_text=True)
+
+        self.assertIn('talonario de facturas', html)
+        self.assertIn('/contador/talonarios', html)
 
 
 if __name__ == '__main__':

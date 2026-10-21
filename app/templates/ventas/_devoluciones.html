@@ -22,6 +22,7 @@
             <span class="font-semibold text-gray-800 dark:text-gray-100">
                 ₲ {{ "{:,.0f}".format(dev.monto_total or 0).replace(",", ".") }}
             </span>
+            {% include 'contador/_nota_credito_papel.html' %}
         </li>
         {% endfor %}
     </ul>
