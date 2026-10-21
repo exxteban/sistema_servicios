@@ -1,0 +1,174 @@
+                // Continua tab_runtime_js_open_tab.html (dentro de openTab).
+                // El cableado ajax del contenido (forms y links internos) se aplica
+                // tanto al HTML que llega por fetch como al que se adopta ya
+                // renderizado desde el panel principal.
+                function wireTabContent(contentDiv) {
+                    contentDiv.querySelectorAll('form').forEach(form => {
+                        if (form.hasAttribute('data-no-ajax') || form.hasAttribute('data-custom-submit')) return;
+                        const method = ((form.getAttribute('method') || form.method || 'GET') + '').toUpperCase();
+
+                        if (method === 'GET') {
+                            form.addEventListener('submit', async (e) => {
+                                if (e.defaultPrevented) return;
+                                e.preventDefault();
+                                const submitter = e.submitter;
+                                const formData = submitter ? new FormData(form, submitter) : new FormData(form);
+                                const action = form.action || window.location.href;
+                                const formUrl = new URL(action, window.location.origin);
+
+                                for (const [key, value] of formData.entries()) {
+                                    formUrl.searchParams.set(key, value);
+                                }
+
+                                const currentKey = getKeyByTabId(tabId);
+                                if (currentKey) {
+                                    const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                    meta.url = normalizeKey(formUrl.toString());
+                                    tabMetaByKey.set(currentKey, meta);
+                                }
+
+                                await loadContent(formUrl.toString());
+                                saveState();
+                            });
+                            return;
+                        }
+
+                        form.addEventListener('submit', async (e) => {
+                            if (e.defaultPrevented) return;
+                            e.preventDefault();
+                            ensureLoadingCover();
+
+                            let loadSeq = 0;
+                            try {
+                                loadSeq = ++currentLoadSeq;
+
+                                if (currentAbortController) {
+                                    try { currentAbortController.abort(); } catch { }
+                                }
+                                currentAbortController = new AbortController();
+
+                                const submitter = e.submitter;
+                                const formData = submitter ? new FormData(form, submitter) : new FormData(form);
+                                const action = form.action || window.location.href;
+                                const fetchUrl = new URL(action, window.location.origin);
+                                fetchUrl.searchParams.set('partial', '1');
+
+                                dlog('[FORM SUBMIT]', method, fetchUrl.toString(), safeLogFormData(formData));
+                                const response = await fetch(fetchUrl.toString(), {
+                                    method,
+                                    body: formData,
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                                    redirect: 'follow',
+                                    signal: currentAbortController.signal
+                                });
+
+                                const rawHtml = await response.text();
+                                const payload = extractTabHtml(rawHtml);
+                                dlog('[FORM RESPONSE]', response.status, response.url, { redirected: response.redirected });
+
+                                if (loadSeq !== currentLoadSeq) return;
+
+                                if (!response.ok) {
+                                    await applyPayload(payload);
+                                    return;
+                                }
+
+                                const currentKey = getKeyByTabId(tabId);
+                                if (currentKey) {
+                                    const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                    meta.url = normalizeKey(response.url || new URL(action, window.location.origin).toString());
+                                    tabMetaByKey.set(currentKey, meta);
+
+                                    if (response.redirected && response.url) {
+                                        const redirectedKey = normalizeKey(response.url);
+                                        if (redirectedKey && redirectedKey !== currentKey) {
+                                            const existingId = tabIdsByKey.get(redirectedKey);
+                                            if (existingId && existingId !== tabId) {
+                                                setActiveTab(existingId);
+                                                const existingLoader = tabLoadersById.get(existingId);
+                                                if (existingLoader) await existingLoader(response.url);
+                                                window.appInjectFlashesFromHtml(tabPanelsById.get(existingId), rawHtml);
+                                                closeTab(tabId);
+                                                saveState();
+                                                return;
+                                            }
+                                            if (!tabIdsByKey.has(redirectedKey)) {
+                                                tabIdsByKey.delete(currentKey);
+                                                tabMetaByKey.delete(currentKey);
+                                                tabIdsByKey.set(redirectedKey, tabId);
+                                                tabMetaByKey.set(redirectedKey, meta);
+                                            }
+                                        }
+                                    }
+
+                                    if (response.url && isDashboardUrl(response.url)) {
+                                        meta.title = 'Dashboard';
+                                        meta.iconClass = 'fas fa-tachometer-alt';
+                                        tabMetaByKey.set(getKeyByTabId(tabId) || currentKey, meta);
+                                        syncTabButtonMeta(tabId, meta);
+                                    }
+                                }
+
+                                if (response.redirected && response.url) {
+                                    await loadContent(response.url);
+                                    // loadContent vuelve a pedir la pagina, ya sin los flash.
+                                    window.appInjectFlashesFromHtml(panel, rawHtml);
+                                    saveState();
+                                    return;
+                                }
+
+                                await applyPayload(payload);
+                                saveState();
+                            } catch (error) {
+                                if (error && error.name === 'AbortError') return;
+                                console.error('Error submitting form:', error);
+                            } finally {
+                                if (loadSeq === currentLoadSeq) {
+                                    removeLoadingCover();
+                                }
+                            }
+                        });
+                    });
+
+                    contentDiv.querySelectorAll('a[href]').forEach(link => {
+                        if (link.classList.contains('app-tab-link')) return;
+                        if (link.hasAttribute('download')) return;
+                        if (link.getAttribute('target') === '_blank') return;
+
+                        const href = link.getAttribute('href');
+                        if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+                        try {
+                            const linkUrl = new URL(href, window.location.origin);
+                            if (linkUrl.origin !== window.location.origin) return;
+
+                            // Detectar si es un link "Volver/Regresar" para usar appGoBack()
+                            const linkText = (link.textContent || '').trim().toLowerCase();
+                            const hasBackIcon = link.querySelector('.fa-arrow-left, .fa-chevron-left, .fa-angle-left');
+                            const isBackLink = !link.hasAttribute('data-no-back') && (
+                                hasBackIcon || /^(volver|regresar|back|ir atr[aá]s)/.test(linkText)
+                            );
+
+                            link.addEventListener('click', async (e) => {
+                                e.preventDefault();
+                                // El dashboard vive en la pestaña principal: no duplicarlo aquí.
+                                if (isDashboardUrl(linkUrl.toString()) && window.appNavigateToDashboard) {
+                                    window.appNavigateToDashboard();
+                                    return;
+                                }
+                                if (isBackLink && window.appGoBack) {
+                                    window.appGoBack();
+                                    return;
+                                }
+                                const currentKey = getKeyByTabId(tabId);
+                                if (currentKey) {
+                                    const meta = tabMetaByKey.get(currentKey) || { url: currentKey, title: '', iconClass: '' };
+                                    meta.url = normalizeKey(linkUrl.toString());
+                                    tabMetaByKey.set(currentKey, meta);
+                                }
+                                await loadContent(linkUrl.toString());
+                                saveState();
+                            });
+                        } catch { }
+                    });
+                }

@@ -1,10 +1,10 @@
 import re
 from pathlib import Path
 
+from tab_runtime_testing import tab_runtime_source
+
 
 TIENDA_ADMIN_TEMPLATES = Path("app/templates/tienda_admin")
-TAB_RUNTIME_PART1 = Path("app/templates/layout/tab_runtime_js_part1.html")
-TAB_RUNTIME_PART2 = Path("app/templates/layout/tab_runtime_js_part2.html")
 TIENDA_ADMIN_ROUTE = Path("app/routes/tienda_admin.py")
 RELOADABLE_SCRIPT_GUARD = Path("app/templates/layout/reloadable_script_guard.html")
 PROMOCIONES_RUNTIME = Path("app/templates/layout/tienda_admin_promociones_runtime.html")
@@ -56,7 +56,7 @@ def test_tienda_admin_header_buttons_use_single_click_handler():
 
 
 def test_tab_runtime_normalizes_stale_reloadable_state_declarations():
-    source = TAB_RUNTIME_PART1.read_text(encoding="utf-8")
+    source = tab_runtime_source()
 
     assert "normalizeReloadableInlineScript" in source
     assert "isRedeclarationError" in source
@@ -65,7 +65,7 @@ def test_tab_runtime_normalizes_stale_reloadable_state_declarations():
 
 
 def test_tienda_admin_tab_loads_without_cache():
-    runtime_source = TAB_RUNTIME_PART2.read_text(encoding="utf-8")
+    runtime_source = tab_runtime_source()
     route_source = TIENDA_ADMIN_ROUTE.read_text(encoding="utf-8")
     search_source = (TIENDA_ADMIN_TEMPLATES / "_panel_base_js.html").read_text(encoding="utf-8")
 
@@ -123,11 +123,11 @@ def test_modal_backdrops_stay_below_dialog_panels():
 
 def test_tab_navigation_closes_transient_overlays():
     layout_source = Path("app/templates/layout_refactored.html").read_text(encoding="utf-8")
-    tab_runtime_source = TAB_RUNTIME_PART1.read_text(encoding="utf-8")
+    runtime_js = tab_runtime_source()
     overlay_runtime_source = TRANSIENT_OVERLAY_RUNTIME.read_text(encoding="utf-8")
     panel_source = (TIENDA_ADMIN_TEMPLATES / "panel.html").read_text(encoding="utf-8")
 
     assert "transient_overlay_runtime.html" in layout_source
-    assert "window.appCloseTransientOverlays?.(panel)" in tab_runtime_source
+    assert "window.appCloseTransientOverlays?.(panel)" in runtime_js
     assert "[data-app-transient-overlay]" in overlay_runtime_source
     assert "data-app-transient-overlay" in panel_source

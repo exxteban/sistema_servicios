@@ -336,10 +336,12 @@
                 {% endif %}
 
                 <div id="app-tab-panels" class="flex-1 min-h-0 bg-transparent flex flex-col" data-app-shell-viewport-lock="true">
-                    {% set principal_page_title = '' %}
-                    {% if self.title is defined %}
-                    {% set principal_page_title = self.title() | striptags | trim %}
-                    {% endif %}
+                    {# `self.title` no sirve aca: app_shell se incluye desde el layout, y
+                       dentro de un include `self` son los bloques de ESTE template, que no
+                       tiene `title`. El layout ya resolvio el bloque en `browser_title`, que
+                       si esta en contexto para el include. Sin esto el titulo quedaba vacio
+                       y la pestana movida a su lugar se llamaba "Pantalla". #}
+                    {% set principal_page_title = (browser_title | default('')) | striptags | trim %}
                     <section id="app-tab-panel-principal"
                         data-app-shell-viewport-lock="true"
                         class="app-tab-panel flex-1 min-h-0 overflow-y-auto p-3 2xl:p-4" data-tab-panel="principal"

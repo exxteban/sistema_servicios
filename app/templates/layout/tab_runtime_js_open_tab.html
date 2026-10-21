@@ -1,0 +1,342 @@
+            // Continua tab_runtime_js_part1.html (mismo IIFE, se incluyen en orden).
+
+            function extractTabHtml(rawHtml) {
+                try {
+                    const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
+                    function collectExtraStyles(excludedNodes = []) {
+                        const excluded = excludedNodes.filter(Boolean);
+                        const chunks = [];
+                        doc.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+                            const isExcluded = excluded.some((parent) => {
+                                try {
+                                    return parent === node || parent.contains(node);
+                                } catch {
+                                    return false;
+                                }
+                            });
+                            if (isExcluded) return;
+                            chunks.push(node.outerHTML || '');
+                        });
+                        return chunks.join('\n');
+                    }
+
+                    function splitNodeHtml(node) {
+                        if (!node) {
+                            return { contentHtml: '', scriptsHtml: '', stylesHtml: '' };
+                        }
+
+                        const clone = node.cloneNode(true);
+                        const scriptChunks = [];
+                        clone.querySelectorAll('script').forEach((scriptNode) => {
+                            scriptChunks.push(scriptNode.outerHTML || '');
+                            scriptNode.remove();
+                        });
+
+                        return {
+                            contentHtml: clone.innerHTML || '',
+                            scriptsHtml: scriptChunks.join('\n'),
+                            stylesHtml: ''
+                        };
+                    }
+
+                    const partialContent = doc.getElementById('partial-content');
+                    if (partialContent) {
+                        const partialScripts = doc.getElementById('partial-scripts');
+                        const extracted = splitNodeHtml(partialContent);
+                        const extraScripts = partialScripts ? (partialScripts.innerHTML || '') : '';
+                        return {
+                            contentHtml: extracted.contentHtml,
+                            scriptsHtml: [extracted.scriptsHtml, extraScripts].filter(Boolean).join('\n'),
+                            stylesHtml: collectExtraStyles([partialContent, partialScripts]),
+                            pageTitle: (partialContent.getAttribute('data-page-title') || '').trim()
+                        };
+                    }
+
+                    const principal = doc.getElementById('app-tab-panel-principal');
+                    if (principal) {
+                        const extracted = splitNodeHtml(principal);
+                        extracted.stylesHtml = collectExtraStyles([principal]);
+                        return extracted;
+                    }
+
+                    if (doc.body) {
+                        const extracted = splitNodeHtml(doc.body);
+                        extracted.stylesHtml = collectExtraStyles([doc.body]);
+                        return extracted;
+                    }
+                } catch { }
+
+                return { contentHtml: rawHtml || '', scriptsHtml: '', stylesHtml: '' };
+            }
+
+            function openTab(url, title, iconClass, options = {}) {
+                const activate = options.activate !== false;
+                const scroll = options.scroll !== false;
+                // Nodos ya renderizados por el servidor que esta pestana adopta tal cual,
+                // en vez de pedir la URL de nuevo (ver relocatePrincipalIntoTab).
+                const adoptContent = Array.isArray(options.adoptContent) ? options.adoptContent : null;
+                const preferExistingByTitle = options.preferExistingByTitle === true;
+
+                const key = normalizeKey(url);
+                const targetIsDashboard = isDashboardUrl(url);
+
+                let existingId = tabIdsByKey.get(key);
+                if (!existingId && preferExistingByTitle && title) {
+                    for (const [existingKey] of tabIdsByKey.entries()) {
+                        const meta = tabMetaByKey.get(existingKey);
+                        if (!meta) continue;
+                        if (meta.title !== title) continue;
+                        if (iconClass && meta.iconClass && meta.iconClass !== iconClass) continue;
+                        const existingUrl = meta.url || existingKey;
+                        if (isDashboardUrl(existingUrl) && !targetIsDashboard) continue;
+                        existingId = tabIdsByKey.get(existingKey);
+                        if (existingId) {
+                            if (existingKey !== key && !tabIdsByKey.has(key)) {
+                                tabIdsByKey.delete(existingKey);
+                                tabMetaByKey.delete(existingKey);
+                                tabIdsByKey.set(key, existingId);
+                                tabMetaByKey.set(key, meta);
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (existingId) {
+                    if (activate) setActiveTab(existingId);
+                    const btn = tabButtonsById.get(existingId);
+                    if (btn && scroll) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                    const loader = tabLoadersById.get(existingId);
+                    const meta = tabMetaByKey.get(key);
+                    const normalizedUrl = normalizeKey(url);
+                    if (loader && meta && meta.url !== normalizedUrl) {
+                        meta.url = normalizedUrl;
+                        tabMetaByKey.set(key, meta);
+                        loader(url);
+                        saveState();
+                    }
+                    return;
+                }
+
+                if (creatingTabs.has(key)) {
+                    console.log('Tab already being created:', key);
+                    return;
+                }
+
+                creatingTabs.add(key);
+
+                const tabId = `tab-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                tabIdsByKey.set(key, tabId);
+                tabMetaByKey.set(key, { url: normalizeKey(url), title, iconClass });
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = tabBtnBaseClass;
+                btn.setAttribute('data-tab-id', tabId);
+                btn.setAttribute('aria-selected', 'false');
+                btn.classList.add('bg-gray-100', 'dark:bg-gray-900', 'text-gray-500', 'dark:text-gray-400', 'border-transparent');
+                btn.classList.remove('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-200', 'border-gray-200', 'dark:border-gray-700');
+
+                const icon = document.createElement('i');
+                icon.className = iconClass || 'fas fa-window-maximize';
+                btn.appendChild(icon);
+
+                const label = document.createElement('span');
+                label.className = 'whitespace-nowrap';
+                label.textContent = title || 'PestaÃ±a';
+                btn.appendChild(label);
+
+                const closeBtn = document.createElement('span');
+                closeBtn.className = `${closeBtnBaseClass} app-tab-close select-none`;
+                closeBtn.setAttribute('role', 'button');
+                closeBtn.setAttribute('aria-label', 'Cerrar pestaÃ±a');
+                closeBtn.innerHTML = '&times;';
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    closeTab(tabId);
+                });
+                btn.appendChild(closeBtn);
+
+                btn.addEventListener('click', () => setActiveTab(tabId));
+                tabBar.appendChild(btn);
+                tabButtonsById.set(tabId, btn);
+
+                const panel = document.createElement('section');
+                panel.className = 'app-tab-panel relative flex-1 min-h-0 overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4';
+                panel.setAttribute('data-tab-panel', tabId);
+                panel.setAttribute('aria-hidden', 'true');
+                panel.hidden = true;
+
+                const cover = document.createElement('div');
+                cover.className = 'loading-cover absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10';
+                cover.setAttribute('aria-hidden', 'true');
+
+                const spinner = document.createElement('div');
+                spinner.className = 'w-10 h-10 rounded-full border-4 border-gray-300 dark:border-gray-700 border-t-blue-500 animate-spin';
+                cover.appendChild(spinner);
+                panel.appendChild(cover);
+
+                const posPerfPaths = new Set(['/ventas/pos', '/ventas/registro-vendedor']);
+
+                function isPosPerfTarget(urlLike) {
+                    try {
+                        const parsed = new URL(urlLike, window.location.origin);
+                        return posPerfPaths.has(parsed.pathname);
+                    } catch {
+                        return false;
+                    }
+                }
+
+                function getPosPerfTiming() {
+                    const timing = window.__posPerfTabLoadTiming;
+                    if (!timing || typeof timing !== 'object') return null;
+                    return timing;
+                }
+
+                function markPosPerf(name) {
+                    const timing = getPosPerfTiming();
+                    if (!timing) return;
+                    timing[name] = performance.now();
+                }
+
+                let currentLoadSeq = 0;
+                let currentAbortController = null;
+
+                function removePanelContent() {
+                    panel.querySelectorAll('[data-app-tab-content]').forEach((el) => {
+                        try {
+                            if (window.Alpine && typeof window.Alpine.destroyTree === 'function') {
+                                window.Alpine.destroyTree(el);
+                            }
+                        } catch { }
+                        el.remove();
+                    });
+                }
+
+                function ensureLoadingCover() {
+                    let loadingCover = panel.querySelector('.loading-cover');
+                    if (loadingCover) return loadingCover;
+                    loadingCover = document.createElement('div');
+                    loadingCover.className = 'loading-cover absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10';
+                    const loadSpinner = document.createElement('div');
+                    loadSpinner.className = 'w-10 h-10 rounded-full border-4 border-gray-300 dark:border-gray-700 border-t-blue-500 animate-spin';
+                    loadingCover.appendChild(loadSpinner);
+                    panel.appendChild(loadingCover);
+                    return loadingCover;
+                }
+
+                function removeLoadingCover() {
+                    const loadingCover = panel.querySelector('.loading-cover');
+                    if (loadingCover) loadingCover.remove();
+                }
+
+                const reloadableTabGlobals = [
+                    'tiendaAdminAutoBusquedaTimer',
+                    'tiendaAdminUltimaBusqueda',
+                    'tiendaAdminBusquedaController',
+                    'productoActualImagenes',
+                    'imagenProductoPendiente',
+                    'productoActualOferta',
+                    'estadoActualOferta',
+                    'promocionProductosSeleccionados',
+                    'promocionBusquedaTimer',
+                    'tiendaDashboardStatsState',
+                    'tiendaStatsState'
+                ];
+
+                function normalizeReloadableInlineScript(source) {
+                    let normalized = source || '';
+                    reloadableTabGlobals.forEach((name) => {
+                        normalized = normalized.replace(
+                            new RegExp(`\\b(?:var|let|const)\\s+${name}\\s*=`, 'g'),
+                            `window.${name} =`
+                        );
+                    });
+                    return normalized;
+                }
+
+                function isRedeclarationError(error) {
+                    return /Identifier '.+' has already been declared/.test(String(error?.message || error || ''));
+                }
+
+                async function applyPayload(payload) {
+                    markPosPerf('apply_payload_start_perf');
+                    removePanelContent();
+
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'app-tab-content h-full w-full';
+                    contentDiv.setAttribute('data-app-tab-content', '1');
+                    contentDiv.innerHTML = [payload.stylesHtml || '', payload.contentHtml || ''].filter(Boolean).join('\n');
+
+                    panel.appendChild(contentDiv);
+                    markPosPerf('content_appended_perf');
+
+                    markPosPerf('script_replace_start_perf');
+                    if (payload.scriptsHtml) {
+                        const scriptsHost = document.createElement('div');
+                        scriptsHost.setAttribute('data-tab-scripts', '1');
+                        scriptsHost.hidden = true;
+                        contentDiv.appendChild(scriptsHost);
+
+                        const scriptsTemplate = document.createElement('template');
+                        scriptsTemplate.innerHTML = payload.scriptsHtml;
+                        const scriptLoads = [];
+
+                        Array.from(scriptsTemplate.content.childNodes).forEach((node) => {
+                            if (node.nodeType !== Node.ELEMENT_NODE) {
+                                return;
+                            }
+
+                            if (node.tagName === 'SCRIPT') {
+                                const newScript = document.createElement('script');
+                                Array.from(node.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                                if (node.src) {
+                                    newScript.async = false;
+                                    scriptLoads.push(new Promise((resolve) => {
+                                        newScript.addEventListener('load', resolve, { once: true });
+                                        newScript.addEventListener('error', resolve, { once: true });
+                                    }));
+                                } else {
+                                    newScript.appendChild(document.createTextNode(normalizeReloadableInlineScript(node.innerHTML)));
+                                }
+                                try {
+                                    scriptsHost.appendChild(newScript);
+                                } catch (error) {
+                                    if (!isRedeclarationError(error)) {
+                                        throw error;
+                                    }
+                                    console.warn('Script omitido por estado global ya declarado:', error);
+                                }
+                                return;
+                            }
+
+                            scriptsHost.appendChild(node.cloneNode(true));
+                        });
+
+                        if (scriptLoads.length > 0) {
+                            await Promise.allSettled(scriptLoads);
+                        }
+                    }
+                    markPosPerf('script_replace_end_perf');
+
+                    if (window.Alpine) {
+                        window.Alpine.initTree(contentDiv);
+                    }
+
+                    markPosPerf('apply_payload_end_perf');
+
+                    setTimeout(() => {
+                        const flashMessages = contentDiv.querySelectorAll('.flash-message');
+                        if (flashMessages.length > 0) {
+                            panel.scrollTop = 0;
+
+                            flashMessages.forEach(msg => {
+                                const category = msg.getAttribute('data-flash-category');
+                                if (category === 'danger' || category === 'warning') {
+                                    msg.style.animation = 'slideDown 0.3s ease-out, flashPulse 0.6s ease-in-out';
+                                }
+                            });
+                        }
+                    }, 50);
+
+                    wireTabContent(contentDiv);
+                }

@@ -1,0 +1,249 @@
+            // Continua tab_runtime_js_part2.html (mismo IIFE).
+
+            // El panel principal es el documento que renderiza el servidor: cualquier carga
+            // completa (un link sin app-tab-link, un redirect de POST, F5 sobre otra URL)
+            // deja esa pantalla adentro de la pestana del Dashboard. Por eso, al arrancar,
+            // se la muda a su propia pestana y el panel principal vuelve a mostrar el
+            // Dashboard: principal == Dashboard, siempre.
+            function injectHtmlPayload(container, payload) {
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'app-tab-content h-full w-full';
+                contentDiv.setAttribute('data-app-tab-content', '1');
+                contentDiv.innerHTML = [payload.stylesHtml || '', payload.contentHtml || ''].filter(Boolean).join('\n');
+                container.appendChild(contentDiv);
+
+                if (payload.scriptsHtml) {
+                    const scriptsHost = document.createElement('div');
+                    scriptsHost.setAttribute('data-tab-scripts', '1');
+                    scriptsHost.hidden = true;
+                    contentDiv.appendChild(scriptsHost);
+
+                    const scriptsTemplate = document.createElement('template');
+                    scriptsTemplate.innerHTML = payload.scriptsHtml;
+                    Array.from(scriptsTemplate.content.childNodes).forEach((node) => {
+                        if (node.nodeType !== Node.ELEMENT_NODE) return;
+                        if (node.tagName === 'SCRIPT') {
+                            const newScript = document.createElement('script');
+                            Array.from(node.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                            if (node.src) newScript.async = false;
+                            else newScript.appendChild(document.createTextNode(node.innerHTML));
+                            scriptsHost.appendChild(newScript);
+                            return;
+                        }
+                        scriptsHost.appendChild(node.cloneNode(true));
+                    });
+                }
+
+                if (window.Alpine) {
+                    try { window.Alpine.initTree(contentDiv); } catch { }
+                }
+                return contentDiv;
+            }
+
+            function findSidebarMetaForUrl(url) {
+                try {
+                    const targetKey = normalizeKey(url);
+                    const links = document.querySelectorAll('.app-tab-link');
+                    for (const link of links) {
+                        const href = link.getAttribute('data-tab-url') || link.getAttribute('href');
+                        if (!href) continue;
+                        if (normalizeKey(href) !== targetKey) continue;
+                        return {
+                            title: (link.getAttribute('data-tab-title') || link.textContent || '').trim(),
+                            iconClass: link.getAttribute('data-tab-icon') || ''
+                        };
+                    }
+                } catch { }
+                return null;
+            }
+
+            async function renderDashboardIntoPrincipal() {
+                const principalPanel = tabPanelsById.get(principalTabId);
+                if (!principalPanel) return false;
+                try {
+                    const fetchUrl = new URL(DASHBOARD_URL, window.location.origin);
+                    fetchUrl.searchParams.set('partial', '1');
+                    const response = await fetch(fetchUrl.toString(), {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (!response.ok) return false;
+                    const payload = extractTabHtml(await response.text());
+                    injectHtmlPayload(principalPanel, payload);
+                    // Recien con el Dashboard adentro se declara el invariante: si el fetch
+                    // falla, el panel queda marcado como "no es el dashboard" y el click en la
+                    // pestana principal cae al fallback de recarga completa.
+                    principalPanel.setAttribute('data-page-is-dashboard', '1');
+                    principalPanel.setAttribute('data-page-title', 'Dashboard');
+                    syncTabButtonMeta(principalTabId, { title: 'Dashboard', iconClass: 'fas fa-tachometer-alt' });
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+
+            function relocatePrincipalIntoTab() {
+                const principalPanel = tabPanelsById.get(principalTabId);
+                if (!principalPanel) return null;
+                if (principalPanel.getAttribute('data-page-is-dashboard') === '1') return null;
+
+                const url = window.location.pathname + (window.location.search || '');
+                if (!isRestorableUrl(url)) return null;
+
+                const nodes = Array.from(principalPanel.childNodes);
+                if (nodes.length === 0) return null;
+
+                const sidebarMeta = findSidebarMetaForUrl(url);
+                const title = (principalPanel.getAttribute('data-page-title') || '').trim()
+                    || (sidebarMeta ? sidebarMeta.title : '')
+                    || 'Pantalla';
+                const iconClass = (sidebarMeta && sidebarMeta.iconClass) || 'fas fa-window-maximize';
+
+                // Si una pestana guardada apunta a esta misma URL se cierra: la que vale es la
+                // que trae el contenido recien renderizado por el servidor.
+                const duplicateId = tabIdsByKey.get(normalizeKey(url));
+                if (duplicateId && duplicateId !== principalTabId) closeTab(duplicateId);
+
+                openTab(url, title, iconClass, { adoptContent: nodes, activate: true });
+
+                // syncPrincipalTabLabel ya habia puesto el nombre de esta pantalla en el boton
+                // principal; se devuelve a "Dashboard" ya mismo, sin esperar al fetch.
+                syncTabButtonMeta(principalTabId, { title: 'Dashboard', iconClass: 'fas fa-tachometer-alt' });
+
+                const adoptedId = tabIdsByKey.get(normalizeKey(url));
+                if (!adoptedId) return null;
+
+                renderDashboardIntoPrincipal();
+                return adoptedId;
+            }
+
+            function shouldNavigateToDashboard() {
+                const dashboardPath = normalizePathname(new URL(DASHBOARD_URL, window.location.origin).pathname);
+                const currentPath = normalizePathname(window.location.pathname);
+                return currentPath !== dashboardPath;
+            }
+
+            function principalPanelShowsDashboard() {
+                const principalPanel = tabPanelsById.get(principalTabId);
+                if (!principalPanel) return false;
+                return principalPanel.getAttribute('data-page-is-dashboard') === '1';
+            }
+
+            function syncPrincipalTabLabel() {
+                if (!principalBtn || principalPanelShowsDashboard()) return;
+
+                const principalPanel = tabPanelsById.get(principalTabId);
+                if (!principalPanel) return;
+
+                const label = (principalPanel.getAttribute('data-page-title') || '').trim();
+                if (!label) return;
+
+                const labelEl = principalBtn.querySelector('span.whitespace-nowrap');
+                if (labelEl) {
+                    labelEl.textContent = label;
+                }
+            }
+
+            function isPrincipalTabVisible() {
+                const principalPanel = tabPanelsById.get(principalTabId);
+                return getActiveTabId() === principalTabId
+                    && Boolean(principalPanel)
+                    && principalPanel.hidden !== true
+                    && principalPanel.getAttribute('aria-hidden') !== 'true';
+            }
+
+            {% include 'layout/_dashboard_soft_refresh_js.html' %}
+
+            function navigateToDashboard() {
+                // Si el panel principal no muestra el dashboard (cargó otra página en él)
+                // → recarga completa. La URL del navegador no sirve para decidirlo: al
+                // activar otra pestaña pasa a ser la de esa pestaña.
+                if (!principalPanelShowsDashboard()) {
+                    try {
+                        setActiveTab(principalTabId);
+                        saveState();
+                    } catch { }
+                    window.location.assign(DASHBOARD_URL);
+                    return;
+                }
+
+                // El panel principal ya tiene el dashboard: activarlo al instante y
+                // traer los datos nuevos en segundo plano, sin recargar la página.
+                const wasPrincipalActive = isPrincipalTabVisible();
+                setActiveTab(principalTabId);
+                if (!wasPrincipalActive) refreshPrincipalDashboardInPlace();
+
+                // Scroll al botón para que sea visible si hay muchas pestañas
+                if (principalBtn) {
+                    principalBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                }
+            }
+
+            window.appNavigateToDashboard = navigateToDashboard;
+
+            if (principalBtn) {
+                // Usar capture:true para que este handler gane sobre cualquier listener
+                // de burbuja que pudiera re-procesar el click como app-tab-link.
+                principalBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    navigateToDashboard();
+                }, true);
+            }
+
+            const homeLink = document.getElementById('sidebar-home-link');
+            if (homeLink) {
+                homeLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    navigateToDashboard();
+                }, true);
+            }
+
+            const logoLink = document.getElementById('app-logo-link');
+            if (logoLink) {
+                logoLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    navigateToDashboard();
+                }, true);
+            }
+
+            syncPrincipalTabLabel();
+
+            const currentRequestIsDashboard = isDashboardUrl(window.location.href);
+            // URL con la que se dibujó el dashboard principal (conserva rango/fechas).
+            const principalDashboardUrl = currentRequestIsDashboard ? window.location.href : DASHBOARD_URL;
+
+            if (currentRequestIsDashboard) {
+                restoreState();
+                setActiveTab(principalTabId);
+                saveState();
+            } else {
+                // Carga completa de una URL que no es el dashboard (entrada directa, F5 o
+                // un fallback de navegacion): la pestana activa debe ser la de la URL
+                // pedida, nunca la que quedo guardada como activa. Su pestana guardada
+                // (si existia) se omite porque el panel principal ya trae esta pagina.
+                restoreState({ activate: false, skipKey: window.location.href });
+                const adoptedTabId = relocatePrincipalIntoTab();
+                if (!adoptedTabId) setActiveTab(principalTabId);
+                saveState();
+            }
+
+            // Inicializar el estado del browser con la URL actual al arrancar.
+            // Esto permite que popstate funcione correctamente desde el primer momento.
+            try {
+                const initUrl = normalizeKey(window.location.href);
+                const initTitle = document.title;
+                const activeId = getActiveTabId();
+                // Solo hacer replaceState si no hay ya un estado appNav
+                if (!history.state || !history.state.appNav) {
+                    history.replaceState(
+                        { tabId: activeId, url: initUrl, appNav: true },
+                        initTitle,
+                        window.location.href
+                    );
+                }
+            } catch { }
+        })();

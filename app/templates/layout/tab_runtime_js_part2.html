@@ -169,13 +169,37 @@
                     }
                 }
 
-                (async () => {
-                    await loadContent(url);
-                })();
+                if (!adoptContent) {
+                    (async () => {
+                        await loadContent(url);
+                    })();
+                }
 
                 panels.appendChild(panel);
                 tabPanelsById.set(tabId, panel);
                 tabLoadersById.set(tabId, loadContent);
+
+                if (adoptContent) {
+                    // El panel ya esta en el DOM: recien ahora se mueven los nodos, para que
+                    // el salto sea detach+attach en el mismo tick y Alpine no destruya el arbol
+                    // (los componentes conservan su estado y sus listeners ya enganchados).
+                    const adoptedDiv = document.createElement('div');
+                    adoptedDiv.className = 'app-tab-content h-full w-full';
+                    adoptedDiv.setAttribute('data-app-tab-content', '1');
+                    adoptContent.forEach((node) => adoptedDiv.appendChild(node));
+                    panel.appendChild(adoptedDiv);
+                    // El HTML adoptado viene de una carga completa: sus forms y links no
+                    // estaban interceptados, asi que se cablean igual que el de un fetch.
+                    wireTabContent(adoptedDiv);
+                    removeLoadingCover();
+
+                    const adoptedMeta = tabMetaByKey.get(key);
+                    if (adoptedMeta) {
+                        adoptedMeta.pageTitle = (title || '').trim();
+                        tabMetaByKey.set(key, adoptedMeta);
+                    }
+                    pushTabHistory(tabId, normalizeKey(url));
+                }
 
                 if (activate) setActiveTab(tabId);
                 if (scroll) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
@@ -371,129 +395,3 @@
                     logoutForm.submit();
                 });
             }
-
-            function shouldNavigateToDashboard() {
-                const dashboardPath = normalizePathname(new URL(DASHBOARD_URL, window.location.origin).pathname);
-                const currentPath = normalizePathname(window.location.pathname);
-                return currentPath !== dashboardPath;
-            }
-
-            function principalPanelShowsDashboard() {
-                const principalPanel = tabPanelsById.get(principalTabId);
-                if (!principalPanel) return false;
-                return principalPanel.getAttribute('data-page-is-dashboard') === '1';
-            }
-
-            function syncPrincipalTabLabel() {
-                if (!principalBtn || principalPanelShowsDashboard()) return;
-
-                const principalPanel = tabPanelsById.get(principalTabId);
-                if (!principalPanel) return;
-
-                const label = (principalPanel.getAttribute('data-page-title') || '').trim();
-                if (!label) return;
-
-                const labelEl = principalBtn.querySelector('span.whitespace-nowrap');
-                if (labelEl) {
-                    labelEl.textContent = label;
-                }
-            }
-
-            function isPrincipalTabVisible() {
-                const principalPanel = tabPanelsById.get(principalTabId);
-                return getActiveTabId() === principalTabId
-                    && Boolean(principalPanel)
-                    && principalPanel.hidden !== true
-                    && principalPanel.getAttribute('aria-hidden') !== 'true';
-            }
-
-            {% include 'layout/_dashboard_soft_refresh_js.html' %}
-
-            function navigateToDashboard() {
-                // Si el panel principal no muestra el dashboard (cargó otra página en él)
-                // → recarga completa. La URL del navegador no sirve para decidirlo: al
-                // activar otra pestaña pasa a ser la de esa pestaña.
-                if (!principalPanelShowsDashboard()) {
-                    try {
-                        setActiveTab(principalTabId);
-                        saveState();
-                    } catch { }
-                    window.location.assign(DASHBOARD_URL);
-                    return;
-                }
-
-                // El panel principal ya tiene el dashboard: activarlo al instante y
-                // traer los datos nuevos en segundo plano, sin recargar la página.
-                const wasPrincipalActive = isPrincipalTabVisible();
-                setActiveTab(principalTabId);
-                if (!wasPrincipalActive) refreshPrincipalDashboardInPlace();
-
-                // Scroll al botón para que sea visible si hay muchas pestañas
-                if (principalBtn) {
-                    principalBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-                }
-            }
-
-            window.appNavigateToDashboard = navigateToDashboard;
-
-            if (principalBtn) {
-                // Usar capture:true para que este handler gane sobre cualquier listener
-                // de burbuja que pudiera re-procesar el click como app-tab-link.
-                principalBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    navigateToDashboard();
-                }, true);
-            }
-
-            const homeLink = document.getElementById('sidebar-home-link');
-            if (homeLink) {
-                homeLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    navigateToDashboard();
-                }, true);
-            }
-
-            const logoLink = document.getElementById('app-logo-link');
-            if (logoLink) {
-                logoLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    navigateToDashboard();
-                }, true);
-            }
-
-            syncPrincipalTabLabel();
-
-            const currentRequestIsDashboard = isDashboardUrl(window.location.href);
-            // URL con la que se dibujó el dashboard principal (conserva rango/fechas).
-            const principalDashboardUrl = currentRequestIsDashboard ? window.location.href : DASHBOARD_URL;
-
-            if (currentRequestIsDashboard) {
-                restoreState();
-                setActiveTab(principalTabId);
-                saveState();
-            } else if (!restoreState()) {
-                setActiveTab(principalTabId);
-                saveState();
-            }
-
-            // Inicializar el estado del browser con la URL actual al arrancar.
-            // Esto permite que popstate funcione correctamente desde el primer momento.
-            try {
-                const initUrl = normalizeKey(window.location.href);
-                const initTitle = document.title;
-                const activeId = getActiveTabId();
-                // Solo hacer replaceState si no hay ya un estado appNav
-                if (!history.state || !history.state.appNav) {
-                    history.replaceState(
-                        { tabId: activeId, url: initUrl, appNav: true },
-                        initTitle,
-                        window.location.href
-                    );
-                }
-            } catch { }
-        })();
