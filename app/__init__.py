@@ -145,7 +145,7 @@ def create_app(config_name='default'):
 
     # Configuración de Logging
     import logging
-    from logging.handlers import WatchedFileHandler
+    from logging.handlers import RotatingFileHandler
 
     log_level_name = (os.environ.get('LOG_LEVEL') or ('DEBUG' if app.config.get('DEBUG') else 'INFO')).upper()
     log_level = getattr(logging, log_level_name, logging.INFO)
@@ -155,12 +155,20 @@ def create_app(config_name='default'):
         if not os.path.exists('logs'):
             os.mkdir('logs')
 
-        file_handler = WatchedFileHandler('logs/sistema.log')
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(log_level)
-        app.logger.addHandler(file_handler)
+        # Handler rotativo y sin duplicados: create_app() puede ejecutarse muchas
+        # veces en el mismo proceso (pytest) y app.logger es un logger compartido.
+        if not any(isinstance(h, RotatingFileHandler) for h in app.logger.handlers):
+            file_handler = RotatingFileHandler(
+                'logs/sistema.log',
+                maxBytes=max(1024 * 1024, _as_int_env('LOG_MAX_BYTES', 20 * 1024 * 1024)),
+                backupCount=max(0, _as_int_env('LOG_BACKUP_COUNT', 5)),
+                encoding='utf-8',
+            )
+            file_handler.setFormatter(logging.Formatter(
+                '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+            ))
+            file_handler.setLevel(log_level)
+            app.logger.addHandler(file_handler)
         app.logger.setLevel(log_level)
         app.logger.info('Sistema de Inventario iniciado')
     except (PermissionError, OSError) as e:
@@ -336,19 +344,32 @@ def create_app(config_name='default'):
                 sa_event.listen(engine, "after_cursor_execute", _after_cursor_execute)
                 setattr(engine, '_obs_slow_sql_listener_registered', True)
 
-        @sa_event.listens_for(db.session, "after_commit")
-        def _after_commit(_session):
-            if not _is_truthy_env('LOG_DB_COMMITS', '0'):
-                return
-            req_id = getattr(g, 'request_id', None)
-            prefix = f'[{req_id}] ' if req_id else ''
-            app.logger.info(f"{prefix}DB COMMIT")
+        # Registrar los listeners una sola vez por proceso (igual que SLOW_SQL):
+        # si no, cada create_app() acumula listeners y un rollback se multiplica.
+        if not getattr(db.session, '_obs_tx_listeners_registered', False):
+            @sa_event.listens_for(db.session, "after_commit")
+            def _after_commit(_session):
+                if not _is_truthy_env('LOG_DB_COMMITS', '0'):
+                    return
+                req_id = getattr(g, 'request_id', None) if has_request_context() else None
+                prefix = f'[{req_id}] ' if req_id else ''
+                app.logger.info(f"{prefix}DB COMMIT")
 
-        @sa_event.listens_for(db.session, "after_rollback")
-        def _after_rollback(_session):
-            req_id = getattr(g, 'request_id', None)
-            prefix = f'[{req_id}] ' if req_id else ''
-            app.logger.warning(f"{prefix}DB ROLLBACK")
+            @sa_event.listens_for(db.session, "after_rollback")
+            def _after_rollback(_session):
+                # Apagado por defecto: era la causa del crecimiento monstruoso del log.
+                if not _is_truthy_env('LOG_DB_ROLLBACK', '0'):
+                    return
+                req_id = None
+                if has_request_context():
+                    if getattr(g, '_db_rollback_logged', False):
+                        return
+                    g._db_rollback_logged = True
+                    req_id = getattr(g, 'request_id', None)
+                prefix = f'[{req_id}] ' if req_id else ''
+                app.logger.warning(f"{prefix}DB ROLLBACK")
+
+            setattr(db.session, '_obs_tx_listeners_registered', True)
     except Exception:
         pass
     
