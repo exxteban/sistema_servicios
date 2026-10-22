@@ -11,93 +11,21 @@
     const HEALTH_GOOD_MS = 1400;
     const SYNC_RETRY_MS = 10000;
     const SYNC_RETRY_MAX_MS = 60000;
-    const PENDING_DB_NAME = 'pos_offline_queue_v1';
-    const PENDING_STORE = 'ventas';
     // Si una venta quedó marcada como "sincronizando" hace más de este tiempo,
     // fue un envío interrumpido: la volvemos a dejar pendiente para reintentar.
     const SENDING_STALE_MS = 2 * 60 * 1000;
 
-    function now() {
-        return Date.now();
-    }
+    const {
+        PROCESAR_TIMEOUT_MS,
+        now,
+        esErrorTemporalServidor,
+        normalizedText,
+        itemKey,
+        safeJsonParse,
+        readPendingIdb,
+        replacePendingIdb,
+    } = window.POSOfflineColaDB;
 
-    // Errores transitorios del servidor: la venta sigue pendiente y se reintenta
-    // sola, sin marcarla como "requiere revisión".
-    // 0 = sin respuesta; 408 timeout; 429 rate limit; 5xx errores del servidor.
-    function esErrorTemporalServidor(status) {
-        const code = Number(status || 0);
-        return code === 0 || code === 408 || code === 429 || code >= 500;
-    }
-
-    function normalizedText(value) {
-        return String(value || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
-            .trim();
-    }
-
-    function itemKey(item) {
-        return `${item && item.tipo ? item.tipo : 'producto'}-${item && item.id ? item.id : ''}`;
-    }
-
-    function safeJsonParse(raw, fallback) {
-        try {
-            return JSON.parse(raw);
-        } catch (e) {
-            return fallback;
-        }
-    }
-
-    function openPendingDb() {
-        return new Promise((resolve, reject) => {
-            if (!window.indexedDB) {
-                reject(new Error('indexedDB unavailable'));
-                return;
-            }
-            const request = indexedDB.open(PENDING_DB_NAME, 1);
-            request.onupgradeneeded = () => {
-                const db = request.result;
-                if (!db.objectStoreNames.contains(PENDING_STORE)) {
-                    db.createObjectStore(PENDING_STORE, { keyPath: 'client_request_id' });
-                }
-            };
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error || new Error('indexedDB open failed'));
-        });
-    }
-
-    async function readPendingIdb() {
-        const db = await openPendingDb();
-        return await new Promise((resolve, reject) => {
-            const tx = db.transaction(PENDING_STORE, 'readonly');
-            const request = tx.objectStore(PENDING_STORE).getAll();
-            request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
-            request.onerror = () => reject(request.error || new Error('indexedDB read failed'));
-            tx.oncomplete = () => db.close();
-            tx.onerror = () => db.close();
-        });
-    }
-
-    async function replacePendingIdb(items) {
-        const db = await openPendingDb();
-        await new Promise((resolve, reject) => {
-            const tx = db.transaction(PENDING_STORE, 'readwrite');
-            const store = tx.objectStore(PENDING_STORE);
-            store.clear();
-            for (const item of items || []) {
-                if (item && item.client_request_id) store.put(item);
-            }
-            tx.oncomplete = () => {
-                db.close();
-                resolve();
-            };
-            tx.onerror = () => {
-                db.close();
-                reject(tx.error || new Error('indexedDB write failed'));
-            };
-        });
-    }
 
     window.posApp = function posAppOfflineResilience() {
         const app = originalPosApp();
@@ -543,7 +471,7 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload),
-                    }, { timeoutMs: 9000, slowMs: 1800 });
+                    }, { timeoutMs: PROCESAR_TIMEOUT_MS, slowMs: 1800 });
                     if (response.ok && data && data.success) {
                         this.ventasPendientes = (this.ventasPendientes || []).filter(v => v.client_request_id !== venta.client_request_id);
                         this.guardarVentasPendientes();
@@ -615,102 +543,6 @@
             }
             if (this.isOnline && this.connectionStatus === 'syncing') this.marcarConexionOnline();
         };
-
-        app.consultarVentaYaRegistrada = async function consultarVentaYaRegistrada(clientRequestId) {
-            const id = String(clientRequestId || '').trim();
-            if (!id) return null;
-            try {
-                const { response, data } = await this.fetchJsonConTimeout(`/ventas/sync-status/${encodeURIComponent(id)}`, {}, {
-                    timeoutMs: 5000,
-                    slowMs: 1500,
-                    markSlow: false,
-                });
-                if (response.ok && data && data.success && data.exists) return data;
-            } catch (e) {
-            }
-            return null;
-        };
-
-        app.ventaPendienteEsDescartable = function ventaPendienteEsDescartable(venta) {
-            // Solo se puede descartar manualmente una venta detenida por error permanente,
-            // nunca una que todavia se va a reintentar sola (asi no se pierde nada por error).
-            return String((venta && venta.estado_sync) || 'pendiente') === 'error';
-        };
-
-        app.reintentarVentaPendiente = function reintentarVentaPendiente(clientRequestId) {
-            const id = String(clientRequestId || '').trim();
-            const venta = (this.ventasPendientes || []).find(v => v.client_request_id === id);
-            if (venta) {
-                venta.estado_sync = 'pendiente';
-                venta.ultimo_error = '';
-                venta.updated_at = now();
-                this.guardarVentasPendientes();
-            }
-            return this.sincronizarVentasPendientes();
-        };
-
-        app.descartarVentaPendiente = function descartarVentaPendiente(clientRequestId) {
-            const id = String(clientRequestId || '').trim();
-            if (!id) return;
-            const venta = (this.ventasPendientes || []).find(v => v.client_request_id === id);
-            if (!venta) return;
-            if (!this.ventaPendienteEsDescartable(venta)) {
-                mostrarNotificacion('Solo se pueden descartar ventas detenidas por error. Esta se reintentara sola.', 'warning');
-                return;
-            }
-            const total = (typeof this.formatNumber === 'function') ? this.formatNumber(this.totalVentaPendiente(venta)) : this.totalVentaPendiente(venta);
-            const confirmar = window.confirm(
-                '¿Descartar definitivamente esta venta en cola?\n\n' +
-                `Total: ₲ ${total}\n` +
-                `Motivo del error: ${venta.ultimo_error || 'desconocido'}\n\n` +
-                'Esta accion NO se puede deshacer. Solo hacelo si confirmaste que la venta no debe registrarse.'
-            );
-            if (!confirmar) return;
-            this.ventasPendientes = (this.ventasPendientes || []).filter(v => v.client_request_id !== id);
-            this.guardarVentasPendientes();
-            if (!this.ventasPendientes.some(v => (v.estado_sync || '') === 'error')) {
-                this.ultimaSincronizacionError = '';
-            }
-            mostrarNotificacion('Venta descartada de la cola local', 'info');
-        };
-
-        const originalEjecutarVenta = app.ejecutarVenta;
-        if (typeof originalEjecutarVenta === 'function') {
-            app.ejecutarVenta = async function ejecutarVentaConTimeout(...args) {
-                const originalFetch = window.fetch;
-                const self = this;
-                window.fetch = function fetchPosConTimeout(input, init) {
-                    if (String(input || '').includes('/ventas/procesar')) {
-                        return self.fetchResponseConTimeout(input, init, { timeoutMs: 9000, slowMs: 1800 }, originalFetch.bind(this));
-                    }
-                    return originalFetch.call(this, input, init);
-                };
-                try {
-                    return await originalEjecutarVenta.apply(this, args);
-                } finally {
-                    window.fetch = originalFetch;
-                }
-            };
-        }
-
-        const originalEnviarVentaACaja = app.enviarVentaACaja;
-        if (typeof originalEnviarVentaACaja === 'function') {
-            app.enviarVentaACaja = async function enviarVentaACajaConTimeout(...args) {
-                const originalFetch = window.fetch;
-                const self = this;
-                window.fetch = function fetchCajaConTimeout(input, init) {
-                    if (String(input || '').includes('/ventas/enviar-a-caja')) {
-                        return self.fetchResponseConTimeout(input, init, { timeoutMs: 7000, slowMs: 1500 }, originalFetch.bind(this));
-                    }
-                    return originalFetch.call(this, input, init);
-                };
-                try {
-                    return await originalEnviarVentaACaja.apply(this, args);
-                } finally {
-                    window.fetch = originalFetch;
-                }
-            };
-        }
 
         return app;
     };
