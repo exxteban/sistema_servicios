@@ -72,14 +72,16 @@
     }
 
     async function replacePendingIdb(items) {
+        // Copia plana: la cola vive dentro de Alpine (Proxy) y IndexedDB no puede
+        // clonar proxies (DataCloneError). Se copia ANTES de abrir la transacción
+        // para que un error no deje commiteado el clear() con la cola vacía.
+        const plain = JSON.parse(JSON.stringify((items || []).filter(item => item && item.client_request_id)));
         const db = await openPendingDb();
         await new Promise((resolve, reject) => {
             const tx = db.transaction(PENDING_STORE, 'readwrite');
             const store = tx.objectStore(PENDING_STORE);
             store.clear();
-            for (const item of items || []) {
-                if (item && item.client_request_id) store.put(item);
-            }
+            for (const item of plain) store.put(item);
             tx.oncomplete = () => {
                 db.close();
                 resolve();
