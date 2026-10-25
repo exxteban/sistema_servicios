@@ -137,6 +137,39 @@ def test_dashboard_gastronomia_guarda_orden_manual_de_tarjetas():
     assert caja_index < pos_index
 
 
+def test_dashboard_gastronomia_agrupa_tarjetas_y_expone_resumen_en_vivo():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_cliente_usuario(app, 'admin_resumen_dashboard', 'Administrador')
+    _loguear(client, app, 'admin_resumen_dashboard')
+
+    html = client.get('/gastronomia/').get_data(as_text=True)
+    assert 'Operacion en vivo' in html
+    assert 'Analisis y produccion' in html
+    assert html.count('data-dashboard-card-grid') >= 2
+    assert 'class="app-tab-link gd-chip"' in html
+
+    response = client.get('/api/gastronomia/dashboard/resumen')
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['ok'] is True
+    assert payload['resumen']['caja_abierta'] is False
+    assert payload['resumen']['cocina_pendientes'] == 0
+    assert payload['badges'] == {}
+
+
+def test_resumen_dashboard_respeta_permisos_del_rol():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_cliente_usuario(app, 'cocina_resumen_dashboard', 'Cocina')
+    _loguear(client, app, 'cocina_resumen_dashboard')
+
+    resumen = client.get('/api/gastronomia/dashboard/resumen').get_json()['resumen']
+    assert resumen['cocina_pendientes'] == 0
+    assert resumen['ventas_hoy'] is None
+    assert resumen['caja_abierta'] is None
+
+
 def test_cajero_sin_cliente_usa_contexto_operativo_unico():
     app = create_app('testing')
     client = app.test_client()

@@ -1,9 +1,12 @@
 // Idempotente: el dashboard se re-dibuja en segundo plano al volver a su pestaña
 // (refresco silencioso) y el script inline del template vuelve a llamar al init.
+// Las tarjetas viven en un grid por grupo: se reordenan dentro de su grupo y el
+// orden guardado es la concatenacion de todos los grupos.
 window.initGastroDashboardCardOrder = function () {
-  const grid = document.getElementById('gastro-dashboard-cards');
-  if (!grid || grid.dataset.cardOrderReady === '1') return;
-  grid.dataset.cardOrderReady = '1';
+  const grids = Array.from(document.querySelectorAll('[data-dashboard-card-grid]'))
+    .filter((grid) => grid.dataset.cardOrderReady !== '1');
+  if (!grids.length) return;
+  grids.forEach((grid) => { grid.dataset.cardOrderReady = '1'; });
   const csrf = document.getElementById('csrf-token')?.value
     || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
     || '';
@@ -13,7 +16,7 @@ window.initGastroDashboardCardOrder = function () {
   let orderSaveQueued = false;
   let suppressNextClick = false;
 
-  const cards = () => Array.from(grid?.querySelectorAll('[data-dashboard-card-id]') || []);
+  const cards = () => grids.flatMap((grid) => Array.from(grid.querySelectorAll('[data-dashboard-card-id]')));
   const currentOrder = () => cards().map((card) => String(card.dataset.dashboardCardId || '')).filter(Boolean);
 
   const setSaving = (saving) => {
@@ -21,11 +24,11 @@ window.initGastroDashboardCardOrder = function () {
   };
 
   const restoreOrder = (order) => {
-    if (!grid || !order.length) return;
+    if (!order.length) return;
     const cardById = new Map(cards().map((card) => [String(card.dataset.dashboardCardId || ''), card]));
     order.forEach((id) => {
       const card = cardById.get(String(id));
-      if (card) grid.appendChild(card);
+      if (card) card.parentElement.appendChild(card);
     });
   };
 
@@ -70,68 +73,70 @@ window.initGastroDashboardCardOrder = function () {
     return event.clientY > box.top + (box.height / 2);
   };
 
-  grid?.addEventListener('pointerdown', (event) => {
-    const handle = event.target.closest('[data-dashboard-card-drag-handle]');
-    if (!handle) return;
-    armedCard = handle.closest('[data-dashboard-card-id]');
-  });
+  grids.forEach((grid) => {
+    grid.addEventListener('pointerdown', (event) => {
+      const handle = event.target.closest('[data-dashboard-card-drag-handle]');
+      if (!handle) return;
+      armedCard = handle.closest('[data-dashboard-card-id]');
+    });
 
-  grid?.addEventListener('keydown', (event) => {
-    const handle = event.target.closest('[data-dashboard-card-drag-handle]');
-    if (!handle || !['Enter', ' '].includes(event.key)) return;
-    event.preventDefault();
-    handle.closest('[data-dashboard-card-id]')?.focus();
-  });
+    grid.addEventListener('keydown', (event) => {
+      const handle = event.target.closest('[data-dashboard-card-drag-handle]');
+      if (!handle || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault();
+      handle.closest('[data-dashboard-card-id]')?.focus();
+    });
 
-  grid?.addEventListener('click', (event) => {
-    if (event.target.closest('[data-dashboard-card-drag-handle]')) {
+    grid.addEventListener('click', (event) => {
+      if (event.target.closest('[data-dashboard-card-drag-handle]')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        suppressNextClick = false;
+        return;
+      }
+      if (!suppressNextClick) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       suppressNextClick = false;
-      return;
-    }
-    if (!suppressNextClick) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    suppressNextClick = false;
-  }, true);
+    }, true);
 
-  grid?.addEventListener('dragstart', (event) => {
-    const handle = event.target.closest('[data-dashboard-card-drag-handle]');
-    const card = cardFromEvent(event);
-    if (!card || (armedCard !== card && !handle)) {
+    grid.addEventListener('dragstart', (event) => {
+      const handle = event.target.closest('[data-dashboard-card-drag-handle]');
+      const card = cardFromEvent(event);
+      if (!card || (armedCard !== card && !handle)) {
+        event.preventDefault();
+        return;
+      }
+      draggedCard = card;
+      previousOrder = currentOrder();
+      orderSaveQueued = false;
+      card.classList.add('is-dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', card.dataset.dashboardCardId || '');
+    });
+
+    grid.addEventListener('dragover', (event) => {
+      if (!draggedCard) return;
+      const targetCard = cardFromEvent(event);
+      if (!targetCard || targetCard === draggedCard || targetCard.parentElement !== draggedCard.parentElement) return;
       event.preventDefault();
-      return;
-    }
-    draggedCard = card;
-    previousOrder = currentOrder();
-    orderSaveQueued = false;
-    card.classList.add('is-dragging');
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', card.dataset.dashboardCardId || '');
-  });
+      const insertAfter = shouldInsertAfter(event, targetCard);
+      grid.insertBefore(draggedCard, insertAfter ? targetCard.nextSibling : targetCard);
+    });
 
-  grid?.addEventListener('dragover', (event) => {
-    if (!draggedCard) return;
-    const targetCard = cardFromEvent(event);
-    if (!targetCard || targetCard === draggedCard) return;
-    event.preventDefault();
-    const insertAfter = shouldInsertAfter(event, targetCard);
-    grid.insertBefore(draggedCard, insertAfter ? targetCard.nextSibling : targetCard);
-  });
+    grid.addEventListener('drop', (event) => {
+      if (!draggedCard) return;
+      event.preventDefault();
+      suppressNextClick = true;
+      persistChangedOrder();
+    });
 
-  grid?.addEventListener('drop', (event) => {
-    if (!draggedCard) return;
-    event.preventDefault();
-    suppressNextClick = true;
-    persistChangedOrder();
-  });
-
-  grid?.addEventListener('dragend', () => {
-    persistChangedOrder();
-    if (draggedCard) draggedCard.classList.remove('is-dragging');
-    draggedCard = null;
-    armedCard = null;
+    grid.addEventListener('dragend', () => {
+      persistChangedOrder();
+      if (draggedCard) draggedCard.classList.remove('is-dragging');
+      draggedCard = null;
+      armedCard = null;
+    });
   });
 };
 

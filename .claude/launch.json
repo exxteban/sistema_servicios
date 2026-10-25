@@ -57,6 +57,21 @@
         "SERVER": "flask",
         "DEBUG": "0"
       }
+    },
+    {
+      "name": "dashboard-gastro",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "run.py"
+      ],
+      "port": 5059,
+      "env": {
+        "PORT": "5059",
+        "APP_CONFIG": "development",
+        "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/C--Users-csarl-Documents-proyectos-saas-sistema-servicios/a4a21aa3-338f-4a4a-b8a9-191885590588/scratchpad/dash.db",
+        "SERVER": "flask",
+        "DEBUG": "0"
+      }
     }
   ]
 }

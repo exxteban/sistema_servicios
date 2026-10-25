@@ -656,8 +656,8 @@ def test_caja_avisa_si_no_hay_sesion_abierta_y_dashboard_resalta_pendientes():
     _crear_pedido_listo(client, csrf, producto_id)
 
     dashboard_html = client.get('/gastronomia/').get_data(as_text=True)
-    assert 'gastro-dashboard-card--alert' in dashboard_html
-    assert '1 pendiente' in dashboard_html
+    assert 'gd-card--alert' in dashboard_html
+    assert '1 sin cobrar' in dashboard_html
     assert 'Hay pedidos sin cobrar esperando en caja.' in dashboard_html
 
 
