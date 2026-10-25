@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 
-{% set caja_con_pendientes = pedidos_pendientes_caja|default(0) > 0 %}
-
 {% block title %}Gastronomia{% endblock %}
 
 {% block content %}
 <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
-<div class="mx-auto max-w-6xl space-y-6" data-dashboard-soft-refresh="1">
+<div class="gd mx-auto max-w-6xl space-y-6" data-dashboard-soft-refresh="1">
     {% if not contexto_operativo %}
     <section class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
         Este usuario no tiene un contexto operativo asignado para usar las pantallas de Gastronomia.
@@ -14,155 +12,86 @@
     </section>
     {% endif %}
 
-    <section class="space-y-4">
-        <div class="flex items-center justify-between gap-3">
-            <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Menu operativo</h2>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Accesos directos para trabajar en el dia a dia.</p>
-            </div>
-        </div>
-        <div id="gastro-dashboard-cards" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {% for card in dashboard_cards %}
-        {% set card_alert = card.alert_count|default(0) > 0 %}
-        {% set card_abre_pestana = contexto_operativo and not card.disabled %}
-        <a href="{{ url_for(card.endpoint, **card.endpoint_params|default({})) if contexto_operativo else '#' }}"
-            data-dashboard-card-id="{{ card.id }}"
-            {% if card_abre_pestana %}data-tab-title="{{ card.title }}" data-tab-icon="{{ card.icon }}"{% endif %}
-            draggable="true"
-            class="{% if card_abre_pestana %}app-tab-link {% endif %}gastro-dashboard-card group relative rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition {{ card.hover_class }} hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if card_alert %}gastro-dashboard-card--alert{% endif %} {% if card.disabled %}pointer-events-none opacity-60{% endif %}">
-            <span data-dashboard-card-drag-handle
-                data-tab-ignore-click="1"
-                class="gastro-dashboard-card__handle"
-                role="button"
-                tabindex="0"
-                aria-label="Mover {{ card.title }}"
-                title="Mover">
-                <i class="fas fa-grip-vertical"></i>
-            </span>
-            <div class="gastro-dashboard-card__top flex items-start justify-between gap-3">
-                <i class="{{ card.icon }} text-2xl {{ card.icon_class }}"></i>
-                {% if card_alert %}
-                <span class="gastro-dashboard-card__alert-badge rounded-full bg-rose-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">
-                    {{ card.alert_count }} pendiente{% if card.alert_count != 1 %}s{% endif %}
-                </span>
-                {% endif %}
-            </div>
-            <h2 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">{{ card.title }}</h2>
-            <p class="mt-2 text-sm {% if card_alert %}font-semibold text-rose-700 dark:text-rose-200{% else %}text-gray-600 dark:text-gray-400{% endif %}">
-                {{ card.description }}
-            </p>
-        </a>
-        {% endfor %}
+    {% if contexto_operativo %}
+    {# Cada chip abre el modulo de donde sale el dato. #}
+    {% macro stat_chip(endpoint, tab_title, tab_icon) %}
+    <a href="{{ url_for(endpoint) }}" data-tab-title="{{ tab_title }}" data-tab-icon="{{ tab_icon }}" class="app-tab-link gd-chip">{{ caller() }}</a>
+    {% endmacro %}
+    <section class="gd-stats" data-dashboard-stats>
+        {% if resumen.caja_abierta is not none %}
+        {% call stat_chip('gastronomia.caja', 'Caja', 'fas fa-cash-register') %}
+            <span class="gd-chip__dot {{ 'is-on' if resumen.caja_abierta }}" data-stat-dot="caja_abierta"></span>
+            <span data-stat="caja_abierta">{{ 'Caja abierta' if resumen.caja_abierta else 'Caja cerrada' }}</span>
+        {% endcall %}
+        {% endif %}
+        {% if resumen.ventas_hoy is not none %}
+        {% call stat_chip('gastronomia.reportes' if permisos.reportes else 'gastronomia.caja', 'Reportes' if permisos.reportes else 'Caja', 'fas fa-chart-line' if permisos.reportes else 'fas fa-cash-register') %}
+            <strong data-stat="ventas_hoy_formatted">{{ resumen.ventas_hoy_formatted }}</strong>
+            <span class="gd-chip__muted">hoy · <span data-stat="pedidos_cobrados_hoy">{{ resumen.pedidos_cobrados_hoy }}</span> cobros</span>
+        {% endcall %}
+        {% endif %}
+        {% if resumen.mesas_total %}
+        {% call stat_chip('gastronomia.salon', 'Salon', 'fas fa-chair') %}
+            <strong data-stat="mesas_ocupadas">{{ resumen.mesas_ocupadas }}</strong>
+            <span class="gd-chip__muted">/ {{ resumen.mesas_total }} mesas</span>
+        {% endcall %}
+        {% endif %}
+        {% if resumen.cocina_pendientes is not none %}
+        {% call stat_chip('gastronomia.cocina', 'Cocina', 'fas fa-fire') %}
+            <strong data-stat="cocina_pendientes">{{ resumen.cocina_pendientes }}</strong>
+            <span class="gd-chip__muted">en cocina</span>
+        {% endcall %}
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% for group in dashboard_groups %}
+    <section class="space-y-3">
+        <h2 class="gd-section-title"><i class="{{ group.icon }}"></i>{{ group.title }}</h2>
+        <div class="gd-grid" data-dashboard-card-grid>
+            {% for card in group.cards %}
+            {% include 'gastronomia/_dashboard_card.html' %}
+            {% endfor %}
         </div>
     </section>
+    {% endfor %}
 
-    <section class="space-y-4">
-        <div>
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Carga y configuracion</h2>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Altas y ajustes fuera del flujo operativo.</p>
-        </div>
-        <div class="grid gap-4 md:grid-cols-2">
+    {% if permisos.menu or permisos.salon %}
+    <section class="space-y-3">
+        <h2 class="gd-section-title"><i class="fas fa-sliders"></i>Carga y configuracion</h2>
+        <div class="gd-grid gd-grid--config">
             {% if permisos.menu %}
-            <a href="{{ url_for('gastronomia.menu_config') if contexto_operativo else '#' }}" data-tab-title="Cargar menu" data-tab-icon="fas fa-utensils" class="{% if contexto_operativo %}app-tab-link {% endif %}inline-flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-                <span>
-                    <span class="block text-base font-semibold text-gray-900 dark:text-white">Cargar menu</span>
-                    <span class="mt-1 block text-sm text-gray-600 dark:text-gray-400">Categorias, productos y disponibilidad.</span>
+            <a href="{{ url_for('gastronomia.menu_config') if contexto_operativo else '#' }}" data-tab-title="Cargar menu" data-tab-icon="fas fa-utensils" class="{% if contexto_operativo %}app-tab-link {% endif %}gd-card gd-card--compact gd-tone-config {% if not contexto_operativo %}is-disabled{% endif %}">
+                <span class="gd-card__icon"><i class="fas fa-utensils"></i></span>
+                <span class="gd-card__body">
+                    <span class="gd-card__title">Cargar menu</span>
+                    <span class="gd-card__desc">Categorias, productos y disponibilidad.</span>
                 </span>
-                <i class="fas fa-utensils text-xl text-amber-500"></i>
+                <i class="fas fa-arrow-right gd-card__go"></i>
             </a>
             {% endif %}
             {% if permisos.salon %}
-            <a href="{{ url_for('gastronomia.salon_config') if contexto_operativo else '#' }}" data-tab-title="Configurar salon" data-tab-icon="fas fa-chair" class="{% if contexto_operativo %}app-tab-link {% endif %}inline-flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 {% if not contexto_operativo %}pointer-events-none opacity-60{% endif %}">
-                <span>
-                    <span class="block text-base font-semibold text-gray-900 dark:text-white">Configurar salon</span>
-                    <span class="mt-1 block text-sm text-gray-600 dark:text-gray-400">Mesas, ubicacion, capacidad y orden.</span>
+            <a href="{{ url_for('gastronomia.salon_config') if contexto_operativo else '#' }}" data-tab-title="Configurar salon" data-tab-icon="fas fa-chair" class="{% if contexto_operativo %}app-tab-link {% endif %}gd-card gd-card--compact gd-tone-config {% if not contexto_operativo %}is-disabled{% endif %}">
+                <span class="gd-card__icon"><i class="fas fa-chair"></i></span>
+                <span class="gd-card__body">
+                    <span class="gd-card__title">Configurar salon</span>
+                    <span class="gd-card__desc">Mesas, ubicacion, capacidad y orden.</span>
                 </span>
-                <i class="fas fa-chair text-xl text-indigo-500"></i>
+                <i class="fas fa-arrow-right gd-card__go"></i>
             </a>
             {% endif %}
         </div>
     </section>
+    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_css %}
-<style>
-    .gastro-dashboard-card--alert {
-        border-color: rgb(251 113 133);
-        box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12), 0 12px 30px rgba(244, 63, 94, 0.16);
-        animation: gastro-card-pulse 1.25s ease-in-out infinite;
-    }
-    .dark .gastro-dashboard-card--alert {
-        border-color: rgb(251 113 133);
-        box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.16), 0 12px 30px rgba(0, 0, 0, 0.28);
-    }
-    .gastro-dashboard-card__top {
-        padding-right: 3.75rem;
-    }
-    .gastro-dashboard-card__alert-badge {
-        flex-shrink: 0;
-        white-space: nowrap;
-    }
-    .gastro-dashboard-card__handle {
-        position: absolute;
-        right: 1rem;
-        top: 1rem;
-        display: inline-flex;
-        height: 2rem;
-        width: 2rem;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.75rem;
-        color: rgb(148 163 184);
-        cursor: grab;
-        opacity: 0;
-        transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-    }
-    .gastro-dashboard-card:hover .gastro-dashboard-card__handle,
-    .gastro-dashboard-card:focus-within .gastro-dashboard-card__handle {
-        opacity: 1;
-    }
-    .gastro-dashboard-card__handle:hover,
-    .gastro-dashboard-card__handle:focus {
-        background-color: rgb(241 245 249);
-        color: rgb(15 23 42);
-        outline: none;
-    }
-    .dark .gastro-dashboard-card__handle:hover,
-    .dark .gastro-dashboard-card__handle:focus {
-        background-color: rgba(255, 255, 255, 0.08);
-        color: rgb(226 232 240);
-    }
-    .gastro-dashboard-card__handle:active {
-        cursor: grabbing;
-        transform: scale(0.96);
-    }
-    .gastro-dashboard-card.is-dragging {
-        opacity: 0.55;
-        transform: scale(0.98);
-    }
-    .gastro-dashboard-card.is-saving {
-        pointer-events: none;
-        opacity: 0.72;
-    }
-    @media (hover: none) {
-        .gastro-dashboard-card__handle {
-            opacity: 1;
-        }
-    }
-    @keyframes gastro-card-pulse {
-        0%,
-        100% {
-            transform: scale(1);
-        }
-        50% {
-            transform: scale(1.015);
-        }
-    }
-</style>
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/dashboard.css', v='20261024-3') }}">
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/dashboard_card_order.js', v='20261020-1') }}"></script>
-<script>window.initGastroDashboardCardOrder?.();</script>
+<script src="{{ url_for('gastronomia.static', filename='js/dashboard_card_order.js', v='20261024-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/dashboard_live.js', v='20261024-2') }}"></script>
+<script>window.initGastroDashboardCardOrder?.(); window.initGastroDashboardLive?.();</script>
 {% endblock %}

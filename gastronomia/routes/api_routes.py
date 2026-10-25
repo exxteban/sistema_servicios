@@ -4,8 +4,9 @@ from flask_login import current_user, login_required
 
 from app import db
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.dashboard_permisos import permisos_dashboard
 from gastronomia.services.dashboard_preferences import set_dashboard_card_order
-from gastronomia.services.encargo_service import encargos_habilitados
+from gastronomia.services.dashboard_resumen_service import badges_dashboard, resumen_dashboard
 from gastronomia.services.channel_price_service import aplicar_precio_canal, normalizar_canal_precio
 from gastronomia.services.menu_image_service import (
     eliminar_imagen_producto_menu,
@@ -48,7 +49,6 @@ from gastronomia.services.permisos import (
     PERMISO_REPORTES,
     PERMISO_SALON,
     requiere_permiso_gastronomia,
-    tiene_permiso_gastronomia,
 )
 
 
@@ -134,9 +134,27 @@ def actualizar_orden_dashboard():
     card_ids = data.get('cards') or data.get('card_ids') or data.get('ids') or []
     if not isinstance(card_ids, list):
         return jsonify({'error': 'validation_error', 'mensaje': 'El orden recibido no es valido.'}), 400
-    order = set_dashboard_card_order(current_user, card_ids, _permisos_dashboard())
+    order = set_dashboard_card_order(current_user, card_ids, permisos_dashboard(cliente_id_actual_gastronomia()))
     db.session.commit()
     return jsonify({'ok': True, 'cards': order})
+
+
+@gastronomia_api_bp.route('/dashboard/resumen', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(
+    PERMISO_ACCESO,
+    PERMISO_MENU,
+    PERMISO_POS,
+    PERMISO_COCINA,
+    PERMISO_CAJA,
+    PERMISO_SALON,
+    PERMISO_DELIVERY,
+    PERMISO_REPORTES,
+)
+def resumen_dashboard_api():
+    cliente_id = cliente_id_actual_gastronomia()
+    resumen = resumen_dashboard(cliente_id, current_user, permisos_dashboard(cliente_id))
+    return jsonify({'ok': True, 'resumen': resumen, 'badges': badges_dashboard(resumen)})
 
 
 @gastronomia_api_bp.route('/categorias', methods=['GET'])
@@ -149,22 +167,6 @@ def categorias():
     incluir_ocultas = request.args.get('publico') != '1'
     items = listar_categorias(cliente_id, incluir_ocultas=incluir_ocultas)
     return jsonify({'ok': True, 'categorias': [item.to_dict() for item in items]})
-
-
-def _permisos_dashboard() -> dict[str, bool]:
-    return {
-        'menu': tiene_permiso_gastronomia(PERMISO_MENU),
-        'pos': tiene_permiso_gastronomia(PERMISO_POS),
-        'salon': tiene_permiso_gastronomia(PERMISO_SALON),
-        'cocina': tiene_permiso_gastronomia(PERMISO_COCINA),
-        'caja': tiene_permiso_gastronomia(PERMISO_CAJA),
-        'delivery': tiene_permiso_gastronomia(PERMISO_DELIVERY),
-        'entregas': tiene_permiso_gastronomia(PERMISO_CAJA, PERMISO_COCINA, PERMISO_SALON),
-        'reportes': tiene_permiso_gastronomia(PERMISO_REPORTES),
-        # Historial de ventas del sistema (/ventas/): anular, factura, NC.
-        'ventas': bool(current_user.tiene_permiso('ver_ventas')),
-        'encargos': tiene_permiso_gastronomia(PERMISO_POS) and encargos_habilitados(cliente_id_actual_gastronomia()),
-    }
 
 
 @gastronomia_api_bp.route('/categorias/orden', methods=['PUT'])

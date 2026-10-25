@@ -28,6 +28,14 @@ def listar_salon(cliente_id: int) -> list[dict]:
     return [_mesa_con_estado(mesa, pedidos.get(mesa.nombre.strip().lower(), [])) for mesa in mesas]
 
 
+def resumen_ocupacion_salon(cliente_id: int) -> tuple[int, int]:
+    """(mesas con pedidos activos, mesas activas) para el resumen del dashboard."""
+    mesas = listar_mesas(cliente_id)
+    pedidos = _pedidos_activos_por_mesa(cliente_id)
+    ocupadas = sum(1 for mesa in mesas if mesa.nombre.strip().lower() in pedidos)
+    return ocupadas, len(mesas)
+
+
 def obtener_mesa(cliente_id: int, mesa_id: int) -> GastronomiaMesa | None:
     return GastronomiaMesa.query.filter(
         GastronomiaMesa.cliente_id == int(cliente_id),

@@ -104,7 +104,7 @@ def test_salon_crea_mesas_y_calcula_estado_desde_pedidos():
     dashboard = client.get('/gastronomia/')
     assert dashboard.status_code == 200
     dashboard_html = dashboard.get_data(as_text=True)
-    assert 'Menu operativo' in dashboard_html
+    assert 'Operacion en vivo' in dashboard_html
     assert 'Carga y configuracion' in dashboard_html
     assert 'Cargar menu' in dashboard_html
     assert 'Configurar salon' in dashboard_html

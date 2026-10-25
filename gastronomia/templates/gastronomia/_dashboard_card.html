@@ -1,0 +1,25 @@
+{% set card_alert = card.alert_count|default(0) > 0 %}
+{% set card_abre_pestana = contexto_operativo and not card.disabled %}
+<a href="{{ url_for(card.endpoint, **card.endpoint_params|default({})) if contexto_operativo else '#' }}"
+    data-dashboard-card-id="{{ card.id }}"
+    {% if card_abre_pestana %}data-tab-title="{{ card.title }}" data-tab-icon="{{ card.icon }}"{% endif %}
+    draggable="true"
+    class="{% if card_abre_pestana %}app-tab-link {% endif %}gd-card gastro-dashboard-card gd-tone-{{ card.group }} {% if card.featured %}gd-card--featured{% endif %} {% if card_alert %}gd-card--alert{% endif %} {% if card.disabled %}is-disabled{% endif %}">
+    <span class="gd-card__icon"><i class="{{ card.icon }}"></i></span>
+    <span class="gd-card__body">
+        <span class="gd-card__head">
+            <span class="gd-card__title">{{ card.title }}</span>
+            <span class="gd-badge {% if card.badge %}gd-badge--{{ card.badge.tone }}{% endif %}" data-dashboard-badge {% if not card.badge %}hidden{% endif %}>{{ card.badge.text if card.badge else '' }}</span>
+        </span>
+        <span class="gd-card__desc">{{ card.description }}</span>
+    </span>
+    <span data-dashboard-card-drag-handle
+        data-tab-ignore-click="1"
+        class="gastro-dashboard-card__handle"
+        role="button"
+        tabindex="0"
+        aria-label="Mover {{ card.title }}"
+        title="Mover">
+        <i class="fas fa-grip-vertical"></i>
+    </span>
+</a>
