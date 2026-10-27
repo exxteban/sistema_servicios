@@ -25,8 +25,10 @@ from gastronomia.services.menu_service import (
     listar_productos,
     obtener_categoria,
     obtener_producto,
+    parse_int,
     reordenar_categorias,
 )
+from gastronomia.services.producto_clon_service import copiar_receta_y_opciones
 from gastronomia.services.modificadores_service import (
     eliminar_grupo,
     eliminar_opcion,
@@ -285,6 +287,9 @@ def crear_producto():
                 producto.id_producto,
                 data.get('adicionales_precio'),
             )
+        clonar_desde = parse_int(data.get('clonar_desde'), 0)
+        if clonar_desde:
+            copiar_receta_y_opciones(cliente_id, clonar_desde, producto.id_producto)
     except PermissionError:
         _limpiar_imagen_subida(imagen_nueva)
         return jsonify({'error': 'sin_permisos_uploads', 'mensaje': 'No hay permisos para guardar la imagen.'}), 500

@@ -295,6 +295,7 @@
     clearObjectUrl();
     productoForm.reset();
     productoForm.id_producto.value = '';
+    productoForm.clonar_desde.value = '';
     productoForm.imagen_url.value = '';
     productoForm.disponible.checked = true;
     productoForm.visible.checked = true;
@@ -316,6 +317,8 @@
     clearObjectUrl();
     productoForm.reset();
     productoForm.id_producto.value = clonar ? '' : producto.id_producto;
+    // El backend copia receta y grupos de opciones del original (los hidden no se limpian con reset()).
+    productoForm.clonar_desde.value = clonar ? producto.id_producto : '';
     productoForm.categoria_id.value = producto.categoria_id;
     productoForm.nombre.value = clonar ? `${producto.nombre || ''} (copia)` : (producto.nombre || '');
     productoForm.descripcion.value = producto.descripcion || '';

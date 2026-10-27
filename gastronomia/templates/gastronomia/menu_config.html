@@ -82,6 +82,7 @@
                         </button>
                     </div>
                     <input type="hidden" name="id_producto">
+                    <input type="hidden" name="clonar_desde">
                     <div class="gastro-producto-subtabs mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Secciones del producto">
                         <button type="button" class="gastro-entry-tab activa" data-producto-subtab="datos" role="tab" aria-selected="true">Datos y extras</button>
                         <button type="button" class="gastro-entry-tab" data-producto-subtab="publicacion" role="tab" aria-selected="false">Imagen y disponibilidad</button>
@@ -475,7 +476,7 @@
 
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/menu_extras_editor.js', v='tabscope-20261020-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='clonar-20261027-4') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='clonar-20261027-5') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_producto_acciones.js', v='clonar-20261027-3') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_precio_inline.js', v='precio-20261027-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_producto_subtabs.js', v='tabscope-20261020-1') }}"></script>
@@ -485,6 +486,6 @@
 <script src="{{ url_for('gastronomia.static', filename='js/menu_channel_prices.js', v='tabscope-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_list_filter.js', v='tabscope-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/category_order.js', v='tabscope-20261020-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/stock_config.js', v='stocktabs-20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/stock_config.js', v='receta-20261027-2') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/stock_subtabs.js', v='tabscope-20261020-1') }}"></script>
 {% endblock %}
