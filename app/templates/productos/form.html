@@ -45,7 +45,7 @@
                     <div data-product-code-results class="mt-2 hidden overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"></div>
                     <div class="mt-4">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código de barras</label>
-                        <input type="text" name="codigo_barras" maxlength="50" value="{{ request.form.get('codigo_barras', producto.codigo_barras if producto else '') }}"
+                        <input type="text" name="codigo_barras" maxlength="50" value="{{ request.form.get('codigo_barras', (producto.codigo_barras or '') if producto else '') }}"
                             @keydown.enter.prevent="$refs.productoForm && ($refs.productoForm.requestSubmit ? $refs.productoForm.requestSubmit() : $refs.productoForm.submit())"
                             class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
                             placeholder="Ej: 7891234567890">
@@ -106,29 +106,29 @@
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
                 <textarea name="descripcion" rows="3"
                     class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
-                    x-bind:placeholder="esServicio ? 'Detalle del servicio ofrecido, duración o condiciones...' : 'Descripción detallada del producto...'">{{ request.form.get('descripcion', producto.descripcion if producto else '') }}</textarea>
+                    x-bind:placeholder="esServicio ? 'Detalle del servicio ofrecido, duración o condiciones...' : 'Descripción detallada del producto...'">{{ request.form.get('descripcion', (producto.descripcion or '') if producto else '') }}</textarea>
             </div>
 
             <!-- Características -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Marca</label>
-                    <input type="text" name="marca" maxlength="100" value="{{ request.form.get('marca', producto.marca if producto else '') }}"
+                    <input type="text" name="marca" maxlength="100" value="{{ request.form.get('marca', (producto.marca or '') if producto else '') }}"
                         class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Modelo</label>
-                    <input type="text" name="modelo" maxlength="100" value="{{ request.form.get('modelo', producto.modelo if producto else '') }}"
+                    <input type="text" name="modelo" maxlength="100" value="{{ request.form.get('modelo', (producto.modelo or '') if producto else '') }}"
                         class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Color</label>
-                    <input type="text" name="color" maxlength="50" value="{{ request.form.get('color', producto.color if producto else '') }}"
+                    <input type="text" name="color" maxlength="50" value="{{ request.form.get('color', (producto.color or '') if producto else '') }}"
                         class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Capacidad</label>
-                    <input type="text" name="capacidad" maxlength="50" value="{{ request.form.get('capacidad', producto.capacidad if producto else '') }}"
+                    <input type="text" name="capacidad" maxlength="50" value="{{ request.form.get('capacidad', (producto.capacidad or '') if producto else '') }}"
                         class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
                         placeholder="Ej: 1L">
                 </div>
@@ -153,7 +153,7 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precio Mayorista</label>
                         <input type="number" name="precio_mayorista" step="0.01"
-                            value="{{ request.form.get('precio_mayorista', producto.precio_mayorista if producto else '') }}"
+                            value="{{ request.form.get('precio_mayorista', (producto.precio_mayorista or '') if producto else '') }}"
                             class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
                     </div>
                 </div>
@@ -226,7 +226,7 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción Extendida (Tienda)</label>
                         <textarea name="descripcion_tienda" rows="3"
                             class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none transition-colors"
-                            placeholder="Descripción detallada para los clientes de la tienda online...">{{ request.form.get('descripcion_tienda', producto.descripcion_tienda if producto else '') }}</textarea>
+                            placeholder="Descripción detallada para los clientes de la tienda online...">{{ request.form.get('descripcion_tienda', (producto.descripcion_tienda or '') if producto else '') }}</textarea>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Si dejas esto en blanco, se usará la descripción principal.</p>
                     </div>
                 </div>
