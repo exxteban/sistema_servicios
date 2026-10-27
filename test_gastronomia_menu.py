@@ -192,6 +192,21 @@ def test_api_menu_crea_categoria_y_producto_con_cliente_de_sesion():
     assert producto_toggle['visible_en_tv'] is False
     assert producto_toggle['publicado_tienda'] is False
 
+    precio_resp = client.put(
+        f'/api/gastronomia/productos/{producto["id_producto"]}/estado',
+        json={'precio': '42.000'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert precio_resp.status_code == 200
+    assert precio_resp.get_json()['producto']['precio'] == 42000
+    assert precio_resp.get_json()['producto']['visible'] is False
+    precio_invalido = client.put(
+        f'/api/gastronomia/productos/{producto["id_producto"]}/estado',
+        json={'precio': 'abc'},
+        headers={'X-CSRFToken': csrf},
+    )
+    assert precio_invalido.status_code == 400
+
     borrar_categoria_resp = client.delete(
         f'/api/gastronomia/categorias/{categoria_id}',
         headers={'X-CSRFToken': csrf},
@@ -478,3 +493,61 @@ def test_api_menu_guarda_imagen_subida_y_reemplaza_archivo_anterior():
         assert producto_actualizado['visible_en_tv'] is False
         assert producto_actualizado['publicado_tienda'] is False
         assert not ruta_uno.exists()
+
+
+def test_api_menu_no_borra_imagen_compartida_con_producto_duplicado():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_restaurante(app, 'Resto Copia', 'resto_copia')
+    _loguear(client, app, 'resto_copia')
+
+    page = client.get('/gastronomia/menu')
+    csrf = _csrf(page.get_data(as_text=True))
+    categoria_resp = client.post(
+        '/api/gastronomia/categorias',
+        json={'nombre': 'Hamburguesas', 'orden': 1},
+        headers={'X-CSRFToken': csrf},
+    )
+    categoria_id = categoria_resp.get_json()['categoria']['id_categoria']
+
+    with TemporaryDirectory() as static_dir:
+        app.static_folder = static_dir
+        original = client.post(
+            '/api/gastronomia/productos',
+            data={
+                'categoria_id': str(categoria_id),
+                'nombre': 'La Gus simple',
+                'precio': '28000',
+                'imagen_archivo': (_imagen_png('red'), 'gus.png'),
+            },
+            headers={'X-CSRFToken': csrf},
+        ).get_json()['producto']
+        ruta = Path(static_dir, *original['imagen_url'].replace('/static/', '').split('/'))
+
+        # Duplicar desde la UI envia la misma imagen_url sin id_producto.
+        copia_resp = client.post(
+            '/api/gastronomia/productos',
+            data={
+                'categoria_id': str(categoria_id),
+                'nombre': 'La Gus doble',
+                'precio': '35000',
+                'imagen_url': original['imagen_url'],
+            },
+            headers={'X-CSRFToken': csrf},
+        )
+        assert copia_resp.status_code == 201
+        copia = copia_resp.get_json()['producto']
+        assert copia['imagen_url'] == original['imagen_url']
+
+        actualizar_resp = client.put(
+            f"/api/gastronomia/productos/{copia['id_producto']}",
+            data={
+                'categoria_id': str(categoria_id),
+                'nombre': 'La Gus doble',
+                'precio': '35000',
+                'imagen_archivo': (_imagen_png('blue'), 'gus-doble.png'),
+            },
+            headers={'X-CSRFToken': csrf},
+        )
+        assert actualizar_resp.status_code == 200
+        assert ruta.is_file()

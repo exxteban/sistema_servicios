@@ -75,6 +75,12 @@
             <div data-entry-tab-panel="producto" class="hidden" role="tabpanel">
                 <form id="producto-form" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <h2 class="text-base font-semibold text-gray-900 dark:text-white">Producto</h2>
+                    <div id="producto-edit-banner" class="gastro-edit-banner hidden">
+                        <span data-edit-banner-text class="min-w-0 truncate"></span>
+                        <button type="button" data-new-product class="gastro-edit-banner-new">
+                            <i class="fas fa-plus"></i>Cargar uno nuevo
+                        </button>
+                    </div>
                     <input type="hidden" name="id_producto">
                     <div class="gastro-producto-subtabs mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Secciones del producto">
                         <button type="button" class="gastro-entry-tab activa" data-producto-subtab="datos" role="tab" aria-selected="true">Datos y extras</button>
@@ -167,9 +173,13 @@
                             </label>
                         </div>
                         </div>
-                        <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <div class="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
                             <button id="producto-submit" type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
                                 <i class="fas fa-save"></i>Guardar producto
+                            </button>
+                            <button type="submit" data-save-and-new title="Guarda y deja el formulario listo para el siguiente producto de la misma categoria"
+                                    class="gastro-save-and-new inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold">
+                                <i class="fas fa-plus"></i>Guardar y crear otro
                             </button>
                             <button id="producto-cancel-edit" type="button" class="hidden rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-900">
                                 Cancelar
@@ -339,7 +349,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/menu_asistentes.css', v='20261019-2') }}">
-<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/menu_listas.css', v='20261020-2') }}">
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/menu_listas.css', v='20261027-4') }}">
 <style>
     .gastro-image-preview-shell {
         height: 9rem;
@@ -465,7 +475,9 @@
 
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/menu_extras_editor.js', v='tabscope-20261020-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='tabscope-20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_config.js', v='clonar-20261027-4') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_producto_acciones.js', v='clonar-20261027-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/menu_precio_inline.js', v='precio-20261027-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_producto_subtabs.js', v='tabscope-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_plantillas.js', v='tabscope-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/menu_promo_rapida.js', v='tabscope-20261020-1') }}"></script>

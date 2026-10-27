@@ -20,6 +20,7 @@ from gastronomia.services.menu_service import (
     eliminar_producto,
     guardar_categoria,
     guardar_producto,
+    imagen_usada_por_otro_producto,
     listar_categorias,
     listar_productos,
     obtener_categoria,
@@ -344,7 +345,11 @@ def actualizar_producto(producto_id):
                 producto.id_producto,
                 data.get('adicionales_precio'),
             )
-        if imagen_anterior and imagen_anterior != producto.imagen_url:
+        if (
+            imagen_anterior
+            and imagen_anterior != producto.imagen_url
+            and not imagen_usada_por_otro_producto(cliente_id, imagen_anterior, producto.id_producto)
+        ):
             try:
                 eliminar_imagen_producto_menu(imagen_anterior, current_app.static_folder)
             except OSError:
@@ -368,7 +373,11 @@ def actualizar_estado_producto_api(producto_id):
     cliente_id, error = _cliente_o_error()
     if error:
         return error
-    producto = actualizar_estado_producto(cliente_id, producto_id, _payload())
+    try:
+        producto = actualizar_estado_producto(cliente_id, producto_id, _payload())
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     if not producto:
         return jsonify({'error': 'not_found'}), 404
     return jsonify({'ok': True, 'producto': producto.to_dict()})

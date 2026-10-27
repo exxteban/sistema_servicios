@@ -14,6 +14,7 @@
   const productoImagePreview = scope.querySelector('#producto-imagen-preview');
   const productoImageEmpty = scope.querySelector('#producto-imagen-empty');
   const productoImageName = scope.querySelector('#producto-imagen-nombre');
+  const productoEditBanner = scope.querySelector('#producto-edit-banner');
   const mainTabButtons = Array.from(scope.querySelectorAll('[data-main-tab]'));
   const mainTabPanels = Array.from(scope.querySelectorAll('[data-main-tab-panel]'));
   const entryTabButtons = Array.from(scope.querySelectorAll('[data-entry-tab]'));
@@ -81,8 +82,8 @@
     ...overrides,
   });
 
-  const menuStateFromUrl = () => {
-    const url = new URL(window.location.href);
+  const menuStateFromUrl = (href = window.location.href) => {
+    const url = new URL(href, window.location.origin);
     return normalizeMenuState({
       mainTab: url.searchParams.get(menuStateParamKeys.mainTab) || 'menu',
       entryTab: url.searchParams.get(menuStateParamKeys.entryTab) || defaultEntryTab,
@@ -113,9 +114,10 @@
     }
   };
 
-  const persistAlert = (message, ok) => {
+  // url: el runtime de pestanas ejecuta este script antes de actualizar location, asi que el destino viaja aca.
+  const persistAlert = (message, ok, url) => {
     try {
-      window.sessionStorage.setItem(persistedAlertKey, JSON.stringify({message, ok}));
+      window.sessionStorage.setItem(persistedAlertKey, JSON.stringify({message, ok, url}));
     } catch (_error) {
       // Ignore storage issues and continue without persisted feedback.
     }
@@ -127,16 +129,17 @@
       if (!raw) return;
       window.sessionStorage.removeItem(persistedAlertKey);
       const persisted = JSON.parse(raw);
-      if (!persisted?.message) return;
-      showAlert(persisted.message, Boolean(persisted.ok));
+      if (persisted?.message) showAlert(persisted.message, Boolean(persisted.ok));
+      return persisted?.url || '';
     } catch (_error) {
       // Ignore malformed persisted alerts.
     }
+    return '';
   };
 
   const reloadMenuView = async ({message, ok, state = {}} = {}) => {
-    persistAlert(message, ok);
     const targetUrl = buildMenuUrl(state);
+    persistAlert(message, ok, targetUrl);
     if (typeof window.appNavigateActiveTab === 'function') {
       try {
         await window.appNavigateActiveTab(targetUrl);
@@ -301,18 +304,20 @@
     productoForm.stock_disponible.value = 0;
     productoSubmit.innerHTML = '<i class="fas fa-save"></i>Guardar producto';
     productoCancelEdit.classList.add('hidden');
+    productoEditBanner?.classList.add('hidden');
     renderImagePreview({emptyText: 'Sin imagen'});
     syncMenuStateInUrl({editProductId: ''});
   };
 
-  const cargarProductoParaEditar = async (productoId) => {
+  // clonar: precarga los datos pero sin id, asi al guardar se crea un producto nuevo.
+  const cargarProductoParaEditar = async (productoId, {clonar = false} = {}) => {
     const data = await apiJson(`/api/gastronomia/productos/${productoId}?modificadores=1`);
     const producto = data.producto;
     clearObjectUrl();
     productoForm.reset();
-    productoForm.id_producto.value = producto.id_producto;
+    productoForm.id_producto.value = clonar ? '' : producto.id_producto;
     productoForm.categoria_id.value = producto.categoria_id;
-    productoForm.nombre.value = producto.nombre || '';
+    productoForm.nombre.value = clonar ? `${producto.nombre || ''} (copia)` : (producto.nombre || '');
     productoForm.descripcion.value = producto.descripcion || '';
     productoForm.ingredientes_removibles.value = ingredientesRemovibles(producto);
     if (productoForm.adicionales_precio) {
@@ -330,19 +335,22 @@
     productoForm.control_stock_venta.checked = Boolean(producto.control_stock_venta);
     productoForm.stock_disponible.value = Number(producto.stock_disponible || 0);
     productoForm.quitar_imagen.checked = false;
-    productoSubmit.innerHTML = '<i class="fas fa-save"></i>Actualizar producto';
+    productoSubmit.innerHTML = clonar
+      ? '<i class="fas fa-copy"></i>Crear copia'
+      : '<i class="fas fa-save"></i>Actualizar producto';
     productoCancelEdit.classList.remove('hidden');
+    if (productoEditBanner) {
+      productoEditBanner.querySelector('[data-edit-banner-text]').textContent = `${clonar ? 'Duplicando' : 'Editando'}: ${producto.nombre || ''}`;
+      productoEditBanner.classList.remove('hidden');
+    }
+    // El id no se guarda en la URL: al volver a "Menu" el formulario debe arrancar vacio.
     switchEntryTab('producto');
-    syncMenuStateInUrl({
-      mainTab: 'menu',
-      entryTab: 'producto',
-      editProductId: producto.id_producto,
-    });
     renderImagePreview({
       url: producto.imagen_url || '',
       emptyText: 'Sin imagen',
     });
     productoForm.scrollIntoView({behavior: 'smooth', block: 'start'});
+    if (clonar) productoForm.nombre.select();
   };
 
   const toggleProductoEstado = async (input) => {
@@ -447,16 +455,18 @@
       data.set('disponible', event.currentTarget.disponible.checked ? '1' : '0');
       data.set('quitar_imagen', event.currentTarget.quitar_imagen.checked ? '1' : '0');
       const productoId = data.get('id_producto');
+      const crearOtro = Boolean(event.submitter?.hasAttribute('data-save-and-new'));
       const url = productoId ? `/api/gastronomia/productos/${productoId}` : '/api/gastronomia/productos';
       const response = await apiMultipart(url, {method: productoId ? 'PUT' : 'POST', body: data});
+      // menu_producto_acciones.js lee esta marca al recargar y deja el formulario vacio en la misma categoria.
+      if (crearOtro) scope.gastroMenuRecordarNuevo?.(data.get('categoria_id'));
+      const nombre = response?.producto?.nombre || data.get('nombre');
       await reloadMenuView({
-        message: 'Producto guardado.',
+        message: crearOtro ? `"${nombre}" guardado. Carga el siguiente.` : `"${nombre}" guardado.`,
         ok: true,
-        state: {
-          mainTab: 'menu',
-          entryTab: 'producto',
-          editProductId: response?.producto?.id_producto || productoId || '',
-        },
+        state: crearOtro
+          ? {mainTab: 'menu', entryTab: 'producto', editProductId: ''}
+          : {mainTab: 'menu-cargado', menuTab: 'productos', editProductId: ''},
       });
     } catch (error) {
       showAlert(error.message, false);
@@ -532,18 +542,25 @@
     cargarProductoParaEditar(button.dataset.editProduct).catch((error) => showAlert(error.message, false));
   });
 
-  const restoreMenuState = async () => {
-    const initialState = menuStateFromUrl();
+  const restoreMenuState = async (pendingUrl = '') => {
+    const initialState = menuStateFromUrl(pendingUrl || window.location.href);
     switchMainTab(initialState.mainTab);
     switchEntryTab(initialState.entryTab);
     switchTab(initialState.menuTab);
-    if (!initialState.editProductId) return;
-    await cargarProductoParaEditar(initialState.editProductId);
+    // Links viejos con gastro_edit_product: abrir el formulario vacio y limpiar la URL.
+    if (initialState.editProductId) syncMenuStateInUrl({editProductId: ''});
   };
 
   scope.gastroMenuReload = reloadMenuView;
   scope.gastroMenuShowAlert = showAlert;
+  scope.gastroMenuProducto = {
+    cargar: cargarProductoParaEditar,
+    reset: resetProductoForm,
+    abrirFormulario: () => {
+      switchMainTab('menu');
+      switchEntryTab('producto');
+    },
+  };
   renderImagePreview({emptyText: 'Sin imagen'});
-  restorePersistedAlert();
-  restoreMenuState().catch((error) => showAlert(error.message, false));
+  restoreMenuState(restorePersistedAlert()).catch((error) => showAlert(error.message, false));
 }());
