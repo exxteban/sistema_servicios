@@ -174,11 +174,11 @@
     recipeItems.length > 0);
   };
 
-  scope.querySelector('#stock-recipe-add').addEventListener('click', async () => {
-    if (!recipeProduct.value) return showAlert('Paso 1: selecciona el producto del menu antes de agregar insumos.', false);
+  // Suma el insumo elegido en el selector a la receta en memoria. Devuelve false si la seleccion no es valida.
+  const addSelectedInsumo = () => {
     const insumo = selectedRecipeInsumo();
     const cantidad = Math.max(0, Number(recipeQuantity.value || 0));
-    if (!insumo || cantidad <= 0) return showAlert('Selecciona un insumo y una cantidad valida.', false);
+    if (!insumo || cantidad <= 0) return false;
     const existing = recipeItems.find((item) => Number(item.insumo_id) === Number(insumo.id_producto));
     if (existing) {
       existing.cantidad = Number(existing.cantidad || 0) + cantidad;
@@ -191,6 +191,12 @@
       });
     }
     renderRecipe();
+    return true;
+  };
+
+  scope.querySelector('#stock-recipe-add').addEventListener('click', async () => {
+    if (!recipeProduct.value) return showAlert('Paso 1: selecciona el producto del menu antes de agregar insumos.', false);
+    if (!addSelectedInsumo()) return showAlert('Selecciona un insumo y una cantidad valida.', false);
     try {
       await persistRecipe();
     } catch (error) {
@@ -212,6 +218,8 @@
 
   scope.querySelector('#stock-recipe-save').addEventListener('click', async () => {
     try {
+      // Confirmar con la lista vacia toma el insumo que quedo elegido en el selector sin pulsar "Agregar".
+      if (recipeProduct.value && !recipeItems.length) addSelectedInsumo();
       await persistRecipe({confirmation: true});
     } catch (error) {
       showAlert(error.message, false);
