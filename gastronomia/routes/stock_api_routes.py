@@ -3,6 +3,13 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
 from gastronomia.services.access import cliente_id_actual_gastronomia
+from gastronomia.services.costos_service import (
+    aplicar_costo_extra_categoria,
+    costo_plato,
+    guardar_costo_extra,
+    guardar_precio_compra_insumo,
+    resumen_costos_platos,
+)
 from gastronomia.services.permisos import PERMISO_MENU, PERMISO_POS, requiere_permiso_gastronomia
 from gastronomia.services.stock_preview_service import previsualizar_stock_carrito
 from gastronomia.services.stock_service import (
@@ -164,3 +171,59 @@ def actualizar_receta(producto_id):
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'receta': data})
+
+
+@gastronomia_stock_api_bp.route('/stock/productos/<int:producto_id>/costo', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def costo_producto(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        data = costo_plato(cliente_id, producto_id)
+    except ValueError as exc:
+        return jsonify({'error': 'not_found', 'mensaje': str(exc)}), 404
+    return jsonify({'ok': True, 'costo': data})
+
+
+@gastronomia_stock_api_bp.route('/stock/productos/<int:producto_id>/costo-extra', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def actualizar_costo_extra(producto_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    data = _payload()
+    try:
+        actualizados = 0
+        if data.get('aplicar_categoria'):
+            actualizados = aplicar_costo_extra_categoria(cliente_id, producto_id, data.get('monto'))
+        costo = guardar_costo_extra(cliente_id, producto_id, data.get('monto'))
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'costo': costo, 'actualizados': actualizados})
+
+
+@gastronomia_stock_api_bp.route('/stock/costos/resumen', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def resumen_costos():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    return jsonify({'ok': True, 'productos': resumen_costos_platos(cliente_id)})
+
+
+@gastronomia_stock_api_bp.route('/stock/insumos/<int:insumo_id>/precio-compra', methods=['PUT'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def actualizar_precio_compra(insumo_id):
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    try:
+        insumo = guardar_precio_compra_insumo(cliente_id, insumo_id, _payload().get('precio_compra'))
+    except ValueError as exc:
+        return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    return jsonify({'ok': True, 'insumo': serializar_insumo(insumo)})

@@ -9,7 +9,9 @@
   const exportLink = document.getElementById('export-report');
   const csrf = document.getElementById('csrf-token')?.value || '';
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Fecha local: toISOString() usa UTC y despues de las 21 h (Paraguay) mostraba el dia siguiente.
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   fromInput.value = today;
   toInput.value = today;
 
