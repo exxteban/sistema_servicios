@@ -42,6 +42,7 @@ def serializar_insumo(insumo: Producto) -> dict:
         'nombre': insumo.nombre,
         'stock_actual': int(insumo.stock_actual or 0),
         'stock_minimo': int(insumo.stock_minimo or 0),
+        'precio_compra': float(insumo.precio_compra or 0),
         'unidad_stock': _normalizar_unidad(getattr(insumo, 'unidad_stock', None)),
         'presentaciones': [
             item.to_dict()

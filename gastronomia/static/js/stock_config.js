@@ -32,6 +32,10 @@
     if (!response.ok) throw new Error(data.mensaje || data.error || 'Solicitud invalida.');
     return data;
   };
+  // Avisa a stock_costos.js que cambio el plato o su receta para recalcular costo y ganancia.
+  const notifyRecipeChanged = () => root.dispatchEvent(new CustomEvent('gastro:recipe-changed', {
+    detail: {productoId: recipeProduct.value},
+  }));
   const selectedInsumo = () => insumos.find((item) => String(item.id_producto) === String(insumoSelect.value));
   const selectedRecipeInsumo = () => insumos.find((item) => String(item.id_producto) === String(recipeInsumo.value));
   const selectedRecipeSummary = () => recipeSummaries.find((item) => String(item.producto_id) === String(recipeProduct.value));
@@ -144,6 +148,7 @@
       recipeOptions = [];
       renderRecipe();
       syncRecipeControls();
+      notifyRecipeChanged();
       return;
     }
     const data = await apiJson(`/api/gastronomia/stock/productos/${recipeProduct.value}/receta`);
@@ -151,6 +156,7 @@
     recipeOptions = data.receta?.opciones || [];
     renderRecipe();
     syncRecipeControls();
+    notifyRecipeChanged();
   };
 
   insumoSelect.addEventListener('change', renderInsumo);
@@ -167,6 +173,7 @@
     await loadRecipeSummaries();
     renderRecipe();
     syncRecipeControls();
+    notifyRecipeChanged();
     const plato = data.receta?.producto_nombre || 'Producto';
     showAlert(recipeItems.length
       ? `${plato}: receta activa con ${recipeItems.length} insumo(s). Los proximos pedidos descontaran stock automaticamente.`

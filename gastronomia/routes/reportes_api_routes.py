@@ -6,6 +6,7 @@ from app.utils.permisos import validar_autorizacion
 from gastronomia.services.access import cliente_id_actual_gastronomia
 from gastronomia.services.anulacion_service import anular_venta_gastronomica
 from gastronomia.services.delivery_privacy import ocultar_localizacion_pedido
+from gastronomia.services.ganancia_service import ganancia_estimada
 from gastronomia.services.permisos import PERMISO_CAJA, PERMISO_REPORTES, requiere_permiso_gastronomia
 from gastronomia.services.reportes_service import generar_csv_reportes, nombre_archivo_reportes_csv, resumen_reportes
 
@@ -33,6 +34,21 @@ def reportes_resumen():
         fecha_hasta=request.args.get('hasta'),
     )
     return jsonify({'ok': True, 'resumen': data})
+
+
+@gastronomia_reportes_api_bp.route('/reportes/ganancia', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_REPORTES)
+def reportes_ganancia():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    data = ganancia_estimada(
+        cliente_id,
+        fecha_desde=request.args.get('desde'),
+        fecha_hasta=request.args.get('hasta'),
+    )
+    return jsonify({'ok': True, 'ganancia': data})
 
 
 @gastronomia_reportes_api_bp.route('/reportes/exportar.csv', methods=['GET'])

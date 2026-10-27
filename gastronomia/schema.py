@@ -55,6 +55,7 @@ PRODUCT_COLUMN_MIGRATIONS = (
     ('publicado_tienda', 'BOOLEAN NOT NULL DEFAULT 1'),
     ('control_stock_venta', 'BOOLEAN NOT NULL DEFAULT 0'),
     ('stock_disponible', 'INTEGER'),
+    ('costo_extra', 'NUMERIC(15, 2) NOT NULL DEFAULT 0'),
 )
 
 OPTION_COLUMN_MIGRATIONS = (
