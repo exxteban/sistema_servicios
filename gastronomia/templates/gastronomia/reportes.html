@@ -49,7 +49,7 @@
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">Cuanto ganamos</h2>
-                <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Ventas cobradas menos el costo estimado de cada plato (receta + extra fijo) y los gastos pagados.</p>
+                <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Ventas cobradas menos el costo estimado de cada plato (receta + extra fijo) y los gastos pagados (caja, gastos corrientes y sueldos).</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <button type="button" data-profit-range="hoy" class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200">Hoy</button>
@@ -107,5 +107,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261027-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261027-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261027-2') }}"></script>
 {% endblock %}
