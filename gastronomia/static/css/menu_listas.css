@@ -324,3 +324,97 @@
 .dark .gastro-recipe-progress {
     background: rgb(127 29 29 / 0.4);
 }
+.gastro-list-add-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: rgb(4 120 87);
+}
+.gastro-list-add-row:hover {
+    background: rgb(236 253 245);
+}
+.dark .gastro-list-add-row {
+    color: rgb(110 231 183);
+}
+.dark .gastro-list-add-row:hover {
+    background: rgb(6 78 59 / 0.3);
+}
+.gastro-inline-price {
+    border-radius: 0.375rem;
+    border-bottom: 1px dashed currentColor;
+    padding: 0 0.15rem;
+    font-weight: 700;
+    cursor: text;
+}
+.gastro-inline-price:hover {
+    background: rgb(236 253 245);
+}
+.gastro-inline-price-input {
+    width: 7.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgb(16 185 129);
+    padding: 0.1rem 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: rgb(17 24 39);
+}
+.dark .gastro-inline-price:hover {
+    background: rgb(6 78 59 / 0.3);
+}
+.dark .gastro-inline-price-input {
+    background: rgb(17 24 39);
+    color: rgb(243 244 246);
+}
+.gastro-save-and-new {
+    border: 1px solid rgb(110 231 183);
+    color: rgb(4 120 87);
+}
+.gastro-save-and-new:hover {
+    background: rgb(236 253 245);
+}
+.dark .gastro-save-and-new {
+    border-color: rgb(16 185 129 / 0.4);
+    color: rgb(110 231 183);
+}
+.dark .gastro-save-and-new:hover {
+    background: rgb(6 78 59 / 0.3);
+}
+.gastro-edit-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    border: 1px solid rgb(252 211 77);
+    border-radius: 0.75rem;
+    background: rgb(255 251 235);
+    padding: 0.55rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: rgb(146 64 14);
+}
+.gastro-edit-banner.hidden {
+    display: none;
+}
+.gastro-edit-banner-new {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 0.5rem;
+    background: rgb(5 150 105);
+    padding: 0.35rem 0.7rem;
+    color: white;
+}
+.gastro-edit-banner-new:hover {
+    background: rgb(4 120 87);
+}
+.dark .gastro-edit-banner {
+    border-color: rgb(251 191 36 / 0.4);
+    background: rgb(120 53 15 / 0.35);
+    color: rgb(253 230 138);
+}

@@ -196,6 +196,8 @@ def actualizar_estado_producto(cliente_id: int, producto_id: int, data: dict) ->
     producto = obtener_producto(cliente_id, producto_id)
     if not producto:
         return None
+    if 'precio' in data:
+        producto.precio = parse_price(data.get('precio'))
     if 'visible' in data:
         producto.visible = parse_bool(data.get('visible'), bool(producto.visible))
     if 'visible_en_tv' in data:
@@ -253,6 +255,17 @@ def eliminar_producto(cliente_id: int, producto_id: int) -> bool:
     producto.activo = False
     db.session.commit()
     return True
+
+
+def imagen_usada_por_otro_producto(cliente_id: int, imagen_url: str | None, producto_id: int) -> bool:
+    """Los productos duplicados comparten archivo de imagen: no borrarlo mientras otro lo use."""
+    if not imagen_url:
+        return False
+    return db.session.query(GastronomiaProducto.id_producto).filter(
+        GastronomiaProducto.cliente_id == int(cliente_id),
+        GastronomiaProducto.imagen_url == imagen_url,
+        GastronomiaProducto.id_producto != int(producto_id),
+    ).first() is not None
 
 
 def _commit_or_raise_duplicate(message: str) -> None:
