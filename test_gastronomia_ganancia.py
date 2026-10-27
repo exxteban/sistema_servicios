@@ -2,6 +2,8 @@ from datetime import date
 
 from app import create_app, db
 from app.models import MovimientoCaja, SesionCaja, Usuario
+from control_de_empleados.models import Empleado, EmpleadoPago
+from gastos_corrientes.models import GastoCorriente, PagoGastoCorriente
 from gastronomia.models import GastronomiaProducto
 from test_gastronomia_reportes import _abrir_caja, _crear_insumo_receta, _crear_productos, _csrf, _loguear, _pedido_cobrado
 
@@ -73,6 +75,29 @@ def test_ganancia_estimada_por_dia_resta_costo_y_gastos():
             monto=5000,
             motivo='Garrafa de gas',
         ))
+        empleado = Empleado(cliente_id=cliente_id, nombre_completo='Cocinero Ganancia', salario_base=3000)
+        gasto = GastoCorriente(cliente_id=cliente_id, nombre='Luz Ganancia', monto_estimado=2000)
+        db.session.add_all([empleado, gasto])
+        db.session.flush()
+        db.session.add_all([
+            EmpleadoPago(
+                cliente_id=cliente_id,
+                id_empleado=empleado.id_empleado,
+                periodo=date.today().strftime('%Y-%m'),
+                fecha_pago=date.today(),
+                total_pagado=3000,
+            ),
+            PagoGastoCorriente(
+                cliente_id=cliente_id,
+                id_gasto_corriente=gasto.id_gasto_corriente,
+                periodo_anio=date.today().year,
+                periodo_mes=date.today().month,
+                fecha_vencimiento=date.today(),
+                fecha_pago=date.today(),
+                monto_pagado=2000,
+                estado='pagado',
+            ),
+        ])
         db.session.commit()
 
     hoy = date.today().isoformat()
@@ -83,8 +108,11 @@ def test_ganancia_estimada_por_dia_resta_costo_y_gastos():
     assert totales['ventas'] == 90000
     assert totales['costo'] == 24000
     assert totales['ganancia_bruta'] == 66000
-    assert totales['gastos'] == 5000
-    assert totales['ganancia_neta'] == 61000
+    assert totales['gastos_caja'] == 5000
+    assert totales['gastos_fijos'] == 2000
+    assert totales['sueldos'] == 3000
+    assert totales['gastos'] == 10000
+    assert totales['ganancia_neta'] == 56000
     assert totales['unidades_sin_costo'] == 1
     assert len(data['dias']) == 1
     assert [item['nombre'] for item in data['platos_sin_costo']] == ['Bebida']

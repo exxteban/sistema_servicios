@@ -32,7 +32,7 @@
       ['Ventas', money(t.ventas), `${t.pedidos} pedido(s)`, 'text-gray-900 dark:text-white'],
       ['Costo de lo vendido', money(t.costo), `${t.costo_pct}% de las ventas`, 'text-gray-900 dark:text-white'],
       ['Ganancia bruta', money(t.ganancia_bruta), `${t.margen_pct}% de margen`, tone(t.ganancia_bruta)],
-      ['Gastos pagados', money(t.gastos), 'Caja y gastos fijos', 'text-gray-900 dark:text-white'],
+      ['Gastos pagados', money(t.gastos), `Caja ${money(t.gastos_caja)} · Fijos ${money(t.gastos_fijos)} · Sueldos ${money(t.sueldos)}`, 'text-gray-900 dark:text-white'],
       ['Ganancia neta', money(t.ganancia_neta), 'Lo que queda', tone(t.ganancia_neta)],
     ];
     kpis.innerHTML = cards.map(([title, value, note, color]) => `

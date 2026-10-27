@@ -10,12 +10,16 @@ from app import db
 from app.models import MovimientoCaja
 from app.models.compra import Compra
 from app.utils.helpers import parse_iso_date, today_local, utc_bounds_for_local_dates, utc_naive_to_local
+from control_de_empleados.models import EmpleadoPago
 from gastos_corrientes.models import PagoGastoCorriente
 from gastronomia.models import GastronomiaPedidoItem, GastronomiaPedidoPago
 from gastronomia.services.costos_service import costo_total_por_plato
 
 
 MAX_DIAS = 93
+CAMPOS_SUMABLES = (
+    'ventas', 'pedidos', 'costo', 'gastos', 'gastos_caja', 'gastos_fijos', 'sueldos', 'unidades', 'unidades_sin_costo',
+)
 
 
 def ganancia_estimada(cliente_id: int, fecha_desde: str | None = None, fecha_hasta: str | None = None) -> dict:
@@ -47,7 +51,7 @@ def ganancia_estimada(cliente_id: int, fecha_desde: str | None = None, fecha_has
     filas = [_cerrar_dia(dia) for dia in dias.values()]
     totales = _cerrar_dia({
         **_dia_vacio(None),
-        **{campo: sum(fila[campo] for fila in filas) for campo in ('ventas', 'pedidos', 'costo', 'gastos', 'unidades', 'unidades_sin_costo')},
+        **{campo: sum(fila[campo] for fila in filas) for campo in CAMPOS_SUMABLES},
     })
     return {
         'periodo': {'desde': desde.isoformat(), 'hasta': hasta.isoformat()},
@@ -113,9 +117,7 @@ def _sumar_gastos(cliente_id: int, inicio, fin, desde: date, hasta: date, dias: 
         .all()
     )
     for mov in egresos:
-        dia = _dia_local(mov.fecha_movimiento)
-        if dia in dias:
-            dias[dia]['gastos'] += float(mov.monto or 0)
+        _sumar_gasto(dias, _dia_local(mov.fecha_movimiento), 'gastos_caja', mov.monto)
 
     # Gastos fijos pagados (alquiler, luz, sueldos), se paguen o no desde caja.
     pagos_fijos = (
@@ -129,8 +131,26 @@ def _sumar_gastos(cliente_id: int, inicio, fin, desde: date, hasta: date, dias: 
         .all()
     )
     for pago in pagos_fijos:
-        if pago.fecha_pago in dias:
-            dias[pago.fecha_pago]['gastos'] += float(pago.monto_pagado or 0)
+        _sumar_gasto(dias, pago.fecha_pago, 'gastos_fijos', pago.monto_pagado)
+
+    # Sueldos registrados en Control de empleados (no generan movimiento de caja).
+    sueldos = (
+        EmpleadoPago.query
+        .filter(
+            EmpleadoPago.fecha_pago >= desde,
+            EmpleadoPago.fecha_pago <= hasta,
+            or_(EmpleadoPago.cliente_id == int(cliente_id), EmpleadoPago.cliente_id.is_(None)),
+        )
+        .all()
+    )
+    for pago in sueldos:
+        _sumar_gasto(dias, pago.fecha_pago, 'sueldos', pago.total_pagado)
+
+
+def _sumar_gasto(dias: dict, dia: date | None, campo: str, monto) -> None:
+    if dia in dias:
+        dias[dia][campo] += float(monto or 0)
+        dias[dia]['gastos'] += float(monto or 0)
 
 
 def _compras_periodo(desde: date, hasta: date) -> float:
@@ -154,6 +174,9 @@ def _dia_vacio(dia: date | None) -> dict:
         'pedidos': 0,
         'costo': 0.0,
         'gastos': 0.0,
+        'gastos_caja': 0.0,
+        'gastos_fijos': 0.0,
+        'sueldos': 0.0,
         'unidades': 0,
         'unidades_sin_costo': 0,
     }
