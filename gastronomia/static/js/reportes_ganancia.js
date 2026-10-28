@@ -139,13 +139,14 @@
 
   const ACTIVO = ['border-violet-300', 'bg-violet-50', 'text-violet-700', 'dark:bg-violet-500/15', 'dark:text-violet-200'];
   // Pestañas de la seccion: cada una muestra un grupo de datos para no hacer scroll largo.
-  const TAB_ACTIVA = ['border-violet-500', 'text-violet-700', 'dark:text-violet-200'];
+  const TAB_ACTIVA = ['bg-violet-600', 'text-white', 'shadow-sm'];
+  const TAB_INACTIVA = ['text-gray-600', 'dark:text-gray-300'];
   const mostrarTab = (nombre) => {
     section.querySelectorAll('[data-profit-tab]').forEach((tab) => {
       const activa = tab.dataset.profitTab === nombre;
       tab.setAttribute('aria-selected', String(activa));
-      tab.classList.toggle('border-transparent', !activa);
       TAB_ACTIVA.forEach((cls) => tab.classList.toggle(cls, activa));
+      TAB_INACTIVA.forEach((cls) => tab.classList.toggle(cls, !activa));
     });
     section.querySelectorAll('[data-profit-panel]').forEach((panel) => {
       panel.classList.toggle('hidden', panel.dataset.profitPanel !== nombre);

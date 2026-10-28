@@ -146,6 +146,27 @@
     );
   };
 
+  // Pestañas de la pagina: "Cuanto ganamos" (ganancia) o "Ventas y anulaciones".
+  const pageTabs = document.querySelector('[data-page-tabs]');
+  const PAGE_TAB_ACTIVA = ['bg-violet-600', 'text-white', 'shadow-sm'];
+  const PAGE_TAB_INACTIVA = ['text-gray-600', 'dark:text-gray-300'];
+  const mostrarPagina = (nombre) => {
+    pageTabs?.querySelectorAll('[data-page-tab]').forEach((tab) => {
+      const activa = tab.dataset.pageTab === nombre;
+      tab.setAttribute('aria-selected', String(activa));
+      PAGE_TAB_ACTIVA.forEach((cls) => tab.classList.toggle(cls, activa));
+      PAGE_TAB_INACTIVA.forEach((cls) => tab.classList.toggle(cls, !activa));
+    });
+    document.querySelectorAll('[data-page-panel]').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.pagePanel !== nombre);
+    });
+  };
+  pageTabs?.addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-page-tab]');
+    if (tab) mostrarPagina(tab.dataset.pageTab);
+  });
+  mostrarPagina('ganancia');
+
   document.getElementById('load-report')?.addEventListener('click', () => {
     loadReport().catch((error) => showAlert(error.message, false));
   });
