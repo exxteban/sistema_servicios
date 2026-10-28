@@ -114,8 +114,7 @@
     el('profit-hero').innerHTML = ui.hero(data);
     el('profit-warnings').innerHTML = avisos(data);
     const conVentas = t.ventas > 0;
-    el('profit-breakdown').classList.toggle('hidden', !conVentas);
-    el('profit-dishes').classList.toggle('hidden', !conVentas);
+    el('profit-tabs').classList.toggle('hidden', !conVentas);
     if (!conVentas) {
       el('profit-days').innerHTML = '';
       return;
@@ -139,6 +138,20 @@
   });
 
   const ACTIVO = ['border-violet-300', 'bg-violet-50', 'text-violet-700', 'dark:bg-violet-500/15', 'dark:text-violet-200'];
+  // Pestañas de la seccion: cada una muestra un grupo de datos para no hacer scroll largo.
+  const TAB_ACTIVA = ['border-violet-500', 'text-violet-700', 'dark:text-violet-200'];
+  const mostrarTab = (nombre) => {
+    section.querySelectorAll('[data-profit-tab]').forEach((tab) => {
+      const activa = tab.dataset.profitTab === nombre;
+      tab.setAttribute('aria-selected', String(activa));
+      tab.classList.toggle('border-transparent', !activa);
+      TAB_ACTIVA.forEach((cls) => tab.classList.toggle(cls, activa));
+    });
+    section.querySelectorAll('[data-profit-panel]').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.profitPanel !== nombre);
+    });
+  };
+  mostrarTab('resumen');
   const marcarRango = (button) => section.querySelectorAll('[data-profit-range]').forEach((btn) => {
     const activo = btn === button;
     btn.setAttribute('aria-pressed', String(activo));
@@ -151,6 +164,11 @@
   [fromInput, toInput].forEach((input) => input.addEventListener('change', () => marcarRango(null)));
 
   section.addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-profit-tab]');
+    if (tab) {
+      mostrarTab(tab.dataset.profitTab);
+      return;
+    }
     const button = event.target.closest('[data-profit-range]');
     if (!button) return;
     const today = new Date();
