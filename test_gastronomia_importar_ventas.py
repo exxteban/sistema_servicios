@@ -168,6 +168,14 @@ def test_importa_deshace_y_aprende(tmp_path):
     assert resumen['ventas_total'] == 102000.0
     assert resumen['pedidos_cobrados'] == 4
 
+    detalle = client.get(f"/api/gastronomia/importar-ventas/{importacion['id_importacion']}/ventas").get_json()
+    assert len(detalle['ventas']) == 9
+    dobke = next(v for v in detalle['ventas'] if v['texto_excel'] == 'flye dobke')
+    assert dobke['producto'] == 'Flye Doble' and dobke['monto'] == 35000.0 and dobke['fecha'] == '2026-10-14'
+    assert dobke['hoja'] == 'venta por nota de pedido' and dobke['fila'] == 7
+    with app.app_context():
+        assert Venta.query.filter(Venta.observaciones.like('%Importado de Excel: flye dobke')).count() == 1
+
     repetido = client.post('/api/gastronomia/importar-ventas/aplicar', json=payload, headers=headers)
     assert repetido.status_code == 400
 

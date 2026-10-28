@@ -1,10 +1,11 @@
 /* Flujo de importacion de ventas historicas: subir -> revisar -> confirmar. */
 (function () {
-  const raiz = document.querySelector('[data-importar-ventas]');
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const raiz = scope.querySelector('[data-importar-ventas]');
   if (!raiz) return;
   const R = window.ImportarVentasRender;
   const csrf = document.getElementById('csrf-token')?.value || '';
-  const $ = (id) => document.getElementById(id);
+  const $ = (id) => scope.querySelector(`#${id}`);
   let estado = null;
 
   async function api(url, opciones = {}) {
@@ -155,6 +156,28 @@
     }
   }
 
+  async function verVentas(boton) {
+    const caja = $('imp-detalle');
+    boton.disabled = true;
+    try {
+      const resp = await api(`/api/gastronomia/importar-ventas/${boton.dataset.verVentas}/ventas`);
+      caja.innerHTML = R.detalleVentas(resp);
+      caja.classList.remove('hidden');
+      caja.scrollIntoView({behavior: 'smooth', block: 'start'});
+    } catch (error) {
+      alerta(error.message);
+    } finally {
+      boton.disabled = false;
+    }
+  }
+
+  function filtrarDetalle(texto) {
+    const buscado = texto.trim().toLowerCase();
+    $('imp-detalle').querySelectorAll('tbody tr').forEach((fila) => {
+      fila.classList.toggle('hidden', Boolean(buscado) && !fila.dataset.buscar.includes(buscado));
+    });
+  }
+
   async function revertir(boton) {
     const id = boton.dataset.revertir;
     if (boton.disabled || !window.confirm(`Deshacer la importacion #${id}? Se borran sus ventas y cajas historicas.`)) return;
@@ -163,6 +186,7 @@
     try {
       const resp = await api(`/api/gastronomia/importar-ventas/${id}/revertir`, {method: 'POST'});
       alerta(`Importacion #${id} deshecha: se borraron ${resp.importacion.pedidos_borrados} ventas.`, 'ok');
+      $('imp-detalle').classList.add('hidden');
       cargarHistorial();
     } catch (error) {
       alerta(error.message);
@@ -195,11 +219,15 @@
   $('imp-cancelar').addEventListener('click', () => { reiniciar(); alerta(''); });
   raiz.addEventListener('change', alCambiar);
   raiz.addEventListener('input', (evento) => {
+    if (evento.target.dataset.detalleBuscar !== undefined) { filtrarDetalle(evento.target.value); return; }
     if (evento.target.dataset.grupoNombre !== undefined || evento.target.dataset.grupoPrecio !== undefined) alCambiar(evento);
   });
   raiz.addEventListener('click', (evento) => {
     const boton = evento.target.closest('[data-revertir]');
     if (boton) revertir(boton);
+    const ver = evento.target.closest('[data-ver-ventas]');
+    if (ver) verVentas(ver);
+    if (evento.target.closest('[data-detalle-cerrar]')) $('imp-detalle').classList.add('hidden');
   });
   cargarHistorial();
 })();

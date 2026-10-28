@@ -1,13 +1,14 @@
 (function () {
   // Seccion "Cuanto ganamos" de reportes. Usa el mismo rango Desde/Hasta que reportes.js.
-  const section = document.querySelector('[data-report-profit]');
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const section = scope.querySelector('[data-report-profit]');
   const ui = window.GananciaUI;
   if (!section || !ui) return;
 
   const {money, escapeHtml, pct, dayLabel, card, muted} = ui;
-  const fromInput = document.getElementById('report-from');
-  const toInput = document.getElementById('report-to');
-  const el = (id) => document.getElementById(id);
+  const fromInput = scope.querySelector('#report-from');
+  const toInput = scope.querySelector('#report-to');
+  const el = (id) => scope.querySelector(`#${id}`);
 
   const isoLocal = (date) => {
     const pad = (n) => String(n).padStart(2, '0');

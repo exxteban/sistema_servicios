@@ -125,7 +125,9 @@
       const deshecha = imp.estado !== 'aplicada';
       const accion = deshecha
         ? '<span class="text-xs font-semibold text-gray-400">Deshecha</span>'
-        : `<button type="button" data-revertir="${imp.id_importacion}" class="rounded-lg border border-rose-200 px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300">Deshacer</button>`;
+        : `<div class="flex justify-end gap-2">
+            <button type="button" data-ver-ventas="${imp.id_importacion}" class="rounded-lg border border-violet-200 px-3 py-1 text-xs font-bold text-violet-700 hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-300">Ver ventas</button>
+            <button type="button" data-revertir="${imp.id_importacion}" class="rounded-lg border border-rose-200 px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300">Deshacer</button></div>`;
       return `<tr class="${deshecha ? 'opacity-60' : ''}">
         <td class="px-2 py-2">#${imp.id_importacion}</td><td class="px-2 py-2">${esc(imp.nombre_archivo || '')}</td>
         <td class="px-2 py-2">${fechaLegible(imp.fecha_desde)} - ${fechaLegible(imp.fecha_hasta)}</td>
@@ -138,5 +140,31 @@
       <tbody class="divide-y divide-gray-100 dark:divide-gray-700">${filas}</tbody></table></div>`;
   }
 
-  window.ImportarVentasRender = {resumen, hojas, dias, sinDetalle, grupos, historial, dinero, fechaLegible, fmt};
+  function detalleVentas(data) {
+    const imp = data.importacion;
+    const filas = data.ventas.map((v) => {
+      const buscar = esc(`${v.texto_excel} ${v.producto} ${v.nota} ${fechaLegible(v.fecha)}`.toLowerCase());
+      return `<tr data-buscar="${buscar}">
+        <td class="whitespace-nowrap px-2 py-1.5">${fechaLegible(v.fecha)}</td>
+        <td class="px-2 py-1.5"><span class="font-mono text-xs">${esc(v.texto_excel)}</span>
+          <div class="text-xs text-gray-400">${esc(v.hoja)}${v.fila ? `, fila ${v.fila}` : ''}</div></td>
+        <td class="px-2 py-1.5 font-semibold">${esc(v.producto)}${v.nota ? `<div class="text-xs font-normal text-gray-500">${esc(v.nota)}</div>` : ''}</td>
+        <td class="px-2 py-1.5 text-right">${fmt.format(v.cantidad)}</td>
+        <td class="whitespace-nowrap px-2 py-1.5 text-right">${dinero(v.monto)}</td></tr>`;
+    }).join('');
+    return `<div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p class="font-bold text-gray-900 dark:text-white">Ventas de la importacion #${imp.id_importacion}
+          <span class="font-normal text-gray-500">(${fmt.format(data.ventas.length)} ventas, ${dinero(imp.total)})</span></p>
+        <div class="flex gap-2">
+          <input type="search" data-detalle-buscar placeholder="Buscar plato, texto o fecha..." class="${input} w-60">
+          <button type="button" data-detalle-cerrar class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold dark:border-gray-700">Cerrar</button>
+        </div></div>
+      <div class="max-h-[32rem] overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+        <table class="min-w-full text-sm"><thead class="sticky top-0 bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-gray-900">
+          <tr><th class="px-2 py-2">Fecha</th><th class="px-2 py-2">En el Excel decia</th><th class="px-2 py-2">Se cargo como</th>
+          <th class="px-2 py-2 text-right">Cant.</th><th class="px-2 py-2 text-right">Monto</th></tr></thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-700">${filas}</tbody></table></div>`;
+  }
+
+  window.ImportarVentasRender = {resumen, hojas, dias, sinDetalle, grupos, historial, detalleVentas, dinero, fechaLegible, fmt};
 })();

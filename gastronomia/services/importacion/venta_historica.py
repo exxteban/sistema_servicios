@@ -113,7 +113,7 @@ def crear_venta_historica(
         descuento_fidelizacion_monto=Decimal('0.00'),
         total=monto,
         tipo_venta='contado',
-        observaciones=f'Pedido gastronomia #{pedido.id_pedido} | Importado de Excel',
+        observaciones=f'Pedido gastronomia #{pedido.id_pedido} | Importado de Excel: {fila["nombre"]}'[:500],
     )
     db.session.add(venta)
     db.session.flush()

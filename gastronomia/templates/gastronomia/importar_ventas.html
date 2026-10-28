@@ -86,11 +86,12 @@
         <h2 class="text-lg font-bold text-gray-900 dark:text-white">Importaciones anteriores</h2>
         <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">Si algo salio mal, deshacela: se borran sus ventas y cajas historicas (los productos creados quedan en el menu).</p>
         <div id="imp-historial" class="text-sm text-gray-600 dark:text-gray-300">Cargando...</div>
+        <div id="imp-detalle" class="mt-4 hidden text-sm text-gray-700 dark:text-gray-200"></div>
     </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/importar_ventas_render.js', v='20261028-3') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/importar_ventas.js', v='20261028-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/importar_ventas_render.js', v='20261028-5') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/importar_ventas.js', v='20261028-5') }}"></script>
 {% endblock %}
