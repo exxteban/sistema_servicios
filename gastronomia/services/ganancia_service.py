@@ -8,6 +8,7 @@ from sqlalchemy import or_
 
 from app import db
 from app.models import MovimientoCaja
+from app.models.caja import REFERENCIA_COMPRA_INSUMOS
 from app.models.compra import Compra
 from app.utils.helpers import parse_iso_date, today_local, utc_bounds_for_local_dates, utc_naive_to_local
 from control_de_empleados.models import EmpleadoPago
@@ -18,7 +19,8 @@ from gastronomia.services.costos_service import costo_total_por_plato
 
 MAX_DIAS = 93
 CAMPOS_SUMABLES = (
-    'ventas', 'pedidos', 'costo', 'gastos', 'gastos_caja', 'gastos_fijos', 'sueldos', 'unidades', 'unidades_sin_costo',
+    'ventas', 'pedidos', 'costo', 'gastos', 'gastos_caja', 'gastos_fijos', 'sueldos', 'insumos_caja',
+    'unidades', 'unidades_sin_costo',
 )
 
 
@@ -46,7 +48,8 @@ def ganancia_estimada(cliente_id: int, fecha_desde: str | None = None, fecha_has
         dias[dia]['pedidos'] += 1
 
     platos = _platos_vendidos(cliente_id, dia_por_pedido, dias)
-    _sumar_gastos(cliente_id, inicio, fin, desde, hasta, dias)
+    detalle_gastos = defaultdict(lambda: {'monto': 0.0, 'veces': 0})
+    _sumar_gastos(cliente_id, inicio, fin, desde, hasta, dias, detalle_gastos)
 
     filas = [_cerrar_dia(dia) for dia in dias.values()]
     totales = _cerrar_dia({
@@ -63,6 +66,10 @@ def ganancia_estimada(cliente_id: int, fecha_desde: str | None = None, fecha_has
             key=lambda item: -item['cantidad'],
         ),
         'compras': _compras_periodo(desde, hasta),
+        'gastos_detalle': [
+            {'concepto': concepto, 'tipo': tipo, **valores}
+            for (tipo, concepto), valores in sorted(detalle_gastos.items(), key=lambda kv: -kv[1]['monto'])
+        ],
     }
 
 
@@ -104,20 +111,30 @@ def _platos_vendidos(cliente_id: int, dia_por_pedido: dict, dias: dict) -> dict:
     return platos
 
 
-def _sumar_gastos(cliente_id: int, inicio, fin, desde: date, hasta: date, dias: dict) -> None:
-    # Egresos manuales de caja (sin referencia): gas, delivery, compras chicas del dia, etc.
+def _sumar_gastos(cliente_id: int, inicio, fin, desde: date, hasta: date, dias: dict, detalle: dict) -> None:
+    # Egresos manuales de caja: gas, delivery, etc. Los marcados como compra de
+    # insumos no se restan: esa mercaderia ya esta en el costo de receta.
     egresos = (
         MovimientoCaja.query
         .filter(
             MovimientoCaja.tipo == 'egreso',
-            or_(MovimientoCaja.referencia_tipo.is_(None), MovimientoCaja.referencia_tipo == ''),
+            or_(
+                MovimientoCaja.referencia_tipo.is_(None),
+                MovimientoCaja.referencia_tipo.in_(('', REFERENCIA_COMPRA_INSUMOS)),
+            ),
             MovimientoCaja.fecha_movimiento >= inicio,
             MovimientoCaja.fecha_movimiento < fin,
         )
         .all()
     )
     for mov in egresos:
-        _sumar_gasto(dias, _dia_local(mov.fecha_movimiento), 'gastos_caja', mov.monto)
+        dia = _dia_local(mov.fecha_movimiento)
+        if mov.referencia_tipo == REFERENCIA_COMPRA_INSUMOS:
+            if dia in dias:
+                dias[dia]['insumos_caja'] += float(mov.monto or 0)
+            continue
+        if _sumar_gasto(dias, dia, 'gastos_caja', mov.monto):
+            _anotar(detalle, 'caja', _concepto(mov.motivo, 'Gasto de caja'), mov.monto)
 
     # Gastos fijos pagados (alquiler, luz, sueldos), se paguen o no desde caja.
     pagos_fijos = (
@@ -131,7 +148,9 @@ def _sumar_gastos(cliente_id: int, inicio, fin, desde: date, hasta: date, dias: 
         .all()
     )
     for pago in pagos_fijos:
-        _sumar_gasto(dias, pago.fecha_pago, 'gastos_fijos', pago.monto_pagado)
+        if _sumar_gasto(dias, pago.fecha_pago, 'gastos_fijos', pago.monto_pagado):
+            nombre = getattr(getattr(pago, 'gasto_corriente', None), 'nombre', None)
+            _anotar(detalle, 'fijo', _concepto(nombre, 'Gasto fijo'), pago.monto_pagado)
 
     # Sueldos registrados en Control de empleados (no generan movimiento de caja).
     sueldos = (
@@ -144,13 +163,28 @@ def _sumar_gastos(cliente_id: int, inicio, fin, desde: date, hasta: date, dias: 
         .all()
     )
     for pago in sueldos:
-        _sumar_gasto(dias, pago.fecha_pago, 'sueldos', pago.total_pagado)
+        if _sumar_gasto(dias, pago.fecha_pago, 'sueldos', pago.total_pagado):
+            _anotar(detalle, 'sueldo', 'Sueldos', pago.total_pagado)
 
 
-def _sumar_gasto(dias: dict, dia: date | None, campo: str, monto) -> None:
-    if dia in dias:
-        dias[dia][campo] += float(monto or 0)
-        dias[dia]['gastos'] += float(monto or 0)
+def _sumar_gasto(dias: dict, dia: date | None, campo: str, monto) -> bool:
+    if dia not in dias:
+        return False
+    dias[dia][campo] += float(monto or 0)
+    dias[dia]['gastos'] += float(monto or 0)
+    return True
+
+
+def _anotar(detalle: dict, tipo: str, concepto: str, monto) -> None:
+    item = detalle[(tipo, concepto)]
+    item['monto'] = round(item['monto'] + float(monto or 0), 2)
+    item['veces'] += 1
+
+
+def _concepto(texto: str | None, por_defecto: str) -> str:
+    # Agrupa "garrafa de gas" y "Garrafa de gas " bajo el mismo renglon.
+    limpio = ' '.join((texto or '').split())
+    return limpio[:1].upper() + limpio[1:] if limpio else por_defecto
 
 
 def _compras_periodo(desde: date, hasta: date) -> float:
@@ -177,6 +211,7 @@ def _dia_vacio(dia: date | None) -> dict:
         'gastos_caja': 0.0,
         'gastos_fijos': 0.0,
         'sueldos': 0.0,
+        'insumos_caja': 0.0,
         'unidades': 0,
         'unidades_sin_costo': 0,
     }

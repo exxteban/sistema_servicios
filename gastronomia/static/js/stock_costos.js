@@ -9,6 +9,7 @@
   const recipeProduct = scope.querySelector('#stock-recipe-product');
   const recipeList = scope.querySelector('#stock-recipe-summary');
   const alertBox = scope.querySelector('#gastro-stock-alert');
+  const precio = window.GastroPrecioInsumo;
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -62,18 +63,19 @@
       <div class="grid grid-cols-[1fr_auto] items-center gap-2 text-sm">
         <span class="min-w-0 truncate"><strong>${escapeHtml(item.insumo_nombre)}</strong> x ${item.cantidad} ${escapeHtml(item.unidad_stock)}</span>
         <span class="flex items-center gap-2">
-          <input type="number" min="0" step="1" value="${Math.round(item.precio_compra)}" data-cost-insumo="${item.insumo_id}"
-                 title="Costo de compra por ${escapeHtml(item.unidad_stock)}" aria-label="Costo de ${escapeHtml(item.insumo_nombre)}" class="${inputClass} ${item.precio_compra > 0 ? '' : 'border-red-300'}">
+          <input type="number" min="0" step="1" value="${precio.aPantalla(item.precio_compra, item.unidad_stock)}"
+                 data-cost-insumo="${item.insumo_id}" data-cost-unidad="${escapeHtml(item.unidad_stock)}"
+                 title="Cuanto pagas ${precio.etiqueta(item.unidad_stock)}" aria-label="Precio de ${escapeHtml(item.insumo_nombre)} por ${precio.etiqueta(item.unidad_stock)}" class="${inputClass} ${item.precio_compra > 0 ? '' : 'border-red-300'}">
           <span class="w-24 text-right text-xs font-bold text-gray-500">${money(item.subtotal)}</span>
         </span>
       </div>
     `).join('') || '<p class="text-xs font-semibold text-gray-500">Sin insumos en la receta: el costo es solo el extra.</p>';
     const warning = cost.insumos_sin_precio
-      ? `<p class="mt-2 text-xs font-bold text-red-600">${cost.insumos_sin_precio} insumo(s) sin costo cargado. Escribe cuanto pagas por unidad.</p>`
+      ? `<p class="mt-2 text-xs font-bold text-red-600">${cost.insumos_sin_precio} insumo(s) sin costo cargado. Completalos en la pestana "Precios de ingredientes".</p>`
       : '';
     panel.innerHTML = `
       <h4 class="text-sm font-bold text-gray-900 dark:text-white">Costo y ganancia por plato</h4>
-      <p class="mt-1 text-xs font-semibold text-gray-500">Costo de compra por unidad de cada insumo. Se guarda al salir del campo.</p>
+      <p class="mt-1 text-xs font-semibold text-gray-500">Precio de compra de cada insumo (carne por kilo, salsas por litro, pan por unidad). Se guarda al salir del campo.</p>
       <div class="mt-3 space-y-2">${rows}</div>
       ${warning}
       <div class="mt-3 border-t border-gray-100 pt-3 dark:border-gray-700">
@@ -115,7 +117,7 @@
   const savePurchasePrice = async (input) => {
     await apiJson(`/api/gastronomia/stock/insumos/${input.dataset.costInsumo}/precio-compra`, {
       method: 'PUT',
-      body: {precio_compra: Number(input.value || 0)},
+      body: {precio_compra: precio.aBase(input.value, input.dataset.costUnidad)},
     });
     showAlert('Costo del insumo guardado. Se actualiza en todos los platos que lo usan.');
     await refresh();

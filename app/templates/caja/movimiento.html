@@ -59,6 +59,16 @@
                     placeholder="Ej: Aporte de caja chica, Pago a proveedor...">
             </div>
 
+            {% if marca_rubro and marca_rubro.get('es_gastronomia') %}
+            <label id="compra-insumos-opcion" class="hidden cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                <input type="checkbox" name="es_compra_insumos" value="1" class="mt-1 h-4 w-4">
+                <span class="text-sm text-gray-700 dark:text-gray-200">
+                    <span class="font-semibold">Es compra de mercadería o ingredientes</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400">Marcalo si compraste carne, verduras, bebidas, etc. Así no se cuenta dos veces en "Cuánto ganamos", porque el costo de los ingredientes ya sale de las recetas.</span>
+                </span>
+            </label>
+            {% endif %}
+
             <div class="flex space-x-4">
                 <a href="{{ url_for('caja.estado') }}"
                     class="flex-1 text-center bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 py-3 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
@@ -80,6 +90,16 @@
     (function () {
         var form = document.getElementById('form-movimiento-caja');
         if (!form) return;
+        var opcionInsumos = document.getElementById('compra-insumos-opcion');
+        if (opcionInsumos) {
+            form.addEventListener('change', function () {
+                var tipoSel = form.querySelector('input[name="tipo"]:checked');
+                var esEgreso = !!tipoSel && tipoSel.value === 'egreso';
+                opcionInsumos.classList.toggle('hidden', !esEgreso);
+                opcionInsumos.classList.toggle('flex', esEgreso);
+                if (!esEgreso) opcionInsumos.querySelector('input').checked = false;
+            });
+        }
         var PARECE_VENTA = /\b(venta|ventas|vend\w*|planilla|cobro|hamburguesas?|pedido)\b/i;
         form.addEventListener('submit', function (event) {
             var tipo = form.querySelector('input[name="tipo"]:checked');

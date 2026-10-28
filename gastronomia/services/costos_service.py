@@ -65,6 +65,30 @@ def costo_total_por_plato(cliente_id: int, producto_ids: list[int]) -> dict[int,
     }
 
 
+def insumos_en_recetas(cliente_id: int) -> list[dict]:
+    """Insumos usados en recetas activas: los unicos cuyo precio afecta la ganancia."""
+    filas = (
+        db.session.query(Producto, db.func.count(GastronomiaRecetaInsumo.id_receta_insumo))
+        .join(GastronomiaRecetaInsumo, GastronomiaRecetaInsumo.insumo_id == Producto.id_producto)
+        .join(GastronomiaProducto, GastronomiaProducto.id_producto == GastronomiaRecetaInsumo.producto_id)
+        .filter(
+            GastronomiaRecetaInsumo.cliente_id == int(cliente_id),
+            GastronomiaRecetaInsumo.activo.is_(True),
+            GastronomiaProducto.activo.is_(True),
+        )
+        .group_by(Producto.id_producto)
+        .order_by(Producto.nombre.asc())
+        .all()
+    )
+    return [{
+        'id_producto': int(insumo.id_producto),
+        'nombre': insumo.nombre,
+        'unidad_stock': getattr(insumo, 'unidad_stock', 'unidad') or 'unidad',
+        'precio_compra': float(insumo.precio_compra or 0),
+        'platos': int(platos or 0),
+    } for insumo, platos in filas]
+
+
 def guardar_costo_extra(cliente_id: int, producto_id: int, monto) -> dict:
     producto = _obtener_producto_menu(cliente_id, producto_id)
     producto.costo_extra = _parse_monto(monto)
