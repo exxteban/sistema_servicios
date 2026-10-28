@@ -130,6 +130,10 @@ class SesionCaja(db.Model):
 from app.models.venta import Venta
 
 
+# Egreso manual que paga mercaderia/insumos (ya contada en el costo de lo vendido).
+REFERENCIA_COMPRA_INSUMOS = 'compra_insumos'
+
+
 class MovimientoCaja(db.Model):
     __tablename__ = 'movimientos_caja'
     

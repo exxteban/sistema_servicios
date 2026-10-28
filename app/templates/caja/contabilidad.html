@@ -36,6 +36,23 @@
         </div>
     </div>
 
+    {% if marca_rubro and marca_rubro.get('es_gastronomia') %}
+    {% set url_ganancia = url_for('gastronomia.reportes', ver='ganancia', desde=desde.isoformat() if desde else '', hasta=hasta.isoformat() if hasta else '') %}
+    <div class="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700 dark:bg-emerald-900/20" data-html2canvas-ignore="true">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-sack-dollar mt-1 text-xl text-emerald-600 dark:text-emerald-400"></i>
+            <div>
+                <p class="font-semibold text-gray-800 dark:text-white">¿Querés saber cuánto ganaste de verdad?</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">Esta pantalla muestra la plata que entró y salió de la caja. La ganancia real descuenta además lo que costaron los ingredientes, los gastos y los sueldos.</p>
+            </div>
+        </div>
+        <a href="{{ url_ganancia }}" data-tab-url="{{ url_ganancia }}" data-tab-title="Reportes" data-tab-icon="fas fa-chart-line"
+            class="app-tab-link inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-700">
+            Ver cuánto ganamos<i class="fas fa-arrow-right ml-2"></i>
+        </a>
+    </div>
+    {% endif %}
+
     <div id="pdf-report-content">
         <form method="GET" action="{{ url_for('caja.contabilidad') }}" data-html2canvas-ignore="true"
             class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-4">

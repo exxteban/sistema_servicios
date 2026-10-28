@@ -12,8 +12,10 @@
   // Fecha local: toISOString() usa UTC y despues de las 21 h (Paraguay) mostraba el dia siguiente.
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  fromInput.value = today;
-  toInput.value = today;
+  // Un acceso directo puede traer el rango (ej. desde Contabilidad); si no, hoy.
+  const shell = document.querySelector('[data-gastro-reportes]');
+  fromInput.value = shell?.dataset.inicioDesde || today;
+  toInput.value = shell?.dataset.inicioHasta || fromInput.value;
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const showAlert = (message, ok) => {
@@ -101,16 +103,16 @@
             <span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">${escapeHtml(item.metodo_pago)}</span>
           </div>
           <p class="mt-1 text-sm font-semibold text-gray-600 dark:text-gray-300">${escapeHtml(saleLabel(item))}</p>
-          <p class="mt-1 text-xs font-semibold text-gray-500">${escapeHtml(formatDateTime(item.fecha_pago))} - Estado ${escapeHtml(item.estado_pedido)}</p>
+          <p class="mt-1 text-xs font-semibold text-gray-500">${escapeHtml(formatDateTime(item.fecha_pago))} - Pedido ${escapeHtml(String(item.estado_pedido || '').replace(/_/g, ' '))}</p>
         </div>
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center md:justify-end">
           <strong class="text-lg text-gray-900 dark:text-white">${money(item.total_cobrado)}</strong>
-          <button type="button" data-void-sale="${item.id_pedido}" data-venta-id="${item.id_venta}" class="rounded-lg bg-rose-600 px-3 py-2 text-sm font-black text-white hover:bg-rose-700" data-permiso="anular_venta">
+          <button type="button" data-void-sale="${item.id_pedido}" data-venta-id="${item.id_venta}" class="rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:bg-transparent dark:text-rose-300 dark:hover:bg-rose-500/10" data-permiso="anular_venta">
             Anular venta
           </button>
         </div>
       </div>
-    `).join('') || '<div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">No hay ventas cobradas para anular en el periodo.</div>';
+    `).join('') || '<div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">No hay ventas cobradas con caja abierta en el periodo.</div>';
     if (window.aplicarPermisosUI) window.aplicarPermisosUI();
   };
   const saleLabel = (item) => {
@@ -143,6 +145,27 @@
       ventaId
     );
   };
+
+  // Pestañas de la pagina: "Cuanto ganamos" (ganancia) o "Ventas y anulaciones".
+  const pageTabs = document.querySelector('[data-page-tabs]');
+  const PAGE_TAB_ACTIVA = ['bg-violet-600', 'text-white', 'shadow-sm'];
+  const PAGE_TAB_INACTIVA = ['text-gray-600', 'dark:text-gray-300'];
+  const mostrarPagina = (nombre) => {
+    pageTabs?.querySelectorAll('[data-page-tab]').forEach((tab) => {
+      const activa = tab.dataset.pageTab === nombre;
+      tab.setAttribute('aria-selected', String(activa));
+      PAGE_TAB_ACTIVA.forEach((cls) => tab.classList.toggle(cls, activa));
+      PAGE_TAB_INACTIVA.forEach((cls) => tab.classList.toggle(cls, !activa));
+    });
+    document.querySelectorAll('[data-page-panel]').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.pagePanel !== nombre);
+    });
+  };
+  pageTabs?.addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-page-tab]');
+    if (tab) mostrarPagina(tab.dataset.pageTab);
+  });
+  mostrarPagina('ganancia');
 
   document.getElementById('load-report')?.addEventListener('click', () => {
     loadReport().catch((error) => showAlert(error.message, false));

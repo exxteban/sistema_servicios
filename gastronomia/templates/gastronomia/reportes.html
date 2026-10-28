@@ -3,7 +3,9 @@
 {% block title %}Reportes Gastronomia{% endblock %}
 
 {% block content %}
-<div class="reportes-shell mx-auto max-w-7xl" data-gastro-reportes>
+<div class="reportes-shell mx-auto max-w-7xl" data-gastro-reportes
+     data-inicio-desde="{{ inicio_desde|default('') }}" data-inicio-hasta="{{ inicio_hasta|default('') }}"
+     data-inicio-rango="{{ inicio_rango|default('') }}" {% if inicio_ver %}data-inicio-ver="ganancia"{% endif %}>
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
     <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -22,76 +24,89 @@
         </div>
     </div>
 
-    <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div class="grid gap-3 lg:grid-cols-[180px_180px_auto_auto] lg:items-end">
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                Desde
-                <input id="report-from" type="date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-            </label>
-            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                Hasta
-                <input id="report-to" type="date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-3 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-            </label>
-            <button type="button" id="load-report" class="rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white hover:bg-violet-700 sm:w-36">
-                Actualizar
-            </button>
-            <a id="export-report" href="#" class="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
-                <i class="fas fa-file-csv mr-2"></i>Exportar CSV
-            </a>
-        </div>
+    <div class="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+            Desde
+            <input id="report-from" type="date" class="rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+        </label>
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+            Hasta
+            <input id="report-to" type="date" class="rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+        </label>
+        <button type="button" id="load-report" class="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-violet-700">
+            Actualizar
+        </button>
+        <a id="export-report" href="#" class="inline-flex items-center rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
+            <i class="fas fa-file-csv mr-2"></i>CSV
+        </a>
     </div>
 
     <div id="report-alert" class="mb-4 hidden rounded-lg border px-4 py-3 text-sm font-semibold"></div>
 
     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" id="report-kpis"></section>
 
-    <section class="mt-5 rounded-xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-500/30 dark:bg-gray-800" data-report-profit>
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Cuanto ganamos</h2>
-                <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Ventas cobradas menos el costo estimado de cada plato (receta + extra fijo) y los gastos pagados (caja, gastos corrientes y sueldos).</p>
+    <nav role="tablist" class="mt-5 flex gap-1 rounded-xl bg-gray-200 p-1 dark:bg-gray-800" data-page-tabs>
+        <button type="button" role="tab" data-page-tab="ganancia" class="flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2 py-3 text-base font-bold transition hover:bg-white sm:px-3 dark:hover:bg-gray-700"><span class="hidden sm:inline"><i class="fas fa-sack-dollar"></i></span>¿Cuánto ganamos?</button>
+        <button type="button" role="tab" data-page-tab="ventas" class="flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2 py-3 text-base font-bold transition hover:bg-white sm:px-3 dark:hover:bg-gray-700"><span class="hidden sm:inline"><i class="fas fa-receipt"></i></span>Ventas y anulaciones</button>
+    </nav>
+    <div data-page-panel="ganancia">
+        <section id="cuanto-ganamos" class="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40" data-report-profit>
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <h2 class="text-xl font-black text-gray-900 dark:text-white">¿Cuánto ganamos?</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Lo que vendiste, menos lo que costaron los ingredientes y los gastos del local.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" data-profit-range="hoy" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">Hoy</button>
+                    <button type="button" data-profit-range="7" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">Últimos 7 días</button>
+                    <button type="button" data-profit-range="mes" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">Este mes</button>
+                </div>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <button type="button" data-profit-range="hoy" class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200">Hoy</button>
-                <button type="button" data-profit-range="7" class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200">Ultimos 7 dias</button>
-                <button type="button" data-profit-range="mes" class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200">Este mes</button>
+            <div id="profit-hero" class="mt-4"></div>
+            <div id="profit-warnings" class="mt-3 space-y-2"></div>
+            <div id="profit-tabs" class="mt-4">
+                <div role="tablist" class="flex gap-1 overflow-x-auto rounded-xl bg-gray-200 p-1 dark:bg-gray-800">
+                    <button type="button" role="tab" data-profit-tab="resumen" class="profit-tab flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2 py-2.5 text-sm font-bold transition sm:px-3 hover:bg-white dark:hover:bg-gray-700"><span class="hidden sm:inline"><i class="fas fa-gauge-high"></i></span>Resumen</button>
+                    <button type="button" role="tab" data-profit-tab="dias" class="profit-tab flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2 py-2.5 text-sm font-bold transition sm:px-3 hover:bg-white dark:hover:bg-gray-700"><span class="hidden sm:inline"><i class="fas fa-calendar-days"></i></span>Día a día</button>
+                    <button type="button" role="tab" data-profit-tab="platos" class="profit-tab flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2 py-2.5 text-sm font-bold transition sm:px-3 hover:bg-white dark:hover:bg-gray-700"><span class="hidden sm:inline"><i class="fas fa-utensils"></i></span>Platos y gastos</button>
+                </div>
+                <div data-profit-panel="resumen" class="mt-4 grid gap-4 xl:grid-cols-2">
+                    <div id="profit-steps"></div>
+                    <div id="profit-health"></div>
+                </div>
+                <div data-profit-panel="dias" class="mt-4 hidden">
+                    <div id="profit-days"></div>
+                </div>
+                <div data-profit-panel="platos" class="mt-4 hidden space-y-4">
+                    <div id="profit-dishes" class="grid gap-4 xl:grid-cols-2"></div>
+                    <div id="profit-expenses"></div>
+                </div>
             </div>
-        </div>
-        <div id="profit-kpis" class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"></div>
-        <div id="profit-warnings" class="mt-3 space-y-2"></div>
-        <div class="mt-4 grid gap-5 xl:grid-cols-2">
-            <div>
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white">Dia a dia</h3>
-                <div class="mt-2 overflow-x-auto"><table class="min-w-full text-sm" id="profit-days"></table></div>
+        </section>
+    </div>
+    <div data-page-panel="ventas" class="hidden">
+        <section class="mt-5 grid gap-5 xl:grid-cols-2">
+            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Productos mas vendidos</h2>
+                <div id="top-products" class="mt-4 space-y-3"></div>
             </div>
-            <div>
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white">Ganancia por plato</h3>
-                <div class="mt-2 overflow-x-auto"><table class="min-w-full text-sm" id="profit-dishes"></table></div>
+            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Ventas por metodo</h2>
+                <div id="sales-methods" class="mt-4 space-y-3"></div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <section class="mt-5 grid gap-5 xl:grid-cols-2">
-        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Productos mas vendidos</h2>
-            <div id="top-products" class="mt-4 space-y-3"></div>
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Ventas por metodo</h2>
-            <div id="sales-methods" class="mt-4 space-y-3"></div>
-        </div>
-    </section>
-
-    <section class="mt-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Ventas cobradas para anular</h2>
-                <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Anula desde aca una venta gastronomica cobrada. Restaura stock, revierte caja y sale de los reportes.</p>
+        <section class="mt-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Ventas cobradas con caja abierta</h2>
+                    <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">No hace falta anular nada de esta lista. Usala solo si una venta se cobro por error (monto, metodo o pedido equivocado): al anularla se restaura el stock, se revierte la caja y sale de los reportes. Al cerrar la caja ya no aparecen aca.</p>
+                </div>
+                <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-gray-600 dark:bg-gray-700 dark:text-gray-300">Solo si hubo un error</span>
             </div>
-            <span class="rounded-full bg-rose-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">Accion critica</span>
-        </div>
-        <div id="voidable-sales" class="mt-4 space-y-3"></div>
-    </section>
+            <div id="voidable-sales" class="mt-4 space-y-3"></div>
+        </section>
+    </div>
 </div>
 {% endblock %}
 
@@ -106,6 +121,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261027-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261027-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261027-6') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia_ui.js', v='20261027-4') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261027-4') }}"></script>
 {% endblock %}

@@ -214,8 +214,8 @@ def test_reportes_page_carga_para_cliente_gastronomico():
     html = response.get_data(as_text=True)
     assert 'Reportes' in html
     assert 'js/reportes.js' in html
-    assert 'Ventas cobradas para anular' in html
-    assert 'Exportar CSV' in html
+    assert 'Ventas cobradas con caja abierta' in html
+    assert 'id="export-report"' in html
 
 
 def test_reportes_exporta_csv_simple_del_periodo():

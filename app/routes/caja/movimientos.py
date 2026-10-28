@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.models import MovimientoCaja, SesionCaja
+from app.models.caja import REFERENCIA_COMPRA_INSUMOS
 from app.routes.caja import caja_bp
 from app.utils.auditoria_utils import registrar_auditoria
 
@@ -44,12 +45,14 @@ def registrar_movimiento():
             flash('Debe indicar el motivo del movimiento.', 'warning')
             return render_template('caja/movimiento.html', sesion=sesion)
 
+        es_compra_insumos = tipo == 'egreso' and bool(request.form.get('es_compra_insumos'))
         movimiento = MovimientoCaja(
             id_sesion_caja=sesion.id_sesion,
             id_usuario=current_user.id_usuario,
             tipo=tipo,
             monto=monto,
-            motivo=motivo
+            motivo=motivo,
+            referencia_tipo=REFERENCIA_COMPRA_INSUMOS if es_compra_insumos else None,
         )
 
         db.session.add(movimiento)

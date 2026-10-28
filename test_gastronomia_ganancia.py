@@ -2,6 +2,7 @@ from datetime import date
 
 from app import create_app, db
 from app.models import MovimientoCaja, SesionCaja, Usuario
+from app.models.caja import REFERENCIA_COMPRA_INSUMOS
 from control_de_empleados.models import Empleado, EmpleadoPago
 from gastos_corrientes.models import GastoCorriente, PagoGastoCorriente
 from gastronomia.models import GastronomiaProducto
@@ -75,6 +76,14 @@ def test_ganancia_estimada_por_dia_resta_costo_y_gastos():
             monto=5000,
             motivo='Garrafa de gas',
         ))
+        db.session.add(MovimientoCaja(
+            id_sesion_caja=sesion.id_sesion,
+            id_usuario=usuario.id_usuario,
+            tipo='egreso',
+            monto=7000,
+            motivo='Verduras del dia',
+            referencia_tipo=REFERENCIA_COMPRA_INSUMOS,
+        ))
         empleado = Empleado(cliente_id=cliente_id, nombre_completo='Cocinero Ganancia', salario_base=3000)
         gasto = GastoCorriente(cliente_id=cliente_id, nombre='Luz Ganancia', monto_estimado=2000)
         db.session.add_all([empleado, gasto])
@@ -112,9 +121,68 @@ def test_ganancia_estimada_por_dia_resta_costo_y_gastos():
     assert totales['gastos_fijos'] == 2000
     assert totales['sueldos'] == 3000
     assert totales['gastos'] == 10000
+    assert totales['insumos_caja'] == 7000
     assert totales['ganancia_neta'] == 56000
+    detalle = {(item['tipo'], item['concepto']): item['monto'] for item in data['gastos_detalle']}
+    assert detalle == {('caja', 'Garrafa de gas'): 5000, ('fijo', 'Luz Ganancia'): 2000, ('sueldo', 'Sueldos'): 3000}
     assert totales['unidades_sin_costo'] == 1
     assert len(data['dias']) == 1
     assert [item['nombre'] for item in data['platos_sin_costo']] == ['Bebida']
     pizza = next(item for item in data['platos'] if item['producto_id'] == pizza_id)
     assert pizza['ganancia'] == 56000
+
+
+def test_precios_insumos_lista_solo_los_usados_en_recetas():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, pizza_id, _bebida_id = _crear_productos(app, 'Resto Precios', 'resto_precios')
+    insumo_id = _crear_insumo_receta(app, cliente_id, pizza_id, nombre='Harina Precios', stock=10, cantidad=200)
+    _loguear(client, app, 'resto_precios')
+
+    resp = client.get('/api/gastronomia/stock/insumos/precios')
+    assert resp.status_code == 200
+    insumos = resp.get_json()['insumos']
+    assert [(item['id_producto'], item['platos'], item['precio_compra']) for item in insumos] == [(insumo_id, 1, 0.0)]
+
+
+def test_egreso_marcado_como_compra_insumos_guarda_referencia():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_productos(app, 'Resto Insumos', 'resto_insumos')
+    _loguear(client, app, 'resto_insumos')
+    _abrir_caja(app, 'resto_insumos')
+    html = client.get('/caja/movimiento').get_data(as_text=True)
+    assert 'es_compra_insumos' in html
+    csrf = _csrf(client.get('/gastronomia/caja').get_data(as_text=True))
+
+    for motivo, extra in (('Carne', {'es_compra_insumos': '1'}), ('Taxi', {}), ('Aporte', {'es_compra_insumos': '1'})):
+        tipo = 'ingreso' if motivo == 'Aporte' else 'egreso'
+        resp = client.post('/caja/movimiento', data={'csrf_token': csrf, 'tipo': tipo, 'monto': 1000, 'motivo': motivo, **extra})
+        assert resp.status_code in (200, 302)
+
+    with app.app_context():
+        refs = {mov.motivo: mov.referencia_tipo for mov in MovimientoCaja.query.filter(MovimientoCaja.motivo.in_(['Carne', 'Taxi', 'Aporte']))}
+    # Solo un egreso puede ser compra de insumos; un ingreso nunca.
+    assert refs == {'Carne': REFERENCIA_COMPRA_INSUMOS, 'Taxi': None, 'Aporte': None}
+
+
+def test_accesos_directos_llevan_a_cuanto_ganamos():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_productos(app, 'Resto Accesos', 'resto_accesos')
+    _loguear(client, app, 'resto_accesos')
+
+    inicio = client.get('/gastronomia/').get_data(as_text=True)
+    assert '¿Cuánto ganamos?' in inicio
+    assert 'ver=ganancia' in inicio
+
+    html = client.get('/gastronomia/reportes?ver=ganancia&rango=mes').get_data(as_text=True)
+    primero_de_mes = date.today().replace(day=1).isoformat()
+    assert f'data-inicio-desde="{primero_de_mes}"' in html
+    assert f'data-inicio-hasta="{date.today().isoformat()}"' in html
+    assert 'data-inicio-rango="mes"' in html
+    assert 'data-inicio-ver="ganancia"' in html
+
+    contabilidad = client.get('/caja/contabilidad?desde=2026-10-01&hasta=2026-10-15').get_data(as_text=True)
+    assert 'Ver cuánto ganamos' in contabilidad
+    assert 'desde=2026-10-01' in contabilidad and 'ver=ganancia' in contabilidad

@@ -211,7 +211,7 @@ def test_caja_actual_permite_anular_venta_desde_modal_de_movimiento():
     caja_actual = client.get('/caja/')
     assert caja_actual.status_code == 200
     html = caja_actual.get_data(as_text=True)
-    assert 'Ventas cobradas para anular' not in client.get('/gastronomia/caja').get_data(as_text=True)
+    assert 'Ventas cobradas con caja abierta' not in client.get('/gastronomia/caja').get_data(as_text=True)
     assert f'data-venta-id="{venta_id}"' in html
     assert 'data-venta-anulable="1"' in html
     assert 'Anular venta' in html

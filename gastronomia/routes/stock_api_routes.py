@@ -8,6 +8,7 @@ from gastronomia.services.costos_service import (
     costo_plato,
     guardar_costo_extra,
     guardar_precio_compra_insumo,
+    insumos_en_recetas,
     resumen_costos_platos,
 )
 from gastronomia.services.permisos import PERMISO_MENU, PERMISO_POS, requiere_permiso_gastronomia
@@ -213,6 +214,16 @@ def resumen_costos():
     if error:
         return error
     return jsonify({'ok': True, 'productos': resumen_costos_platos(cliente_id)})
+
+
+@gastronomia_stock_api_bp.route('/stock/insumos/precios', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def precios_insumos():
+    cliente_id, error = _cliente_o_error()
+    if error:
+        return error
+    return jsonify({'ok': True, 'insumos': insumos_en_recetas(cliente_id)})
 
 
 @gastronomia_stock_api_bp.route('/stock/insumos/<int:insumo_id>/precio-compra', methods=['PUT'])
