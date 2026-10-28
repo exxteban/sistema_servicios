@@ -20,6 +20,8 @@ TAMANOS = {
     'simple': ('simple', 'simpel', 'simples', 'normal', 'nomal', 'normail', 'normales', 'comun'),
 }
 CORTES_MODIFICADOR = {'con', 'sin', 'c', 's', 'extra', 'mas'}
+# 'La Gus simple' en el menu es la 'gus simple' del Excel.
+ARTICULOS = {'el', 'la', 'los', 'las', 'lo'}
 CLAVE_VARIOS = '__varios__'
 NOMBRE_VARIOS = 'Varios (importado)'
 SIMILITUD_MINIMA = 0.75
@@ -38,6 +40,8 @@ def analizar_nombre(nombre: str) -> dict:
     for token in re.split(r'[\s/]+', texto):
         tokens.extend(_separar_tamano_pegado(token))
     tokens = [token for token in tokens if token and not token.isdigit()]
+    while len(tokens) > 1 and tokens[0] in ARTICULOS:
+        tokens.pop(0)
     tamano, base, extras, en_modificador = None, [], [], False
     for token in tokens:
         tamano_token = _tamano(token)
@@ -75,7 +79,7 @@ def agrupar_alias(filas: list[dict], productos_menu: list[dict], aprendidos: dic
             tamano = info['analisis']['tamano'] or _tamano_por_precio(info, tamanos_precio)
             sufijo = tamano or _sufijo_sin_tamano(info, tamanos_precio)
             nombre = _titulo(f"{familia['canonico']} {sufijo or ''}")
-            existente = _buscar_en_menu(nombre, familia['canonico'], tamano, productos_menu)
+            existente = _buscar_en_menu(nombre, familia['miembros'], tamano, productos_menu)
             if existente:
                 _agregar(grupos, f"p{existente['id_producto']}", info, nombre=existente['nombre'],
                          accion='existente', producto_id=int(existente['id_producto']), origen='menu')
@@ -170,7 +174,8 @@ def _sufijo_sin_tamano(info: dict, tamanos_precio: dict) -> str:
     return ' '.join(info['analisis']['base'].split(' ')[1:])
 
 
-def _buscar_en_menu(nombre: str, canonico: str, tamano: str | None, productos_menu: list[dict]) -> dict | None:
+def _buscar_en_menu(nombre: str, miembros: list[str], tamano: str | None, productos_menu: list[dict]) -> dict | None:
+    """miembros: todas las formas de escribir la primera palabra ('flye', 'flyn', 'flynn')."""
     objetivo = clave_alias(nombre)
     mejor, mejor_ratio = None, 0.0
     for producto in productos_menu:
@@ -179,7 +184,7 @@ def _buscar_en_menu(nombre: str, canonico: str, tamano: str | None, productos_me
             return producto
         analisis = analizar_nombre(producto['nombre'])
         primera = (analisis['base'].split(' ') or [''])[0]
-        if not _parecidas(canonico, primera):
+        if not any(_parecidas(miembro, primera) for miembro in miembros):
             continue
         if (analisis['tamano'] or 'simple') != (tamano or 'simple'):
             continue

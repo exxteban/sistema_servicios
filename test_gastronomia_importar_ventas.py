@@ -98,6 +98,26 @@ def test_agrupa_formas_de_escribir_en_productos():
     assert nota == 'con panceta'
 
 
+def test_usa_el_menu_aunque_tenga_otro_nombre():
+    """El menu de Breaking Food dice 'La Gus simple' / 'La Flynn doble'; el Excel, 'gus normal' / 'flye dobke'."""
+    filas = [
+        {'nombre': 'gus normal', 'cantidad': 1, 'monto': 28000},
+        {'nombre': 'gus doble', 'cantidad': 1, 'monto': 35000},
+        {'nombre': 'flye dobke', 'cantidad': 1, 'monto': 35000},
+        {'nombre': 'Flye Doble', 'cantidad': 1, 'monto': 35000},
+        {'nombre': 'flyn doble', 'cantidad': 1, 'monto': 35000},
+        {'nombre': 'heinseberg doble', 'cantidad': 1, 'monto': 35000},
+        {'nombre': 'palitos', 'cantidad': 1, 'monto': 8000},
+    ]
+    nombres = ['La Gus simple', 'La Gus doble', 'La Flynn doble', 'La Heinsenberg doble']
+    menu = [{'id_producto': i + 1, 'nombre': n, 'precio': 0} for i, n in enumerate(nombres)]
+    grupos = {g['nombre']: g for g in agrupar_alias(filas, menu, {})}
+
+    assert {n: grupos[n]['accion'] for n in nombres} == dict.fromkeys(nombres, 'existente')
+    assert grupos['La Flynn doble']['unidades'] == 3
+    assert grupos['Palitos']['accion'] == 'crear'
+
+
 def test_importa_deshace_y_aprende(tmp_path):
     app = create_app('testing')
     app.instance_path = str(tmp_path)
