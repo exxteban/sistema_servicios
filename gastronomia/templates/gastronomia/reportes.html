@@ -99,10 +99,10 @@
         <section class="mt-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Ventas cobradas para anular</h2>
-                    <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Anula desde aca una venta gastronomica cobrada. Restaura stock, revierte caja y sale de los reportes.</p>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">Ventas cobradas con caja abierta</h2>
+                    <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">No hace falta anular nada de esta lista. Usala solo si una venta se cobro por error (monto, metodo o pedido equivocado): al anularla se restaura el stock, se revierte la caja y sale de los reportes. Al cerrar la caja ya no aparecen aca.</p>
                 </div>
-                <span class="rounded-full bg-rose-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">Accion critica</span>
+                <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-gray-600 dark:bg-gray-700 dark:text-gray-300">Solo si hubo un error</span>
             </div>
             <div id="voidable-sales" class="mt-4 space-y-3"></div>
         </section>
@@ -121,7 +121,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261027-5') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261027-6') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia_ui.js', v='20261027-4') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261027-4') }}"></script>
 {% endblock %}
