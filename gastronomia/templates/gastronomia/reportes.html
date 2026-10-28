@@ -21,6 +21,10 @@
                class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
                 <i class="fas fa-cash-register"></i>Caja
             </a>
+            <a href="{{ url_for('gastronomia.importar_ventas') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                <i class="fas fa-file-excel"></i>Importar ventas de Excel
+            </a>
         </div>
     </div>
 
@@ -121,7 +125,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261027-6') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261028-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia_ui.js', v='20261027-4') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261027-4') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261028-1') }}"></script>
 {% endblock %}

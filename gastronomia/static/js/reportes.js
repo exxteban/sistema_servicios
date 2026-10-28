@@ -1,19 +1,20 @@
 (function () {
-  const alertBox = document.getElementById('report-alert');
-  const kpis = document.getElementById('report-kpis');
-  const topProducts = document.getElementById('top-products');
-  const salesMethods = document.getElementById('sales-methods');
-  const voidableSales = document.getElementById('voidable-sales');
-  const fromInput = document.getElementById('report-from');
-  const toInput = document.getElementById('report-to');
-  const exportLink = document.getElementById('export-report');
+  const scope = (document.currentScript && document.currentScript.closest('[data-app-tab-content]')) || document;
+  const alertBox = scope.querySelector('#report-alert');
+  const kpis = scope.querySelector('#report-kpis');
+  const topProducts = scope.querySelector('#top-products');
+  const salesMethods = scope.querySelector('#sales-methods');
+  const voidableSales = scope.querySelector('#voidable-sales');
+  const fromInput = scope.querySelector('#report-from');
+  const toInput = scope.querySelector('#report-to');
+  const exportLink = scope.querySelector('#export-report');
   const csrf = document.getElementById('csrf-token')?.value || '';
 
   // Fecha local: toISOString() usa UTC y despues de las 21 h (Paraguay) mostraba el dia siguiente.
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   // Un acceso directo puede traer el rango (ej. desde Contabilidad); si no, hoy.
-  const shell = document.querySelector('[data-gastro-reportes]');
+  const shell = scope.querySelector('[data-gastro-reportes]');
   fromInput.value = shell?.dataset.inicioDesde || today;
   toInput.value = shell?.dataset.inicioHasta || fromInput.value;
 
@@ -147,7 +148,7 @@
   };
 
   // Pestañas de la pagina: "Cuanto ganamos" (ganancia) o "Ventas y anulaciones".
-  const pageTabs = document.querySelector('[data-page-tabs]');
+  const pageTabs = scope.querySelector('[data-page-tabs]');
   const PAGE_TAB_ACTIVA = ['bg-violet-600', 'text-white', 'shadow-sm'];
   const PAGE_TAB_INACTIVA = ['text-gray-600', 'dark:text-gray-300'];
   const mostrarPagina = (nombre) => {
@@ -157,7 +158,7 @@
       PAGE_TAB_ACTIVA.forEach((cls) => tab.classList.toggle(cls, activa));
       PAGE_TAB_INACTIVA.forEach((cls) => tab.classList.toggle(cls, !activa));
     });
-    document.querySelectorAll('[data-page-panel]').forEach((panel) => {
+    scope.querySelectorAll('[data-page-panel]').forEach((panel) => {
       panel.classList.toggle('hidden', panel.dataset.pagePanel !== nombre);
     });
   };
@@ -167,7 +168,7 @@
   });
   mostrarPagina('ganancia');
 
-  document.getElementById('load-report')?.addEventListener('click', () => {
+  scope.querySelector('#load-report')?.addEventListener('click', () => {
     loadReport().catch((error) => showAlert(error.message, false));
   });
   fromInput?.addEventListener('change', syncExportLink);

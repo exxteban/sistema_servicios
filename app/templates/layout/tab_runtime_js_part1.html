@@ -311,7 +311,7 @@
                     const isPrincipal = tabId === principalTabId;
                     const hasContent = activePanel && (isPrincipal || activePanel.querySelector('[data-app-tab-content]'));
                     if (activePanel && hasContent) {
-                        const appTitle = window.__appBaseTitle || 'Sistema de GestiÃ³n Comercial';
+                        const appTitle = window.__appBaseTitle || {% if marca_rubro and not marca_rubro.es_gastronomia %}{{ marca_rubro.titulo|tojson }}{% else %}'Sistema de Gestión Gastronómica'{% endif %};
                         const currentKey = getKeyByTabId(tabId);
                         const meta = currentKey ? tabMetaByKey.get(currentKey) : null;
                         const savedPageTitle = meta ? (meta.pageTitle || '').trim() : '';
@@ -341,7 +341,12 @@
                                     fullTitle,
                                     absUrl
                                 );
-                            } else if (isPrincipal) {
+                            } else if (
+                                isPrincipal
+                                && (typeof principalPanelShowsDashboard !== 'function' || principalPanelShowsDashboard())
+                            ) {
+                                // Solo reescribir a la URL del dashboard si el panel principal
+                                // realmente lo muestra; si trae otra pagina la URL no cambia.
                                 history.replaceState(
                                     { tabId: principalTabId, url: normalizeKey(DASHBOARD_URL), appNav: true },
                                     fullTitle,
@@ -418,8 +423,18 @@
                 if (removedKey) tabMetaByKey.delete(removedKey);
 
                 if (isActive) {
-                    setActiveTab(fallbackTabId);
-                    if (fallbackTabId === principalTabId) refreshPrincipalDashboardInPlace();
+                    if (
+                        fallbackTabId === principalTabId
+                        && typeof principalPanelShowsDashboard === 'function'
+                        && typeof navigateToDashboard === 'function'
+                        && !principalPanelShowsDashboard()
+                    ) {
+                        // El panel principal quedo con otra pagina: volver al dashboard real.
+                        navigateToDashboard();
+                    } else {
+                        setActiveTab(fallbackTabId);
+                        if (fallbackTabId === principalTabId) refreshPrincipalDashboardInPlace();
+                    }
                 }
 
                 saveState();
