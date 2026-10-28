@@ -164,3 +164,25 @@ def test_egreso_marcado_como_compra_insumos_guarda_referencia():
         refs = {mov.motivo: mov.referencia_tipo for mov in MovimientoCaja.query.filter(MovimientoCaja.motivo.in_(['Carne', 'Taxi', 'Aporte']))}
     # Solo un egreso puede ser compra de insumos; un ingreso nunca.
     assert refs == {'Carne': REFERENCIA_COMPRA_INSUMOS, 'Taxi': None, 'Aporte': None}
+
+
+def test_accesos_directos_llevan_a_cuanto_ganamos():
+    app = create_app('testing')
+    client = app.test_client()
+    _crear_productos(app, 'Resto Accesos', 'resto_accesos')
+    _loguear(client, app, 'resto_accesos')
+
+    inicio = client.get('/gastronomia/').get_data(as_text=True)
+    assert '¿Cuánto ganamos?' in inicio
+    assert 'ver=ganancia' in inicio
+
+    html = client.get('/gastronomia/reportes?ver=ganancia&rango=mes').get_data(as_text=True)
+    primero_de_mes = date.today().replace(day=1).isoformat()
+    assert f'data-inicio-desde="{primero_de_mes}"' in html
+    assert f'data-inicio-hasta="{date.today().isoformat()}"' in html
+    assert 'data-inicio-rango="mes"' in html
+    assert 'data-inicio-ver="ganancia"' in html
+
+    contabilidad = client.get('/caja/contabilidad?desde=2026-10-01&hasta=2026-10-15').get_data(as_text=True)
+    assert 'Ver cuánto ganamos' in contabilidad
+    assert 'desde=2026-10-01' in contabilidad and 'ver=ganancia' in contabilidad

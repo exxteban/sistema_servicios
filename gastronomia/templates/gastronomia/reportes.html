@@ -3,7 +3,9 @@
 {% block title %}Reportes Gastronomia{% endblock %}
 
 {% block content %}
-<div class="reportes-shell mx-auto max-w-7xl" data-gastro-reportes>
+<div class="reportes-shell mx-auto max-w-7xl" data-gastro-reportes
+     data-inicio-desde="{{ inicio_desde|default('') }}" data-inicio-hasta="{{ inicio_hasta|default('') }}"
+     data-inicio-rango="{{ inicio_rango|default('') }}" {% if inicio_ver %}data-inicio-ver="ganancia"{% endif %}>
     <input type="hidden" id="csrf-token" value="{{ csrf_token() }}">
     <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -45,7 +47,7 @@
 
     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" id="report-kpis"></section>
 
-    <section class="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40" data-report-profit>
+    <section id="cuanto-ganamos" class="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40" data-report-profit>
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h2 class="text-xl font-black text-gray-900 dark:text-white">¿Cuánto ganamos?</h2>
@@ -105,7 +107,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261027-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia_ui.js', v='20261027-3') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261027-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes.js', v='20261027-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia_ui.js', v='20261027-4') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/reportes_ganancia.js', v='20261027-4') }}"></script>
 {% endblock %}

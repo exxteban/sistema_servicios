@@ -118,6 +118,16 @@ _DASHBOARD_CARD_DEFINITIONS = (
         'icon': 'fas fa-truck-ramp-box',
     },
     {
+        'id': 'ganancia',
+        'group': 'analisis',
+        'permission': 'reportes',
+        'title': '¿Cuánto ganamos?',
+        'description': 'Ganancia real del mes: ventas menos ingredientes, gastos y sueldos.',
+        'endpoint': 'gastronomia.reportes',
+        'endpoint_params': {'ver': 'ganancia', 'rango': 'mes'},
+        'icon': 'fas fa-sack-dollar',
+    },
+    {
         'id': 'reportes',
         'group': 'analisis',
         'permission': 'reportes',

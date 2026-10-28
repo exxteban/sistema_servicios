@@ -12,8 +12,10 @@
   // Fecha local: toISOString() usa UTC y despues de las 21 h (Paraguay) mostraba el dia siguiente.
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  fromInput.value = today;
-  toInput.value = today;
+  // Un acceso directo puede traer el rango (ej. desde Contabilidad); si no, hoy.
+  const shell = document.querySelector('[data-gastro-reportes]');
+  fromInput.value = shell?.dataset.inicioDesde || today;
+  toInput.value = shell?.dataset.inicioHasta || fromInput.value;
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const showAlert = (message, ok) => {

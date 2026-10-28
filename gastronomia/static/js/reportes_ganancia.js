@@ -144,7 +144,9 @@
     btn.setAttribute('aria-pressed', String(activo));
     ACTIVO.forEach((cls) => btn.classList.toggle(cls, activo));
   });
-  marcarRango(section.querySelector('[data-profit-range="hoy"]'));
+  const shell = section.closest('[data-gastro-reportes]');
+  const rangoInicial = shell?.dataset.inicioRango || (shell?.dataset.inicioDesde ? '' : 'hoy');
+  marcarRango(rangoInicial ? section.querySelector(`[data-profit-range="${rangoInicial}"]`) : null);
   // Si cambian las fechas a mano, ningun atajo queda marcado.
   [fromInput, toInput].forEach((input) => input.addEventListener('change', () => marcarRango(null)));
 
@@ -162,5 +164,7 @@
     el('load-report')?.click();
   });
   el('load-report')?.addEventListener('click', loadSafe);
-  loadSafe();
+  loadSafe().then(() => {
+    if (shell?.dataset.inicioVer === 'ganancia') section.scrollIntoView({behavior: 'smooth', block: 'start'});
+  });
 }());
