@@ -183,3 +183,19 @@ def test_importar_ventas_requiere_sesion():
     client = app.test_client()
     assert client.get('/api/gastronomia/importar-ventas').status_code in (302, 401)
     assert client.get('/gastronomia/importar-ventas').status_code in (302, 401)
+
+
+def test_guarda_el_excel_aunque_instance_no_se_pueda_escribir(tmp_path):
+    """En el servidor el servicio puede no tener permiso sobre instance/: se usa la carpeta temporal."""
+    from werkzeug.datastructures import FileStorage
+    from gastronomia.services.importacion.analisis import guardar_archivo, ruta_archivo
+
+    app = create_app('testing')
+    bloqueado = tmp_path / 'instance_es_un_archivo'
+    bloqueado.write_text('x')
+    app.instance_path = str(bloqueado)
+    with app.app_context():
+        token = guardar_archivo(FileStorage(io.BytesIO(_excel_desordenado()), 'ventas.xlsx'))
+        ruta = ruta_archivo(token)
+    assert not ruta.startswith(str(bloqueado))
+    assert leer_excel(ruta).bloques

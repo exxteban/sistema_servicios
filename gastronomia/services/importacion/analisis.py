@@ -1,9 +1,11 @@
 """Paso 1 de la importacion: leer el Excel y armar la vista previa."""
 from __future__ import annotations
 
+import getpass
 import hashlib
 import os
 import re
+import tempfile
 from datetime import date
 
 from flask import current_app
@@ -29,9 +31,7 @@ def guardar_archivo(archivo) -> str:
     if not contenido:
         raise ValueError('El archivo esta vacio.')
     token = hashlib.sha256(contenido).hexdigest()
-    carpeta = os.path.join(current_app.instance_path, CARPETA)
-    os.makedirs(carpeta, exist_ok=True)
-    with open(os.path.join(carpeta, f'{token}.xlsx'), 'wb') as destino:
+    with open(os.path.join(_carpeta_escribible(), f'{token}.xlsx'), 'wb') as destino:
         destino.write(contenido)
     return token
 
@@ -39,10 +39,40 @@ def guardar_archivo(archivo) -> str:
 def ruta_archivo(token: str) -> str:
     if not re.fullmatch(r'[0-9a-f]{64}', token or ''):
         raise ValueError('Archivo de importacion invalido.')
-    ruta = os.path.join(current_app.instance_path, CARPETA, f'{token}.xlsx')
-    if not os.path.exists(ruta):
-        raise ValueError('El archivo ya no esta disponible: volve a subirlo.')
-    return ruta
+    for carpeta in _carpetas():
+        ruta = os.path.join(carpeta, f'{token}.xlsx')
+        if os.path.exists(ruta):
+            return ruta
+    raise ValueError('El archivo ya no esta disponible: volve a subirlo.')
+
+
+def _carpetas() -> list[str]:
+    """instance/ si se puede escribir; si no (servicio sin permisos), la carpeta temporal del sistema.
+
+    La temporal lleva el usuario en el nombre: en un mismo servidor conviven varias instalaciones.
+    """
+    return [
+        os.path.join(current_app.instance_path, CARPETA),
+        os.path.join(tempfile.gettempdir(), f'{CARPETA}_{_usuario_sistema()}'),
+    ]
+
+
+def _usuario_sistema() -> str:
+    try:
+        return re.sub(r'[^\w.-]', '_', getpass.getuser())
+    except Exception:  # servicios sin usuario con nombre (p. ej. DynamicUser de systemd)
+        return str(os.getuid()) if hasattr(os, 'getuid') else 'app'
+
+
+def _carpeta_escribible() -> str:
+    for carpeta in _carpetas():
+        try:
+            os.makedirs(carpeta, exist_ok=True)
+        except OSError:
+            continue
+        if os.access(carpeta, os.W_OK):
+            return carpeta
+    raise ValueError('El servidor no tiene una carpeta con permiso de escritura para guardar el Excel.')
 
 
 def leer_archivo(token: str) -> LecturaExcel:
