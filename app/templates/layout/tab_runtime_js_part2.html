@@ -220,6 +220,12 @@
                     return false;
                 }
             };
+            // Panel de la pestaña activa: varias pestañas conviven en el mismo DOM
+            // y un querySelector suelto puede devolver el elemento de una oculta.
+            window.appActiveTabPanel = function () {
+                return tabPanelsById.get(getActiveTabId()) || null;
+            };
+
             window.appCloseActiveTabToPrincipal = function () {
                 try {
                     const tabId = getActiveTabId();

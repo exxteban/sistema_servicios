@@ -3,6 +3,31 @@
                 // tanto al HTML que llega por fetch como al que se adopta ya
                 // renderizado desde el panel principal.
                 function wireTabContent(contentDiv) {
+                    // Un envio "escapa" del tab (no se intercepta) cuando el form o el boton
+                    // que lo envia apuntan a otra ventana (target=_blank) o cambian el metodo.
+                    // Sin esto, paginas independientes como la de impresion de etiquetas se
+                    // inyectaban dentro del tab y su window.print() imprimia el sistema entero.
+                    function submitEscapesTab(form, submitter, registeredMethod) {
+                        const target = ((submitter && submitter.getAttribute('formtarget'))
+                            || form.getAttribute('target') || '').trim().toLowerCase();
+                        if (target && target !== '_self') return true;
+                        const overrideMethod = ((submitter && submitter.getAttribute('formmethod')) || '').trim().toUpperCase();
+                        if (overrideMethod && overrideMethod !== registeredMethod) return true;
+                        return false;
+                    }
+
+                    // Respeta el formaction del boton presionado (ej. "Quitar" dentro del
+                    // form de "Guardar"); sin esto todo boton enviaba al action del form.
+                    function resolveSubmitAction(form, submitter) {
+                        const override = submitter && submitter.getAttribute('formaction');
+                        if (override) {
+                            try {
+                                return new URL(override, window.location.href).toString();
+                            } catch { }
+                        }
+                        return form.action || window.location.href;
+                    }
+
                     contentDiv.querySelectorAll('form').forEach(form => {
                         if (form.hasAttribute('data-no-ajax') || form.hasAttribute('data-custom-submit')) return;
                         const method = ((form.getAttribute('method') || form.method || 'GET') + '').toUpperCase();
@@ -10,10 +35,11 @@
                         if (method === 'GET') {
                             form.addEventListener('submit', async (e) => {
                                 if (e.defaultPrevented) return;
-                                e.preventDefault();
                                 const submitter = e.submitter;
+                                if (submitEscapesTab(form, submitter, 'GET')) return;
+                                e.preventDefault();
                                 const formData = submitter ? new FormData(form, submitter) : new FormData(form);
-                                const action = form.action || window.location.href;
+                                const action = resolveSubmitAction(form, submitter);
                                 const formUrl = new URL(action, window.location.origin);
 
                                 for (const [key, value] of formData.entries()) {
@@ -35,6 +61,8 @@
 
                         form.addEventListener('submit', async (e) => {
                             if (e.defaultPrevented) return;
+                            const submitter = e.submitter;
+                            if (submitEscapesTab(form, submitter, method)) return;
                             e.preventDefault();
                             ensureLoadingCover();
 
@@ -47,9 +75,8 @@
                                 }
                                 currentAbortController = new AbortController();
 
-                                const submitter = e.submitter;
                                 const formData = submitter ? new FormData(form, submitter) : new FormData(form);
-                                const action = form.action || window.location.href;
+                                const action = resolveSubmitAction(form, submitter);
                                 const fetchUrl = new URL(action, window.location.origin);
                                 fetchUrl.searchParams.set('partial', '1');
 
