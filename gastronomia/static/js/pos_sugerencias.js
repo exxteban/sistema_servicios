@@ -5,6 +5,20 @@
     if (!host) return null;
     let timer, controller, timeout, generation = 0;
     let hidden = false, destroyed = false, signature = '', catalog = null, rows = [];
+    let displayedMaximum = 0;
+    let inViewport = typeof IntersectionObserver !== 'function';
+    const shown = new Map(), touched = new Map();
+    const keyFor = (origin, target) => `${origin}:${target}`;
+    const markShown = (items) => items.forEach((item) => {
+      if (Number.isInteger(item.id_origen) && shown.size < 180) {
+        shown.set(keyFor(item.id_origen, item.id_producto), [item.id_origen, item.id_producto]);
+      }
+    });
+    const recordVisible = () => {
+      if (!inViewport || host.hidden || document.visibilityState === 'hidden'
+          || (host.getClientRects && !host.getClientRects().length)) return;
+      markShown(list.hidden ? rows.slice(0, displayedMaximum) : rows);
+    };
     const max = Math.min(3, Math.max(1, Number(host.dataset.max || 3)));
     const element = (tag, className, text) => {
       const node = document.createElement(tag);
@@ -73,6 +87,8 @@
         list.append(li);
       });
       host.hidden = rows.length === 0;
+      displayedMaximum = maximum;
+      recordVisible();
     };
     const current = (version, key) => !destroyed && !hidden && root.isConnected
       && navigator.onLine !== false && version === generation && key === stateSignature(getState());
@@ -133,10 +149,11 @@
       } else if (button.dataset.action === 'more') {
         list.hidden = !list.hidden;
         more.setAttribute('aria-expanded', String(!list.hidden));
+        if (!list.hidden) recordVisible();
       } else if (button.dataset.product && navigator.onLine !== false) {
         const state = getState();
         const item = rows.find((s) => String(s.id_producto) === button.dataset.product);
-        if (item && eligible(item, state)) openProduct(productFor(item.id_producto, state));
+        if (item && eligible(item, state)) openProduct(productFor(item.id_producto, state), item.id_origen);
       }
     };
     const onOffline = () => { cancel(); hide(); };
@@ -148,11 +165,32 @@
       host.removeEventListener('click', onClick);
       window.removeEventListener('offline', onOffline);
       window.removeEventListener('online', onOnline);
+      document.removeEventListener?.('visibilitychange', recordVisible);
+      observer?.disconnect();
     };
+    const observer = typeof IntersectionObserver === 'function'
+      ? new IntersectionObserver((entries) => {
+        inViewport = entries.some((entry) => entry.isIntersecting);
+        if (inViewport) recordVisible();
+      }) : null;
+    observer?.observe(host);
+    document.addEventListener?.('visibilitychange', recordVisible);
     host.addEventListener('click', onClick);
     window.addEventListener('offline', onOffline);
     window.addEventListener('online', onOnline);
-    return {refresh, destroy, reset: () => { hidden = false; signature = ''; cancel(); hide(); }};
+    return {
+      refresh, destroy,
+      payload: () => ({mostradas: [...shown.values()], tocadas: [...touched.values()]}),
+      accepted: (item) => {
+        const key = keyFor(item.origen_sugerencia, item.producto_id);
+        if (shown.has(key)) touched.set(key, shown.get(key));
+      },
+      restore: (data) => {
+        for (const pair of data?.mostradas || []) shown.set(keyFor(...pair), pair);
+        for (const pair of data?.tocadas || []) touched.set(keyFor(...pair), pair);
+      },
+      reset: () => { hidden = false; signature = ''; shown.clear(); touched.clear(); cancel(); hide(); },
+    };
   };
   window.GastronomiaSugerencias = {create};
 })();

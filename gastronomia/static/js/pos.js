@@ -34,6 +34,7 @@
   let selectedPriceChannel = '';
   let cart = [];
   let activeProduct = null;
+  let activeSuggestionOrigin = null;
   let editingItemKey = null;
   let nextItemKey = 1;
   const generarItemKey = () => `nuevo-${nextItemKey++}`;
@@ -165,6 +166,7 @@
     return {
       key: item.id_item ? `pedido-item-${item.id_item}` : generarItemKey(),
       producto_id: item.producto_id,
+      origen_sugerencia: item.origen_sugerencia || null,
       canal_precio: item.canal_precio || null,
       nombre: item.nombre_producto,
       cantidad: Math.max(1, Number(item.cantidad || 1)),
@@ -220,6 +222,8 @@
   };
   const hydrateOrder = (order) => {
     if (!order) return;
+    if (Number(order.id_pedido) !== activeOrderId) suggestions?.reset();
+    suggestions?.restore(order.sugerencias);
     window.GastronomiaChannelPrices?.hydrateOrderChannel(order, root, selectedPriceChannel, (channel) => {
       selectedPriceChannel = channel; selectedCategory = ''; loadProducts().catch((error) => showAlert(error.message, false));
     });
@@ -246,8 +250,9 @@
     if (order.pagado) throw new Error('No se puede editar un pedido que ya fue cobrado.');
     hydrateOrder(order);
   };
-  const openProduct = (product, item = null) => {
+  const openProduct = (product, item = null, origin = null) => {
     activeProduct = product;
+    activeSuggestionOrigin = item?.origen_sugerencia || origin;
     editingItemKey = item?.key || null;
     modalName.textContent = product.nombre;
     modalPrice.textContent = money(product.precio);
@@ -279,6 +284,7 @@
     const configuredItem = {
       key: editingItemKey || generarItemKey(),
       producto_id: activeProduct.id_producto,
+      origen_sugerencia: activeSuggestionOrigin,
       canal_precio: activeProduct.canal_precio || null,
       nombre: activeProduct.nombre,
       cantidad: Math.max(1, Number(modalQty.value || 1)),
@@ -296,6 +302,7 @@
       cart.push(configuredItem);
     }
     lastOrderId = activeOrderId || null;
+    suggestions?.accepted(configuredItem);
     closeModal();
     renderCart();
   };
@@ -349,26 +356,9 @@
   );
   const cartTotalAmount = () => cartSubtotal() + deliveryShippingCost();
 
-  const buildOrderPayload = () => ({
-    tipo_pedido: orderTypeInput?.value || 'mostrador',
-    mesa: tableNameInput?.value.trim() || '',
-    referencia_entrega: deliveryReferenceInput?.value.trim() || '',
-    nombre_cliente: deliveryReferenceInput?.value.trim() || '',
-    celular_cliente: deliveryPhoneInput?.value.trim() || '',
-    direccion_entrega: deliveryAddressInput?.value.trim() || '',
-    ...(window.GastronomiaDeliveryLocation?.payload() || {}),
-    tiempo_estimado_minutos: deliveryEstimateInput?.value || null,
-    costo_envio: deliveryShippingCost(),
-    notas: root.querySelector('#order-notes').value.trim(),
-    items: cart.map((item) => ({
-      producto_id: item.producto_id,
-      canal_precio: item.canal_precio || null,
-      cantidad: item.cantidad,
-      peso_kg: item.peso_kg ?? null,
-      opciones: item.opciones,
-      notas: item.notas,
-    })),
-  });
+  const buildOrderPayload = () => window.GastronomiaOrderPayload.build(
+    root, cart, window.GastronomiaDeliveryLocation?.payload() || {}, suggestions,
+  );
 
   const saveOrder = async ({resetAfterCreate = true} = {}) => {
     if (!cart.length) throw new Error('El pedido debe tener items.');
@@ -443,6 +433,7 @@
     modal.classList.add('hidden');
     modal.classList.remove('flex');
     activeProduct = null;
+    activeSuggestionOrigin = null;
     editingItemKey = null;
   };
 
@@ -574,7 +565,8 @@
   });
 
   const suggestions = window.GastronomiaSugerencias?.create(root, {
-    getState: () => ({cart, products, channel: selectedPriceChannel}), openProduct, money,
+    getState: () => ({cart, products, channel: selectedPriceChannel}),
+    openProduct: (product, origin) => openProduct(product, null, origin), money,
   });
   const mesaInicial = root?.dataset.mesaInicial || '';
   const tipoInicial = root?.dataset.tipoInicial || '';

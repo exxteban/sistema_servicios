@@ -47,12 +47,20 @@ test('editar pedido restaura su canal y la selección del catálogo', () => {
   window.GastronomiaChannelPrices.hydrateOrderChannel({items: [{canal_precio: 'pedidosya'}]}, root, 'pedidosya', () => assert.fail('No debe recargar el mismo canal'));
 });
 
-function setup({ignoreAbort = false} = {}) {
+function setup({ignoreAbort = false, observe = false} = {}) {
   let now = 0, nextTimer = 0;
   const timers = new Map(), requests = [];
+  const observers = [];
   const window = new Element();
-  const document = {createElement: (tag) => new Element(tag), activeElement: {name: 'buscador'}};
+  const document = Object.assign(new Element('document'), {
+    createElement: (tag) => new Element(tag), activeElement: {name: 'buscador'},
+  });
   const context = vm.createContext({window, document, navigator: {onLine: true},
+    ...(observe ? {IntersectionObserver: class {
+      constructor(callback) { observers.push(callback); }
+      observe() {}
+      disconnect() {}
+    }} : {}),
     AbortController, URLSearchParams,
     setTimeout: (fn, delay) => { const id = ++nextTimer; timers.set(id, {fn, at: now + delay}); return id; },
     clearTimeout: (id) => timers.delete(id),
@@ -83,19 +91,19 @@ function setup({ignoreAbort = false} = {}) {
       {id_producto: 1, nombre: 'Hamburguesa', precio: 15000, disponible: true},
       {id_producto: 2, nombre: 'Papas', precio: 5000, disponible: true},
     ]};
-    const opened = [];
+    const opened = [], origins = [];
     const controller = window.GastronomiaSugerencias.create(root, {
-      getState: () => state, openProduct: (p) => opened.push(p), money: (v) => `Gs. ${v}`,
+      getState: () => state, openProduct: (p, origin) => { opened.push(p); origins.push(origin); }, money: (v) => `Gs. ${v}`,
     });
-    return {host, root, state, opened, controller,
+    return {host, root, state, opened, origins, controller,
       click: (button) => host.listeners.click({target: button})};
   };
   const respond = async (index, ids = [2]) => {
     requests[index].resolve({ok: true, json: async () => ({max: 3,
-      sugerencias: ids.map((id) => ({id_producto: id, motivo: 'Regla del negocio'}))})});
+      sugerencias: ids.map((id) => ({id_producto: id, id_origen: 1, motivo: 'Regla del negocio'}))})});
     await flush();
   };
-  return {tick, respond, requests, instance, document, window};
+  return {tick, respond, requests, instance, document, window, observers};
 }
 
 test('debounce, precio del catálogo y mismo configurador sin robar foco', async () => {
@@ -186,4 +194,63 @@ test('canal incompatible no consulta; por peso y extras con precio no muestran i
   pos.controller.refresh();
   await env.tick(500); await env.respond(1);
   assert.equal(chips(pos.host)[0].textContent, '+ Papas');
+});
+
+test('solo cuenta lo visible, deduplica redibujos y cancelar el configurador no es tocar', async () => {
+  const env = setup(), pos = env.instance();
+  for (const id of [3, 4, 5]) pos.state.products.push({id_producto: id, nombre: `Extra ${id}`, precio: 1, disponible: true});
+  pos.controller.refresh(); await env.tick(500); await env.respond(0, [2, 3, 4, 5]);
+  const data = () => JSON.parse(JSON.stringify(pos.controller.payload()));
+  assert.deepEqual(data().mostradas, [[1, 2], [1, 3], [1, 4]]);
+  pos.click(chips(pos.host)[0]);
+  assert.equal(pos.origins[0], 1);
+  assert.deepEqual(data().tocadas, [], 'Abrir o cancelar el modal no confirma una adición');
+  pos.controller.accepted({producto_id: 2, origen_sugerencia: 1});
+  pos.controller.accepted({producto_id: 2, origen_sugerencia: 1});
+  assert.deepEqual(data().tocadas, [[1, 2]]);
+  pos.click(find(pos.host, (n) => n.dataset.action === 'more'));
+  assert.equal(data().mostradas.length, 4);
+  pos.state.products = [...pos.state.products];
+  pos.controller.refresh(); await env.tick(500); await env.respond(1, [2, 3, 4, 5]);
+  assert.equal(data().mostradas.length, 4);
+  pos.controller.reset();
+  assert.deepEqual(data(), {mostradas: [], tocadas: []});
+});
+
+test('restaurar un pedido conserva pares y el payload solo marca sus renglones', () => {
+  const env = setup(), pos = env.instance();
+  pos.controller.restore({mostradas: [[1, 2]], tocadas: [[1, 2]]});
+  const window = {};
+  vm.runInContext(fs.readFileSync(path.resolve(__dirname, '../../gastronomia/static/js/pos_order_payload.js'), 'utf8'), vm.createContext({window}));
+  const values = {'order-type': 'delivery', 'delivery-shipping-cost': '1000', 'delivery-phone': 'Ficticio'};
+  const root = {querySelector: (id) => ({value: values[id.slice(1)] || ''})};
+  const cart = [{producto_id: 2, cantidad: 1, origen_sugerencia: 1}, {producto_id: 2, cantidad: 3}];
+  const data = window.GastronomiaOrderPayload.build(root, cart, {destino_latitud: -25}, pos.controller);
+  assert.equal(data.costo_envio, 1000);
+  assert.equal(data.destino_latitud, -25);
+  assert.deepEqual(JSON.parse(JSON.stringify(data.sugerencias)), {mostradas: [[1, 2]], tocadas: [[1, 2]]});
+  assert.equal(data.items[0].origen_sugerencia, 1);
+  assert.equal('origen_sugerencia' in data.items[1], false);
+});
+
+test('un POS oculto no cuenta como mostrado hasta volver a estar visible', async () => {
+  const env = setup(), pos = env.instance();
+  env.document.visibilityState = 'hidden';
+  pos.controller.refresh(); await env.tick(500); await env.respond(0);
+  assert.equal(pos.controller.payload().mostradas.length, 0);
+  env.document.visibilityState = 'visible';
+  env.document.listeners.visibilitychange();
+  assert.equal(pos.controller.payload().mostradas.length, 1);
+});
+
+test('una franja fuera del viewport espera a ser visible para registrar exposición', async () => {
+  const env = setup({observe:true}), pos = env.instance();
+  pos.controller.refresh(); await env.tick(500); await env.respond(0);
+  assert.equal(pos.controller.payload().mostradas.length, 0);
+  pos.host.getClientRects = () => [];
+  env.observers[0]([{isIntersecting:true}]);
+  assert.equal(pos.controller.payload().mostradas.length, 0, 'Una pestaña interna oculta tampoco cuenta');
+  pos.host.getClientRects = () => [{}];
+  env.observers[0]([{isIntersecting:true}]);
+  assert.equal(pos.controller.payload().mostradas.length, 1);
 });

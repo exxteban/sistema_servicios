@@ -12,8 +12,8 @@ cómo se mide.
 
 ### Avance de implementación — 30/10/2026
 
-Base, administración e integración con el POS implementadas; pendientes la
-validación con historial real, MySQL real y la medición de aceptación:
+Base, administración, POS, medición y aprendizaje implementados; pendientes
+la validación con historial real y MySQL real:
 
 - [x] Seis tablas nuevas: configuración (apagada por defecto), reglas,
   exclusiones, pares, orígenes y estado/candado del cálculo. Registradas antes
@@ -42,7 +42,7 @@ validación con historial real, MySQL real y la medición de aceptación:
 - [x] Prueba de dos workers con sesiones independientes sobre SQLite en
   archivo: un cálculo ocupado no se repite. Pruebas de vencimiento, frecuencia
   y rechazo de publicación si otro worker reemplazó el token del candado.
-- [ ] Cobertura efectiva de franja y medición del endpoint (requieren etapa 3).
+- [ ] Cobertura efectiva de franja y medición del endpoint con catálogo real.
 - [ ] Ejecutar las pruebas contra MySQL real (compilar DDL no lo sustituye).
 - [ ] Revisar diagnóstico con historial de 2 o 3 instalaciones autorizadas.
 - [x] Pantalla del dueño en `/gastronomia/sugerencias`, accesible desde Menú
@@ -53,7 +53,7 @@ validación con historial real, MySQL real y la medición de aceptación:
   calculadas, fallback por categoría, afinidad portada del padre, disponibilidad,
   stock, visibilidad, exclusiones, prohibiciones, precio y carrito. Muestra
   métricas y motivos de descarte, con atajos «Nunca con este» y «Nunca sugerir
-  esto». Usa precios normales; falta adaptar la consulta del POS a sus canales.
+  esto». La vista previa usa precios normales; el POS consulta con su canal.
 - [x] Botón de recálculo en segundo plano, con protección contra solicitudes
   duplicadas en el proceso y candado compartido con el scheduler en la base.
 - [x] Verificación en navegador con datos ficticios: guardar regla hamburguesa
@@ -81,27 +81,65 @@ validación con historial real, MySQL real y la medición de aceptación:
   ajuste a 390 px sin desbordamiento horizontal y guardado/envío a cocina con
   fallo HTTP del sugeridor. El entorno SQLite en memoria se ejecutó en forma
   serial para no compartir su única conexión entre requests simultáneos.
-- [ ] Medición y fatiga (segunda entrega).
+- [x] Medición, fatiga y factor de aceptación (segunda entrega, detalle abajo).
 
-Validación actual: 46 pruebas de backend aprobadas entre
+Validación actual: 110 pruebas de backend aprobadas entre
 `test_gastronomia_sugerencias.py`,
 `test_gastronomia_sugerencias_scheduler.py` y
 `test_gastronomia_sugerencias_diagnostico.py` y
 `test_gastronomia_sugerencias_admin.py` y `test_gastronomia_sugerencias_pos.py`,
-más regresiones de menú, modo operativo, stock preview, promociones, edición
-de pedidos, venta por peso y cobro avanzado.
+más `test_gastronomia_sugerencias_medicion.py` y regresiones de pedidos, caja,
+Inteligencia, precios por canal, venta por peso y modificadores.
 Cubren arranque y funcionamiento del menú con base SQLite en memoria,
 administración, aislamiento, validación, permisos, CSRF y escape de nombres HTML.
-Además pasaron las 6 pruebas de JavaScript de
+Además pasaron las 10 pruebas de JavaScript de
 `node --test tests/js/gastronomia_pos_sugerencias.test.cjs`: restauración del
 canal, debounce, configuración del producto, conservación del foco, respuesta
 vieja aun ignorando abort, timeout, reintento limitado, ocultamiento por pedido
-e instancia, compatibilidad de canales y etiquetas sin precio variable.
+e instancia, compatibilidad de canales y etiquetas sin precio variable,
+exposición visible, aceptación confirmada y payload con atribución.
 No se ejecutaron migraciones ni recálculos sobre bases reales ni se activó la
 franja en instalaciones reales; solo se habilitó en el entorno ficticio de QA.
 El scheduler está conectado al arranque habitual: en ejecución normal
 calculará asociaciones para las configuraciones de gastronomía activas,
 respetando la demora y la variable de desactivación.
+
+### Segunda entrega — medición y aprendizaje (30/10/2026)
+
+- Dos tablas aditivas: `gastronomia_sugerencias_estadistica` y
+  `gastronomia_sugerencias_pedido`. La segunda conserva **cada par mostrado**
+  una sola vez por pedido (hasta 180), su aceptación y los ids de los renglones
+  finales agregados desde la franja. Hace falta conservar la exposición para
+  resolver ventas cobradas después y deduplicar al editar; no se guarda cada
+  redibujo ni cada clic. Los contadores agregados siguen siendo uno por par.
+- `registro.py`: sesión/transacción propia después del commit del pedido.
+  Valida productos del mismo cliente, ignora telemetría inválida y deduplica
+  reintentos. La atribución se conserva al reabrir y editar, distingue dos
+  renglones del mismo producto, y se invalida si cambia el evento de guardado
+  y falla la actualización estadística. Sin el campo opcional, el pedido sigue
+  funcionando. El módulo apagado no registra nuevas exposiciones.
+- El front cuenta solo las píldoras visibles y el resto al abrir «⋯».
+  Una pestaña o franja oculta no suma. Abrir/cancelar el configurador no es
+  tocar: se marca al confirmar el producto; quitarlo luego conserva la tocada
+  histórica pero elimina su atribución como vendido desde la franja.
+- `aprendizaje.py`: el cálculo diario resuelve vendidas cruzando pagos válidos
+  y renglones actuales. No duplica al recalcular y corrige anulaciones.
+  **Precisión sobre §6–7:** se conserva `mostradas` para todos los pedidos
+  guardados, pero el denominador del aprendizaje/fatiga es `resueltas`
+  (exposiciones en pedidos cobrados, sin venta anulada). Un pedido abierto no
+  es un rechazo. Factor entre 0,5 y 1,5; 30 pedidos cobrados con aceptación
+  menor al 2% ocultan el par 30 días y reinician su ventana. Los pedidos de la
+  ventana anterior no lo vuelven a ocultar al vencer. Publicación y registro
+  comparten el candado de la instalación.
+- `medicion.py`: tarjeta en BI Gastronomía, por fecha local de cobro, sin
+  anuladas ni encargos; pedidos/renglones desde la franja y productos pedidos
+  por menú. Top 5 del período y pares sin ventas del acumulado (actualizado
+  diariamente). Permanece visible con historial aunque se apague el módulo.
+- QA en SQLite efímera: sugerencia → guardar → reabrir → editar cantidad →
+  cocina → caja → tarjeta (1 pedido, 1 renglón, sin duplicar exposiciones).
+  Escritorio y 390 px, temas claro/oscuro, sin desbordamiento horizontal.
+  Pruebas fuerzan errores SQL reales en inserción y actualización estadística:
+  guardar, enviar a cocina, cobrar y descontar stock siguen funcionando.
 
 Tras crear las tablas mediante el arranque habitual de la aplicación, el
 diagnóstico inicial se consulta con:
@@ -119,7 +157,7 @@ desde el guardado ni desde el cobro de un pedido.
 Para habilitar la franja en una instalación, revisar primero las reglas y la
 vista previa, activar «Activar sugeridor» y «Mostrar sugerencias en el POS» en
 Menú → Sugerencias, guardar y volver a abrir el POS. Ambos interruptores nacen
-apagados. La medición de aceptación y la fatiga todavía no están implementadas.
+apagados. La aceptación y la fatiga se actualizan con el cálculo diario.
 
 ## 1. Principios (heredados del padre)
 
@@ -308,8 +346,8 @@ caracteres** (MySQL).
 | `gastronomia_sugerencias_excluido` | Plato o categoría que nunca se sugiere ni cuenta. |
 | `gastronomia_sugerencias_config` | Una fila por `cliente_id`: `activo`, `mostrar_en_pos`, `max_franja` (1–3). Tabla propia para no tocar `gastronomia_cliente_config`. |
 | `gastronomia_sugerencias_calculo` | Estado del último cálculo (inicio, fin, pedidos leídos, pares, error) y candado. |
-| `gastronomia_sugerencias_estadistica` | Etapa 6. Contadores por par: `mostradas`, `tocadas`, `vendidas`, `ultima_vez`. Un contador por par, no una fila por vez mostrada. |
-| `gastronomia_sugerencias_pedido` | Etapa 6. Ítems que entraron **desde la franja** (`pedido_id`, `producto_id`, `id_origen`). |
+| `gastronomia_sugerencias_estadistica` | Contadores por par: `mostradas`, `tocadas`, `vendidas`, `resueltas`, `ultima_vez`, `inicio_ventana`, `oculto_hasta`. Un contador por par. |
+| `gastronomia_sugerencias_pedido` | Una exposición por pedido/par (`pedido_id`, `producto_id`, `id_origen`, `mostrada_en`, `tocada`); `items_aceptados` conserva ids de renglones desde la franja y `guardado_evento_id` identifica su guardado. |
 
 Todos los campos nuevos con `default` o `nullable`; instalaciones existentes
 siguen funcionando sin datos en estas tablas.
@@ -508,8 +546,8 @@ Cada etapa con sus pruebas, verificada en el navegador y commiteada sola.
 2. **Pantalla del dueño**: config, reglas, excluidos, «Ver qué se
    sugeriría». Con «Mostrar en el POS» apagado.
 3. **Endpoint + franja en el POS.** Prender cliente por cliente.
-4. *(Segunda entrega)* **Medición, fatiga y `factor_aceptacion`.** Hasta
-   entonces el orden usa factor 1.
+4. *(Segunda entrega, implementada)* **Medición, fatiga y `factor_aceptacion`.**
+   Sin pedidos cobrados expuestos, el orden usa factor 1.
 
 Estimación: 3 a 5 días para las etapas 1–3 portando el código del padre;
 2 a 3 días más para la etapa 4.

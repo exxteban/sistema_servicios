@@ -1,5 +1,6 @@
 <div x-show="inteligenciaTab === 'gastronomia'" {% if vista_activa != 'gastronomia' %}style="display: none;"{% endif %} class="app-tab-panel space-y-4">
     {% include "inteligencia/gastronomia/_kpis.html" %}
+    {% include "inteligencia/gastronomia/_sugerencias.html" %}
 
     {% if not panel.gastronomia.activo %}
     <div class="rounded-2xl border border-dashed border-violet-300 bg-violet-50 p-4 text-sm text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">

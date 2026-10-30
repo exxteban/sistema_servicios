@@ -16,6 +16,7 @@ from gastronomia.sugerencias_models import (
 )
 from gastronomia.services.sugerencias import constantes as C
 from gastronomia.services.sugerencias.diagnostico import analizar
+from gastronomia.services.sugerencias.aprendizaje import actualizar
 
 
 def recalcular(cliente_id, ahora=None, *, solo_si_vencido=False):
@@ -62,6 +63,7 @@ def recalcular(cliente_id, ahora=None, *, solo_si_vencido=False):
                 db.session.add(Par(cliente_id=cliente_id, calculado_en=ahora, **fila))
             for origen, pedidos in resultado['conteos'][nivel].crudo.items():
                 db.session.add(Origen(cliente_id=cliente_id, nivel=nivel, id_origen=origen, pedidos=pedidos))
+        actualizar(cliente_id, ahora)
         db.session.commit()
         return True
     except Exception as exc:

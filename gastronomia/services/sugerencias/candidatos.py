@@ -10,6 +10,7 @@ from gastronomia.sugerencias_models import (
 )
 from gastronomia.services.sugerencias.afinidad import Catalogo
 from gastronomia.services.sugerencias import constantes as C
+from gastronomia.services.sugerencias.aprendizaje import factores
 
 
 def _coincide(tipo, numero, producto):
@@ -48,6 +49,7 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
     ).all()
     comprobar_plazo()
     candidatos = []
+    aprendizaje = factores(cliente_id)
     for origen in origenes:
         comprobar_plazo()
         def sumar(destino, fuente, puntaje, *, regla=None, par=None):
@@ -56,7 +58,8 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
             candidatos.append(dict(
                 id_producto=destino.id_producto, nombre=destino.nombre, id_origen=origen.id_producto,
                 fuente=fuente, forzada=regla is not None, prioridad=regla.prioridad if regla else 0,
-                puntaje=puntaje * (1 + afinidad / (1 + afinidad)) * peso,
+                puntaje=puntaje * (1 + afinidad / (1 + afinidad)) * peso
+                * aprendizaje.get((origen.id_producto, destino.id_producto), {}).get('factor', 1),
                 soporte=par.soporte if par else None, confianza=par.confianza if par else None,
                 lift=par.lift if par else None,
                 motivo='Regla del negocio' if regla else (
@@ -104,6 +107,8 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
             razon = 'Conflicto de nombres'
         elif not fila['forzada'] and precio(p) > principal and (fila['lift'] or 0) < C.LIFT_PRECIO_ALTO:
             razon = 'Precio mayor que el plato principal'
+        elif aprendizaje.get((origen.id_producto, p.id_producto), {}).get('oculto'):
+            razon = 'Oculta por baja aceptación durante 30 días'
         if razon:
             descartados.append(dict(fila, descarte=razon))
             continue
