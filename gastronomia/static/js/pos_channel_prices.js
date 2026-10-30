@@ -16,5 +16,15 @@
     }
   };
 
-  window.GastronomiaChannelPrices = {ensureCanAdd, fetchProducts};
+  const hydrateOrderChannel = (order, root, currentChannel, apply) => {
+    if (!order?.items?.length) return;
+    const channel = normalize(order.items[0].canal_precio);
+    if (channel === normalize(currentChannel)) return;
+    root.querySelectorAll('.pos-category').forEach((button) => {
+      button.classList.toggle('active', normalize(button.dataset.priceChannel) === channel && !button.dataset.category);
+    });
+    apply(channel);
+  };
+
+  window.GastronomiaChannelPrices = {ensureCanAdd, fetchProducts, hydrateOrderChannel};
 }());

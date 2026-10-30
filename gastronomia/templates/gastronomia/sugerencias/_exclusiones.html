@@ -1,0 +1,6 @@
+<section class="gs-card">
+    <h2>Productos y categorías excluidos</h2>
+    <p class="gs-muted">No se ofrecen como complemento ni participan en el próximo cálculo de asociaciones. Guardá los cambios y recalculá para actualizar el historial.</p>
+    <form method="post" class="gs-inline">{{ csrf() }}<input type="hidden" name="accion" value="excluir"><label>Excluir{{ elegir('destino', opciones) }}</label><button type="submit">Excluir</button></form>
+    <ul class="gs-list">{% for e in exclusiones %}<li class="gs-inline"><span>{{ opciones.get(e.tipo ~ ':' ~ e.id_ref, 'Referencia eliminada') }}</span><form method="post">{{ csrf() }}<input type="hidden" name="accion" value="quitar_exclusion"><input type="hidden" name="exclusion_id" value="{{ e.id }}"><button type="submit" class="gs-secondary">Quitar exclusión</button></form></li>{% else %}<li>No hay exclusiones.</li>{% endfor %}</ul>
+</section>

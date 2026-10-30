@@ -373,3 +373,7 @@ def register_runtime_features(app, db):
         from app.bootstrap.peluqueria_recordatorios_scheduler import iniciar_scheduler_recordatorios_peluqueria
 
         iniciar_scheduler_recordatorios_peluqueria(app)
+
+    from app.bootstrap.gastronomia_sugerencias_scheduler import iniciar_scheduler_sugerencias_gastronomia
+
+    iniciar_scheduler_sugerencias_gastronomia(app)

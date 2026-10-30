@@ -20,6 +20,7 @@ from gastronomia.services.tienda_pedido_service import (
     serializar_pedidos_tienda,
 )
 from gastronomia.services.venta_integration_service import crear_cola_cobro_central_desde_pedido
+from gastronomia.services.sugerencias.registro import registrar_seguro, restaurar_seguro
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
     PERMISO_COCINA,
@@ -69,9 +70,11 @@ def crear():
     if error:
         return error
     try:
-        pedido = crear_pedido(cliente_id, current_user.id_usuario, _payload())
+        payload = _payload()
+        pedido = crear_pedido(cliente_id, current_user.id_usuario, payload)
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    registrar_seguro(cliente_id, pedido.id_pedido, payload)
     return jsonify({'ok': True, 'pedido': _pedido_data(pedido)}), 201
 
 
@@ -100,11 +103,13 @@ def actualizar(pedido_id):
         # Fecha, anticipo y sena se validan en encargo_service: no se edita por la ruta generica.
         return jsonify({'error': 'validation_error', 'mensaje': 'Los encargos se editan desde la pantalla de encargos.'}), 400
     try:
-        pedido = actualizar_pedido_abierto(cliente_id, pedido_id, _payload())
+        payload = _payload()
+        pedido = actualizar_pedido_abierto(cliente_id, pedido_id, payload)
     except ValueError as exc:
         if str(exc) == 'Pedido no encontrado.':
             return jsonify({'error': 'not_found'}), 404
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    registrar_seguro(cliente_id, pedido.id_pedido, payload)
     return jsonify({'ok': True, 'pedido': _pedido_data(pedido)})
 
 
@@ -203,4 +208,5 @@ def estado(pedido_id):
 
 
 def _pedido_data(pedido):
-    return ocultar_localizacion_pedido(pedido.to_dict(), current_user)
+    data = ocultar_localizacion_pedido(pedido.to_dict(), current_user)
+    return restaurar_seguro(pedido.cliente_id, pedido.id_pedido, data)

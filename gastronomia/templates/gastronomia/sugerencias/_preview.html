@@ -1,0 +1,14 @@
+<section class="gs-card">
+    <h2>Ver qué se sugeriría</h2>
+    <p class="gs-muted">Vista previa con precios normales. Funciona aunque el sugeridor esté apagado. No registra ventas ni estadísticas.</p>
+    <form method="get" class="gs-inline"><label>Plato del pedido{{ elegir('producto', opciones, seleccionado, platos=true) }}</label><button type="submit">Ver sugerencias</button></form>
+    {% if preview is not none %}
+    <ul class="gs-list">{% for s in preview.sugerencias %}<li>
+        <p><strong>{{ s.nombre }}</strong> · {{ s.motivo }}</p>
+        {% if s.soporte is not none %}<p class="gs-muted">{{ s.soporte }} pedidos juntos · Confianza {{ '%.0f'|format(s.confianza * 100) }}% · Lift {{ '%.2f'|format(s.lift) }}</p>{% endif %}
+        <div class="gs-inline"><form method="post">{{ csrf() }}<input type="hidden" name="accion" value="regla"><input type="hidden" name="tipo" value="prohibir"><input type="hidden" name="origen" value="{{ seleccionado }}"><input type="hidden" name="destino" value="producto:{{ s.id_producto }}"><button class="gs-secondary" type="submit">Nunca con este</button></form>
+        <form method="post">{{ csrf() }}<input type="hidden" name="accion" value="excluir"><input type="hidden" name="destino" value="producto:{{ s.id_producto }}"><button class="gs-secondary" type="submit">Nunca sugerir esto</button></form></div>
+    </li>{% else %}<li>No hay sugerencias válidas para este plato. Podés crear una regla o recalcular el historial.</li>{% endfor %}</ul>
+    {% if preview.descartados %}<details><summary>Candidatos descartados</summary><ul class="gs-list">{% for s in preview.descartados %}<li>{{ s.nombre }} · {{ s.descarte }}</li>{% endfor %}</ul></details>{% endif %}
+    {% endif %}
+</section>

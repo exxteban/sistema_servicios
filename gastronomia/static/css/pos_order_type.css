@@ -1,0 +1,46 @@
+.pos-order-type-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 40px;
+    padding: 7px 12px;
+    border: 1px solid rgb(245 158 11);
+    border-radius: 12px;
+    background: rgb(254 243 199);
+    color: rgb(146 64 14);
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    list-style: none;
+}
+
+.pos-order-type-summary::-webkit-details-marker {
+    display: none;
+}
+
+#order-type-selected,
+.pos-order-type-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pos-order-type-expand {
+    font-size: 0.75rem;
+}
+
+.pos-order-type-picker[open] .fa-chevron-down {
+    transform: rotate(180deg);
+}
+
+.pos-order-type-summary:focus-visible {
+    outline: 2px solid rgb(234 88 12);
+    outline-offset: 2px;
+}
+
+.dark .pos-order-type-summary {
+    border-color: rgb(251 191 36);
+    background: rgb(120 53 15 / 0.45);
+    color: rgb(253 230 138);
+}

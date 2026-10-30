@@ -20,6 +20,7 @@ from gastronomia.services.inteligencia_clientes import clientes_frecuentes_gastr
 from gastronomia.services.inteligencia_margen import productos_alto_volumen_bajo_margen
 from gastronomia.services.inteligencia_promos import promociones_horario_bajo
 from gastronomia.services.inteligencia_stock import alertas_stock_menu
+from gastronomia.services.sugerencias.medicion import resumen_seguro as resumen_sugerencias
 
 
 def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dict, cliente_id: int | None = None) -> dict:
@@ -54,6 +55,7 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
         'promos_horario_bajo': promos_horario_bajo,
         'productos_bajo_margen': productos_bajo_margen,
         'clientes_frecuentes': clientes_frecuentes,
+        'sugerencias': resumen_sugerencias(cliente_id_resuelto, periodo_actual),
         'insights': insights,
     }
 

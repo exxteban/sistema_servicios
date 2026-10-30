@@ -1,0 +1,13 @@
+.gs-pos { --gs-pos-border: #c4b5fd; --gs-pos-bg: #faf9ff; --gs-pos-text: #4b5563; --gs-pos-accent: #6d28d9; margin-top: 10px; padding: 7px; border: 1px solid var(--gs-pos-border); border-radius: 9px; background: var(--gs-pos-bg); color: var(--gs-pos-text); }
+.dark .gs-pos { --gs-pos-border: #655a89; --gs-pos-bg: #252539; --gs-pos-text: #d1d5db; --gs-pos-accent: #c4b5fd; }
+.gs-pos[hidden], .gs-pos [hidden] { display: none !important; }
+.gs-pos-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.gs-pos-label { font-size: 11px; white-space: nowrap; }
+.gs-pos-chips { display: flex; flex: 1; gap: 5px; overflow-x: auto; min-width: 0; }
+.gs-pos-chip { max-width: 180px; flex-shrink: 0; border: 1px solid var(--gs-pos-border); border-radius: 18px; padding: 6px 9px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: transparent; color: inherit; text-align: left; }
+.gs-pos-control { flex-shrink: 0; padding: 4px 6px; font-size: 16px; color: var(--gs-pos-accent); }
+.gs-pos-list { list-style: none; padding: 0; margin: 7px 0 0; border-top: 1px solid var(--gs-pos-border); max-height: 220px; overflow-y: auto; }
+.gs-pos-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-top: 7px; }
+.gs-pos-reason { font-size: 11px; }
+.gs-pos button:focus-visible { outline: 2px solid var(--gs-pos-accent); outline-offset: 2px; }
+@media (max-width: 640px) { .gs-pos-chip { max-width: 150px; } }

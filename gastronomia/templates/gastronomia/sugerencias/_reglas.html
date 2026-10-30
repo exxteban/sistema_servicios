@@ -1,0 +1,26 @@
+<section class="gs-card">
+    <h2>{{ 'Editar regla' if editar else 'Nueva regla' }}</h2>
+    <form method="post">{{ csrf() }}<input type="hidden" name="accion" value="regla">
+        {% if editar %}<input type="hidden" name="regla_id" value="{{ editar.id }}">{% endif %}
+        <div class="gs-grid">
+            <label>Acción<select name="tipo"><option value="forzar" {{ 'selected' if not editar or editar.tipo == 'forzar' }}>Sugerir</option><option value="prohibir" {{ 'selected' if editar and editar.tipo == 'prohibir' }}>Nunca sugerir</option></select></label>
+            <label>Cuando piden{{ elegir('origen', opciones, (editar.origen_tipo ~ ':' ~ editar.origen_id) if editar and editar.origen_tipo != 'cualquiera' else 'cualquiera', cualquiera=true) }}</label>
+            <label>Complemento{{ elegir('destino', opciones, (editar.destino_tipo ~ ':' ~ editar.destino_id) if editar else '') }}</label>
+        </div>
+        <label class="gs-check"><input type="checkbox" name="prioridad" value="1" {{ 'checked' if editar and editar.prioridad }}> Ponerla antes que las otras reglas</label>
+        <p class="gs-muted">Guardar reemplaza la regla anterior de la misma combinación. Las prohibiciones y la disponibilidad siempre se respetan.</p>
+        <button type="submit">{{ 'Guardar regla' if editar else 'Crear regla' }}</button>
+        {% if editar %}<a href="{{ url_for('gastronomia.sugerencias_config') }}">Cancelar edición</a>{% endif %}
+    </form>
+    <h2>Reglas guardadas</h2>
+    <form method="get" class="gs-inline"><label>Buscar reglas<input name="q" value="{{ busqueda }}" maxlength="120" placeholder="Nombre del plato o categoría"></label><button type="submit">Buscar</button><a href="{{ url_for('gastronomia.sugerencias_config') }}">Ver todas</a></form>
+    <ul class="gs-list">
+    {% for r in reglas %}
+        <li><p><strong>{{ 'Sugerir' if r.tipo == 'forzar' else 'Nunca sugerir' }}</strong>: {{ opciones.get(r.origen_tipo ~ ':' ~ r.origen_id, 'Cualquier pedido' if r.origen_tipo == 'cualquiera' else 'Origen eliminado') }} → {{ opciones.get(r.destino_tipo ~ ':' ~ r.destino_id, 'Destino eliminado') }} <span class="gs-muted">{{ '· pausada' if not r.activa }}{{ ' · prioritaria' if r.prioridad }}</span></p>
+            <div class="gs-inline"><a href="{{ url_for('gastronomia.sugerencias_config', editar=r.id) }}">Editar</a>
+            <form method="post">{{ csrf() }}<input type="hidden" name="accion" value="alternar"><input type="hidden" name="regla_id" value="{{ r.id }}"><button type="submit">{{ 'Pausar' if r.activa else 'Reanudar' }}</button></form>
+            <form method="post">{{ csrf() }}<input type="hidden" name="accion" value="eliminar"><input type="hidden" name="regla_id" value="{{ r.id }}"><button type="submit" class="gs-secondary">Eliminar</button></form></div>
+        </li>
+    {% else %}<li>No hay reglas{{ ' que coincidan con la búsqueda' if busqueda else ' guardadas' }}.</li>{% endfor %}
+    </ul>
+</section>
