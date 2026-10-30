@@ -46,10 +46,13 @@ en MariaDB real; pendientes completar historiales y medición HTTP desplegada:
   endpoint; medido sobre una copia temporal del catálogo e historial local.
 - [x] Verificación funcional HTTP y POS en la demo desplegada, con una regla
   autorizada. Catálogo de 61 productos; cálculo de 303 pedidos y 0 asociaciones.
+- [x] Diagnóstico del servidor de la demo: 0,99% de canastas múltiples;
+  180 consultas correctas, medianas 22,7–29,3 ms y máximo 41,9 ms del servicio.
+  Se mantienen umbrales y se priorizan reglas; Cafe no entró en el top 20 muestreado.
 - [ ] Latencia HTTP instrumentada y rendimiento con catálogo grande.
 - [x] Ejecutar las pruebas contra MySQL/MariaDB real: 33 escenarios aprobados
   en MariaDB 10.4.32, además de la compilación de DDL.
-- [ ] Revisar diagnóstico con historial de 2 o 3 instalaciones autorizadas.
+- [ ] Completar revisión de 2 o 3 instalaciones autorizadas (demo revisada: 1).
 - [x] Pantalla del dueño en `/gastronomia/sugerencias`, accesible desde Menú
   con permiso `gastronomia_menu`: configuración, alta/edición/pausa/reanudación
   y eliminación de reglas, prioridad, búsqueda y exclusiones por plato/categoría.
