@@ -1,13 +1,67 @@
-.gs-pos { --gs-pos-border: #c4b5fd; --gs-pos-bg: #faf9ff; --gs-pos-text: #4b5563; --gs-pos-accent: #6d28d9; margin-top: 10px; padding: 7px; border: 1px solid var(--gs-pos-border); border-radius: 9px; background: var(--gs-pos-bg); color: var(--gs-pos-text); }
-.dark .gs-pos { --gs-pos-border: #655a89; --gs-pos-bg: #252539; --gs-pos-text: #d1d5db; --gs-pos-accent: #c4b5fd; }
+.gs-pos {
+  --gs-border: #fed7aa;
+  --gs-bg: #fffaf5;
+  --gs-card: #fff;
+  --gs-text: #1f2937;
+  --gs-muted: #6b7280;
+  --gs-accent: #c2410c;
+  --gs-soft: #ffedd5;
+  margin-top: 12px;
+  padding: 12px;
+  min-width: 0;
+  border: 1px solid var(--gs-border);
+  border-radius: 12px;
+  background: var(--gs-bg);
+  color: var(--gs-text);
+}
+.dark .gs-pos {
+  --gs-border: #62402e;
+  --gs-bg: #29221e;
+  --gs-card: #332b26;
+  --gs-text: #f3f4f6;
+  --gs-muted: #c0b4ab;
+  --gs-accent: #fdba74;
+  --gs-soft: #493224;
+}
 .gs-pos[hidden], .gs-pos [hidden] { display: none !important; }
-.gs-pos-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
-.gs-pos-label { font-size: 11px; white-space: nowrap; }
-.gs-pos-chips { display: flex; flex: 1; gap: 5px; overflow-x: auto; min-width: 0; }
-.gs-pos-chip { max-width: 180px; flex-shrink: 0; border: 1px solid var(--gs-pos-border); border-radius: 18px; padding: 6px 9px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: transparent; color: inherit; text-align: left; }
-.gs-pos-control { flex-shrink: 0; padding: 4px 6px; font-size: 16px; color: var(--gs-pos-accent); }
-.gs-pos-list { list-style: none; padding: 0; margin: 7px 0 0; border-top: 1px solid var(--gs-pos-border); max-height: 220px; overflow-y: auto; }
-.gs-pos-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-top: 7px; }
-.gs-pos-reason { font-size: 11px; }
-.gs-pos button:focus-visible { outline: 2px solid var(--gs-pos-accent); outline-offset: 2px; }
-@media (max-width: 640px) { .gs-pos-chip { max-width: 150px; } }
+.gs-pos-row, .gs-pos-heading { display: flex; align-items: center; }
+.gs-pos-row { justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.gs-pos-heading { min-width: 0; gap: 7px; }
+.gs-pos-sparkle { color: var(--gs-accent); font-size: 17px; }
+.gs-pos-label { font-size: 12px; font-weight: 700; line-height: 1.4; }
+.gs-pos-close {
+  display: grid; place-items: center; flex: 0 0 32px;
+  width: 32px; height: 32px; margin: -5px -5px -5px 0; padding: 0;
+  border: 0; border-radius: 8px; background: transparent;
+  color: var(--gs-muted); font-size: 21px; cursor: pointer;
+}
+.gs-pos-chips { display: grid; gap: 7px; min-width: 0; }
+.gs-pos-chip {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  box-sizing: border-box; width: 100%; min-width: 0; min-height: 58px;
+  padding: 9px 10px 9px 12px; border: 1px solid var(--gs-border); border-radius: 9px;
+  background: var(--gs-card); color: inherit; text-align: left; cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.gs-pos-product { display: grid; gap: 3px; min-width: 0; }
+.gs-pos-name { font-size: 13px; font-weight: 650; line-height: 1.35; overflow-wrap: anywhere; }
+.gs-pos-price { color: var(--gs-muted); font-size: 12px; font-weight: 500; line-height: 1.3; }
+.gs-pos-add {
+  display: grid; place-items: center; flex: 0 0 30px;
+  width: 30px; height: 30px; border-radius: 8px; background: var(--gs-soft);
+  color: var(--gs-accent); font-size: 21px; font-weight: 500; line-height: 1;
+}
+.gs-pos-more {
+  display: block; width: 100%; min-height: 36px; margin: 7px 0 -5px; padding: 7px 4px;
+  border: 0; border-radius: 7px; background: transparent; color: var(--gs-accent);
+  font-size: 11px; font-weight: 650; text-align: center; cursor: pointer;
+}
+.gs-pos-list { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0 3px 0 0; max-height: 280px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--gs-border) transparent; }
+.gs-pos-list li { min-width: 0; }
+.gs-pos-reason { display: block; margin: 5px 3px 0; font-size: 11px; line-height: 1.45; color: var(--gs-muted); overflow-wrap: anywhere; }
+.gs-pos button:focus-visible { outline: 2px solid var(--gs-accent); outline-offset: 3px; }
+@media (hover: hover) {
+  .gs-pos-chip:hover { border-color: var(--gs-accent); }
+  .gs-pos-more:hover, .gs-pos-close:hover { background: var(--gs-soft); color: var(--gs-accent); }
+}
+@media (prefers-reduced-motion: reduce) { .gs-pos-chip { transition: none; } }

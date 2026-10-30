@@ -409,8 +409,8 @@ patrón de módulo que `pos_peso.js` o `pos_channel_prices.js`. `pos.js` ya tien
   debería aplicarse igual al menú y a la franja.
 - **Ubicación**: franja fina al pie de la lista del carrito, dentro de la misma
   tarjeta. Nada en la zona de totales y cobro.
-- **Estilo**: texto chico y apagado, píldoras de borde 1px, ícono de destellos
-  (no lamparita). Variables CSS propias con variante oscura; nada de
+- **Estilo**: tarjetas a ancho completo, nombre y precio separados, botón «+»
+  y encabezado con destellos. Variables CSS propias con variante oscura; nada de
   `bg-white` fijo.
 - **Comportamiento**:
   1. Consulta cuando el carrito se queda quieto ~500 ms.
@@ -421,12 +421,12 @@ patrón de módulo que `pos_peso.js` o `pos_channel_prices.js`. `pos.js` ya tien
      cambio del carrito vuelve a probar. Nunca un error visible.
   4. No toma el foco al aparecer.
   5. «✕» la oculta para ese pedido; vuelve en el siguiente.
-  6. «⋯» despliega la lista completa con motivos **dentro de la tarjeta** (en
+  6. «Ver sugerencias y motivos» abre la lista completa **dentro de la tarjeta** (en
      el padre, un popover flotante quedaba cortado por `overflow-hidden`).
   7. Al **editar un pedido existente** (mesa abierta, `cart` cargado desde
      `order.items`) la franja funciona igual.
-  8. En celular: una sola línea con desplazamiento lateral; nunca empuja el
-     botón de cobro.
+  8. En celular: hasta 3 tarjetas apiladas sin desplazamiento horizontal. La
+     lista ampliada tiene desplazamiento vertical y altura limitada.
 - **Pestañas**: el POS puede estar abierto en varias; nada de ids fijos nuevos
   que choquen.
 
