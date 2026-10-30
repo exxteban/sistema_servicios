@@ -46,4 +46,5 @@ tiempo y CLI sin escrituras (incluido hash del archivo antes y después).
 En navegador se verificó el contrato del GET y la exclusión de productos ya
 presentes en el carrito, con un servidor temporal y datos ficticios.
 La [validación en MariaDB real](sugerencias_gastronomia_mysql.md) ya pasó.
-La medición HTTP desplegada y los otros historiales siguen pendientes.
+La [verificación funcional de la demo](sugerencias_gastronomia_demo_qa.md) ya pasó.
+La latencia HTTP instrumentada y los otros historiales siguen pendientes.

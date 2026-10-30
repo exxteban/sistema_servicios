@@ -44,7 +44,9 @@ en MariaDB real; pendientes completar historiales y medición HTTP desplegada:
   y rechazo de publicación si otro worker reemplazó el token del candado.
 - [x] Diagnóstico de cobertura con filtros actuales y tiempos del servicio del
   endpoint; medido sobre una copia temporal del catálogo e historial local.
-- [ ] Medición HTTP en una instalación desplegada y rendimiento con catálogo grande.
+- [x] Verificación funcional HTTP y POS en la demo desplegada, con una regla
+  autorizada. Catálogo de 61 productos; cálculo de 303 pedidos y 0 asociaciones.
+- [ ] Latencia HTTP instrumentada y rendimiento con catálogo grande.
 - [x] Ejecutar las pruebas contra MySQL/MariaDB real: 33 escenarios aprobados
   en MariaDB 10.4.32, además de la compilación de DDL.
 - [ ] Revisar diagnóstico con historial de 2 o 3 instalaciones autorizadas.
@@ -156,6 +158,9 @@ locales están en [docs/sugerencias_gastronomia_diagnostico.md](docs/sugerencias
 
 La validación de 33 escenarios en MariaDB real, el runner aislado y sus
 resguardos están en [docs/sugerencias_gastronomia_mysql.md](docs/sugerencias_gastronomia_mysql.md).
+
+La prueba de la demo desplegada y su configuración final autorizada están en
+[docs/sugerencias_gastronomia_demo_qa.md](docs/sugerencias_gastronomia_demo_qa.md).
 
 Ese script no usa `create_app`, no crea tablas ni ejecuta migraciones. Para
 el recálculo explícito se dispone de
