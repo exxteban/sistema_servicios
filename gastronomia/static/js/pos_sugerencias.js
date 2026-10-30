@@ -5,8 +5,8 @@
     if (!host) return null;
     let timer, controller, timeout, generation = 0;
     let hidden = false, destroyed = false, signature = '', catalog = null, rows = [];
-    let displayedMaximum = 0;
     let inViewport = typeof IntersectionObserver !== 'function';
+    const exposureTargets = new Map(), visibleTargets = new Set();
     const shown = new Map(), touched = new Map();
     const keyFor = (origin, target) => `${origin}:${target}`;
     const markShown = (items) => items.forEach((item) => {
@@ -17,7 +17,9 @@
     const recordVisible = () => {
       if (!inViewport || host.hidden || document.visibilityState === 'hidden'
           || (host.getClientRects && !host.getClientRects().length)) return;
-      markShown(list.hidden ? rows.slice(0, displayedMaximum) : rows);
+      const visible = [...exposureTargets].filter(([node, target]) =>
+        (!observer || visibleTargets.has(node)) && (!target.detail || !list.hidden));
+      markShown(visible.map(([, target]) => target.item));
     };
     const max = Math.min(3, Math.max(1, Number(host.dataset.max || 3)));
     const element = (tag, className, text) => {
@@ -72,6 +74,9 @@
     };
     const render = (items, state, maximum) => {
       rows = items.filter((item) => eligible(item, state));
+      observer?.disconnect();
+      exposureTargets.clear();
+      visibleTargets.clear();
       chips.replaceChildren();
       list.replaceChildren();
       rows.forEach((item, index) => {
@@ -80,14 +85,19 @@
         button.type = 'button';
         button.title = product.nombre;
         button.dataset.product = String(item.id_producto);
-        if (index < maximum) chips.append(button);
+        if (index < maximum) {
+          chips.append(button);
+          exposureTargets.set(button, {item, detail: false});
+        }
         const li = element('li', '');
         const detail = button.cloneNode(true);
+        exposureTargets.set(detail, {item, detail: true});
         li.append(detail, element('span', 'gs-pos-reason', item.motivo));
         list.append(li);
       });
       host.hidden = rows.length === 0;
-      displayedMaximum = maximum;
+      observer?.observe(host);
+      for (const node of exposureTargets.keys()) observer?.observe(node);
       recordVisible();
     };
     const current = (version, key) => !destroyed && !hidden && root.isConnected
@@ -170,8 +180,14 @@
     };
     const observer = typeof IntersectionObserver === 'function'
       ? new IntersectionObserver((entries) => {
-        inViewport = entries.some((entry) => entry.isIntersecting);
-        if (inViewport) recordVisible();
+        for (const entry of entries) {
+          if (entry.target === host) inViewport = entry.isIntersecting;
+          else if (exposureTargets.has(entry.target)) {
+            if (entry.isIntersecting) visibleTargets.add(entry.target);
+            else visibleTargets.delete(entry.target);
+          }
+        }
+        recordVisible();
       }) : null;
     observer?.observe(host);
     document.addEventListener?.('visibilitychange', recordVisible);

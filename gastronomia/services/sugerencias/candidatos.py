@@ -33,6 +33,7 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
     def precio(producto):
         return precios.get(producto.id_producto, float(producto.precio or 0))
     carrito = list(reversed(dict.fromkeys(reversed(productos_carrito))))
+    productos_en_carrito = [productos[p] for p in carrito if p in productos]
     origenes = [productos[p] for p in carrito if p in productos and productos[p].activo][-C.MAX_ORIGENES_CARRITO:]
     reglas = Regla.query.filter_by(cliente_id=cliente_id, activa=True).all()
     exclusiones = {(e.tipo, e.id_ref) for e in Excluido.query.filter_by(cliente_id=cliente_id)}
@@ -109,7 +110,8 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
             razon = 'Ya está en el pedido'
         elif excluido(p):
             razon = 'Excluido por el negocio'
-        elif any(r.tipo == 'prohibir' and _coincide(r.origen_tipo, r.origen_id, origen)
+        elif any(r.tipo == 'prohibir' and any(
+                 _coincide(r.origen_tipo, r.origen_id, producto) for producto in productos_en_carrito)
                  and _coincide(r.destino_tipo, r.destino_id, p) for r in reglas):
             razon = 'Combinación prohibida'
         elif C.CONFLICTO_NOMBRES_ACTIVO and fila['fuente'] == 'categoria' and catalogo.conflicto(origen.id_producto, p.id_producto):

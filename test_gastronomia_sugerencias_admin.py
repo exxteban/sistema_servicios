@@ -89,6 +89,32 @@ def test_exclusion_y_prohibicion_categoria_ganan_a_regla(datos):
     assert previsualizar(cliente, [ids[0]])['descartados'][0]['descarte'] == 'Combinación prohibida'
 
 
+@pytest.mark.parametrize('tipo', ['producto', 'categoria'])
+@pytest.mark.parametrize('antiguo,excluido', [(False, False), (True, False), (False, True)])
+def test_prohibicion_respeta_todo_el_carrito(datos, tipo, antiguo, excluido):
+    cliente, _, ids = datos
+    categoria = GastronomiaCategoria(cliente_id=cliente, nombre='Origen prohibido')
+    db.session.add(categoria)
+    db.session.flush()
+    db.session.get(GastronomiaProducto, ids[0]).categoria_id = categoria.id_categoria
+    db.session.add_all([
+        Regla(cliente_id=cliente, tipo='prohibir', origen_tipo=tipo,
+              origen_id=ids[0] if tipo == 'producto' else categoria.id_categoria,
+              destino_tipo='producto', destino_id=ids[2]),
+        Regla(cliente_id=cliente, tipo='forzar', origen_tipo='producto', origen_id=ids[1],
+              destino_tipo='producto', destino_id=ids[2]),
+    ])
+    if excluido:
+        db.session.add(Excluido(cliente_id=cliente, tipo='producto', id_ref=ids[0]))
+    db.session.commit()
+    # La regla positiva sigue funcionando cuando falta el producto prohibido.
+    assert previsualizar(cliente, [ids[1]])['sugerencias'][0]['id_producto'] == ids[2]
+    carrito = [ids[0], ids[3], ids[4], ids[1]] if antiguo else ids[:2]
+    resultado = previsualizar(cliente, carrito)
+    assert resultado['sugerencias'] == []
+    assert resultado['descartados'][0]['descarte'] == 'Combinación prohibida'
+
+
 def test_config_valida_y_no_se_crea_en_lectura(datos):
     cliente = datos[0]
     previsualizar(cliente, [datos[2][0]])

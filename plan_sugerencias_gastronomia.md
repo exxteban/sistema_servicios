@@ -102,14 +102,18 @@ más `test_gastronomia_sugerencias_medicion.py` y regresiones de pedidos, caja,
 Inteligencia, precios por canal, venta por peso y modificadores.
 Cubren arranque y funcionamiento del menú con base SQLite en memoria,
 administración, aislamiento, validación, permisos, CSRF y escape de nombres HTML.
-Además pasaron las 10 pruebas de JavaScript de
+Además pasaron las 11 pruebas de JavaScript de
 `node --test tests/js/gastronomia_pos_sugerencias.test.cjs`: restauración del
 canal, debounce, configuración del producto, conservación del foco, respuesta
 vieja aun ignorando abort, timeout, reintento limitado, ocultamiento por pedido
 e instancia, compatibilidad de canales y etiquetas sin precio variable,
-exposición visible, aceptación confirmada y payload con atribución.
-No se ejecutaron migraciones ni recálculos sobre bases reales ni se activó la
-franja en instalaciones reales; solo se habilitó en el entorno ficticio de QA.
+exposición visible por botón al desplazar franja/lista, aceptación confirmada y
+payload con atribución. Las prohibiciones se comprueban contra todo el carrito,
+incluso platos excluidos del aprendizaje o anteriores a los últimos 3 orígenes.
+La demo se dejó con la franja y la regla Cafe → Medialuna activas, por
+autorización del usuario para las pruebas de la IA; allí se ejecutó el recálculo
+documentado. Las demás pruebas usaron entornos aislados, sin intervenir otras
+instalaciones reales.
 El scheduler está conectado al arranque habitual: en ejecución normal
 calculará asociaciones para las configuraciones de gastronomía activas,
 respetando la demora y la variable de desactivación.
@@ -327,7 +331,7 @@ el diagnóstico muestra sugerencias de categoría absurdas.
 7. **Precio coherente**: no sugerir algo más caro que el plato principal del
    carrito, salvo regla del dueño o lift ≥ 4. (Que el postre no cueste más que
    la hamburguesa.)
-8. **Fatiga**: un par mostrado en 30+ pedidos donde el destino terminó en
+8. **Fatiga**: un par mostrado en 30+ pedidos cobrados y no anulados donde el destino terminó en
    menos del 2% se oculta 30 días, y sus contadores vuelven a cero (como en el
    padre, para que al volver tenga otra oportunidad real).
 
@@ -338,8 +342,9 @@ muestra.
 
 `puntaje = puntaje_base × (1 + afinidad_normalizada) × factor_aceptacion`
 
-- `factor_aceptacion = (vendidas + 1) / (mostradas + 10)`, relativo al
-  promedio, **acotado entre 0,5 y 1,5**.
+- `factor_aceptacion = (vendidas + 1) / (resueltas + 10)`, relativo al
+  promedio de los pares no ocultos, **acotado entre 0,5 y 1,5**. `resueltas`
+  cuenta exposiciones en pedidos cobrados y no anulados; sin resueltas, factor 1.
 - Reglas forzadas primero (si pasan los filtros).
 - Con varios platos en el carrito: se juntan los candidatos de cada uno, se
   suman puntajes del mismo destino y pesa más el último agregado. Se miran solo

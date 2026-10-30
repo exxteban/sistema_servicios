@@ -50,7 +50,7 @@ test('editar pedido restaura su canal y la selección del catálogo', () => {
 function setup({ignoreAbort = false, observe = false} = {}) {
   let now = 0, nextTimer = 0;
   const timers = new Map(), requests = [];
-  const observers = [];
+  const observers = [], observed = new Set();
   const window = new Element();
   const document = Object.assign(new Element('document'), {
     createElement: (tag) => new Element(tag), activeElement: {name: 'buscador'},
@@ -58,8 +58,8 @@ function setup({ignoreAbort = false, observe = false} = {}) {
   const context = vm.createContext({window, document, navigator: {onLine: true},
     ...(observe ? {IntersectionObserver: class {
       constructor(callback) { observers.push(callback); }
-      observe() {}
-      disconnect() {}
+      observe(target) { observed.add(target); }
+      disconnect() { observed.clear(); }
     }} : {}),
     AbortController, URLSearchParams,
     setTimeout: (fn, delay) => { const id = ++nextTimer; timers.set(id, {fn, at: now + delay}); return id; },
@@ -103,7 +103,7 @@ function setup({ignoreAbort = false, observe = false} = {}) {
       sugerencias: ids.map((id) => ({id_producto: id, id_origen: 1, motivo: 'Regla del negocio'}))})});
     await flush();
   };
-  return {tick, respond, requests, instance, document, window, observers};
+  return {tick, respond, requests, instance, document, window, observers, observed};
 }
 
 test('debounce, precio del catálogo y mismo configurador sin robar foco', async () => {
@@ -248,9 +248,39 @@ test('una franja fuera del viewport espera a ser visible para registrar exposici
   pos.controller.refresh(); await env.tick(500); await env.respond(0);
   assert.equal(pos.controller.payload().mostradas.length, 0);
   pos.host.getClientRects = () => [];
-  env.observers[0]([{isIntersecting:true}]);
+  env.observers[0]([{target:pos.host, isIntersecting:true},
+    {target:chips(pos.host)[0], isIntersecting:true}]);
   assert.equal(pos.controller.payload().mostradas.length, 0, 'Una pestaña interna oculta tampoco cuenta');
   pos.host.getClientRects = () => [{}];
-  env.observers[0]([{isIntersecting:true}]);
+  env.observers[0]([{target:pos.host, isIntersecting:true}]);
   assert.equal(pos.controller.payload().mostradas.length, 1);
+});
+
+test('solo registra botones visibles al desplazar las píldoras y la lista', async () => {
+  const env = setup({observe:true}), pos = env.instance();
+  for (const id of [3, 4, 5]) pos.state.products.push({id_producto:id, nombre:`Extra ${id}`, precio:1, disponible:true});
+  pos.controller.refresh(); await env.tick(500); await env.respond(0, [2, 3, 4, 5]);
+  const observe = (...entries) => env.observers[0](entries);
+  const shown = () => JSON.parse(JSON.stringify(pos.controller.payload().mostradas));
+  const buttons = chips(pos.host);
+  assert.ok(env.observed.has(pos.host));
+  assert.ok(buttons.every((button) => env.observed.has(button)));
+  observe({target:pos.host, isIntersecting:true}, {target:buttons[0], isIntersecting:true},
+    {target:buttons[1], isIntersecting:false}, {target:buttons[2], isIntersecting:false});
+  assert.deepEqual(shown(), [[1, 2]], 'El overflow horizontal no cuenta como exposición');
+  observe({target:buttons[0], isIntersecting:false}, {target:buttons[1], isIntersecting:true});
+  assert.deepEqual(shown(), [[1, 2], [1, 3]], 'Desplazar registra el botón que entra');
+  pos.click(find(pos.host, (n) => n.dataset.action === 'more'));
+  assert.equal(shown().length, 2, 'Abrir la lista espera la visibilidad de cada botón');
+  const list = find(pos.host, (n) => n.className === 'gs-pos-list');
+  assert.ok(list.children.every((li) => env.observed.has(li.children[0])));
+  observe({target:list.children[2].children[0], isIntersecting:true});
+  assert.deepEqual(shown(), [[1, 2], [1, 3], [1, 4]]);
+  observe({target:list.children[3].children[0], isIntersecting:true});
+  assert.equal(shown().length, 4, 'Desplazar la lista registra el siguiente destino');
+  pos.controller.reset();
+  observe({target:buttons[0], isIntersecting:true});
+  assert.deepEqual(shown(), [], 'Una franja oculta no suma exposiciones');
+  pos.controller.destroy();
+  assert.equal(env.observed.size, 0, 'Destruir la instancia desconecta los observadores');
 });
