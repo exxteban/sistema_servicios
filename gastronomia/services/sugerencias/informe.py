@@ -1,10 +1,12 @@
 """Comparación explicable de umbrales, sin escribir ni cambiar constantes."""
 from collections import Counter
+from datetime import datetime
 
 from gastronomia.models import GastronomiaCategoria
 from gastronomia.services.sugerencias import constantes as C
 from gastronomia.services.sugerencias.calculo import medir
 from gastronomia.services.sugerencias.diagnostico import analizar
+from gastronomia.services.sugerencias.diagnostico_pos import cobertura_registrada, medir_pos
 
 
 def comparar(conteo, *, soporte, confianza, lift, limite_detalle=20):
@@ -54,7 +56,7 @@ def comparar(conteo, *, soporte, confianza, lift, limite_detalle=20):
     }
 
 
-def informe_cliente(cliente_id, ahora=None, limite_detalle=20):
+def informe_cliente(cliente_id, ahora=None, limite_detalle=20, *, muestra_pos=20, repeticiones_pos=3, canales_pos=(None,)):
     resultado = analizar(cliente_id, ahora)
     conteos = resultado.pop('conteos')
     categorias = {c.id_categoria: c.nombre for c in GastronomiaCategoria.query.filter_by(cliente_id=cliente_id)}
@@ -82,4 +84,10 @@ def informe_cliente(cliente_id, ahora=None, limite_detalle=20):
         'Pocas canastas múltiples: priorizar reglas del negocio.'
         if resultado['porcentaje_multiples'] < 15 else 'Revisar los pares antes de activar el POS.'
     )
+    ahora_pos = ahora or datetime.utcnow()
+    resultado['cobertura_registrada'] = cobertura_registrada(cliente_id, ahora_pos)
+    resultado['consulta_pos'] = [medir_pos(
+        cliente_id, conteos['producto'].crudo, muestra=muestra_pos,
+        repeticiones=repeticiones_pos, canal_precio=canal, ahora=ahora_pos,
+    ) for canal in canales_pos]
     return resultado

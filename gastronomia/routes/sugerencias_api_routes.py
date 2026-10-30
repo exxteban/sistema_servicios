@@ -7,11 +7,9 @@ from flask_login import login_required
 from app import db
 from gastronomia.routes.api_routes import gastronomia_api_bp
 from gastronomia.services.access import cliente_id_actual_gastronomia
-from gastronomia.services.channel_price_service import normalizar_canal_precio
 from gastronomia.services.permisos import PERMISO_POS, requiere_permiso_gastronomia
 from gastronomia.services.sugerencias import constantes as C
-from gastronomia.services.sugerencias.candidatos import previsualizar
-from gastronomia.services.sugerencias.pos import config_para_pos
+from gastronomia.services.sugerencias.consulta_pos import consultar
 
 
 def _ids(texto):
@@ -34,15 +32,9 @@ def sugerencias_pos():
         return jsonify({'error': 'gastronomia_no_activa'}), 403
     sugerencias, maximo = [], 0
     try:
-        config = config_para_pos(cliente_id)
-        if config['activo']:
-            maximo = config['max']
-            canal = normalizar_canal_precio(request.args.get('canal_precio'))
-            ids = _ids(request.args.get('productos'))
-            resultado = previsualizar(cliente_id, ids, canal_precio=canal, plazo=plazo) if ids else {'sugerencias': []}
-            if monotonic() < plazo:
-                sugerencias = [{k: fila[k] for k in ('id_producto', 'motivo', 'fuente', 'id_origen')}
-                               for fila in resultado['sugerencias']]
+        resultado = consultar(cliente_id, _ids(request.args.get('productos')),
+                              canal_precio=request.args.get('canal_precio'), plazo=plazo)
+        sugerencias, maximo = resultado['sugerencias'], resultado['max']
     except (TimeoutError, ValueError):
         db.session.rollback()
     except Exception:

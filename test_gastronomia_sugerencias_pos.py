@@ -29,7 +29,7 @@ def test_apagado_no_consulta_motor_ni_crea_config(pantalla, monkeypatch):
     app, client, cliente, ids = pantalla
     def inesperado(*args, **kwargs):
         pytest.fail('No debe consultar candidatos cuando está apagado')
-    monkeypatch.setattr('gastronomia.routes.sugerencias_api_routes.previsualizar', inesperado)
+    monkeypatch.setattr('gastronomia.services.sugerencias.consulta_pos.previsualizar', inesperado)
     resp = client.get(f'/api/gastronomia/sugerencias?productos={ids[0]}')
     assert resp.status_code == 200
     assert resp.get_json() == {'ok': True, 'max': 0, 'sugerencias': []}
@@ -85,7 +85,7 @@ def test_error_sugeridor_no_impide_guardar_cobrar_y_enviar(pantalla, monkeypatch
     activar(pantalla)
     def fallar(*args, **kwargs):
         raise RuntimeError('Fallo simulado del sugeridor')
-    monkeypatch.setattr('gastronomia.routes.sugerencias_api_routes.previsualizar', fallar)
+    monkeypatch.setattr('gastronomia.services.sugerencias.consulta_pos.previsualizar', fallar)
     assert client.get(f'/api/gastronomia/sugerencias?productos={ids[0]}').get_json()['sugerencias'] == []
     _abrir_caja(app, 'admin_sugerencias')
     html = client.get('/gastronomia/pos').get_data(as_text=True)

@@ -42,7 +42,9 @@ la validación con historial real y MySQL real:
 - [x] Prueba de dos workers con sesiones independientes sobre SQLite en
   archivo: un cálculo ocupado no se repite. Pruebas de vencimiento, frecuencia
   y rechazo de publicación si otro worker reemplazó el token del candado.
-- [ ] Cobertura efectiva de franja y medición del endpoint con catálogo real.
+- [x] Diagnóstico de cobertura con filtros actuales y tiempos del servicio del
+  endpoint; medido sobre una copia temporal del catálogo e historial local.
+- [ ] Medición HTTP en una instalación desplegada y rendimiento con catálogo grande.
 - [ ] Ejecutar las pruebas contra MySQL real (compilar DDL no lo sustituye).
 - [ ] Revisar diagnóstico con historial de 2 o 3 instalaciones autorizadas.
 - [x] Pantalla del dueño en `/gastronomia/sugerencias`, accesible desde Menú
@@ -147,6 +149,9 @@ diagnóstico inicial se consulta con:
 ```powershell
 python scripts/diagnostico_sugerencias_gastronomia.py --cliente-id N --limite 20
 ```
+
+El diagnóstico de cobertura y tiempos del POS, su ejecución y los resultados
+locales están en [docs/sugerencias_gastronomia_diagnostico.md](docs/sugerencias_gastronomia_diagnostico.md).
 
 Ese script no usa `create_app`, no crea tablas ni ejecuta migraciones. Para
 el recálculo explícito se dispone de
