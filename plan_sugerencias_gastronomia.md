@@ -12,8 +12,8 @@ cómo se mide.
 
 ### Avance de implementación — 30/10/2026
 
-Base, administración, POS, medición y aprendizaje implementados; pendientes
-la validación con historial real y MySQL real:
+Base, administración, POS, medición y aprendizaje implementados, con pruebas
+en MariaDB real; pendientes completar historiales y medición HTTP desplegada:
 
 - [x] Seis tablas nuevas: configuración (apagada por defecto), reglas,
   exclusiones, pares, orígenes y estado/candado del cálculo. Registradas antes
@@ -45,7 +45,8 @@ la validación con historial real y MySQL real:
 - [x] Diagnóstico de cobertura con filtros actuales y tiempos del servicio del
   endpoint; medido sobre una copia temporal del catálogo e historial local.
 - [ ] Medición HTTP en una instalación desplegada y rendimiento con catálogo grande.
-- [ ] Ejecutar las pruebas contra MySQL real (compilar DDL no lo sustituye).
+- [x] Ejecutar las pruebas contra MySQL/MariaDB real: 33 escenarios aprobados
+  en MariaDB 10.4.32, además de la compilación de DDL.
 - [ ] Revisar diagnóstico con historial de 2 o 3 instalaciones autorizadas.
 - [x] Pantalla del dueño en `/gastronomia/sugerencias`, accesible desde Menú
   con permiso `gastronomia_menu`: configuración, alta/edición/pausa/reanudación
@@ -152,6 +153,9 @@ python scripts/diagnostico_sugerencias_gastronomia.py --cliente-id N --limite 20
 
 El diagnóstico de cobertura y tiempos del POS, su ejecución y los resultados
 locales están en [docs/sugerencias_gastronomia_diagnostico.md](docs/sugerencias_gastronomia_diagnostico.md).
+
+La validación de 33 escenarios en MariaDB real, el runner aislado y sus
+resguardos están en [docs/sugerencias_gastronomia_mysql.md](docs/sugerencias_gastronomia_mysql.md).
 
 Ese script no usa `create_app`, no crea tablas ni ejecuta migraciones. Para
 el recálculo explícito se dispone de

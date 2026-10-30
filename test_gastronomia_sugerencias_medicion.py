@@ -46,7 +46,9 @@ def test_registro_una_vez_por_par_y_solo_renglones_marcados(datos):
     data['items'].append({'producto_id': ids[1], 'cantidad': 3})  # mismo destino por el menú
     registrar_seguro(cliente, p.id_pedido, data)
     registrar_seguro(cliente, p.id_pedido, data)
-    db.session.expire_all()
+    # Nueva lectura tras la transacción independiente (MySQL REPEATABLE READ
+    # conserva la instantánea anterior incluso con expire_all).
+    db.session.rollback()
     assert Exposicion.query.count() == 1
     e = Estadistica.query.one()
     assert (e.mostradas, e.tocadas, e.vendidas) == (1, 1, 0)
@@ -60,7 +62,7 @@ def test_registro_una_vez_por_par_y_solo_renglones_marcados(datos):
     # Quitar lo aceptado y dejar el destino por el menú conserva la exposición histórica.
     data['items'][1].pop('origen_sugerencia')
     registrar_seguro(cliente, p.id_pedido, data)
-    db.session.expire_all()
+    db.session.rollback()
     assert Estadistica.query.one().tocadas == 1
     s = resumen(cliente, periodo())
     assert (s['pedidos'], s['renglones'], s['sin_tocar']) == (0, 0, 1)
@@ -136,7 +138,8 @@ def test_fatiga_solo_con_cobrados_y_nueva_oportunidad(datos):
     db.session.commit()
     actualizar(cliente, ahora)
     db.session.commit()
-    assert e.oculto_hasta == ahora + timedelta(days=30)
+    # DATETIME de MySQL/MariaDB se guarda a segundos, SQLite conserva microsegundos.
+    assert e.oculto_hasta.replace(microsecond=0) == (ahora + timedelta(days=30)).replace(microsecond=0)
     assert (e.mostradas, e.tocadas, e.resueltas, e.vendidas) == (0, 0, 0, 0)
     assert previsualizar(cliente, ids[:1])['sugerencias'] == []
     assert 'aceptación' in previsualizar(cliente, ids[:1])['descartados'][0]['descarte']
@@ -170,13 +173,13 @@ def test_tocada_quitada_antes_de_guardar_y_origen_multiple(datos):
     data = payload(ids)
     data['sugerencias'] = {'mostradas': [ids[:2], [ids[2], ids[1]]], 'tocadas': [[ids[2], ids[1]]]}
     registrar_seguro(cliente, p.id_pedido, data)
-    db.session.expire_all()
+    db.session.rollback()
     assert sum(e.tocadas for e in Estadistica.query.all()) == 2
     # La misma papa aceptada desde un origen no cuenta también como agregada por menú.
     assert resumen(cliente, periodo())['sin_tocar'] == 0
     data['items'][1].pop('origen_sugerencia')
     registrar_seguro(cliente, p.id_pedido, data)
-    db.session.expire_all()
+    db.session.rollback()
     assert Exposicion.query.filter_by(id_origen=ids[2]).one().tocada
     assert resumen(cliente, periodo())['sin_tocar'] == 1
 

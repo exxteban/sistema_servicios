@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from contextlib import nullcontext
+import os
 
 import pytest
 from flask import Flask
@@ -21,29 +23,41 @@ from gastronomia.services.sugerencias.tarea import recalcular
 
 @pytest.fixture
 def datos(request, tmp_path):
-    app = Flask(__name__)
     uri = f"sqlite:///{(tmp_path / 'sugerencias.db').as_posix()}" if getattr(request, 'param', None) == 'archivo' else 'sqlite:///:memory:'
-    app.config.update(SQLALCHEMY_DATABASE_URI=uri, TESTING=True)
-    db.init_app(app)
-    with app.app_context():
-        db.create_all()
-        db.session.add(Rol(id_rol=3, nombre='Prueba'))
-        db.session.commit()
-        cliente = Cliente(nombre='Prueba', ruc_ci='sugerencias')
-        db.session.add(cliente)
-        db.session.flush()
-        usuario = Usuario(username='sugerencias', nombre_completo='Prueba', password_hash='x')
-        db.session.add(usuario)
-        db.session.add(GastronomiaClienteConfig(cliente_id=cliente.id_cliente, gastronomia_activo=True))
-        categoria = GastronomiaCategoria(cliente_id=cliente.id_cliente, nombre='Comidas')
-        db.session.add(categoria)
-        db.session.flush()
-        productos = [GastronomiaProducto(cliente_id=cliente.id_cliente, categoria_id=categoria.id_categoria,
-                                         nombre=f'Plato {i}', precio=10) for i in range(14)]
-        db.session.add_all(productos)
-        db.session.commit()
-        yield cliente.id_cliente, usuario.id_usuario, [p.id_producto for p in productos]
-        db.session.remove()
+    mysql = getattr(request, 'param', None) == 'mysql'
+    if mysql and not os.environ.get('SUGERENCIAS_TEST_MYSQL_URL'):
+        pytest.skip('Usar scripts/probar_sugerencias_mysql.py para iniciar MariaDB aislada.')
+    from sugerencias_mysql_testing import base_mysql
+    with base_mysql() if mysql else nullcontext(uri) as conexion:
+        app = Flask(__name__)
+        app.config.update(SQLALCHEMY_DATABASE_URI=conexion, TESTING=True)
+        db.init_app(app)
+        with app.app_context():
+            try:
+                yield _sembrar_datos()
+            finally:
+                db.session.remove()
+                db.engine.dispose()
+
+
+def _sembrar_datos():
+    db.create_all()
+    db.session.add(Rol(id_rol=3, nombre='Prueba'))
+    db.session.commit()
+    cliente = Cliente(nombre='Prueba', ruc_ci='sugerencias')
+    db.session.add(cliente)
+    db.session.flush()
+    usuario = Usuario(username='sugerencias', nombre_completo='Prueba', password_hash='x')
+    db.session.add(usuario)
+    db.session.add(GastronomiaClienteConfig(cliente_id=cliente.id_cliente, gastronomia_activo=True))
+    categoria = GastronomiaCategoria(cliente_id=cliente.id_cliente, nombre='Comidas')
+    db.session.add(categoria)
+    db.session.flush()
+    productos = [GastronomiaProducto(cliente_id=cliente.id_cliente, categoria_id=categoria.id_categoria,
+                                     nombre=f'Plato {i}', precio=10) for i in range(14)]
+    db.session.add_all(productos)
+    db.session.commit()
+    return cliente.id_cliente, usuario.id_usuario, [p.id_producto for p in productos]
 
 
 def pedido(datos, ids, *, pagado=True, encargo=False, cliente_id=None):
