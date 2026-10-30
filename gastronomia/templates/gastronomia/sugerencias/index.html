@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% from 'gastronomia/sugerencias/_campos.html' import csrf, elegir with context %}
+{% block title %}Sugerencias · Gastronomía{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/sugerencias_admin.css') }}">
+<div class="gs-admin">
+    <header><div><p>Gastronomía</p><h1>Sugerencias de venta</h1><p>Elegí qué complementos ofrecer mientras se carga un pedido.</p></div>
+        <a href="{{ url_for('gastronomia.menu_config') }}">Volver al menú</a></header>
+    <section class="gs-card">
+        <h2>Configuración</h2>
+        <form method="post">{{ csrf() }}<input type="hidden" name="accion" value="config">
+            <label class="gs-check"><input type="checkbox" name="activo" value="1" {{ 'checked' if config and config.activo }}> Activar sugeridor</label>
+            <label class="gs-check"><input type="checkbox" name="mostrar_en_pos" value="1" {{ 'checked' if config and config.mostrar_en_pos }}> Mostrar sugerencias en el POS</label>
+            <p class="gs-muted">Prepará las reglas y revisá la vista previa antes de habilitar las sugerencias para el cajero.</p>
+            <label>Máximo de sugerencias visibles<select name="max_franja">{% for n in [1,2,3] %}<option value="{{ n }}" {{ 'selected' if n == (config.max_franja if config else 3) }}>{{ n }}</option>{% endfor %}</select></label>
+            <button type="submit">Guardar configuración</button>
+        </form>
+    </section>
+    {% include 'gastronomia/sugerencias/_reglas.html' %}
+    {% include 'gastronomia/sugerencias/_exclusiones.html' %}
+    <section class="gs-card">
+        <h2>Asociaciones calculadas</h2>
+        {% if estado and estado.token %}<p>Hay un cálculo en curso. Actualizá la página para ver el resultado.</p>{% endif %}
+        {% if estado and estado.fin %}<p>Último cálculo: {{ estado.fin|local_strftime }} · {{ estado.pedidos }} pedidos · {{ estado.pares }} asociaciones.</p>{% else %}<p>Todavía no hay un cálculo finalizado.</p>{% endif %}
+        {% if estado and estado.error %}<p role="alert">El último intento falló. Se conservan los resultados anteriores. Revisá los registros del servidor.</p>{% endif %}
+        <form method="post">{{ csrf() }}<input type="hidden" name="accion" value="recalcular"><button type="submit">Recalcular ahora</button></form>
+        <p class="gs-muted">Analiza pedidos cobrados. Las reglas manuales funcionan aunque haya poco historial.</p>
+    </section>
+    {% include 'gastronomia/sugerencias/_preview.html' %}
+</div>
+{% endblock %}

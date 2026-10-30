@@ -7,6 +7,7 @@ from gastronomia.services.access import cliente_id_actual_gastronomia, mensaje_c
 from gastronomia.services.menu_service import listar_categorias
 from gastronomia.services.pedido_service import obtener_pedido
 from gastronomia.services.peso_service import atajos_peso
+from gastronomia.services.sugerencias.pos import config_segura
 from gastronomia.services.permisos import (
     PERMISO_CAJA,
     PERMISO_POS,
@@ -41,4 +42,5 @@ def pos():
         pedido_inicial_id=int(pedido_inicial.id_pedido) if pedido_inicial else None,
         puede_cobrar=tiene_permiso_gastronomia(PERMISO_CAJA),
         peso_atajos=atajos_peso(cliente_id),
+        sugerencias_config=config_segura(cliente_id),
     )

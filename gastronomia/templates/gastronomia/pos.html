@@ -160,6 +160,7 @@
             </div>
             <p class="mt-3 text-sm font-semibold text-gray-700 dark:text-gray-200">Items del pedido</p>
             <div id="cart-items" class="mt-2 space-y-2"></div>
+            {% include 'gastronomia/_pos_sugerencias.html' %}
             <label class="mt-3 block text-sm font-semibold text-gray-700 dark:text-gray-200">
                 Notas del pedido
                 <textarea id="order-notes" rows="2" placeholder="Escribe una nota para la cocina (opcional)..." class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
@@ -244,6 +245,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos.css', v='20260604-1') }}">
 <link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos_cart_modifiers.css', v='modificadores-20260728-2') }}">
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos_sugerencias.css', v='20261030-1') }}">
 <style>
     @media (min-width: 768px) and (max-width: 1279px) {
         .pos-shell {
@@ -271,13 +273,14 @@
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/promociones.js', v='modificadores-20260728-3') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_stock_alerts.js', v='20260531-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/pos_channel_prices.js', v='20260531-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos_channel_prices.js', v='sugerencias-20261030-1') }}"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_delivery_location.js', v='20260605-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_table_warnings.js', v='20260603-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_cart_modifiers.js', v='modificadores-20260728-3') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_modifier_groups.js', v='peso-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_peso.js', v='peso-20261020-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='peso-20261020-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos_sugerencias.js', v='20261030-1') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='sugerencias-20261030-2') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

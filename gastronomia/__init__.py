@@ -1,4 +1,5 @@
 """Modulo aislado para el modo Gastronomia."""
+from gastronomia import sugerencias_models as _sugerencias_models  # noqa: F401
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.routes.api_routes import gastronomia_api_bp
 from gastronomia.routes.channel_price_api_routes import gastronomia_channel_price_api_bp
@@ -23,6 +24,8 @@ from gastronomia.routes import importacion_api_routes as _importacion_api_routes
 from gastronomia.routes import importacion_routes as _importacion_routes  # noqa: F401
 from gastronomia.routes import entregas_routes as _entregas_routes  # noqa: F401
 from gastronomia.routes import menu_routes as _menu_routes  # noqa: F401
+from gastronomia.routes import sugerencias_routes as _sugerencias_routes  # noqa: F401
+from gastronomia.routes import sugerencias_api_routes as _sugerencias_api_routes  # noqa: F401
 from gastronomia.routes import menu_tv_routes as _menu_tv_routes  # noqa: F401
 from gastronomia.routes import pos_routes as _pos_routes  # noqa: F401
 from gastronomia.routes import produccion_routes as _produccion_routes  # noqa: F401

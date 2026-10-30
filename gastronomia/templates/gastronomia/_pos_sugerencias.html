@@ -1,0 +1,4 @@
+{% if sugerencias_config.activo %}
+<div class="gs-pos" data-pos-sugerencias data-max="{{ sugerencias_config.max }}"
+     data-url="{{ url_for('gastronomia_api.sugerencias_pos') }}" aria-label="Sugerencias para completar el pedido" hidden></div>
+{% endif %}

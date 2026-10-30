@@ -1,0 +1,12 @@
+{% macro csrf() -%}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{%- endmacro %}
+{% macro elegir(nombre, opciones, valor='', cualquiera=false, platos=false) -%}
+<select name="{{ nombre }}" required>
+    <option value="">Seleccioná {{ 'un plato' if platos else 'un plato o categoría' }}</option>
+    {% if cualquiera %}<option value="cualquiera" {{ 'selected' if valor == 'cualquiera' }}>Cualquier pedido</option>{% endif %}
+    {% for clave, texto in opciones.items() %}{% if not platos or clave.startswith('producto:') %}
+    <option value="{{ clave }}" {{ 'selected' if clave == valor }}>{{ texto }}</option>
+    {% endif %}{% endfor %}
+</select>
+{%- endmacro %}

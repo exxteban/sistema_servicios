@@ -1,0 +1,22 @@
+.gs-admin { --gs-bg: #fff; --gs-line: #d1d5db; --gs-text: #111827; --gs-muted: #4b5563; max-width: 1100px; margin: auto; color: var(--gs-text); }
+.dark .gs-admin { --gs-bg: #1f2937; --gs-line: #4b5563; --gs-text: #f3f4f6; --gs-muted: #d1d5db; }
+.gs-admin header, .gs-inline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gs-admin header { justify-content: space-between; margin-bottom: 24px; }
+.gs-admin h1 { font-size: 1.6rem; font-weight: 700; }
+.gs-admin h2 { font-size: 1.1rem; font-weight: 700; margin: 8px 0 14px; }
+.gs-card { background: var(--gs-bg); border: 1px solid var(--gs-line); padding: 22px; border-radius: 12px; margin-bottom: 20px; }
+.gs-admin label { display: block; font-size: .9rem; flex: 1; min-width: 0; }
+.gs-admin input:not([type=checkbox]):not([type=hidden]), .gs-admin select { display: block; width: 100%; min-height: 42px; padding: 8px; border: 1px solid var(--gs-line); border-radius: 7px; background: var(--gs-bg); color: var(--gs-text); margin: 6px 0 12px; }
+.gs-admin .gs-check { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+.gs-admin input[type=checkbox] { width: 18px; height: 18px; }
+.gs-admin button { background: #92400e; color: #fff; padding: 9px 14px; border-radius: 7px; font-weight: 600; min-height: 42px; }
+.gs-admin button.gs-secondary { background: transparent; color: var(--gs-text); border: 1px solid var(--gs-line); }
+.gs-admin a { text-decoration: underline; text-underline-offset: 3px; }
+.gs-admin :is(a, button, input, select, summary):focus-visible { outline: 3px solid #d97706; outline-offset: 3px; }
+.gs-admin .gs-muted { font-size: .85rem; color: var(--gs-muted); margin: 10px 0; }
+.gs-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.gs-list { list-style: none; margin: 16px 0; padding: 0; }
+.gs-list > li { padding: 14px 0; border-top: 1px solid var(--gs-line); overflow-wrap: anywhere; }
+.gs-list p { margin-bottom: 10px; }
+.gs-admin summary { cursor: pointer; padding: 12px 0; }
+@media (max-width: 640px) { .gs-grid { grid-template-columns: 1fr; gap: 0; } .gs-card { padding: 16px; } .gs-inline > label { flex-basis: 100%; } }

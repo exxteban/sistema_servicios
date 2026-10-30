@@ -1,32 +1,32 @@
 (function () {
-  const csrf = document.getElementById('csrf-token')?.value || '';
-  const productsGrid = document.getElementById('products-grid');
-  const productSearch = document.getElementById('product-search');
-  const cartItems = document.getElementById('cart-items');
-  const cartTotal = document.getElementById('cart-total');
-  const productsCount = document.getElementById('products-count');
-  const alertBox = document.getElementById('pos-alert');
-  const clearProductSearchButton = document.getElementById('clear-product-search');
-  const editingOrderBanner = document.getElementById('editing-order-banner');
-  const modal = document.getElementById('modifier-modal');
-  const modalName = document.getElementById('modal-product-name');
-  const modalPrice = document.getElementById('modal-product-price');
-  const modalGroups = document.getElementById('modifier-groups');
-  const modalQty = document.getElementById('modal-qty');
-  const modalNote = document.getElementById('modal-note');
-  const modalModeLabel = document.getElementById('modal-mode-label');
-  const configuredProductButton = document.getElementById('add-configured-product');
-  const root = document.querySelector('[data-gastro-pos]');
-  const orderTypeInput = document.getElementById('order-type');
-  const deliveryReferenceInput = document.getElementById('delivery-reference');
-  const deliveryFields = document.getElementById('delivery-fields');
-  const deliveryPhoneInput = document.getElementById('delivery-phone');
-  const deliveryAddressInput = document.getElementById('delivery-address');
-  const deliveryEstimateInput = document.getElementById('delivery-estimate');
-  const deliveryShippingInput = document.getElementById('delivery-shipping-cost');
-  const tableNameInput = document.getElementById('table-name');
-  const tablePickerSection = document.getElementById('table-picker-section');
-  const tableGrid = document.getElementById('table-grid');
+  const root = document.currentScript?.closest('[data-app-tab-content]')?.querySelector('[data-gastro-pos]') || document.querySelector('[data-gastro-pos]');
+  const csrf = root.querySelector('#csrf-token')?.value || '';
+  const productsGrid = root.querySelector('#products-grid');
+  const productSearch = root.querySelector('#product-search');
+  const cartItems = root.querySelector('#cart-items');
+  const cartTotal = root.querySelector('#cart-total');
+  const productsCount = root.querySelector('#products-count');
+  const alertBox = root.querySelector('#pos-alert');
+  const clearProductSearchButton = root.querySelector('#clear-product-search');
+  const editingOrderBanner = root.querySelector('#editing-order-banner');
+  const modal = root.querySelector('#modifier-modal');
+  const modalName = root.querySelector('#modal-product-name');
+  const modalPrice = root.querySelector('#modal-product-price');
+  const modalGroups = root.querySelector('#modifier-groups');
+  const modalQty = root.querySelector('#modal-qty');
+  const modalNote = root.querySelector('#modal-note');
+  const modalModeLabel = root.querySelector('#modal-mode-label');
+  const configuredProductButton = root.querySelector('#add-configured-product');
+  const orderTypeInput = root.querySelector('#order-type');
+  const deliveryReferenceInput = root.querySelector('#delivery-reference');
+  const deliveryFields = root.querySelector('#delivery-fields');
+  const deliveryPhoneInput = root.querySelector('#delivery-phone');
+  const deliveryAddressInput = root.querySelector('#delivery-address');
+  const deliveryEstimateInput = root.querySelector('#delivery-estimate');
+  const deliveryShippingInput = root.querySelector('#delivery-shipping-cost');
+  const tableNameInput = root.querySelector('#table-name');
+  const tablePickerSection = root.querySelector('#table-picker-section');
+  const tableGrid = root.querySelector('#table-grid');
   const promotions = window.GastronomiaPromociones;
   let products = [];
   let mesas = [];
@@ -73,10 +73,12 @@
     return data;
   };
   const loadProducts = async () => {
+    suggestions?.refresh();
     const nextProducts = await window.GastronomiaChannelPrices.fetchProducts(apiJson, selectedPriceChannel);
     if (!nextProducts) return;
     products = nextProducts;
     renderProducts();
+    suggestions?.refresh();
   };
   const loadMesas = async () => {
     const data = await apiJson('/api/gastronomia/salon/estado');
@@ -127,7 +129,7 @@
   };
   const syncOrderTypeUi = () => {
     const currentType = orderTypeInput?.value || 'mostrador';
-    document.querySelectorAll('[data-order-type]').forEach((button) => {
+    root.querySelectorAll('[data-order-type]').forEach((button) => {
       button.classList.toggle('activa', button.dataset.orderType === currentType);
     });
     if (tablePickerSection) {
@@ -192,7 +194,7 @@
         editingOrderBanner.classList.add('hidden');
       }
     }
-    const saveButton = document.getElementById('save-order');
+    const saveButton = root.querySelector('#save-order');
     if (saveButton) {
       saveButton.innerHTML = activeOrderId
         ? '<i class="fas fa-save"></i> Guardar cambios'
@@ -200,6 +202,7 @@
     }
   };
   const resetDraft = () => {
+    suggestions?.reset();
     cart = [];
     setEditingOrderState(null);
     if (orderTypeInput) orderTypeInput.value = 'mostrador';
@@ -210,13 +213,16 @@
     if (deliveryEstimateInput) deliveryEstimateInput.value = '';
     if (deliveryShippingInput) deliveryShippingInput.value = 0;
     if (tableNameInput) tableNameInput.value = '';
-    const orderNotesInput = document.getElementById('order-notes');
+    const orderNotesInput = root.querySelector('#order-notes');
     if (orderNotesInput) orderNotesInput.value = '';
     syncOrderTypeUi();
     renderCart();
   };
   const hydrateOrder = (order) => {
     if (!order) return;
+    window.GastronomiaChannelPrices?.hydrateOrderChannel(order, root, selectedPriceChannel, (channel) => {
+      selectedPriceChannel = channel; selectedCategory = ''; loadProducts().catch((error) => showAlert(error.message, false));
+    });
     setEditingOrderState(order.id_pedido, order);
     if (orderTypeInput) orderTypeInput.value = order.tipo_pedido || 'mostrador';
     if (deliveryReferenceInput) deliveryReferenceInput.value = order.referencia_entrega || '';
@@ -226,7 +232,7 @@
     if (deliveryEstimateInput) deliveryEstimateInput.value = order.tiempo_estimado_minutos || '';
     if (deliveryShippingInput) deliveryShippingInput.value = order.costo_envio || 0;
     if (tableNameInput) tableNameInput.value = order.mesa || '';
-    const orderNotesInput = document.getElementById('order-notes');
+    const orderNotesInput = root.querySelector('#order-notes');
     if (orderNotesInput) orderNotesInput.value = order.notas || '';
     cart = (order.items || []).map(mapOrderItemToCartItem);
     syncOrderTypeUi();
@@ -332,6 +338,7 @@
     `).join('') || '<div class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">Sin items.</div>';
     cartTotal.textContent = money(cartTotalAmount());
     window.GastronomiaStockAlerts?.refresh(cart);
+    suggestions?.refresh();
   };
 
   const cartSubtotal = () => cart.reduce((sum, item) => sum + promotions.subtotal(item), 0);
@@ -352,7 +359,7 @@
     ...(window.GastronomiaDeliveryLocation?.payload() || {}),
     tiempo_estimado_minutos: deliveryEstimateInput?.value || null,
     costo_envio: deliveryShippingCost(),
-    notas: document.getElementById('order-notes').value.trim(),
+    notas: root.querySelector('#order-notes').value.trim(),
     items: cart.map((item) => ({
       producto_id: item.producto_id,
       canal_precio: item.canal_precio || null,
@@ -491,7 +498,7 @@
     `;
   };
   const fitCategoryLabels = () => {
-    document.querySelectorAll('.pos-category > span:not([data-category-drag-handle])').forEach((label) => {
+    root.querySelectorAll('.pos-category > span:not([data-category-drag-handle])').forEach((label) => {
       label.style.fontSize = '';
       let size = parseFloat(getComputedStyle(label).fontSize || '11');
       while (label.scrollWidth > label.clientWidth && size > 7.5) {
@@ -500,12 +507,12 @@
       }
     });
   };
-  document.getElementById('category-tabs')?.addEventListener('click', (event) => {
+  root.querySelector('#category-tabs')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-category]');
     if (!button) return;
     selectedCategory = button.dataset.category;
     selectedPriceChannel = button.dataset.priceChannel || '';
-    document.querySelectorAll('.pos-category').forEach((item) => item.classList.remove('active'));
+    root.querySelectorAll('.pos-category').forEach((item) => item.classList.remove('active'));
     button.classList.add('active');
     loadProducts().catch((error) => showAlert(error.message, false));
   });
@@ -521,7 +528,7 @@
     productSearch.focus();
   });
   deliveryShippingInput?.addEventListener('input', renderCart);
-  document.getElementById('order-type-buttons')?.addEventListener('click', (event) => {
+  root.querySelector('#order-type-buttons')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-order-type]');
     if (!button) return;
     setOrderType(button.dataset.orderType || 'mostrador');
@@ -551,21 +558,24 @@
     lastOrderId = null;
     renderCart();
   });
-  document.getElementById('close-modal')?.addEventListener('click', closeModal);
-  document.getElementById('add-configured-product')?.addEventListener('click', (event) => {
+  root.querySelector('#close-modal')?.addEventListener('click', closeModal);
+  root.querySelector('#add-configured-product')?.addEventListener('click', (event) => {
     runBusyAction(event.currentTarget, editingItemKey ? 'Guardando...' : 'Agregando...', addConfiguredProduct);
   });
-  document.getElementById('clear-cart')?.addEventListener('click', resetDraft);
-  document.getElementById('save-order')?.addEventListener('click', (event) => {
+  root.querySelector('#clear-cart')?.addEventListener('click', resetDraft);
+  root.querySelector('#save-order')?.addEventListener('click', (event) => {
     runBusyAction(event.currentTarget, 'Guardando...', saveOrder);
   });
-  document.getElementById('send-kitchen')?.addEventListener('click', (event) => {
+  root.querySelector('#send-kitchen')?.addEventListener('click', (event) => {
     runBusyAction(event.currentTarget, 'Enviando...', sendKitchen);
   });
-  document.getElementById('charge-send-kitchen')?.addEventListener('click', (event) => {
+  root.querySelector('#charge-send-kitchen')?.addEventListener('click', (event) => {
     runBusyAction(event.currentTarget, 'Abriendo cobro...', openAdvancedCheckoutAndSendKitchen);
   });
 
+  const suggestions = window.GastronomiaSugerencias?.create(root, {
+    getState: () => ({cart, products, channel: selectedPriceChannel}), openProduct, money,
+  });
   const mesaInicial = root?.dataset.mesaInicial || '';
   const tipoInicial = root?.dataset.tipoInicial || '';
   const pedidoInicialId = Number(root?.dataset.pedidoInicialId || 0);
