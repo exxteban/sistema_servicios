@@ -2,7 +2,7 @@
 
 Mientras se carga un pedido, el POS de gastronomía sugiere hasta 3 platos que
 tiene sentido sumar. **Sin IA**: estadística sobre los pedidos cobrados del
-propio negocio, más reglas del dueño.
+propio negocio, reglas del dueño y complementos gastronómicos iniciales.
 
 Es la adaptación del módulo del padre
 (`sistema_silvio_cel/docs/sugerencias_venta.md`,
@@ -15,6 +15,8 @@ cómo se mide.
 Base, administración, POS, medición y aprendizaje implementados, con pruebas
 en MariaDB real; pendientes completar historiales y medición HTTP desplegada:
 
+- [x] Complementos iniciales sin historial: hamburguesa → papas/bebida,
+  café → medialuna; detalle y validación en [complementos](docs/sugerencias_gastronomia_complementos.md).
 - [x] Seis tablas nuevas: configuración (apagada por defecto), reglas,
   exclusiones, pares, orígenes y estado/candado del cálculo. Registradas antes
   del `create_all` habitual; sin columnas nuevas en tablas existentes.
@@ -224,12 +226,10 @@ Mismo criterio que `gastronomia/services/inteligencia_service.py`:
    historial. Solo dice dónde buscar; el plato concreto se elige por afinidad
    de nombre y ventas (§5).
 
-**Complementos de fábrica** (fuente 5 del padre): **no** en la primera
-entrega. En el padre hicieron falta porque el 90% de las ventas eran de un
-solo producto. En gastronomía se espera más pedidos con varios platos; se
-decide con el diagnóstico (§11): si menos del 15% de los pedidos tiene más de
-un plato, se evalúa un diccionario gastronómico (pizza → bebida, café →
-medialuna) como etapa aparte.
+5. **Complementos de fábrica**, implementados a pedido del usuario el
+   30/10/2026: relaciones gastronómicas iniciales sobre el menú disponible,
+   sin esperar ventas ni cargar reglas. Reglas y asociaciones tienen prioridad.
+   Ver [comportamiento, límites y pruebas](docs/sugerencias_gastronomia_complementos.md).
 
 ## 4. El cálculo
 
@@ -532,7 +532,7 @@ prueba; correr solo esos.
 **Filtros**
 - Agotado (con control de stock), no disponible, inactivo, no visible,
   excluido, prohibido y ya en el carrito no aparecen.
-- Sin reglas ni evidencia: respuesta vacía.
+- Sin reglas, evidencia ni complementos reconocidos: respuesta vacía.
 
 **POS (navegador)**
 - La franja aparece al pie del carrito sin mover filas, y el foco no se mueve.
@@ -572,7 +572,6 @@ Estimación: 3 a 5 días para las etapas 1–3 portando el código del padre;
 ## 16. Fuera de esta etapa
 
 - Agregar en un toque los platos sin opciones (menú y franja juntos).
-- Complementos de fábrica gastronómicos (§3), según el diagnóstico.
 - Sugerir el **combo** que contiene lo cargado (`menu_combo_service.py`).
 - Sugerencias en la tienda online (respetando el aislamiento de
   `/tienda_online`).

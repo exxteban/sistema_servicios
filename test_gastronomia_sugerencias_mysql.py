@@ -19,12 +19,13 @@ import test_gastronomia_sugerencias_medicion as medicion
 import test_gastronomia_sugerencias_diagnostico as diagnostico
 import test_gastronomia_sugerencias_diagnostico_pos as pos
 import test_gastronomia_sugerencias_scheduler as scheduler
+import test_gastronomia_sugerencias_complementos as complementos
 from test_gastronomia_caja import _abrir_caja
 
 
 pytestmark = pytest.mark.parametrize('datos', ['mysql'], indirect=True)
 casos = []
-for modulo in (calculo, admin, medicion, diagnostico, pos, scheduler):
+for modulo in (calculo, admin, medicion, diagnostico, pos, scheduler, complementos):
     for nombre, funcion in vars(modulo).items():
         if not nombre.startswith('test_') or nombre.startswith('test_cli') or not inspect.isfunction(funcion):
             continue

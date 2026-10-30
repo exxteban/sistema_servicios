@@ -3,7 +3,7 @@ from time import monotonic
 
 from gastronomia.channel_models import GastronomiaProductoPrecioCanal
 from gastronomia.services.channel_price_service import normalizar_canal_precio
-from gastronomia.models import GastronomiaProducto
+from gastronomia.models import GastronomiaProducto, GastronomiaCategoria
 from gastronomia.sugerencias_models import (
     GastronomiaSugerenciaRegla as Regla, GastronomiaSugerenciaExcluido as Excluido,
     GastronomiaSugerenciaPar as Par, GastronomiaSugerenciaOrigen as Origen,
@@ -11,6 +11,7 @@ from gastronomia.sugerencias_models import (
 from gastronomia.services.sugerencias.afinidad import Catalogo
 from gastronomia.services.sugerencias import constantes as C
 from gastronomia.services.sugerencias.aprendizaje import factores
+from gastronomia.services.sugerencias.complementos import Complementos
 
 
 def _coincide(tipo, numero, producto):
@@ -50,9 +51,11 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
     comprobar_plazo()
     candidatos = []
     aprendizaje = factores(cliente_id)
+    categorias = {c.id_categoria: c.nombre for c in GastronomiaCategoria.query.filter_by(cliente_id=cliente_id)} if C.COMPLEMENTOS_ACTIVOS else {}
+    complementos = Complementos(productos, categorias, carrito) if C.COMPLEMENTOS_ACTIVOS else None
     for origen in origenes:
         comprobar_plazo()
-        def sumar(destino, fuente, puntaje, *, regla=None, par=None):
+        def sumar(destino, fuente, puntaje, *, regla=None, par=None, motivo=None):
             afinidad, _ = catalogo.afinidad(origen.id_producto, destino.id_producto)
             peso = 1 if origen == origenes[-1] else .5
             candidatos.append(dict(
@@ -62,8 +65,8 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
                 * aprendizaje.get((origen.id_producto, destino.id_producto), {}).get('factor', 1),
                 soporte=par.soporte if par else None, confianza=par.confianza if par else None,
                 lift=par.lift if par else None,
-                motivo='Regla del negocio' if regla else (
-                    'Se suelen pedir juntos' if fuente == 'producto' else 'Asociación entre categorías'),
+                motivo=motivo or ('Regla del negocio' if regla else (
+                    'Se suelen pedir juntos' if fuente == 'producto' else 'Asociación entre categorías')),
             ))
         for regla in reglas:
             if regla.tipo != 'forzar' or not _coincide(regla.origen_tipo, regla.origen_id, origen):
@@ -81,6 +84,12 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
                                          -conteos.get(p.id_producto, 0), p.id_producto))
             for destino in destinos[:C.CANDIDATOS_POR_CATEGORIA]:
                 sumar(destino, nivel, par.puntaje, par=par)
+        if complementos:
+            existentes = {c['id_producto'] for c in candidatos if c['id_origen'] == origen.id_producto}
+            for destino, prioridad, motivo in complementos.para(origen):
+                comprobar_plazo()
+                if destino.id_producto not in existentes:
+                    sumar(destino, 'complemento', C.PUNTAJE_COMPLEMENTO / (1 + prioridad), motivo=motivo)
     aceptados, descartados = {}, []
     principal = max(precio(productos[p]) for p in carrito if p in productos)
     for fila in candidatos:
@@ -107,6 +116,8 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
             razon = 'Conflicto de nombres'
         elif not fila['forzada'] and precio(p) > principal and (fila['lift'] or 0) < C.LIFT_PRECIO_ALTO:
             razon = 'Precio mayor que el plato principal'
+        elif fila['fuente'] == 'complemento' and precio(p) > precio(origen):
+            razon = 'Complemento más caro que el plato que lo pide'
         elif aprendizaje.get((origen.id_producto, p.id_producto), {}).get('oculto'):
             razon = 'Oculta por baja aceptación durante 30 días'
         if razon:
@@ -115,12 +126,22 @@ def previsualizar(cliente_id, productos_carrito, *, canal_precio=None, plazo=Non
         anterior = aceptados.get(p.id_producto)
         if anterior:
             total = anterior['puntaje'] + fila['puntaje']
-            if (fila['forzada'], fila['prioridad'], fila['puntaje']) > (
-                anterior['forzada'], anterior['prioridad'], anterior['puntaje'],
+            if (fila['forzada'], fila['prioridad'], fila['fuente'] != 'complemento', fila['puntaje']) > (
+                anterior['forzada'], anterior['prioridad'], anterior['fuente'] != 'complemento', anterior['puntaje'],
             ):
                 aceptados[p.id_producto] = fila
             aceptados[p.id_producto]['puntaje'] = total
         else:
             aceptados[p.id_producto] = fila
-    salida = sorted(aceptados.values(), key=lambda f: (-f['forzada'], -f['prioridad'], -f['puntaje'], f['id_producto']))
-    return {'sugerencias': salida[:C.MAX_EN_LISTA], 'descartados': descartados[:30]}
+    salida = sorted(aceptados.values(), key=lambda f: (
+        -f['forzada'], -f['prioridad'], f['fuente'] == 'complemento', -f['puntaje'],
+        precio(productos[f['id_producto']]) if f['fuente'] == 'complemento' else 0, f['id_producto']))
+    diversos, tipos_presentes = [], set()
+    for fila in salida:
+        tipo = complementos.tipos.get(fila['id_producto']) if complementos else None
+        if fila['fuente'] == 'complemento' and tipo in tipos_presentes:
+            continue
+        diversos.append(fila)
+        if tipo:
+            tipos_presentes.add(tipo)
+    return {'sugerencias': diversos[:C.MAX_EN_LISTA], 'descartados': descartados[:30]}
