@@ -123,12 +123,18 @@
             <div class="mt-3">
                 <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Tipo de pedido</p>
                 <input type="hidden" id="order-type" value="mostrador">
-                <div id="order-type-buttons" class="mt-2 grid grid-cols-4 gap-2">
-                    <button type="button" data-order-type="mostrador" class="tipo-pedido-btn activa"><i class="fas fa-cash-register"></i>Mostrador</button>
-                    <button type="button" data-order-type="mesa" class="tipo-pedido-btn"><i class="fas fa-chair"></i>Mesa</button>
-                    <button type="button" data-order-type="retiro" class="tipo-pedido-btn"><i class="fas fa-shopping-bag"></i>Retiro</button>
-                    <button type="button" data-order-type="delivery" class="tipo-pedido-btn"><i class="fas fa-motorcycle"></i>Delivery</button>
-                </div>
+                <details id="order-type-picker" class="pos-order-type-picker mt-2">
+                    <summary class="pos-order-type-summary" title="Cambiar tipo de pedido">
+                        <span id="order-type-selected"><i class="fas fa-cash-register" aria-hidden="true"></i>Mostrador</span>
+                        <span class="pos-order-type-expand">Cambiar <i class="fas fa-chevron-down" aria-hidden="true"></i></span>
+                    </summary>
+                    <div id="order-type-buttons" class="mt-2 grid grid-cols-4 gap-2">
+                        <button type="button" data-order-type="mostrador" class="tipo-pedido-btn activa"><i class="fas fa-cash-register"></i>Mostrador</button>
+                        <button type="button" data-order-type="mesa" class="tipo-pedido-btn"><i class="fas fa-chair"></i>Mesa</button>
+                        <button type="button" data-order-type="retiro" class="tipo-pedido-btn"><i class="fas fa-shopping-bag"></i>Retiro</button>
+                        <button type="button" data-order-type="delivery" class="tipo-pedido-btn"><i class="fas fa-motorcycle"></i>Delivery</button>
+                    </div>
+                </details>
             </div>
             <div id="table-picker-section" class="mt-3 hidden">
                 <div class="flex items-center justify-between gap-3">
@@ -244,6 +250,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos.css', v='20260604-1') }}">
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos_order_type.css', v='20261030-1') }}">
 <link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos_cart_modifiers.css', v='modificadores-20260728-2') }}">
 <link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/pos_sugerencias.css', v='20261030-1') }}">
 <style>
@@ -282,6 +289,6 @@
 <script src="{{ url_for('gastronomia.static', filename='js/pos_peso.js', v='peso-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_sugerencias.js', v='20261030-2') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_order_payload.js', v='20261030-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='sugerencias-20261030-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='tipo-pedido-20261030-4') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-3') }}"></script>
 {% endblock %}

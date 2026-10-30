@@ -132,7 +132,16 @@
     const currentType = orderTypeInput?.value || 'mostrador';
     root.querySelectorAll('[data-order-type]').forEach((button) => {
       button.classList.toggle('activa', button.dataset.orderType === currentType);
+      if (button.dataset.orderType === currentType) {
+        const selected = root.querySelector('#order-type-selected');
+        if (selected) selected.innerHTML = button.innerHTML;
+      }
     });
+    const picker = root.querySelector('#order-type-picker');
+    if (picker?.open) {
+      picker.open = false;
+      picker.querySelector('summary')?.focus();
+    }
     if (tablePickerSection) {
       tablePickerSection.classList.toggle('hidden', currentType !== 'mesa');
     }
