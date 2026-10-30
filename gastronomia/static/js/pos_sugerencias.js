@@ -18,7 +18,7 @@
       if (!inViewport || host.hidden || document.visibilityState === 'hidden'
           || (host.getClientRects && !host.getClientRects().length)) return;
       const visible = [...exposureTargets].filter(([node, target]) =>
-        (!observer || visibleTargets.has(node)) && (!target.detail || !list.hidden));
+        (!observer || visibleTargets.has(node)) && (target.detail ? !list.hidden : !chips.hidden));
       markShown(visible.map(([, target]) => target.item));
     };
     const max = Math.min(3, Math.max(1, Number(host.dataset.max || 3)));
@@ -29,21 +29,32 @@
       return node;
     };
     const row = element('div', 'gs-pos-row');
-    row.append(element('span', 'gs-pos-label', '✦ Suelen llevar'));
+    const heading = element('div', 'gs-pos-heading');
+    const sparkle = element('span', 'gs-pos-sparkle', '✦');
+    sparkle.setAttribute('aria-hidden', 'true');
+    heading.append(sparkle, element('span', 'gs-pos-label', 'Completá el pedido'));
+    row.append(heading);
     const chips = element('div', 'gs-pos-chips');
-    const more = element('button', 'gs-pos-control', '⋯');
+    const more = element('button', 'gs-pos-more', 'Ver sugerencias y motivos');
     more.type = 'button';
     more.setAttribute('aria-label', 'Más sugerencias y motivos');
     more.setAttribute('aria-expanded', 'false');
     more.dataset.action = 'more';
-    const close = element('button', 'gs-pos-control', '×');
+    const close = element('button', 'gs-pos-close', '×');
     close.type = 'button';
     close.setAttribute('aria-label', 'Ocultar sugerencias de este pedido');
     close.dataset.action = 'close';
-    row.append(chips, more, close);
+    row.append(close);
     const list = element('ul', 'gs-pos-list');
     list.hidden = true;
-    host.append(row, list);
+    host.append(row, chips, list, more);
+
+    const collapse = () => {
+      list.hidden = true;
+      chips.hidden = false;
+      more.textContent = 'Ver sugerencias y motivos';
+      more.setAttribute('aria-expanded', 'false');
+    };
 
     const stateSignature = (state) => JSON.stringify([
       state.channel || '', state.cart.map((item) => [item.producto_id, item.canal_precio || '']),
@@ -58,8 +69,7 @@
     };
     const hide = () => {
       host.hidden = true;
-      list.hidden = true;
-      more.setAttribute('aria-expanded', 'false');
+      collapse();
     };
     const cancel = () => {
       generation += 1;
@@ -67,10 +77,21 @@
       clearTimeout(timeout);
       controller?.abort();
     };
-    const label = (product) => {
+    const productButton = (product) => {
       const variablePrice = product.unidad_venta === 'kg' || (product.grupos_opciones || [])
         .some((group) => (group.opciones || []).some((option) => Number(option.precio_delta || 0) !== 0));
-      return variablePrice ? product.nombre : `${product.nombre} ${money(product.precio)}`;
+      const button = element('button', 'gs-pos-chip');
+      button.type = 'button';
+      button.title = product.nombre;
+      button.dataset.product = String(product.id_producto);
+      const copy = element('span', 'gs-pos-product');
+      copy.append(element('span', 'gs-pos-name', product.nombre));
+      if (!variablePrice) copy.append(element('span', 'gs-pos-price', money(product.precio)));
+      const add = element('span', 'gs-pos-add', '+');
+      add.setAttribute('aria-hidden', 'true');
+      button.setAttribute('aria-label', `Agregar ${product.nombre}${variablePrice ? '' : `, ${money(product.precio)}`}`);
+      button.append(copy, add);
+      return button;
     };
     const render = (items, state, maximum) => {
       rows = items.filter((item) => eligible(item, state));
@@ -81,20 +102,18 @@
       list.replaceChildren();
       rows.forEach((item, index) => {
         const product = productFor(item.id_producto, state);
-        const button = element('button', 'gs-pos-chip', `+ ${label(product)}`);
-        button.type = 'button';
-        button.title = product.nombre;
-        button.dataset.product = String(item.id_producto);
+        const button = productButton(product);
         if (index < maximum) {
           chips.append(button);
           exposureTargets.set(button, {item, detail: false});
         }
         const li = element('li', '');
-        const detail = button.cloneNode(true);
+        const detail = productButton(product);
         exposureTargets.set(detail, {item, detail: true});
         li.append(detail, element('span', 'gs-pos-reason', item.motivo));
         list.append(li);
       });
+      collapse();
       host.hidden = rows.length === 0;
       observer?.observe(host);
       for (const node of exposureTargets.keys()) observer?.observe(node);
@@ -158,6 +177,8 @@
         hide();
       } else if (button.dataset.action === 'more') {
         list.hidden = !list.hidden;
+        chips.hidden = !list.hidden;
+        more.textContent = list.hidden ? 'Ver sugerencias y motivos' : 'Volver a sugerencias';
         more.setAttribute('aria-expanded', String(!list.hidden));
         if (!list.hidden) recordVisible();
       } else if (button.dataset.product && navigator.onLine !== false) {

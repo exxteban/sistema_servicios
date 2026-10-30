@@ -115,7 +115,9 @@ test('debounce, precio del catálogo y mismo configurador sin robar foco', async
   await env.tick(1);
   await env.respond(0);
   assert.equal(pos.host.hidden, false);
-  assert.equal(chips(pos.host)[0].textContent, '+ Papas Gs. 5000');
+  assert.equal(find(chips(pos.host)[0], (n) => n.className === 'gs-pos-name').textContent, 'Papas');
+  assert.equal(find(chips(pos.host)[0], (n) => n.className === 'gs-pos-price').textContent, 'Gs. 5000');
+  assert.equal(chips(pos.host)[0].attributes['aria-label'], 'Agregar Papas, Gs. 5000');
   assert.equal(env.document.activeElement, focus);
   pos.click(chips(pos.host)[0]);
   assert.equal(pos.opened[0], pos.state.products[1]);
@@ -188,12 +190,14 @@ test('canal incompatible no consulta; por peso y extras con precio no muestran i
   await env.tick(500);
   assert.match(env.requests[0].url, /canal_precio=pedidosya/);
   await env.respond(0);
-  assert.equal(chips(pos.host)[0].textContent, '+ Papas');
+  assert.equal(find(chips(pos.host)[0], (n) => n.className === 'gs-pos-name').textContent, 'Papas');
+  assert.equal(find(chips(pos.host)[0], (n) => n.className === 'gs-pos-price'), undefined);
   pos.state.products = pos.state.products.map((p) => ({...p, unidad_venta: 'unidad',
     grupos_opciones: [{opciones: [{precio_delta: 2000}]}]}));
   pos.controller.refresh();
   await env.tick(500); await env.respond(1);
-  assert.equal(chips(pos.host)[0].textContent, '+ Papas');
+  assert.equal(find(chips(pos.host)[0], (n) => n.className === 'gs-pos-name').textContent, 'Papas');
+  assert.equal(find(chips(pos.host)[0], (n) => n.className === 'gs-pos-price'), undefined);
 });
 
 test('solo cuenta lo visible, deduplica redibujos y cancelar el configurador no es tocar', async () => {
@@ -210,6 +214,11 @@ test('solo cuenta lo visible, deduplica redibujos y cancelar el configurador no 
   assert.deepEqual(data().tocadas, [[1, 2]]);
   pos.click(find(pos.host, (n) => n.dataset.action === 'more'));
   assert.equal(data().mostradas.length, 4);
+  assert.equal(find(pos.host, (n) => n.className === 'gs-pos-chips').hidden, true);
+  assert.equal(find(pos.host, (n) => n.dataset.action === 'more').textContent, 'Volver a sugerencias');
+  pos.click(find(pos.host, (n) => n.dataset.action === 'more'));
+  assert.equal(find(pos.host, (n) => n.className === 'gs-pos-list').hidden, true);
+  assert.equal(find(pos.host, (n) => n.className === 'gs-pos-chips').hidden, false);
   pos.state.products = [...pos.state.products];
   pos.controller.refresh(); await env.tick(500); await env.respond(1, [2, 3, 4, 5]);
   assert.equal(data().mostradas.length, 4);
