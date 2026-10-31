@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from app import db
 from app.models.configuracion import Configuracion
 from app.models.tienda import TiendaConfig
 from gastronomia.models import GastronomiaProducto
+from gastronomia.services.bi.telemetria import TIPO_ACTIVACION, registrar_evento
 
 PASOS_MANUALES = ('qr_impreso', 'bio_instagram', 'estado_whatsapp')
 PREFIJO_CLAVE = 'bi.activacion'
@@ -28,7 +30,10 @@ def marcar_paso_manual(cliente_id: int, paso: str, hecho: bool) -> None:
         _clave_manual(cliente_id, paso),
         hecho,
         descripcion='Paso manual de activacion comercial (BI gastronomia)',
+        commit=False,
     )
+    registrar_evento(cliente_id, TIPO_ACTIVACION, paso)
+    db.session.commit()
 
 
 def _paso(paso_id: str, titulo: str, *, hecho: bool, automatico: bool, detalle: str, endpoint: str) -> dict:

@@ -176,7 +176,7 @@ Solo lo imprescindible para las fases 1 a 3. Las definiciones de costos, turnos 
 - [ ] Auditar identidad de cliente final: normalización de teléfono, duplicados y separación respecto al `id_cliente` de la instalación; no agrupar personas solo por nombre.
 - [ ] Medir cobertura actual: porcentaje de pedidos con cliente identificado por canal y por modalidad.
 - [ ] Confirmar zona horaria local y días de apertura configurados, para no comparar días cerrados.
-- [ ] Verificar si la fidelización por compras aplica a pedidos de gastronomía o si necesita un adaptador.
+- [x] Verificar si la fidelización por compras aplica a pedidos de gastronomía o si necesita un adaptador. Resultado: no aplica a pedidos sin cliente registrado (ver BI-05).
 - [ ] Preparar escenarios ficticios: negocio nuevo sin historial, comida rápida con delivery y cafetería de mostrador.
 
 ### Criterios de aceptación
@@ -199,7 +199,7 @@ Objetivo: que el negocio tenga por dónde recibir pedidos sin comisión y que ca
 - [x] **Comisión evitada estimada**: solo si el dueño configura el porcentaje de comisión de cada plataforma; sin dato, no se muestra.
 - [x] Indicador **porcentaje de pedidos con cliente identificado**, por canal.
 - [x] En el POS, campo de teléfono rápido y visible para mostrador y retiro, opcional y sin bloquear el cobro; reutilizar la normalización existente.
-- [ ] Mostrar al cajero un texto sugerido para pedir el teléfono, vinculado a la fidelización cuando esté activa («con tu número sumás para tu beneficio»).
+- [x] Mostrar al cajero un texto sugerido para pedir el teléfono, vinculado a la fidelización cuando esté activa. Se muestra solo con fidelización activa y dice «con un celular válido, cada compra suma para la fidelización». La frase «sumás para tu beneficio» no se usa porque en gastronomía todavía no se canjean beneficios (ver BI-05b y BI-05c en la sección 18).
 - [x] Registrar si el cliente aceptó recibir mensajes; por defecto, sin consentimiento confirmado no entra en las colas de la fase 2.
 - [x] Embudo de la tienda online: visitas, visitantes y pedidos web por plato, para detectar platos muy vistos y poco pedidos. Usa una tabla propia de visitas a platos de gastronomía, no `TiendaVisitaEvento` (ver BI-04).
 
@@ -265,8 +265,8 @@ Objetivo: que el dueño vea lo que obtuvo y que el proveedor detecte a tiempo un
 
 ### Salud de uso para el proveedor
 
-- [ ] Panel visible solo para el usuario root dentro de **cada instalación**, sin centralizar datos ni comparar instalaciones: último uso del POS y del BI, porcentaje de la activación comercial completado, colas sin atender, tendencia de pedidos de las últimas semanas y funciones nunca usadas.
-- [ ] Semáforo simple (activo, en riesgo, inactivo) con reglas explícitas y documentadas.
+- [x] Panel visible solo para el usuario root dentro de **cada instalación**, sin centralizar datos ni comparar instalaciones: último uso del POS y del BI, porcentaje de la activación comercial completado, colas sin atender, tendencia de pedidos de las últimas semanas y funciones nunca usadas. Ver BI-05.
+- [x] Semáforo simple (activo, en riesgo, inactivo) con reglas explícitas y documentadas (en el módulo `salud_uso.py` y en la misma página).
 - [ ] Cualquier envío de esta información fuera de la instalación queda como decisión pendiente (sección 15) y requiere autorización del cliente.
 
 ### Criterios de aceptación
@@ -445,12 +445,15 @@ Reutilizar `test_inteligencia_comercial.py`, `test_inteligencia_bi_context.py`, 
 | WhatsApp Cloud API | Fuera del plan | No se usa; solo enlaces `wa.me`. |
 | Redacción con IA | Después del MVP | Proveedor existente, editable, medido por costo y uso. |
 | Definiciones de costos y turnos | Fases 5–6 | Una base compartida, coherente con reportes. |
+| Fidelización en pedidos sin cliente registrado | Fase 1 (texto del POS) | **Resuelta en BI-05b y BI-05c:** el celular identifica la venta. Con ficha activa la asigna; sin ficha y con celular válido la crea. Pendiente: canjear beneficios en la caja de gastronomía. |
 
 ## 17. Próxima unidad de trabajo
 
-**Verificación pendiente:** ver en navegador «Clientes que vuelven» (BI-02), «Tu mes en el sistema» (BI-03), el embudo, los materiales y la casilla del POS (BI-04), en escritorio, celular y tema oscuro.
+**Verificación pendiente:** ver en navegador «Clientes que vuelven» (BI-02), «Tu mes en el sistema» (BI-03), el embudo, los materiales y la casilla del POS (BI-04), y «Salud de uso» más la casilla de la tienda (BI-05), en escritorio, celular y tema oscuro.
 
-**BI-05: salud de uso y consentimiento en la tienda online.** Panel de salud de uso solo para root (fase 3, segunda parte). Registrar el consentimiento también en el checkout de la tienda online, solo vía API y dentro de `tienda_online/`. Vincular el texto sugerido del POS con la fidelización cuando esté activa.
+**BI-06: fase 4, tres acciones para hoy con seguimiento.** Contrato común de oportunidad, persistencia con identificador estable, estados con transiciones validadas y la pestaña «Hoy» con hasta tres acciones. Empezar por las fuentes que ya existen: pasos de activación pendientes, cola de mensajes y caída de pedidos. El calendario de fechas especiales, la priorización completa y la evaluación de resultados quedan para entregas siguientes.
+
+Pendiente de decisión, sin fecha (sección 16): canjear beneficios de fidelización en la caja de gastronomía. Hoy los puntos se acumulan, pero no se gastan ahí. Pendiente fuera del MVP: envío de la salud de uso al proveedor, que requiere autorización del cliente.
 
 Actualizar este documento al cerrar cada entrega con alcance real, pruebas realizadas, limitaciones y siguiente paso. Marcar una casilla como terminada únicamente cuando la implementación y sus criterios de aceptación estén verificados.
 
@@ -604,3 +607,112 @@ Actualizar este documento al cerrar cada entrega con alcance real, pruebas reali
 **Siguiente paso**
 
 - Verificar en navegador BI-02, BI-03 y BI-04. Después, BI-05.
+
+### BI-05 — salud de uso, consentimiento en la tienda y telemetría (31/10/2026)
+
+**Alcance real**
+
+- Fase 3, segunda parte: panel «Salud de uso» solo para root (`GET /gastronomia/bi/salud-uso`, plantilla `gastronomia/bi_salud_uso.html`). El enlace aparece en el tab Gastronomía solo a root. Cada instalación ve solo sus datos.
+  - Cálculo en `gastronomia/services/bi/salud_uso.py`: último pedido (POS y tienda por separado), última acción en el BI, activación completada, cola (contactos pendientes y último contacto), pedidos por semana de las últimas 6 semanas y funciones usadas.
+  - Funciones usadas en `salud_funciones.py`: pedidos en el POS, teléfono en pedidos, pedidos de tienda, consentimiento en el POS, cola, activación, comisión y configuración de la cola. Cada una se marca «sin usar» si no hay rastro.
+- Semáforo con reglas explícitas, documentadas en el módulo y en la misma página: **activo** (pedido válido en 7 días y acción en el BI en 30), **inactivo** (sin pedidos o último de más de 14 días), **en riesgo** (el resto).
+- Telemetría (`gastronomia/services/bi/telemetria.py`): cambiar la activación, las comisiones o la configuración de la cola deja un evento. La cola usa ahora ese mismo registro; se quitó su copia privada en `cola_acciones.py`. Las vistas siguen sin registrarse.
+- Consentimiento en el checkout de la tienda online: casilla sin marcar en `tienda_online/src/components/ui/GastronomiaOrderPanel.jsx`. Si el cliente la marca, `POST /api/tienda/<slug>/gastronomia/pedido` recibe `acepta_mensajes: true` y registra la aceptación (`app/routes/tienda_gastronomia_api.py`). Sin marcar no queda nada registrado. Solo el valor `true` exacto cuenta.
+
+**Decisiones**
+
+- «Último uso del BI» cuenta acciones que cambian datos, no vistas. Registrar cada carga del tablero escribiría en la base.
+- El semáforo usa pedidos de cualquier canal, no solo POS. Así una instalación que opera por tienda no aparece como inactiva. Los números por canal se muestran aparte.
+- **Fidelización no se vinculó al texto del POS.** Se verificó que el programa solo suma a ventas con cliente registrado: `clientes_fidelizacion_sincronizacion.py` excluye el consumidor final (id 1) y los pedidos sin factura a un cliente registrado caen en ese consumidor. Decir «con tu número sumás para tu beneficio» sería una promesa falsa. Queda como decisión en la sección 16.
+- El sugeridor del POS no entra en «funciones usadas»: su medición es de exposición, no de uso.
+- El acceso de root usa `es_usuario_root` (`app/services/ia_backoffice/security.py`), la misma regla del asistente IA.
+- La tienda no importa código del backoffice: la lógica de consentimiento vive en `gastronomia/services/bi/consentimiento.py` y la API solo la llama.
+
+**Pruebas**
+
+- `test_gastronomia_bi_salud.py` (12): semáforo por reglas, negocio nuevo, pedido activo, en riesgo, inactivo con motivo, telemetría de cambios, cola sin atender, tendencia de 6 semanas, aislamiento entre instalaciones, 403 a un admin del negocio, enlace solo a root, render con datos.
+- `test_gastronomia_bi_consentimiento_tienda.py` (3): aceptación registra, sin aceptación no deja nada (incluido `'true'` como valor no válido), aceptación resuelve un pendiente del POS.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 364 pasaron y 42 se omitieron (las de MariaDB). Antes de esta entrega eran 349.
+- `tienda_online` compila con `vite build` (salida en el scratchpad, no en el repo).
+- Navegador: no verificado.
+
+**Limitaciones y pendiente**
+
+- Sin verificar en navegador: el panel, el enlace del tablero, la casilla de la tienda, el tema oscuro y el celular. Queda junto con BI-02 a BI-04.
+- Las acciones anteriores a esta entrega no tienen evento. Una instalación que solo usó el BI antes figura «sin acciones» hasta la próxima.
+- Sin vínculo con la fidelización (ver decisiones).
+- El envío de la salud de uso fuera de la instalación no está implementado: requiere autorización del cliente.
+- `tienda_online` no tiene build en el repo; se verificó solo la compilación.
+
+**Siguiente paso**
+
+- Verificar en navegador BI-02 a BI-05. Después, BI-06: fase 4, tres acciones para hoy con seguimiento.
+
+### BI-05b — adaptador de fidelización por teléfono (31/10/2026)
+
+**Alcance real**
+
+- Cobro de gastronomía (`gastronomia/services/caja_service.py`): si el cajero no eligió cliente para la factura y no se pide factura electrónica, la venta se asigna al cliente registrado cuyo teléfono coincide con el celular del pedido. Si la asignación ocurre, la compra se registra al cobrar con `registrar_compra_fidelizacion_por_venta`, como en el POS de ventas. Anular la venta revierte la compra por el camino que ya existía.
+- Lógica en `gastronomia/services/fidelizacion_telefono.py`:
+  - Actúa solo con la fidelización activa.
+  - Nunca crea clientes: usa solo los que ya existen.
+  - Un teléfono que coincide con más de un cliente no asigna nada. No se mezclan personas.
+  - El consumidor final (id 1) y los clientes inactivos no se asignan.
+  - La comparación usa la normalización de identidad del BI; el filtro SQL solo reduce candidatos.
+- POS (`gastronomia/templates/gastronomia/pos.html`, ruta `pos_routes.py`): con fidelización activa aparece «Si ya es cliente registrado, cada compra con su número suma para la fidelización». La frase «sumás para tu beneficio» no se usa, porque en gastronomía no se canjean beneficios todavía.
+
+**Decisiones**
+
+- Match-only en esta entrega: no se crean clientes desde el celular. La creación se decidió después y se registra en BI-05c.
+- Factura primero: un cliente elegido para la factura siempre gana sobre el teléfono. La factura electrónica no usa el adaptador, así que el comprobante nunca se emite a un cliente que no lo pidió.
+- Los nombres no intervienen en la asignación.
+- El nombre «BI-06» queda reservado para la fase 4, y este adaptador se registra como BI-05b.
+
+**Pruebas**
+
+- `test_gastronomia_fidelizacion_telefono.py` (8): cobro real que asigna y suma la compra, consumidor final sin registro, factura al cliente elegido con prioridad, fidelización apagada, teléfono compartido por dos clientes, normalización y clientes inactivos, anulación que revierte la compra, frase del POS solo con fidelización activa.
+- Suites `test_gastronomia_*`, `test_inteligencia_*`, `test_tienda_*` y `test_clientes_fidelizacion.py`: 384 pasaron y 42 se omitieron (las de MariaDB). Antes de este cambio eran 364.
+- Navegador: no verificado.
+
+**Limitaciones y pendiente**
+
+- Cobertura: solo cuentan los pedidos cuyo celular ya está registrado como cliente. Para la mayoría de los clientes finales, la frase del POS no garantiza que la compra sume. Superado por BI-05c.
+- Sin canje de beneficios en la caja de gastronomía. Los puntos se acumulan pero no se gastan ahí.
+- Los pedidos de la tienda online también pasan por el mismo cobro de caja, así que el adaptador los alcanza igual que a los del POS, siempre que su celular coincida con un cliente registrado.
+
+**Siguiente paso**
+
+- Ver BI-05c: la creación de fichas desde el celular se resolvió después de esta entrega.
+
+### BI-05c — creación de ficha de cliente desde el celular (31/10/2026)
+
+**Alcance real**
+
+- Con fidelización activa, si el celular del pedido es válido y ninguna ficha coincide, el cobro crea una ficha de cliente minorista activa (`gastronomia/services/fidelizacion_telefono.py`, `resolver_cliente_fidelizacion`). El nombre sale del pedido, o de la referencia de entrega, o del propio teléfono como último recurso.
+- La ficha se crea con `flush` dentro del cobro: si el cobro falla antes de confirmarse, la ficha se revierte con él.
+- La búsqueda compara el celular normalizado contra todas las fichas, activas o no. Con dos o más coincidencias, o con una sola inactiva, no se asigna ni se crea nada.
+- Con factura electrónica no se crea ni se asigna.
+- POS: la frase queda en «Con un celular válido, cada compra suma para la fidelización», solo con fidelización activa.
+
+**Decisiones**
+
+- Crear solo con fidelización activa: sin el programa no hay razón para cargar fichas en la tabla de clientes.
+- La ficha queda sin RUC/CI. Para facturar después, el cajero la completa desde el flujo de factura. No se reutiliza `obtener_o_crear_cliente_factura`: hace commit en su propia transacción y busca por RUC, así que dentro del cobro rompería la reversión.
+- Se guarda el celular normalizado (`+595…`), para que cualquier formato que se cargue después coincida con la ficha.
+- Anular la venta no borra la ficha. Solo revierte la compra.
+
+**Pruebas**
+
+- `test_gastronomia_fidelizacion_telefono.py`: 11 pruebas en verde (antes 8). Cubren la creación con el nombre del pedido, la reutilización de la ficha con otro formato de celular, la anulación, la factura que tiene prioridad, la fidelización apagada, los homónimos, la ficha inactiva que evita un duplicado, la normalización y la factura electrónica.
+- Regresión ampliada: `test_gastronomia_*`, `test_inteligencia_*`, `test_tienda_*`, `test_clientes_*`, `test_caja_*` y `test_ventas_*`: 497 pasaron y 42 se omitieron (las de MariaDB). Ese conjunto es más amplio que el de BI-05b (384), así que los números no son comparables.
+- Navegador: no verificado.
+
+**Limitaciones y pendiente**
+
+- Carrera: dos cobros simultáneos con un celular nuevo podrían crear dos fichas. La tabla de clientes no tiene restricción de unicidad sobre el teléfono, y no la agregué porque no revisé si hay duplicados existentes. Se acepta por ahora; si hace falta, se resuelve después de auditar esos datos.
+- Las fichas creadas se ven igual que las cargadas a mano en la lista de clientes y en el selector de factura.
+- Sin canje de beneficios en la caja de gastronomía. Los puntos se acumulan, pero no se gastan ahí.
+
+**Siguiente paso**
+
+- Decidir si el canje de beneficios entra en la caja de gastronomía. Después, BI-06: fase 4.

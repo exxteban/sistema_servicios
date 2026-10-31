@@ -7,6 +7,7 @@ from __future__ import annotations
 from app import db
 from app.models.configuracion import Configuracion
 from gastronomia.services.bi.plantillas import PLANTILLAS_DEFAULT
+from gastronomia.services.bi.telemetria import TIPO_CONFIG_COLA, registrar_evento
 
 PREFIJO = 'bi.cola'
 # nombre: (valor por defecto, minimo, maximo)
@@ -81,4 +82,5 @@ def guardar_config(cliente_id: int, datos) -> None:
             descripcion='Cola de envio asistido (BI gastronomia)',
             commit=False,
         )
+    registrar_evento(cliente_id, TIPO_CONFIG_COLA)
     db.session.commit()

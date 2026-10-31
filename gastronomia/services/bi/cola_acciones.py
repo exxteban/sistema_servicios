@@ -10,16 +10,18 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 
 from app import db
-from gastronomia.bi_models import GastronomiaBiContacto, GastronomiaBiEvento, GastronomiaBiNoContactar
+from gastronomia.bi_models import GastronomiaBiContacto, GastronomiaBiNoContactar
 from gastronomia.services.bi.cola import clave_contacto, construir_cola, contar_enviados_hoy, hoy_local, mensaje_para
 from gastronomia.services.bi.cola_config import leer_config
 from gastronomia.services.bi.historial import historial_clientes
+from gastronomia.services.bi.telemetria import (
+    TIPO_ABIERTO,
+    TIPO_ENVIADO,
+    TIPO_NO_CONTACTAR,
+    TIPO_OMITIDO,
+    registrar_evento,
+)
 from gastronomia.services.bi.whatsapp import url_wa_me
-
-TIPO_ABIERTO = 'whatsapp_abierto'
-TIPO_ENVIADO = 'mensaje_enviado'
-TIPO_OMITIDO = 'mensaje_omitido'
-TIPO_NO_CONTACTAR = 'no_contactar'
 
 MSG_LIMITE = 'Llegaste al límite de mensajes de hoy. Mañana sigue la cola.'
 MSG_NO_EN_COLA = 'Ese contacto ya no está en la cola. Recargá la página.'
@@ -55,7 +57,7 @@ def no_quiere_mensajes(cliente_id: int, datos) -> None:
         raise ValueError('Ese contacto no está en tu historial de clientes.')
     if not GastronomiaBiNoContactar.query.filter_by(cliente_id=int(cliente_id), telefono_normalizado=telefono).first():
         db.session.add(GastronomiaBiNoContactar(cliente_id=int(cliente_id), telefono_normalizado=telefono))
-    _registrar_evento(cliente_id, TIPO_NO_CONTACTAR, '')
+    registrar_evento(cliente_id, TIPO_NO_CONTACTAR, '')
     _confirmar()
 
 
@@ -104,12 +106,8 @@ def _guardar_estado(cliente_id: int, candidato: dict, estado: str, tipo_evento: 
         db.session.add(contacto)
     contacto.estado = estado
     contacto.fecha_estado = ahora
-    _registrar_evento(cliente_id, tipo_evento, candidato['segmento'])
+    registrar_evento(cliente_id, tipo_evento, candidato['segmento'])
     _confirmar()
-
-
-def _registrar_evento(cliente_id: int, tipo: str, segmento: str) -> None:
-    db.session.add(GastronomiaBiEvento(cliente_id=int(cliente_id), tipo=tipo, segmento=segmento))
 
 
 def _confirmar() -> None:

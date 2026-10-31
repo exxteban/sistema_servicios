@@ -1,10 +1,11 @@
 """API publica de pedidos gastronomicos desde tienda online."""
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from app import csrf
 from app.models.tienda import TiendaConfig
 from app.services.tienda_context import resolver_cliente_gastronomia_tienda
 from app.services.tienda_presupuesto import tienda_es_gastronomia
+from gastronomia.services.bi.consentimiento import registrar_casilla
 from gastronomia.services.cliente_final_service import (
     crear_pedido_publico_gastronomia,
     perfil_cliente_publico,
@@ -13,6 +14,20 @@ from gastronomia.services.cliente_final_service import (
 
 
 tienda_gastronomia_api_bp = Blueprint('tienda_gastronomia_api', __name__)
+
+
+def _registrar_aceptacion_mensajes(cliente_id: int, data: dict) -> None:
+    """Solo registra la aceptacion explicita del cliente (BI-05).
+
+    Sin aceptar no se guarda nada: el cliente decide en la tienda y no genera pendientes para el dueno.
+    El pedido ya quedo guardado: un celular no valido no lo cancela, solo se deja de registrar la aceptacion.
+    """
+    if data.get('acepta_mensajes') is not True:
+        return
+    try:
+        registrar_casilla(cliente_id, data.get('celular'), True)
+    except ValueError:
+        current_app.logger.info('No se registro la aceptacion de mensajes: celular no valido.')
 
 
 def _config_gastronomia(slug: str):
@@ -61,6 +76,7 @@ def crear_pedido_gastronomia(slug: str):
         result = crear_pedido_publico_gastronomia(cliente_id, data)
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
+    _registrar_aceptacion_mensajes(cliente_id, data)
     result['whatsapp_url'] = whatsapp_pedido_url(
         config.telefono_whatsapp,
         result['pedido'],

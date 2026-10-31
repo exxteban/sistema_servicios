@@ -6,8 +6,10 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy.exc import IntegrityError
 
 from app import db
+from app.services.clientes_fidelizacion import registrar_compra_fidelizacion_por_venta
 from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
+from gastronomia.services.fidelizacion_telefono import resolver_cliente_fidelizacion
 from gastronomia.services.factura_electronica_service import (
     contexto_factura_electronica_caja,
     factura_electronica_solicitada,
@@ -153,6 +155,14 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
 
     pago = _reservar_pago_pedido(cliente_id, usuario_id, pedido, metodo_pago, subtotal, descuento + sena, data)
 
+    # Sin cliente para la factura, el celular identifica la venta para la fidelizacion (ficha existente o nueva).
+    cliente_venta = cliente_factura
+    if cliente_venta is None:
+        cliente_venta = resolver_cliente_fidelizacion(
+            pedido.celular_cliente,
+            pedido.nombre_cliente or pedido.referencia_entrega,
+            factura_electronica_solicitada(data),
+        )
     try:
         # Solo los encargos con sena pasan el argumento: el resto llama igual que siempre.
         extra = {'sena_aplicada': sena} if sena > 0 else {}
@@ -161,13 +171,16 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
             usuario_id,
             data,
             descuento=descuento,
-            id_cliente_venta=cliente_factura.id_cliente if cliente_factura else None,
+            id_cliente_venta=cliente_venta.id_cliente if cliente_venta else None,
             **extra,
         )
     except ValueError:
         db.session.rollback()
         raise
     venta = integracion['venta']
+    if cliente_factura is None and cliente_venta is not None:
+        # La compra suma al cobrar, como en el POS de ventas; el anulado la revierte por el mismo camino.
+        registrar_compra_fidelizacion_por_venta(venta, id_usuario=usuario_id)
     sesion = integracion['sesion']
     metodo = integracion['metodo']
     movimiento = integracion['movimiento']

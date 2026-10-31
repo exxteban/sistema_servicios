@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "inteligencia/gastronomia/_macros.html" import card_header, vacio, plural %}
+
+{% macro fecha(valor) %}{% if valor %}{{ valor.strftime('%d/%m/%Y') }}{% else %}sin datos{% endif %}{% endmacro %}
+{% macro hace(dias) %}{% if dias is none %}sin datos{% elif dias == 0 %}hoy{% else %}hace {{ plural(dias, 'día') }}{% endif %}{% endmacro %}
+
+{% block title %}Salud de uso{% endblock %}
+
+{% block content %}
+{% set colores_semaforo = {
+    'activo': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100',
+    'en_riesgo': 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-100',
+    'inactivo': 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-100'
+} %}
+<div class="mx-auto max-w-5xl space-y-5" aria-label="Salud de uso de la instalación">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <p class="text-sm font-black uppercase tracking-wide text-violet-600 dark:text-violet-300">Solo root</p>
+            <h1 class="text-2xl font-black text-gray-900 dark:text-white">Salud de uso</h1>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Cómo se usa el sistema en esta instalación. Los datos no salen de acá ni se comparan con otros clientes.</p>
+        </div>
+        <a href="{{ url_for('inteligencia.dashboard', vista='gastronomia') }}" class="text-sm font-semibold text-violet-700 hover:underline dark:text-violet-300">Volver al tablero</a>
+    </div>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        {{ card_header('Estado de la instalación', eyebrow='Semáforo', badge=salud.semaforo_label, badge_class=colores_semaforo[salud.semaforo]) }}
+        <p class="mt-3 text-sm text-gray-800 dark:text-gray-100">{{ salud.semaforo_motivo }}</p>
+        <details class="mt-3 rounded-xl border border-gray-200 p-3 text-xs text-gray-600 dark:border-gray-700 dark:text-gray-300">
+            <summary class="cursor-pointer font-semibold text-gray-700 dark:text-gray-200">Cómo se calcula</summary>
+            <ul class="mt-2 list-disc space-y-1 pl-5">
+                <li><strong>Activo:</strong> pedido válido en los últimos 7 días y una acción en el BI en los últimos 30.</li>
+                <li><strong>Inactivo:</strong> sin pedidos válidos, o el último tiene más de 14 días.</li>
+                <li><strong>En riesgo:</strong> el resto. Por ejemplo, pedidos recientes sin acciones recientes en el BI.</li>
+                <li>Las vistas del BI no cuentan como uso: solo se registran las acciones que cambian datos.</li>
+            </ul>
+        </details>
+    </section>
+
+    <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-900/40">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Último pedido</p>
+            <p class="mt-1 text-base font-bold text-gray-900 dark:text-white">{{ fecha(salud.pedidos.ultimo) }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ hace(salud.pedidos.dias_sin_pedido) }}</p>
+        </div>
+        <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-900/40">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Último uso del POS</p>
+            <p class="mt-1 text-base font-bold text-gray-900 dark:text-white">{{ fecha(salud.pedidos.ultimo_pos) }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pedido cargado en el POS.</p>
+        </div>
+        <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-900/40">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Último pedido de tienda</p>
+            <p class="mt-1 text-base font-bold text-gray-900 dark:text-white">{{ fecha(salud.pedidos.ultimo_tienda) }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pedido recibido en la tienda online.</p>
+        </div>
+        <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-900/40">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Última acción en el BI</p>
+            <p class="mt-1 text-base font-bold text-gray-900 dark:text-white">{{ fecha(salud.bi.ultimo_uso) }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ hace(salud.bi.dias_sin_uso) }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            {{ card_header('Activación comercial', eyebrow='Crecer', badge=salud.activacion.completados ~ ' de ' ~ salud.activacion.total, badge_class='bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-100') }}
+            <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                <div class="h-full rounded-full bg-violet-500" style="width: {{ salud.activacion.porcentaje }}%"></div>
+            </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ salud.activacion.porcentaje }}% completado.</p>
+        </article>
+
+        <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            {{ card_header('Cola de clientes que vuelven', eyebrow='Clientes', badge=plural(salud.colas.en_cola, 'contacto') if salud.colas.en_cola else None, badge_class='bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100') }}
+            {% if salud.colas.sin_atender %}
+            <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">Hay contactos esperando y la cola no se usa hace más de 7 días.</p>
+            {% elif salud.colas.en_cola == 0 %}
+            <div class="mt-3">{{ vacio('No hay contactos pendientes en la cola.') }}</div>
+            {% endif %}
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Último contacto de la cola: {{ fecha(salud.colas.ultimo_contacto) }}.</p>
+        </article>
+    </div>
+
+    <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        {{ card_header('Pedidos por semana', eyebrow='Tendencia', badge='últimas ' ~ salud.tendencia|length ~ ' semanas', badge_class='bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200') }}
+        {% set maximo = salud.tendencia | map(attribute='pedidos') | max %}
+        <ul class="mt-3 space-y-2">
+            {% for semana in salud.tendencia %}
+            <li class="grid grid-cols-[6rem_1fr_2.5rem] items-center gap-3 text-xs">
+                <span class="text-gray-600 dark:text-gray-300">Sem. {{ semana.inicio.strftime('%d/%m') }}</span>
+                <span class="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
+                    <span class="block h-full rounded-full bg-emerald-500" style="width: {{ (semana.pedidos * 100 / maximo) if maximo else 0 }}%"></span>
+                </span>
+                <span class="text-right font-semibold text-gray-900 dark:text-white">{{ semana.pedidos }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        <p class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">La semana en curso puede estar incompleta.</p>
+    </article>
+
+    <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        {{ card_header('Funciones usadas', eyebrow='Adopción', badge=(salud.funciones | length - salud.funciones_sin_usar | length) ~ ' de ' ~ (salud.funciones | length), badge_class='bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200') }}
+        <ul class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+            {% for funcion in salud.funciones %}
+            <li class="flex items-center gap-2 text-sm {{ 'text-gray-900 dark:text-white' if funcion.usada else 'text-gray-500 dark:text-gray-400' }}">
+                <span aria-hidden="true">{{ '✓' if funcion.usada else '○' }}</span>
+                <span>{{ funcion.nombre }}{% if not funcion.usada %} <em class="text-xs">(sin usar)</em>{% endif %}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </article>
+</div>
+{% endblock %}

@@ -1,4 +1,9 @@
 <div x-show="inteligenciaTab === 'gastronomia'" {% if vista_activa != 'gastronomia' %}style="display: none;"{% endif %} class="app-tab-panel space-y-4">
+    {% if es_usuario_root_actual %}
+    <div class="flex justify-end">
+        <a href="{{ url_for('gastronomia.bi_salud_uso') }}" class="text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300">Salud de uso (solo root)</a>
+    </div>
+    {% endif %}
     {% include "inteligencia/gastronomia/_kpis.html" %}
     {% include "inteligencia/gastronomia/_crecer.html" %}
     {% include "inteligencia/gastronomia/_embudo_tienda.html" %}

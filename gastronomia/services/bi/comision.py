@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from app import db
 from app.models.configuracion import Configuracion
+from gastronomia.services.bi.telemetria import TIPO_COMISION, registrar_evento
 from gastronomia.services.channel_price_service import CANALES_PRECIOS
 
 PREFIJO = 'bi.comision'
@@ -55,4 +56,5 @@ def guardar_porcentajes(cliente_id: int, datos) -> None:
             descripcion='Comision de plataformas externas (BI gastronomia)',
             commit=False,
         )
+    registrar_evento(cliente_id, TIPO_COMISION)
     db.session.commit()
