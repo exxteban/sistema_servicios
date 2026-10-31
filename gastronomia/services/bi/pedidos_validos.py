@@ -91,11 +91,12 @@ def _fila(pedido, canales_precio: set[str]) -> dict:
         'fecha_local': utc_naive_to_local(pedido.fecha_creacion).date(),
         'identificado': pedido_identificado(pedido.celular_cliente, pedido.cliente_final_id),
         'telefono_invalido': telefono_invalido(pedido.celular_cliente, pedido.cliente_final_id),
+        'total': float(pedido.total or 0),
     }
 
 
 def filas_pedidos_validos(cliente_id: int, periodo: dict) -> list[dict]:
-    """Un dict por pedido valido del periodo, con canal, dia local e identidad."""
+    """Un dict por pedido valido del periodo, con canal, dia local, identidad y total."""
     pedidos = (
         db.session.query(
             GastronomiaPedido.id_pedido,
@@ -103,6 +104,7 @@ def filas_pedidos_validos(cliente_id: int, periodo: dict) -> list[dict]:
             GastronomiaPedido.fecha_creacion,
             GastronomiaPedido.celular_cliente,
             GastronomiaPedido.cliente_final_id,
+            GastronomiaPedido.total,
         )
         .filter(*_criterios_pedidos_validos(cliente_id, periodo))
         .all()

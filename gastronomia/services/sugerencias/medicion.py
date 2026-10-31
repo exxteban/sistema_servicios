@@ -66,8 +66,9 @@ def resumen(cliente_id, periodo):
              .order_by(Estadistica.mostradas.desc(), Estadistica.id).limit(5).all())
     mostradas = (db.session.query(func.coalesce(func.sum(Estadistica.mostradas), 0))
                  .filter(Estadistica.cliente_id == cliente_id).scalar())
+    importe = round(sum(float(i.subtotal or 0) for i in items if i.id_item in renglones), 2)
     return {
-        'pedidos': len(pedidos), 'renglones': len(renglones),
+        'pedidos': len(pedidos), 'renglones': len(renglones), 'importe': importe,
         'sin_tocar': len(destinos_vendidos - destinos_aceptados),
         'mas_vendidas': [fila(par, n) for par, n in vendidos.most_common(5)],
         'nunca_vendidas': [fila((e.id_origen, e.id_destino), e.mostradas) for e in nunca],

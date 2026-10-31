@@ -196,7 +196,7 @@ Objetivo: que el negocio tenga por dónde recibir pedidos sin comisión y que ca
 - [x] Detectar automáticamente lo que ya está hecho (tienda activa, platos sin foto o sin precio) y pedir confirmación manual solo de lo externo (bio de Instagram, QR impreso).
 - [ ] Generar materiales listos: QR descargable e imprimible, texto para la bio, texto para el estado de WhatsApp con el link de la tienda.
 - [x] Indicador **pedidos por canal propio frente a plataformas externas**, por semana.
-- [ ] **Comisión evitada estimada**: solo si el dueño configura el porcentaje de comisión de cada plataforma; sin dato, no se muestra.
+- [x] **Comisión evitada estimada**: solo si el dueño configura el porcentaje de comisión de cada plataforma; sin dato, no se muestra.
 - [x] Indicador **porcentaje de pedidos con cliente identificado**, por canal.
 - [ ] En el POS, campo de teléfono rápido y visible para mostrador y retiro, opcional y sin bloquear el cobro; reutilizar la normalización existente.
 - [ ] Mostrar al cajero un texto sugerido para pedir el teléfono, vinculado a la fidelización cuando esté activa («con tu número sumás para tu beneficio»).
@@ -260,7 +260,7 @@ Objetivo: que el dueño vea lo que obtuvo y que el proveedor detecte a tiempo un
   - mensajes enviados y clientes que volvieron después del mensaje;
   - acompañamientos sugeridos aceptados y su importe (telemetría actual del sugeridor);
   - acciones completadas en el mes.
-- [ ] Redacción honesta: «después de», no «gracias a»; mostrar muestra y cobertura.
+- [x] Redacción honesta: «después de», no «gracias a»; mostrar muestra y cobertura.
 - [ ] Si el mes fue malo, proponer las tres acciones con más potencial en lugar de solo mostrar la caída.
 
 ### Salud de uso para el proveedor
@@ -448,11 +448,9 @@ Reutilizar `test_inteligencia_comercial.py`, `test_inteligencia_bi_context.py`, 
 
 ## 17. Próxima unidad de trabajo
 
-**BI-01: datos mínimos y activación comercial.**
+**Verificación pendiente:** ver en navegador la tarjeta «Clientes que vuelven» (BI-02) y el bloque «Tu mes en el sistema» (BI-03), en escritorio, celular y tema oscuro.
 
-Entregables: pedido válido, clasificación de canales, auditoría de identidad por teléfono y cobertura actual (fase 0), más la lista de activación con detección automática y los indicadores de canal propio y clientes identificados (fase 1).
-
-Luego **BI-02: cola de envío asistido con segmentos de segunda compra y habitual ausente**, con telemetría desde el inicio.
+**BI-04: resto de la fase 1 y salud de uso.** Materiales de activación (QR, texto de bio y de estado de WhatsApp), teléfono rápido en el POS sin bloquear el cobro, registro de consentimiento para mensajes y embudo de la tienda online. Después, el panel de salud de uso solo para root (fase 3).
 
 Actualizar este documento al cerrar cada entrega con alcance real, pruebas realizadas, limitaciones y siguiente paso. Marcar una casilla como terminada únicamente cuando la implementación y sus criterios de aceptación estén verificados.
 
@@ -529,3 +527,42 @@ Actualizar este documento al cerrar cada entrega con alcance real, pruebas reali
 **Siguiente paso**
 
 - Verificar la tarjeta y el formulario en navegador. Después, piloto con una instalación real.
+
+### BI-03 — reporte de valor del mes (31/10/2026)
+
+**Alcance real**
+
+- Fase 3, primera parte: bloque «Tu mes en el sistema» en el tab Gastronomía (`_reporte_valor.html`), con el mes en curso hasta hoy y la comparación con los mismos días del mes anterior (`reporte_valor.py`).
+  - Pedidos y ventas por canal propio, plataformas y desconocido. Pedidos válidos por fecha del pedido, con el total del pedido.
+  - Clientes nuevos identificados: teléfonos cuya primera compra válida cae en el mes. No se agrupa por nombre.
+  - Mensajes de vuelta: envíos del mes de la cola de BI-02. «Volvieron» solo con ventana cerrada.
+  - Acompañamientos aceptados del sugeridor existente, con el importe de los renglones aceptados.
+  - Cobertura de pedidos identificados por teléfono del mes.
+- Fase 1, comisión evitada: porcentaje por plataforma en el mismo bloque (`comision.py`, `POST /gastronomia/bi/comision`, permiso `gastronomia_menu`, CSRF). Sin porcentaje no se muestra nada. Es una estimación: ventas de la plataforma × porcentaje.
+- Reutilización: `retorno.py` separa el conteo por rango en `resumen_envios` y el resumen de BI-02 lo usa sin cambiar. `canales.py` suma ventas y desglose por plataforma. `pedidos_validos.py` agrega el total a cada fila. `medicion.py` (sugeridor) agrega `importe`. Todos cambios aditivos.
+
+**Pruebas**
+
+- `test_gastronomia_bi_reporte.py`: 11 pruebas nuevas, en verde. Cubren periodos equivalentes, variación sin base previa, canal propio frente a apps con cancelados excluidos, clientes nuevos por teléfono con homónimos separados, mensajes (cerrados, volvieron, en observación y fuera del mes), comisión solo con porcentaje, rechazo de valores inválidos sin guardar nada, reporte sin pedidos, degradación del bloque, render del tab con datos y POST.
+- `test_gastronomia_sugerencias_medicion.py`: aserción del importe de los renglones aceptados.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 329 pasaron y 42 se omitieron (las de MariaDB).
+
+**Decisiones**
+
+- Ventas por fecha del pedido, no por fecha de cobro. El panel de Gastronomía usa el cobro (`GastronomiaPedidoPago`), así que en un mismo mes el total del reporte puede diferir de «Ventas» del panel. Se mantiene la fecha del pedido porque coincide con los indicadores de canal de BI-01 y con la definición de pedido válido de la fase 0. Está rotulado en el bloque.
+- Acompañamientos por fecha de cobro, como su medición original. También rotulado.
+- Mes sin base en el período anterior: se muestra «sin base», nunca 0 %.
+
+**Limitaciones y pendiente**
+
+- Sin descarga ni versión imprimible. Sin acciones completadas (fase 4) ni «Si el mes fue malo, proponer acciones» (depende de la fase 4). Sin panel de salud de uso (fase 3, segunda parte).
+- La comparación es mensual; no hay serie semanal de ventas.
+- Pendiente decidir si «Ventas» del reporte debe usar cobro para igualar el panel.
+- `historial_clientes` se calcula varias veces por carga (cola, mensajes y clientes nuevos). Conviene una caché junto con la de BI-02.
+- No verificado visualmente en navegador (layout, celular, tema oscuro). Pendiente junto con la tarjeta de BI-02.
+- Permisos: no hay prueba de rechazo para un usuario sin `gastronomia_menu` en el POST, igual que en BI-02.
+- Sin medición con datos reales.
+
+**Siguiente paso**
+
+- Verificar en navegador BI-02 y BI-03. Después, BI-04 (resto de la fase 1 y salud de uso).

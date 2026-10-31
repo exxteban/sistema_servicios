@@ -10,6 +10,7 @@ from gastronomia.services.bi.pedidos_validos import (
     GRUPO_PROPIO,
     filas_pedidos_validos,
 )
+from gastronomia.services.channel_price_service import CANALES_PRECIOS
 
 GRUPOS = (GRUPO_PROPIO, GRUPO_PLATAFORMA, GRUPO_DESCONOCIDO)
 
@@ -19,19 +20,29 @@ def indicadores_canales(cliente_id: int, periodo: dict) -> dict:
     total = len(filas)
     return {
         'total_pedidos': total,
+        'ventas_total': _ventas(filas),
         'grupos': {
-            grupo: _resumen_grupo([fila for fila in filas if fila['grupo'] == grupo], total)
+            grupo: _resumen_filas([fila for fila in filas if fila['grupo'] == grupo], total)
             for grupo in GRUPOS
+        },
+        'plataformas': {
+            canal: _resumen_filas([fila for fila in filas if fila['canal'] == canal], total)
+            for canal in CANALES_PRECIOS
         },
         'identidad': cobertura_identidad(filas),
         'semanas': _semanas(filas),
     }
 
 
-def _resumen_grupo(filas: list[dict], total: int) -> dict:
+def _ventas(filas: list[dict]) -> float:
+    return round(sum(fila['total'] for fila in filas), 2)
+
+
+def _resumen_filas(filas: list[dict], total: int) -> dict:
     pedidos = len(filas)
     return {
         'pedidos': pedidos,
+        'ventas': _ventas(filas),
         'participacion': round(pedidos * 100 / total, 1) if total else None,
         'identidad': cobertura_identidad(filas),
     }

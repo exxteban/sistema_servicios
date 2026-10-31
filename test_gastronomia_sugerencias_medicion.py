@@ -57,6 +57,9 @@ def test_registro_una_vez_por_par_y_solo_renglones_marcados(datos):
     assert e.vendidas == 1
     s = resumen(cliente, periodo())
     assert (s['pedidos'], s['renglones'], s['sin_tocar']) == (1, 1, 0)
+    aceptados = Exposicion.query.one().items_aceptados
+    esperado = sum(float(i.subtotal) for i in GastronomiaPedidoItem.query.filter(GastronomiaPedidoItem.id_item.in_(aceptados)))
+    assert s['importe'] == round(esperado, 2)
     restaurado = restaurar_seguro(cliente, p.id_pedido, p.to_dict())
     assert [i.get('origen_sugerencia') for i in restaurado['items']] == [None, ids[0], None]
     # Quitar lo aceptado y dejar el destino por el menú conserva la exposición histórica.

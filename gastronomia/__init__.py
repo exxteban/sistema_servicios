@@ -19,6 +19,7 @@ from gastronomia.routes.salon_api_routes import gastronomia_salon_api_bp
 from gastronomia.routes.stock_api_routes import gastronomia_stock_api_bp
 from gastronomia.routes import bi_routes as _bi_routes  # noqa: F401
 from gastronomia.routes import bi_cola_routes as _bi_cola_routes  # noqa: F401
+from gastronomia.routes import bi_reporte_routes as _bi_reporte_routes  # noqa: F401
 from gastronomia.routes import caja_routes as _caja_routes  # noqa: F401
 from gastronomia.routes import cocina_routes as _cocina_routes  # noqa: F401
 from gastronomia.routes import delivery_routes as _delivery_routes  # noqa: F401
