@@ -173,11 +173,11 @@ Solo lo imprescindible para las fases 1 a 3. Las definiciones de costos, turnos 
 
 - [x] Definir pedido válido para contar pedidos y retornos: excluir anulaciones y documentar devoluciones, encargos y ventas importadas.
 - [x] Confirmar los valores reales de `origen_pedido` y `canal_precio` y clasificarlos en canal propio (POS, tienda online, teléfono/WhatsApp) y plataformas externas (PedidosYa, Monchis).
-- [ ] Auditar identidad de cliente final: normalización de teléfono, duplicados y separación respecto al `id_cliente` de la instalación; no agrupar personas solo por nombre.
-- [ ] Medir cobertura actual: porcentaje de pedidos con cliente identificado por canal y por modalidad.
-- [ ] Confirmar zona horaria local y días de apertura configurados, para no comparar días cerrados.
+- [x] Auditar identidad de cliente final: normalización de teléfono, duplicados y separación respecto al `id_cliente` de la instalación; no agrupar personas solo por nombre. Hecho sobre la base local de desarrollo; repetir en cada instalación con `scripts/auditar_fichas_telefono.py` (ver «Auditoría de la fase 0»).
+- [x] Medir cobertura actual: porcentaje de pedidos con cliente identificado por canal y por modalidad. Medido en la base local de desarrollo (14 pedidos); la medición real queda para el piloto.
+- [x] Confirmar zona horaria local y días de apertura configurados, para no comparar días cerrados. Zona horaria confirmada. Días de apertura: no existe configuración estructurada (solo texto libre de horarios en la tienda), así que queda como requisito de la fase 6.
 - [x] Verificar si la fidelización por compras aplica a pedidos de gastronomía o si necesita un adaptador. Resultado: no aplica a pedidos sin cliente registrado (ver BI-05).
-- [ ] Preparar escenarios ficticios: negocio nuevo sin historial, comida rápida con delivery y cafetería de mostrador.
+- [x] Preparar escenarios ficticios: negocio nuevo sin historial, comida rápida con delivery y cafetería de mostrador (`test_gastronomia_bi_escenarios.py`).
 
 ### Criterios de aceptación
 
@@ -192,7 +192,7 @@ Objetivo: que el negocio tenga por dónde recibir pedidos sin comisión y que ca
 
 ### Trabajo
 
-- [ ] **Lista de activación comercial** con progreso visible: tienda online publicada con fotos y precios, horario cargado, QR impreso (mesa, mostrador, bolsa de delivery), link en la bio de Instagram y en el estado de WhatsApp, mensaje de bienvenida listo para copiar.
+- [x] **Lista de activación comercial** con progreso visible: tienda online publicada con fotos y precios, horario cargado, QR impreso (mesa, mostrador, bolsa de delivery), link en la bio de Instagram y en el estado de WhatsApp, mensaje de bienvenida listo para copiar.
 - [x] Detectar automáticamente lo que ya está hecho (tienda activa, platos sin foto o sin precio) y pedir confirmación manual solo de lo externo (bio de Instagram, QR impreso).
 - [x] Generar materiales listos: QR descargable e imprimible, texto para la bio, texto para el estado de WhatsApp con el link de la tienda.
 - [x] Indicador **pedidos por canal propio frente a plataformas externas**, por semana.
@@ -445,19 +445,75 @@ Reutilizar `test_inteligencia_comercial.py`, `test_inteligencia_bi_context.py`, 
 | WhatsApp Cloud API | Fuera del plan | No se usa; solo enlaces `wa.me`. |
 | Redacción con IA | Después del MVP | Proveedor existente, editable, medido por costo y uso. |
 | Definiciones de costos y turnos | Fases 5–6 | Una base compartida, coherente con reportes. |
-| Fidelización en pedidos sin cliente registrado | Fase 1 (texto del POS) | **Resuelta en BI-05b y BI-05c:** el celular identifica la venta. Con ficha activa la asigna; sin ficha y con celular válido la crea. Pendiente: canjear beneficios en la caja de gastronomía. |
+| Fidelización en pedidos sin cliente registrado | Fase 1 (texto del POS) | **Resuelta en BI-05b, BI-05c y BI-05d:** el celular identifica la venta. Con ficha activa la asigna; sin ficha y con celular válido la crea. La caja de gastronomía canjea beneficios de fidelización (BI-05d). |
 
 ## 17. Próxima unidad de trabajo
 
-**Verificación pendiente:** ver en navegador «Clientes que vuelven» (BI-02), «Tu mes en el sistema» (BI-03), el embudo, los materiales y la casilla del POS (BI-04), y «Salud de uso» más la casilla de la tienda (BI-05), en escritorio, celular y tema oscuro.
+**Punto de parada acordado (31/10/2026): cierre del MVP, fases 0 a 3.** No se empieza BI-06 (fase 4) hasta que el dueño del proyecto lo ordene. La fase 4 se decide con datos del piloto.
 
-**BI-06: fase 4, tres acciones para hoy con seguimiento.** Contrato común de oportunidad, persistencia con identificador estable, estados con transiciones validadas y la pestaña «Hoy» con hasta tres acciones. Empezar por las fuentes que ya existen: pasos de activación pendientes, cola de mensajes y caída de pedidos. El calendario de fechas especiales, la priorización completa y la evaluación de resultados quedan para entregas siguientes.
+### Cierre del MVP (pendiente)
 
-Pendiente de decisión, sin fecha (sección 16): canjear beneficios de fidelización en la caja de gastronomía. Hoy los puntos se acumulan, pero no se gastan ahí. Pendiente fuera del MVP: envío de la salud de uso al proveedor, que requiere autorización del cliente.
+Puntos que no necesitan navegador:
+
+- [ ] Commits en pasos pequeños, separando el BI (BI-01 a BI-05) de la fidelización en caja (BI-05b a BI-05d) y de los archivos de configuración local.
+- [ ] Pruebas de rechazo por permisos: un usuario sin `gastronomia_menu` en las acciones de la cola y en el POST de comisión.
+- [ ] Caché del historial de clientes, hoy recalculado varias veces en cada carga del tablero (BI-02 y BI-03).
+- [ ] Reporte mensual imprimible o descargable (fase 3).
+
+Puntos que requieren ver la aplicación o decidir:
+
+- [ ] Verificación en navegador, en escritorio, celular y tema oscuro: «Clientes que vuelven» (BI-02), «Tu mes en el sistema» (BI-03), embudo, materiales y casilla del POS (BI-04), «Salud de uso» y casilla de la tienda (BI-05), y la caja con beneficios y la factura (BI-05d).
+- [ ] Prueba manual en el POS de ventas: canjear un beneficio, anular la venta y comprobar que vuelve a estar disponible (cambio compartido en `beneficio_consumido`).
+- [ ] Activación por configuración de la instalación, para liberar la experiencia solo en el piloto (fase 8).
+- [ ] Decidir si el piloto se entrega con el bloque apilado en el tab Gastronomía o con la vista «Tu negocio» de pestañas. Recomendación: entregar apilado y construir las pestañas junto con la fase 4.
+
+### Después del cierre
+
+- Piloto: una instalación con pocas ventas y otra con más, con línea base y acompañamiento la primera semana (sección 14).
+- Con los resultados, **BI-06: fase 4, tres acciones para hoy con seguimiento.** Contrato común de oportunidad, persistencia con identificador estable, estados con transiciones validadas y la pestaña «Hoy» con hasta tres acciones. Empezar por activación pendiente, cola de mensajes y caída de pedidos.
+- Fuera del MVP: link de reseña, exportación de contactos, envío de la salud de uso al proveedor (requiere autorización del cliente) y los dos puntos del reporte que dependen de la fase 4.
 
 Actualizar este documento al cerrar cada entrega con alcance real, pruebas realizadas, limitaciones y siguiente paso. Marcar una casilla como terminada únicamente cuando la implementación y sus criterios de aceptación estén verificados.
 
 ## 18. Registro de entregas
+
+### Auditoría de la fase 0 (31/10/2026)
+
+Se ejecutó sobre la base local de desarrollo (`inventario.db`, abierta en solo lectura), no sobre una instalación real. Sirve para detectar problemas de datos y fijar el método; los porcentajes reales salen del piloto.
+
+**Cobertura de identificación (pedidos válidos: 14, del 24/05 al 08/06/2026)**
+
+| Origen y modalidad | Pedidos | Identificados | Celular inválido |
+| --- | --- | --- | --- |
+| POS, mostrador | 10 | 0 | 0 |
+| POS, mesa | 1 | 0 | 0 |
+| POS, delivery | 1 | 1 | 0 |
+| Tienda, delivery | 1 | 1 | 0 |
+| Tienda, retiro | 1 | 1 | 0 |
+
+- La muestra es muy pequeña. Solo se identifican los pedidos con delivery, retiro o tienda, donde el celular es obligatorio. En mostrador y mesa no se identificó ninguno. Esto confirma la brecha que ataca el campo de teléfono del POS (BI-04).
+
+**Identidad en la ficha de clientes (183 fichas sin contar consumidor final; 177 con teléfono)**
+
+- 3 celulares repetidos en 6 fichas: `+595981693161` (fichas 2 y 136), `+595976775769` (10 y 88) y `+595982909192` (54 y 151). Son personas o negocios con nombres distintos y el mismo celular. Por la regla de BI-05c, ninguna se asigna sola; el dueño decide.
+- 2 teléfonos que no normalizan: `+549112602-5132` (largo inválido) y `NO SABE`.
+- Ningún nombre de cliente se repite, así que agrupar por nombre no habría producido fusiones falsas en esta base, pero tampoco reconocería a las fichas con celular repetido.
+
+**Zona horaria y días de apertura**
+
+- Zona horaria: `America/Asuncion`, configurable con `APP_TIMEZONE`. Los rangos de fechas del BI usan `utc_bounds_for_local_dates`, que la respeta.
+- Días de apertura: no hay configuración estructurada. La tienda guarda un texto libre (`texto_horarios`). Hasta definirla, ningún análisis puede saber si un día sin pedidos fue un día cerrado. Es requisito de la fase 6.
+
+**Escenarios ficticios** (`test_gastronomia_bi_escenarios.py`, 3 pruebas en verde)
+
+- Negocio nuevo: sin pedidos, cobertura «sin datos» (no 0 %), sin semanas, sin historial y sin romper el bloque.
+- Comida rápida con delivery: separa canal propio y PedidosYa, deja fuera cancelados, cuenta el celular mal formado como inválido y calcula 40 % de cobertura.
+- Cafetería de mostrador: 5 pedidos sin celular dan cobertura 0 %, distinta de «sin datos», y la cola queda vacía.
+
+**Pendiente**
+
+- Correr la medición y el script de duplicados en cada instalación del piloto.
+- Definir los días de apertura antes de la fase 6.
 
 ### BI-01 — núcleo implementado (31/10/2026)
 
@@ -598,7 +654,7 @@ Actualizar este documento al cerrar cada entrega con alcance real, pruebas reali
 **Limitaciones y pendiente**
 
 - El consentimiento no se registra en el checkout de la tienda online. Requiere cambiar `tienda_online/` consumiendo la API. Por ahora, los clientes que solo compraron en la tienda no entran en la cola.
-- El texto sugerido del POS no está vinculado a la fidelización todavía.
+- ~~El texto sugerido del POS no está vinculado a la fidelización todavía.~~ Resuelto en BI-05b/BI-05c.
 - `gastronomia/static/js/pos.js` quedó en 600 líneas, en el límite. El próximo cambio en el POS debe separar código.
 - `app/routes/tienda_api.py` ya tenía 1458 líneas antes de este cambio, por encima del límite de 600. No se agregó lógica ahí, solo la llamada.
 - Sin panel de salud de uso (fase 3, segunda parte).
@@ -623,7 +679,7 @@ Actualizar este documento al cerrar cada entrega con alcance real, pruebas reali
 
 - «Último uso del BI» cuenta acciones que cambian datos, no vistas. Registrar cada carga del tablero escribiría en la base.
 - El semáforo usa pedidos de cualquier canal, no solo POS. Así una instalación que opera por tienda no aparece como inactiva. Los números por canal se muestran aparte.
-- **Fidelización no se vinculó al texto del POS.** Se verificó que el programa solo suma a ventas con cliente registrado: `clientes_fidelizacion_sincronizacion.py` excluye el consumidor final (id 1) y los pedidos sin factura a un cliente registrado caen en ese consumidor. Decir «con tu número sumás para tu beneficio» sería una promesa falsa. Queda como decisión en la sección 16.
+- **Fidelización no se vinculó al texto del POS.** Se verificó que el programa solo suma a ventas con cliente registrado: `clientes_fidelizacion_sincronizacion.py` excluye el consumidor final (id 1) y los pedidos sin factura a un cliente registrado caen en ese consumidor. Decir «con tu número sumás para tu beneficio» sería una promesa falsa. Resuelto después en BI-05b a BI-05d (ver sección 16).
 - El sugeridor del POS no entra en «funciones usadas»: su medición es de exposición, no de uso.
 - El acceso de root usa `es_usuario_root` (`app/services/ia_backoffice/security.py`), la misma regla del asistente IA.
 - La tienda no importa código del backoffice: la lógica de consentimiento vive en `gastronomia/services/bi/consentimiento.py` y la API solo la llama.
@@ -682,7 +738,7 @@ Actualizar este documento al cerrar cada entrega con alcance real, pruebas reali
 
 **Siguiente paso**
 
-- Ver BI-05c: la creación de fichas desde el celular se resolvió después de esta entrega.
+- Ver BI-05c y BI-05d: la creación de fichas, la unicidad por celular, el RUC y el canje en caja se resolvieron después de esta entrega.
 
 ### BI-05c — creación de ficha de cliente desde el celular (31/10/2026)
 
@@ -709,10 +765,51 @@ Actualizar este documento al cerrar cada entrega con alcance real, pruebas reali
 
 **Limitaciones y pendiente**
 
-- Carrera: dos cobros simultáneos con un celular nuevo podrían crear dos fichas. La tabla de clientes no tiene restricción de unicidad sobre el teléfono, y no la agregué porque no revisé si hay duplicados existentes. Se acepta por ahora; si hace falta, se resuelve después de auditar esos datos.
-- Las fichas creadas se ven igual que las cargadas a mano en la lista de clientes y en el selector de factura.
-- Sin canje de beneficios en la caja de gastronomía. Los puntos se acumulan, pero no se gastan ahí.
+- ~~Carrera: dos cobros simultáneos con un celular nuevo podrían crear dos fichas.~~ Corregido en BI-05d con una tabla de fichas por celular y clave única.
+- ~~Las fichas creadas no tienen RUC/CI.~~ Corregido en BI-05d: la factura completa el RUC de la ficha del pedido.
+- ~~Sin canje de beneficios en la caja de gastronomía.~~ Corregido en BI-05d.
 
 **Siguiente paso**
 
-- Decidir si el canje de beneficios entra en la caja de gastronomía. Después, BI-06: fase 4.
+- Ver BI-05d.
+
+### BI-05d — correcciones de la ficha por celular y canje en caja (31/10/2026)
+
+**Alcance real**
+
+- Unicidad por celular: nueva tabla `gastronomia_bi_fichas_telefono` (`gastronomia/bi_models.py`), con clave única por instalación y celular normalizado. Al crear una ficha se guarda esa fila; si otro cobro la guardó primero, el segundo falla al confirmar, se revierte y pide volver a cobrar (`MSG_CARRERA`). En el reintento, la ficha ya está registrada y se usa. Las fichas creadas antes de esta entrega no tienen fila: se siguen buscando por celular.
+- RUC de la ficha: el alta de cliente para factura recibe el `pedido_id` que se está cobrando. Si el celular del pedido tiene una ficha activa sin RUC y ningún otro cliente tiene ese RUC, se completa esa ficha (RUC y nombre) en vez de crear otro cliente. Sin `pedido_id`, el comportamiento es el de antes.
+- Canje de beneficios en la caja de gastronomía:
+  - `GET /api/gastronomia/caja/pedidos/<id>/beneficios` lista los beneficios aplicables del cliente de la venta, con el descuento estimado según el descuento y el envío que haya en la pantalla.
+  - El cobro acepta `beneficio_fidelizacion_id`. Calcula el descuento con `resolver_descuento_beneficio_pos`, lo suma al descuento de la venta (`descuento_fidelizacion_monto`) y registra el canje con `registrar_canje_beneficio_en_venta`. Si no hay cliente registrado, rechaza el cobro sin cobrar nada.
+  - La caja muestra un selector «Beneficio de fidelizacion» solo cuando hay beneficios, y la vista previa del total lo descuenta. El cobro recalcula todo: la vista previa es una estimación.
+- Corrección en la lógica de fidelización compartida (`app/services/clientes_fidelizacion_politica.py`): anular una venta devolvía el saldo del canje, pero el beneficio seguía apareciendo como consumido y no se podía volver a usar. Ahora `beneficio_consumido` ignora los canjes anulados. Afecta también al POS de ventas, que usa la misma función.
+
+**Decisiones**
+
+- El orden del cobro cambió: el cliente de la venta se resuelve antes de reservar el pago, para que el descuento del beneficio entre en el pago. Si el cobro falla, la reserva del pago y la ficha se revierten juntas.
+- El canje solo se aplica a beneficios de tipo porcentaje o monto fijo, los mismos que el POS de ventas.
+- La vista previa usa el endpoint de beneficios, que también ejecuta `sincronizar_beneficios_vencidos` (la misma llamada que el POS). Es una escritura pequeña dentro de una consulta.
+
+**Pruebas**
+
+- `test_gastronomia_fidelizacion_telefono.py`: 17 pruebas en verde. Cubren la carrera (con simulación de la ficha no visible), la ficha ya registrada, el RUC completado sin duplicar, el alta de factura sin pedido, el canje estimado y descontado, la anulación que devuelve el beneficio, el rechazo sin cliente registrado, y las reglas anteriores.
+- `test_gastronomia_caja.py`: su doble de prueba de la venta ahora acepta `descuento_beneficio`. 14 pruebas en verde.
+- Regresión (corrida completa antes de corregir el doble de caja): 531 pasaron, 1 falló y 42 se omitieron (MariaDB), en gastronomía, inteligencia, tienda, clientes, caja, ventas, y los tests de fidelización del asistente y de tienda. La falla era el doble de caja de `test_caja_reserva_pago_antes_de_crear_venta_central`; después de corregirlo, el archivo `test_gastronomia_caja.py` pasa completo (14). La corrida se repitió después con `test_gastronomia_*`, `test_inteligencia_*`, `test_tienda_*`, `test_clientes_*`, `test_caja_*` y `test_ventas_*`: 503 pasaron y 42 se omitieron, sin fallas (no incluye los tests de fidelización del asistente).
+- JS: `caja.js` y `caja_factura.js` pasan `node --check`.
+- Flujo por HTTP sobre una base de prueba sembrada con datos ficticios: 9 comprobaciones en verde. Cubren la lista de beneficios con el descuento estimado (3000, y 2500 con un descuento manual de 5000), el cobro con canje (total 27000), que el beneficio canjeado deja de aparecer, el alta de factura con RUC que completa la ficha sin crear otro cliente, y el RUC y el nombre guardados.
+- Corrección posterior: la caja oculta los beneficios si la venta se factura a un cliente elegido o con factura electrónica (el cobro usa entonces ese cliente y no la ficha del celular). La ficha completada con RUC conserva su nombre salvo que fuera el celular de relleno. Pruebas: 31 en verde (telefono + caja); regresión amplia: 503 pasaron y 42 se omitieron.
+- Navegador: no verificado en pantalla. El navegador integrado no abre `localhost` ni `127.0.0.1` en esta sesión, así que el selector, la vista previa y el formulario de factura no se probaron visualmente.
+
+**Limitaciones y pendiente**
+
+- Las fichas anteriores a esta entrega no tienen fila por celular. `scripts/auditar_fichas_telefono.py <cliente_id>` (`fidelizacion_auditoria.py`) registra la fila de cada celular con una sola ficha y lista los repetidos, que nunca se asignan solos y los resuelve el dueño. Hay que ejecutarlo una vez por instalación; `--solo-listar` no escribe.
+- Alcance: BI-05b a BI-05d salieron del roadmap original. Se cierran aquí; no se amplía la fidelización de la caja salvo necesidad del BI.
+- `beneficio_consumido` es lógica compartida con el POS de ventas: probar a mano un canje y su anulación en ese POS antes de desplegar.
+- La caja no pide el RUC para una ficha que ya lo tiene: se usa tal cual.
+- Sin verificación de diseño en navegador (escritorio, celular, tema oscuro).
+
+**Siguiente paso**
+
+- Verificar la caja con beneficios y la factura en el navegador (la base de prueba queda en `caja-beneficios`, puerto 5060). Después, BI-06: fase 4.
+
