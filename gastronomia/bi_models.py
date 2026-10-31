@@ -99,3 +99,22 @@ class GastronomiaTiendaVisita(db.Model):
     __table_args__ = (
         db.Index('ix_gastro_tienda_visita_producto', 'cliente_id', 'producto_id', 'fecha_visita'),
     )
+
+
+class GastronomiaBiFichaTelefono(db.Model):
+    """Ficha de cliente creada desde el celular de un cobro: una por celular y por instalacion (BI-05c).
+
+    La clave unica impide que dos cobros simultaneos creen dos fichas para el mismo celular: el segundo
+    falla al guardar y se le pide que vuelva a cobrar, y en ese reintento ya encuentra la ficha.
+    """
+    __tablename__ = 'gastronomia_bi_fichas_telefono'
+
+    id_ficha_telefono = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    telefono_normalizado = db.Column(db.String(30), nullable=False)
+    id_cliente_ficha = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False)
+    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('cliente_id', 'telefono_normalizado', name='uq_gastro_bi_ficha_telefono'),
+    )

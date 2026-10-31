@@ -10,6 +10,7 @@
     requested: () => false,
     reset: () => {},
     emitir: async () => false,
+    setPedidoId: () => {},
   };
   if (!panel) {
     window.GastroCajaFactura = disabled;
@@ -28,6 +29,8 @@
   const timeoutMs = Number(panel.dataset.feTimeoutMs) || 110000;
   let selectedClient = null;
   let searchTimer = null;
+  // Pedido que se esta cobrando: el alta de cliente con RUC lo usa para completar su ficha por celular.
+  let pedidoId = null;
 
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
@@ -52,6 +55,7 @@
     resultsEl.innerHTML = '';
     searchInput.value = '';
     renderClient();
+    document.dispatchEvent(new Event('caja-factura-cambio'));
   };
   const renderResults = (clients) => {
     resultsEl.innerHTML = clients.map((client, index) => `
@@ -77,7 +81,7 @@
   const createClient = async () => {
     const {ok, data} = await requestJson('/api/gastronomia/caja/clientes-factura', {
       method: 'POST',
-      body: JSON.stringify({nombre: newName.value.trim(), ruc_ci: newRuc.value.trim()}),
+      body: JSON.stringify({nombre: newName.value.trim(), ruc_ci: newRuc.value.trim(), pedido_id: pedidoId}),
     });
     if (!ok) {
       window.alert(data.mensaje || 'No se pudo guardar el cliente.');
@@ -152,7 +156,10 @@
     return false;
   };
 
-  checkbox.addEventListener('change', () => clientBox.classList.toggle('hidden', !checkbox.checked));
+  checkbox.addEventListener('change', () => {
+    clientBox.classList.toggle('hidden', !checkbox.checked);
+    document.dispatchEvent(new Event('caja-factura-cambio'));
+  });
   clearButton.addEventListener('click', () => selectClient(null));
   searchInput.addEventListener('input', () => {
     clearTimeout(searchTimer);
@@ -169,6 +176,9 @@
     payload: () => (checkbox.checked
       ? {factura_electronica: true, id_cliente_factura: selectedClient?.id_cliente || null}
       : {}),
+    setPedidoId: (id) => {
+      pedidoId = id || null;
+    },
     reset: () => {
       checkbox.checked = false;
       clientBox.classList.add('hidden');

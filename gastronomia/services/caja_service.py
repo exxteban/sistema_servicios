@@ -6,7 +6,11 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy.exc import IntegrityError
 
 from app import db
-from app.services.clientes_fidelizacion import registrar_compra_fidelizacion_por_venta
+from app.services.clientes_fidelizacion import (
+    registrar_canje_beneficio_en_venta,
+    registrar_compra_fidelizacion_por_venta,
+    resolver_descuento_beneficio_pos,
+)
 from app.utils.auditoria_utils import registrar_auditoria
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
 from gastronomia.services.fidelizacion_telefono import resolver_cliente_fidelizacion
@@ -153,16 +157,25 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
             raise ValueError('La facturacion electronica no esta activa o su configuracion esta incompleta.')
         validar_factura_antes_de_cobrar(cliente_factura, subtotal - descuento - sena)
 
-    pago = _reservar_pago_pedido(cliente_id, usuario_id, pedido, metodo_pago, subtotal, descuento + sena, data)
-
     # Sin cliente para la factura, el celular identifica la venta para la fidelizacion (ficha existente o nueva).
     cliente_venta = cliente_factura
     if cliente_venta is None:
         cliente_venta = resolver_cliente_fidelizacion(
+            cliente_id,
             pedido.celular_cliente,
             pedido.nombre_cliente or pedido.referencia_entrega,
             factura_electronica_solicitada(data),
         )
+    try:
+        beneficio = _descuento_beneficio_del_cobro(cliente_venta, data, subtotal, descuento + sena)
+    except ValueError:
+        db.session.rollback()
+        raise
+
+    pago = _reservar_pago_pedido(
+        cliente_id, usuario_id, pedido, metodo_pago, subtotal, descuento + sena + beneficio['descuento'], data,
+    )
+
     try:
         # Solo los encargos con sena pasan el argumento: el resto llama igual que siempre.
         extra = {'sena_aplicada': sena} if sena > 0 else {}
@@ -171,6 +184,7 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
             usuario_id,
             data,
             descuento=descuento,
+            descuento_beneficio=beneficio['descuento'],
             id_cliente_venta=cliente_venta.id_cliente if cliente_venta else None,
             **extra,
         )
@@ -178,6 +192,8 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
         db.session.rollback()
         raise
     venta = integracion['venta']
+    if beneficio['movimiento'] is not None:
+        registrar_canje_beneficio_en_venta(cliente_venta.id_cliente, beneficio['movimiento'].id_movimiento, venta.id_venta, usuario_id)
     if cliente_factura is None and cliente_venta is not None:
         # La compra suma al cobrar, como en el POS de ventas; el anulado la revierte por el mismo camino.
         registrar_compra_fidelizacion_por_venta(venta, id_usuario=usuario_id)
@@ -204,7 +220,7 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
             'id_venta': int(venta.id_venta),
             'id_sesion_caja': int(sesion.id_sesion),
             'id_metodo_pago': int(metodo.id_metodo_pago),
-            'total_cobrado': float(subtotal - descuento - sena),
+            'total_cobrado': float(subtotal - descuento - sena - beneficio['descuento']),
             'sena_aplicada': float(sena),
         },
         commit=False,
@@ -212,6 +228,20 @@ def cobrar_pedido(cliente_id: int, usuario_id: int, pedido_id: int, data: dict) 
     db.session.commit()
     registrar_evento_pedido(pedido, 'pedido_cobrado')
     return pedido
+
+
+def _descuento_beneficio_del_cobro(cliente_venta, data: dict, subtotal: Decimal, descuento_previo: Decimal) -> dict:
+    """Beneficio de fidelizacion elegido en la caja: su descuento y el movimiento que se canjea."""
+    id_beneficio = data.get('beneficio_fidelizacion_id')
+    if id_beneficio in (None, '', 0, '0'):
+        return {'descuento': Decimal('0.00'), 'movimiento': None}
+    if cliente_venta is None:
+        raise ValueError('El beneficio requiere un cliente registrado para la venta.')
+    resultado = resolver_descuento_beneficio_pos(cliente_venta.id_cliente, id_beneficio, subtotal, descuento_previo)
+    return {
+        'descuento': resultado['descuento_adicional'],
+        'movimiento': resultado['beneficio_movimiento'],
+    }
 
 
 def _reservar_pago_pedido(

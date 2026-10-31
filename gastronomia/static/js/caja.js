@@ -18,6 +18,47 @@
   let pollTimer = null;
   let chargeBusy = false;
   const cashStates = new Set(['abierto', 'enviado_cocina', 'preparando', 'listo', 'en_camino', 'entregado']);
+  const beneficioSelect = document.getElementById('payment-beneficio');
+  const beneficioWrapper = document.getElementById('beneficio-wrapper');
+  // Beneficios de fidelizacion del pedido. El descuento que se muestra es una estimacion: el cobro lo recalcula.
+  let beneficios = [];
+  let beneficioSeq = 0;
+  let beneficioTimer = null;
+
+  const beneficioSeleccionado = () => beneficios.find((item) => String(item.id_movimiento) === beneficioSelect?.value) || null;
+  const beneficioEstimado = () => Number(beneficioSeleccionado()?.descuento_estimado || 0);
+  const renderBeneficios = () => {
+    if (!beneficioSelect || !beneficioWrapper) return;
+    const previo = beneficioSelect.value;
+    const opciones = beneficios.map((item) => `<option value="${Number(item.id_movimiento)}">${escapeHtml(item.resumen)}</option>`);
+    beneficioSelect.innerHTML = ['<option value="">Sin beneficio</option>', ...opciones].join('');
+    beneficioSelect.value = beneficios.some((item) => String(item.id_movimiento) === previo) ? previo : '';
+    beneficioWrapper.classList.toggle('hidden', beneficios.length === 0);
+  };
+  const cargarBeneficios = async () => {
+    if (!selectedOrderId) {
+      beneficios = [];
+      renderBeneficios();
+      return;
+    }
+    const seq = ++beneficioSeq;
+    const params = new URLSearchParams({
+      descuento_monto: Math.max(0, Number(discountInput.value || 0)),
+      costo_envio: Math.max(0, Number(shippingInput?.value || 0)),
+    });
+    const facturaPayload = factura.payload();
+    if (facturaPayload.factura_electronica) params.set('factura_electronica', '1');
+    if (facturaPayload.id_cliente_factura) params.set('id_cliente_factura', facturaPayload.id_cliente_factura);
+    const data = await apiJson(`/api/gastronomia/caja/pedidos/${selectedOrderId}/beneficios?${params}`);
+    if (seq !== beneficioSeq) return;
+    beneficios = data.items || [];
+    renderBeneficios();
+    renderSelected();
+  };
+  const programarBeneficios = () => {
+    clearTimeout(beneficioTimer);
+    beneficioTimer = setTimeout(() => cargarBeneficios().catch(() => {}), 250);
+  };
 
   const money = (value) => `Gs. ${Math.round(Number(value || 0)).toLocaleString('es-PY')}`;
   const showAlert = (message, ok) => {
@@ -83,9 +124,11 @@
       return;
     }
     selectedOrderId = preselectId;
+    factura.setPedidoId?.(selectedOrderId);
     if (shippingInput) shippingInput.value = Number(order.costo_envio || 0);
     renderOrders();
     renderSelected();
+    cargarBeneficios().catch(() => {});
     document.querySelector(`.caja-card[data-order="${preselectId}"]`)?.scrollIntoView({behavior: 'smooth', block: 'center'});
   };
   const pollEvents = async () => {
@@ -205,7 +248,7 @@
     }
     const shippingCost = isDelivery ? Math.max(0, Number(shippingInput?.value || order.costo_envio || 0)) : 0;
     const subtotal = Number(order.subtotal || 0);
-    const total = Math.max(0, subtotal + shippingCost - discount - orderSena(order));
+    const total = Math.max(0, subtotal + shippingCost - discount - orderSena(order) - beneficioEstimado());
     selectedSummary.innerHTML = `
       <div class="flex items-center justify-between gap-3">
         <strong class="text-gray-900 dark:text-white">Pedido ${deliveryCode(order)}</strong>
@@ -214,6 +257,7 @@
       <p class="mt-2 text-sm text-gray-500">${escapeHtml(order.tipo_pedido)}${order.mesa ? ` - Mesa ${escapeHtml(order.mesa)}` : ''}${order.referencia_entrega ? ` - ${escapeHtml(order.referencia_entrega)}` : ''}</p>
       ${isDelivery ? `<p class="mt-2 text-xs font-semibold text-gray-500">Productos ${money(subtotal)} + envio ${money(shippingCost)}</p>` : ''}
       ${orderSena(order) ? `<p class="mt-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300">Sena ya cobrada: -${money(orderSena(order))}</p>` : ''}
+      ${beneficioSeleccionado() ? `<p class="mt-2 text-xs font-semibold text-violet-700 dark:text-violet-300">Beneficio de fidelizacion: -${money(beneficioEstimado())} (estimado)</p>` : ''}
     `;
     paymentTotal.textContent = money(total);
     updateChargeButton();
@@ -231,6 +275,7 @@
         costo_envio: Number(shippingInput?.value || 0),
         referencia: document.getElementById('payment-reference')?.value.trim() || '',
         observacion: document.getElementById('payment-note').value.trim(),
+        beneficio_fidelizacion_id: beneficioSeleccionado()?.id_movimiento || null,
         ...factura.payload(),
       }),
     });
@@ -243,6 +288,8 @@
     else window.open(ticketUrl, '_blank');
     factura.reset();
     selectedOrderId = null;
+    beneficios = [];
+    renderBeneficios();
     discountInput.value = 0;
     if (shippingInput) {
       shippingInput.value = 0;
@@ -293,13 +340,25 @@
     const button = event.target.closest('[data-select]');
     if (!button) return;
     selectedOrderId = Number(button.dataset.select);
+    factura.setPedidoId?.(selectedOrderId);
     const order = orders.find((item) => Number(item.id_pedido) === Number(selectedOrderId));
     if (shippingInput) shippingInput.value = Number(order?.costo_envio || 0);
+    beneficios = [];
+    renderBeneficios();
     renderOrders();
     renderSelected();
+    cargarBeneficios().catch(() => {});
   });
-  discountInput?.addEventListener('input', renderSelected);
-  shippingInput?.addEventListener('input', renderSelected);
+  discountInput?.addEventListener('input', () => {
+    renderSelected();
+    programarBeneficios();
+  });
+  shippingInput?.addEventListener('input', () => {
+    renderSelected();
+    programarBeneficios();
+  });
+  beneficioSelect?.addEventListener('change', renderSelected);
+  document.addEventListener('caja-factura-cambio', programarBeneficios);
   document.querySelectorAll('[data-payment-method]').forEach((button) => {
     button.setAttribute('aria-pressed', button.classList.contains('active') ? 'true' : 'false');
     button.addEventListener('click', () => selectPaymentMethod(button));
