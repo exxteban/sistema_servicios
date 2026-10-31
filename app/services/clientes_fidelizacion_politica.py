@@ -74,13 +74,26 @@ def _beneficios_disponibles_actuales(id_cliente):
         ClienteFidelizacionMovimiento.tipo_movimiento == 'beneficio_otorgado',
         ClienteFidelizacionMovimiento.delta_consumos_disponibles > 0,
     ).all()
-    return sum(1 for item in originales if not _tiene_hijo_consumo(item.id_movimiento))
+    return sum(1 for item in originales if not beneficio_consumido(item.id_movimiento))
 
 
-def _tiene_hijo_consumo(id_movimiento):
+def beneficio_consumido(id_movimiento) -> bool:
+    """El beneficio ya no esta disponible: se revoco, vencio o tiene un canje vigente.
+
+    Un canje anulado (reversion_venta sobre el canje) devuelve el beneficio, asi que no cuenta.
+    """
+    id_movimiento = int(id_movimiento)
+    if _hay_hijo(id_movimiento, ('reversion_venta', 'beneficio_vencido')):
+        return True
+    canjes = ClienteFidelizacionMovimiento.query.filter(
+        ClienteFidelizacionMovimiento.id_movimiento_origen == id_movimiento,
+        ClienteFidelizacionMovimiento.tipo_movimiento.in_(('canje_manual', 'canje_venta')),
+    ).all()
+    return any(not _hay_hijo(canje.id_movimiento, ('reversion_venta',)) for canje in canjes)
+
+
+def _hay_hijo(id_movimiento_origen, tipos) -> bool:
     return ClienteFidelizacionMovimiento.query.filter(
-        ClienteFidelizacionMovimiento.id_movimiento_origen == int(id_movimiento),
-        ClienteFidelizacionMovimiento.tipo_movimiento.in_(
-            ('canje_manual', 'canje_venta', 'reversion_venta', 'beneficio_vencido')
-        ),
+        ClienteFidelizacionMovimiento.id_movimiento_origen == int(id_movimiento_origen),
+        ClienteFidelizacionMovimiento.tipo_movimiento.in_(tipos),
     ).first() is not None
