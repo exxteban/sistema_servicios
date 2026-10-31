@@ -97,13 +97,38 @@ Referencias internas:
 
 ## 3. Experiencia propuesta
 
-### Portada: «Tu negocio hoy»
+### Organización en pestañas
 
-1. Resumen de ventas, pedidos y ticket promedio; comparación con días equivalentes cuando haya datos.
+Cada fase suma información; si todo se apila en una vista, el dueño deja de mirarla. Por eso la experiencia se organiza en pestañas, con **una pregunta por pestaña** y poco desplazamiento vertical.
+
+Hoy el tablero de inteligencia ya tiene pestañas (Resumen, Comercial, Operación, Gastronomía), y la pestaña Gastronomía apila KPIs, sugerencias, menú, radar y ritmo en una sola columna. Para no poner pestañas dentro de pestañas, la propuesta es una vista propia **«Tu negocio»** para instalaciones gastronómicas, con estas pestañas:
+
+| Pestaña | Pregunta que responde | Contenido | Fases |
+| --- | --- | --- | --- |
+| **Hoy** | ¿Qué hago hoy? | Hasta 3 acciones y hasta 4 indicadores del día | 1–4 |
+| **Clientes** | ¿A quién le escribo? | Cola de envío asistido; segmentos como filtros | 2 |
+| **Crecer** | ¿Por dónde me llegan pedidos? | Lista de activación, canal propio frente a apps, embudo de la tienda | 1 |
+| **Menú** | ¿Qué platos empujo o reviso? | Cuatro situaciones de platos, sugeridor y promociones | 5–6 |
+| **Resultados** | ¿Sirvió lo que hice? | Reporte del mes, acciones en evaluación e historial | 3–4 |
+
+Reglas de diseño:
+
+- **Máximo cinco pestañas para el dueño.** Preparación, merma y demoras (fase 7) se suman a la pestaña Operación existente o se agregan como sexta solo cuando estén listas.
+- **Sin pestañas anidadas.** Dentro de una pestaña se usan filtros tipo chip (por ejemplo, «Primera compra», «Ausentes», «Reseñas» en Clientes), no sub-pestañas.
+- **Lo importante se ve sin desplazarse:** la respuesta principal de cada pestaña entra en la primera pantalla de una notebook de 1366×768 y de un celular. Lo demás va en «Ver más», con el modal de detalles existente (`_modal_detalles.html`).
+- **Topes por vista:** hasta 3 tarjetas de acción y hasta 4 indicadores. Las listas largas (cola, platos, historial) se paginan o cargan de a poco.
+- **Contadores en las pestañas** (por ejemplo, «Clientes 8») para saber dónde hay algo pendiente sin abrir cada una. Una pestaña sin novedades no muestra contador.
+- **Carga por pestaña:** cada pestaña se pide al abrirla, como parcial, y no se calcula todo al entrar.
+- **Enlaces directos:** cada acción abre la pestaña y el filtro correspondientes (por ejemplo, de Hoy a Clientes con «Ausentes»), y se recuerda la última pestaña abierta.
+- **Estados vacíos de una línea** con un paso concreto, sin bloques grandes de «datos insuficientes».
+- En celular, las pestañas son una barra horizontal desplazable y fija arriba; la cola de mensajes está pensada para usarse desde el teléfono.
+- El panel de salud de uso (fase 3) no es una pestaña del dueño: es una vista aparte, solo para root.
+
+### Pestaña «Hoy»
+
+1. Hasta 4 indicadores: pedidos, ventas, ticket promedio y uno de crecimiento (canal propio o clientes identificados), con comparación con días equivalentes cuando haya datos.
 2. **Tres acciones para hoy**, cada una con un único paso principal. Con poco historial, las acciones vienen de la activación comercial y de la recuperación de clientes, que no necesitan historial.
-3. Indicadores de crecimiento: pedidos por canal propio y porcentaje de pedidos con cliente identificado.
-4. Acceso a la cola de mensajes pendientes y al reporte mensual.
-5. Acceso secundario a menú, clientes, horarios, canales, operación y reportes existentes.
+3. Nada más: el detalle vive en las otras pestañas.
 
 Ejemplos ilustrativos, sin datos reales:
 
@@ -356,6 +381,7 @@ Mejora margen y operación más que ventas; por eso va al final.
 - Separar detectores, priorización, persistencia, colas de mensajes, reporte y evaluación en archivos pequeños. Ningún archivo nuevo o modificado supera 600 líneas.
 - Paquete `gastronomia/services/bi/` para las responsabilidades nuevas (por ejemplo `activacion.py`, `segmentos.py`, `cola_mensajes.py`, `plantillas.py`, `reporte_valor.py`, `salud_uso.py`), con los servicios existentes como adaptadores.
 - Rutas delgadas, plantillas parciales y scripts acotados; no agregar todo a `inteligencia_service.py` o `comercial.py`.
+- Una plantilla parcial y un endpoint por pestaña de «Tu negocio», compatibles con el motor de pestañas existente (`?partial=1`); reutilizar el patrón `role="tablist"` del tablero de inteligencia.
 - Nuevos modelos previstos: acción/oportunidad, eventos de seguimiento, contacto de cola (cliente, segmento, plantilla, estado, fecha) y preferencia de contacto del cliente final. Reutilizar identidad, pedidos, promociones y telemetría actuales.
 - Los enlaces de WhatsApp se generan con una utilidad compartida a partir de la existente en `cliente_final_service.py`; no usar `app/services/whatsapp/`.
 - Clave de deduplicación por instalación, detector, entidad y ventana; registrar versión de regla y evidencia.
@@ -377,7 +403,7 @@ Mejora margen y operación más que ventas; por eso va al final.
 - Estado: recálculos, solicitudes repetidas, transiciones inválidas, caducidad y persistencia de descartes.
 - Integración: oportunidad → mensaje o pantalla → pedido válido → resultado → reporte mensual.
 - Regresión: BI general, gastronomía desactivada, otros rubros, POS, cocina, caja, tienda online y sugeridor.
-- UI: escritorio y móvil (la cola se usará mucho desde el celular), tema claro/oscuro, estados vacíos y error.
+- UI: escritorio y móvil (la cola se usará mucho desde el celular), tema claro/oscuro, estados vacíos y error; topes por vista, respuesta principal visible sin desplazarse, carga por pestaña y enlaces directos a pestaña y filtro.
 - Rendimiento: historial y catálogo representativos, latencia HTTP y fallos de tareas.
 - Base de datos: migraciones y consultas en los motores soportados, con datos ficticios.
 
@@ -414,6 +440,7 @@ Reutilizar `test_inteligencia_comercial.py`, `test_inteligencia_bi_context.py`, 
 | Consentimiento de mensajes | Fase 1 | Registro explícito en POS y tienda; sin consentimiento no entra en colas. |
 | Límite diario y frecuencia de mensajes | Fase 2 | Configurable; valores iniciales conservadores para evitar bloqueos de WhatsApp. |
 | Ventanas de segunda compra y ausencia | Fase 2 | Reglas fijas con poco historial; recurrencia cuando haya evidencia. |
+| Ubicación de «Tu negocio» | Fase 1 | Vista propia con 5 pestañas para gastronomía; la pestaña Gastronomía del tablero general enlaza a ella en vez de duplicar contenido. |
 | Envío de la salud de uso al proveedor | Después del MVP | Por ahora solo visible dentro de cada instalación; exportarla requiere autorización. |
 | WhatsApp Cloud API | Fuera del plan | No se usa; solo enlaces `wa.me`. |
 | Redacción con IA | Después del MVP | Proveedor existente, editable, medido por costo y uso. |
