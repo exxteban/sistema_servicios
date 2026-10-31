@@ -16,6 +16,8 @@ from gastronomia.models import (
     GastronomiaPedidoPago,
     GastronomiaProducto,
 )
+from gastronomia.services.bi.clientes_vuelven import resumen_clientes_vuelven_seguro
+from gastronomia.services.bi.crecer import resumen_crecer_seguro
 from gastronomia.services.inteligencia_clientes import clientes_frecuentes_gastronomia
 from gastronomia.services.inteligencia_margen import productos_alto_volumen_bajo_margen
 from gastronomia.services.inteligencia_promos import promociones_horario_bajo
@@ -56,6 +58,8 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
         'productos_bajo_margen': productos_bajo_margen,
         'clientes_frecuentes': clientes_frecuentes,
         'sugerencias': resumen_sugerencias(cliente_id_resuelto, periodo_actual),
+        'crecer': resumen_crecer_seguro(cliente_id_resuelto, periodo_actual),
+        'clientes_vuelven': resumen_clientes_vuelven_seguro(cliente_id_resuelto),
         'insights': insights,
     }
 

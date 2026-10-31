@@ -171,8 +171,8 @@ Solo lo imprescindible para las fases 1 a 3. Las definiciones de costos, turnos 
 
 ### Trabajo
 
-- [ ] Definir pedido válido para contar pedidos y retornos: excluir anulaciones y documentar devoluciones, encargos y ventas importadas.
-- [ ] Confirmar los valores reales de `origen_pedido` y `canal_precio` y clasificarlos en canal propio (POS, tienda online, teléfono/WhatsApp) y plataformas externas (PedidosYa, Monchis).
+- [x] Definir pedido válido para contar pedidos y retornos: excluir anulaciones y documentar devoluciones, encargos y ventas importadas.
+- [x] Confirmar los valores reales de `origen_pedido` y `canal_precio` y clasificarlos en canal propio (POS, tienda online, teléfono/WhatsApp) y plataformas externas (PedidosYa, Monchis).
 - [ ] Auditar identidad de cliente final: normalización de teléfono, duplicados y separación respecto al `id_cliente` de la instalación; no agrupar personas solo por nombre.
 - [ ] Medir cobertura actual: porcentaje de pedidos con cliente identificado por canal y por modalidad.
 - [ ] Confirmar zona horaria local y días de apertura configurados, para no comparar días cerrados.
@@ -193,11 +193,11 @@ Objetivo: que el negocio tenga por dónde recibir pedidos sin comisión y que ca
 ### Trabajo
 
 - [ ] **Lista de activación comercial** con progreso visible: tienda online publicada con fotos y precios, horario cargado, QR impreso (mesa, mostrador, bolsa de delivery), link en la bio de Instagram y en el estado de WhatsApp, mensaje de bienvenida listo para copiar.
-- [ ] Detectar automáticamente lo que ya está hecho (tienda activa, platos sin foto o sin precio) y pedir confirmación manual solo de lo externo (bio de Instagram, QR impreso).
+- [x] Detectar automáticamente lo que ya está hecho (tienda activa, platos sin foto o sin precio) y pedir confirmación manual solo de lo externo (bio de Instagram, QR impreso).
 - [ ] Generar materiales listos: QR descargable e imprimible, texto para la bio, texto para el estado de WhatsApp con el link de la tienda.
-- [ ] Indicador **pedidos por canal propio frente a plataformas externas**, por semana.
+- [x] Indicador **pedidos por canal propio frente a plataformas externas**, por semana.
 - [ ] **Comisión evitada estimada**: solo si el dueño configura el porcentaje de comisión de cada plataforma; sin dato, no se muestra.
-- [ ] Indicador **porcentaje de pedidos con cliente identificado**, por canal.
+- [x] Indicador **porcentaje de pedidos con cliente identificado**, por canal.
 - [ ] En el POS, campo de teléfono rápido y visible para mostrador y retiro, opcional y sin bloquear el cobro; reutilizar la normalización existente.
 - [ ] Mostrar al cajero un texto sugerido para pedir el teléfono, vinculado a la fidelización cuando esté activa («con tu número sumás para tu beneficio»).
 - [ ] Registrar si el cliente aceptó recibir mensajes; por defecto, sin consentimiento confirmado no entra en las colas de la fase 2.
@@ -226,16 +226,16 @@ Objetivo: convertir clientes identificados en segundas compras y retornos, usand
 
 ### Trabajo
 
-- [ ] Consultar historial más amplio que el período visible para encontrar a quienes dejaron de comprar.
-- [ ] Calcular los segmentos con identidad estable por teléfono; resolver ambigüedades sin fusionar por nombre.
-- [ ] Mostrar última compra, frecuencia, plato favorito y por qué está en la lista.
-- [ ] **Plantillas de mensaje** editables por segmento, con variables (nombre, plato favorito, link de la tienda o del plato). Ofrecer valor sin descuento obligatorio: novedad, disponibilidad del favorito, recordatorio.
-- [ ] **Cola de envío asistido**: un cliente a la vez con el mensaje ya armado; botón «Abrir WhatsApp» (`wa.me` con texto), al volver «Enviado» u «Omitir», y pasa al siguiente.
-- [ ] Límite diario configurable de mensajes por cola y frecuencia máxima por cliente (ejemplo: uno cada 14 días).
-- [ ] Marca «no quiere mensajes» con un clic; ese cliente sale de todas las colas.
+- [x] Consultar historial más amplio que el período visible para encontrar a quienes dejaron de comprar.
+- [x] Calcular los segmentos con identidad estable por teléfono; resolver ambigüedades sin fusionar por nombre.
+- [x] Mostrar última compra, frecuencia, plato favorito y por qué está en la lista.
+- [x] **Plantillas de mensaje** editables por segmento, con variables (nombre, plato favorito, link de la tienda o del plato). Ofrecer valor sin descuento obligatorio: novedad, disponibilidad del favorito, recordatorio.
+- [x] **Cola de envío asistido**: un cliente a la vez con el mensaje ya armado; botón «Abrir WhatsApp» (`wa.me` con texto), al volver «Enviado» u «Omitir», y pasa al siguiente.
+- [x] Límite diario configurable de mensajes por cola y frecuencia máxima por cliente (ejemplo: uno cada 14 días).
+- [x] Marca «no quiere mensajes» con un clic; ese cliente sale de todas las colas.
 - [ ] Link de reseña de Google configurable; mensaje de reseña después de entregas, con el mismo límite.
 - [ ] Opcional: exportar contactos con consentimiento para listas de difusión de WhatsApp Business, explicando que solo llegan a quien guardó el número del negocio.
-- [ ] Asociar compras posteriores al mensaje marcado como enviado, con ventana de observación por segmento y excluyendo anulaciones.
+- [x] Asociar compras posteriores al mensaje marcado como enviado, con ventana de observación por segmento y excluyendo anulaciones.
 
 ### Criterios de aceptación
 
@@ -455,3 +455,77 @@ Entregables: pedido válido, clasificación de canales, auditoría de identidad 
 Luego **BI-02: cola de envío asistido con segmentos de segunda compra y habitual ausente**, con telemetría desde el inicio.
 
 Actualizar este documento al cerrar cada entrega con alcance real, pruebas realizadas, limitaciones y siguiente paso. Marcar una casilla como terminada únicamente cuando la implementación y sus criterios de aceptación estén verificados.
+
+## 18. Registro de entregas
+
+### BI-01 — núcleo implementado (31/10/2026)
+
+**Alcance real**
+
+- Fase 0 (código): clasificación de pedidos y canales en `gastronomia/services/bi/pedidos_validos.py`; identidad por teléfono en `identidad.py`; cobertura por canal.
+  - Valores confirmados en código: `origen_pedido` ∈ {`pos`, `tienda_online`, `importado`}; `canal_precio`, que vive en el ítem y no en el pedido, ∈ {`pedidosya`, `monchis`, nulo}.
+  - Exclusiones: cancelados, importados y encargos. No hay devoluciones como estado: una anulación pasa a `cancelado`.
+  - Teléfono/WhatsApp no es un origen propio: el pedido entra como `pos` con el teléfono cargado.
+- Fase 1 parcial:
+  - Lista de activación (`activacion.py`): pasos automáticos (platos, tienda, fotos, precios, horario) y pasos manuales (QR impreso, bio de Instagram, estado de WhatsApp) que confirma el dueño. Se guardan en `Configuracion` con la clave incluyendo el `id_cliente`.
+  - Indicadores de canal propio frente a plataformas por semana, y cobertura de identidad por canal (`canales.py`).
+- Presentación: bloque «Crecer» en el tab Gastronomía (`_crecer.html`, incluido desde `_tab_gastronomia.html`). Se calcula dentro de `obtener_inteligencia_gastronomia` con degradación segura (`crecer.py`). Ruta nueva `POST /gastronomia/bi/activacion/<paso>` con permiso `gastronomia_menu` y CSRF.
+
+**Pruebas**
+
+- `test_gastronomia_bi_fase0.py`: 11 pruebas nuevas, todas en verde. Cubren clasificación, exclusiones, pedido con varios ítems, identidad por teléfono sin mezclar nombres, cobertura nula, semanas, activación de negocio nuevo, detección de fotos y precios, aislamiento de pasos manuales por cliente, integración con el dashboard y el POST, y degradación del bloque.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 303 pasaron y 42 se omitieron. Las omitidas son las de MariaDB de `test_gastronomia_sugerencias_mysql.py`, que requieren `scripts/probar_sugerencias_mysql.py`.
+- No verificado visualmente en navegador (layout, tema oscuro, celular). Solo se comprobó el HTML renderizado en las pruebas.
+
+**Limitaciones y pendiente**
+
+- Sin medición sobre datos reales: la cobertura actual de cada instalación queda para el piloto.
+- `inteligencia_clientes.py` (frecuentes) todavía agrupa por nombre cuando no hay teléfono. Es una brecha ya registrada en la sección 2; el código nuevo no lo hace.
+- Fuera de BI-01: comisión evitada (requiere porcentaje configurado), materiales (QR, textos de bio y de estado), mensaje de bienvenida, campo de teléfono en el POS, consentimiento, embudo de la tienda, y la vista «Tu negocio» con pestañas. Por ahora el bloque vive en el tab Gastronomía del tablero.
+- Días de apertura: no encontré configuración de días de apertura en el código; sigue sin confirmar.
+- Permisos: no hay prueba de que un usuario sin `gastronomia_menu` reciba rechazo en el POST.
+
+**Siguiente paso**
+
+- Cerrar BI-01 con medición en datos reales del piloto y los materiales de activación. Después, BI-02: cola de envío asistido.
+
+### BI-02 — cola de envío asistido (31/10/2026)
+
+**Alcance real**
+
+- Historial amplio por teléfono (`gastronomia/services/bi/historial.py`): pedidos válidos sin límite de periodo. Nunca agrupa por nombre. Un pedido sin teléfono válido usa el del cliente final.
+- Segmentos (`segmentos.py`):
+  - Segunda compra: una sola fecha de compra, entre `segunda_min` y `segunda_max` días.
+  - Habitual ausente: 3 o más fechas de compra, y más días sin comprar que su intervalo mediano, con tope de 120 días.
+  - Las fechas se cuentan por día: dos pedidos el mismo día cuentan como uno.
+- Cola (`cola.py`, `cola_acciones.py`): un contacto a la vez. Cada acción vuelve a validar el contacto contra la cola actual. Límite diario (por defecto 20) y frecuencia máxima por cliente (por defecto 14 días). «No quiere mensajes» saca el teléfono de todas las colas. Abrir WhatsApp registra la apertura y no marca el mensaje como enviado.
+- Plantillas (`plantillas.py`, `cola_config.py`): una por segmento, editables, con `{nombre}`, `{plato}`, `{negocio}` y `{link}`. No incluyen descuento. El enlace `wa.me` es compartido (`whatsapp.py`); `whatsapp_pedido_url` lo usa ahora, con la misma salida.
+- Atribución (`retorno.py`): compras posteriores al envío marcado, dentro de una ventana cerrada (15 días para segunda compra, 30 para habitual ausente), excluyendo anulados. El texto dice «volvió después del mensaje», sin afirmar causa.
+- Telemetría (`gastronomia/bi_models.py`): eventos `whatsapp_abierto`, `mensaje_enviado`, `mensaje_omitido` y `no_contactar`. Las vistas no se registran, porque requerirían una escritura en cada carga del tablero.
+- Modelos nuevos, todos aditivos y creados por `create_all()`: contactos de la cola, no-contactar y eventos.
+- Presentación: tarjeta «Clientes que vuelven» en el tab Gastronomía. Los formularios son POST con CSRF y el permiso `gastronomia_menu`. «Abrir WhatsApp» abre en una pestaña nueva.
+
+**Pruebas**
+
+- `test_gastronomia_bi_cola.py`: 15 pruebas nuevas, en verde. Cubren reglas de segmentos, historial fuera de periodo y homónimos, habitual ausente fuera de periodo, «no quiere mensajes», abrir sin marcar enviado, límite diario, omitidos, frecuencia, atribución con anulados, configuración fuera de rango, plantilla sin tienda, enlace `wa.me`, acciones y configuración por POST, y degradación del bloque.
+- Con BI-01 suman 26 pruebas en verde.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 318 pasaron y 42 se omitieron (las de MariaDB).
+
+**Decisiones**
+
+- Deduplicación por cliente, teléfono, segmento y último pedido. Una compra nueva crea un contacto nuevo; un envío o un descarte no se repite para el mismo último pedido.
+- Valores por defecto configurables en la tarjeta: 20 mensajes por día, 14 días de frecuencia y segunda compra entre 5 y 15 días.
+- Constantes, no configurables: tope de ausencia de 120 días y ventanas de atribución de 15 y 30 días.
+
+**Limitaciones y pendiente**
+
+- Sin verificar en navegador: el formulario con `target="_blank"` que abre WhatsApp, y el layout en celular y tema oscuro.
+- El historial completo se recalcula en cada carga del tablero. Con historiales grandes conviene caché o carga por pestaña (fase 4 del roadmap).
+- Sin link de reseña, sin exportación de contactos y sin segmento «favorito disponible». Los dos primeros son opcionales en la fase 2; el tercero no está en el alcance de BI-02.
+- El estado vacío («sin clientes con teléfono») no tiene prueba propia.
+- No hay prueba de rechazo para un usuario sin `gastronomia_menu` en las acciones.
+- Sin medición con datos reales.
+
+**Siguiente paso**
+
+- Verificar la tarjeta y el formulario en navegador. Después, piloto con una instalación real.

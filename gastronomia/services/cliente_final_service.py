@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime
 import secrets
-from urllib.parse import quote
 
 from app import db
 from app.models.rol import Rol
@@ -17,6 +16,7 @@ from gastronomia.customer_models import (
     GastronomiaClienteFinal,
 )
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem
+from gastronomia.services.bi.whatsapp import url_wa_me
 from gastronomia.services.pedido_service import crear_pedido
 
 
@@ -299,12 +299,9 @@ def _pedido_publico_dict(pedido: GastronomiaPedido) -> dict:
 
 
 def whatsapp_pedido_url(telefono: str | None, pedido: dict, nombre_tienda: str | None = None) -> str | None:
-    digits = ''.join(ch for ch in str(telefono or '') if ch.isdigit())
-    if not digits:
-        return None
     tienda = f" en {nombre_tienda}" if nombre_tienda else ''
     mensaje = f"Hola, acabo de hacer el pedido {pedido.get('codigo_entrega')}{tienda}. Total: {pedido.get('total')}"
-    return f'https://wa.me/{digits}?text={quote(mensaje)}'
+    return url_wa_me(telefono, mensaje)
 
 
 def _token_valido(cliente: GastronomiaClienteFinal, token: str | None) -> bool:

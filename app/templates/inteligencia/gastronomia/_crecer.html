@@ -1,0 +1,101 @@
+{% from "inteligencia/gastronomia/_macros.html" import card_header, barra, vacio, plural %}
+{% set crecer = panel.gastronomia.crecer %}
+{% if crecer and crecer.disponible %}
+{% set act = crecer.activacion %}
+{% set can = crecer.canales %}
+{% set propio = can.grupos.propio %}
+{% set plataforma = can.grupos.plataforma %}
+<div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        {{ card_header('Activación comercial', eyebrow='Crecer', badge=act.completados ~ ' de ' ~ act.total, badge_class='bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-100') }}
+        {% if act.siguiente %}
+        <p class="mt-3 rounded-lg bg-violet-50 px-3 py-2 text-xs font-medium text-violet-900 dark:bg-violet-500/10 dark:text-violet-100">
+            Siguiente paso: {{ act.siguiente.titulo }}. {{ act.siguiente.detalle }}
+        </p>
+        {% else %}
+        <p class="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-100">
+            Activación completa. Revisá los resultados cada semana.
+        </p>
+        {% endif %}
+        <ul class="mt-3 divide-y divide-gray-100 dark:divide-gray-700">
+            {% for paso in act.pasos %}
+            <li class="flex items-start justify-between gap-3 py-2">
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">
+                        <span aria-hidden="true">{{ '✓' if paso.hecho else '○' }}</span> {{ paso.titulo }}
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ paso.detalle }}</p>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                    {% if not paso.automatico %}
+                    <form method="post" action="{{ url_for('gastronomia.bi_activacion_marcar', paso=paso.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="hecho" value="{{ '0' if paso.hecho else '1' }}">
+                        <button type="submit" class="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+                            {{ 'Desmarcar' if paso.hecho else 'Marcar hecho' }}
+                        </button>
+                    </form>
+                    {% endif %}
+                    <a href="{{ url_for(paso.endpoint) }}" class="text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300">Abrir</a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </article>
+
+    <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        {{ card_header('Canal propio frente a apps', eyebrow='Crecer', badge=plural(can.total_pedidos, 'pedido'), badge_class='bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200') }}
+        {% if can.total_pedidos == 0 %}
+        <div class="mt-3">{{ vacio('Sin pedidos válidos en el período. Compartí tu tienda online para empezar a recibir pedidos propios.') }}</div>
+        {% else %}
+        <div class="mt-3 grid grid-cols-2 gap-3">
+            <div class="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-500/10">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">Propio (POS y tienda)</p>
+                <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ propio.pedidos }}</p>
+                {{ barra(propio.participacion, 'bg-emerald-500') }}
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Identificados: {{ propio.identidad.porcentaje ~ '%' if propio.identidad.porcentaje is not none else 'sin datos' }}
+                </p>
+            </div>
+            <div class="rounded-xl bg-sky-50 p-3 dark:bg-sky-500/10">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-200">Plataformas</p>
+                <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ plataforma.pedidos }}</p>
+                {{ barra(plataforma.participacion, 'bg-sky-500') }}
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Identificados: {{ plataforma.identidad.porcentaje ~ '%' if plataforma.identidad.porcentaje is not none else 'sin datos' }}
+                </p>
+            </div>
+        </div>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Con cliente identificado (teléfono): {{ can.identidad.identificados }} de {{ can.identidad.total }}
+            {% if can.identidad.telefonos_invalidos %}· {{ can.identidad.telefonos_invalidos }} con teléfono no válido{% endif %}.
+        </p>
+        {% if can.grupos.desconocido.pedidos %}
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ can.grupos.desconocido.pedidos }} sin canal conocido (no se cuentan como propios).</p>
+        {% endif %}
+        {% if can.semanas %}
+        <div class="mt-3 overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="text-left text-gray-500 dark:text-gray-400">
+                        <th class="py-1 font-semibold">Semana</th>
+                        <th class="py-1 text-right font-semibold">Propio</th>
+                        <th class="py-1 text-right font-semibold">Plataformas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for semana in can.semanas[-8:] %}
+                    <tr class="border-t border-gray-100 dark:border-gray-700">
+                        <td class="py-1 text-gray-700 dark:text-gray-200">{{ semana.inicio.strftime('%d/%m') }}</td>
+                        <td class="py-1 text-right text-gray-700 dark:text-gray-200">{{ semana.propio }}</td>
+                        <td class="py-1 text-right text-gray-700 dark:text-gray-200">{{ semana.plataforma }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% endif %}
+    </article>
+</div>
+{% endif %}
