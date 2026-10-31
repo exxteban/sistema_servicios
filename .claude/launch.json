@@ -72,6 +72,21 @@
         "SERVER": "flask",
         "DEBUG": "0"
       }
+    },
+    {
+      "name": "caja-beneficios",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "run.py"
+      ],
+      "port": 5060,
+      "env": {
+        "PORT": "5060",
+        "APP_CONFIG": "development",
+        "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/C--Users-csarl-Documents-proyectos-saas-sistema-servicios/72ba107c-abee-4e65-8047-f77a25c02346/scratchpad/verif_bi.db",
+        "SERVER": "flask",
+        "DEBUG": "0"
+      }
     }
   ]
 }
