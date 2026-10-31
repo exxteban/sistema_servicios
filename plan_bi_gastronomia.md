@@ -462,7 +462,8 @@ Puntos que no necesitan navegador:
 
 Puntos que requieren ver la aplicación o decidir:
 
-- [ ] Verificación en navegador, en escritorio, celular y tema oscuro: «Clientes que vuelven» (BI-02), «Tu mes en el sistema» (BI-03), embudo, materiales y casilla del POS (BI-04), «Salud de uso» y casilla de la tienda (BI-05), y la caja con beneficios y la factura (BI-05d).
+- [ ] Verificación en navegador. **Hecho el 31/10/2026 en la demo** (celular en tema oscuro, y 1366×768 en tema claro, sin desbordes): tablero con «Activación comercial», canal propio, embudo, «Clientes que vuelven» (estado vacío) y «Tu mes en el sistema»; materiales con QR y textos; reporte imprimible; «Salud de uso»; interruptor (apagar oculta los tres bloques, encender los devuelve); y campo de celular y casilla de consentimiento en el POS. **Falta:** la cola con un contacto real (la demo no tiene clientes con consentimiento), la caja con beneficios y la factura (la demo tiene la fidelización apagada), la casilla de la tienda online (ver más abajo) y el tema claro en celular.
+- [x] Tienda online reconstruida (31/10/2026): `app/static/tienda_dist` regenerado con `vite build`; el paquete nuevo incluye la casilla de consentimiento (`acepta_mensajes`) y también lo compilado de «venta por peso» (commit 3286a2a), que tampoco estaba en el paquete anterior. 58 pruebas de tienda en verde. **Falta desplegarlo** y comprobar en la tienda pública que la casilla aparece en el pedido; la demo sirvió un paquete distinto (`index-hn0zjAZ7`) del que había en el repo, así que conviene confirmar cómo se despliega la tienda.
 - [ ] Prueba manual en el POS de ventas: canjear un beneficio, anular la venta y comprobar que vuelve a estar disponible (cambio compartido en `beneficio_consumido`).
 - [x] Interruptor por instalación (`interruptor.py`, botón en «Salud de uso», solo root): apagado oculta Crecer, Clientes que vuelven y Tu mes en el sistema sin borrar datos. Por defecto está encendido; para un piloto exclusivo, apagarlo en las demás instalaciones.
 - [ ] Decidir si el piloto se entrega con el bloque apilado en el tab Gastronomía o con la vista «Tu negocio» de pestañas. Recomendación: entregar apilado y construir las pestañas junto con la fase 4.
@@ -699,7 +700,7 @@ Se ejecutó sobre la base local de desarrollo (`inventario.db`, abierta en solo 
 - Las acciones anteriores a esta entrega no tienen evento. Una instalación que solo usó el BI antes figura «sin acciones» hasta la próxima.
 - Sin vínculo con la fidelización (ver decisiones).
 - El envío de la salud de uso fuera de la instalación no está implementado: requiere autorización del cliente.
-- `tienda_online` no tiene build en el repo; se verificó solo la compilación.
+- Corrección posterior: `app/static/tienda_dist` sí está en el repo, pero no se regeneró; la casilla de la tienda no está en el paquete publicado (ver sección 17).
 
 **Siguiente paso**
 
