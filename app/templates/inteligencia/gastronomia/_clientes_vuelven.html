@@ -15,9 +15,16 @@
     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
         Hoy: {{ cola.enviados_hoy }} de {{ cola.limite_dia }} mensajes. Como máximo un mensaje cada {{ cola.frecuencia_dias }} días por cliente.
     </p>
+    {% if vuelven.sin_marcar %}
+    <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+        Celulares cargados sin la casilla de consentimiento marcada: {{ vuelven.sin_marcar }}. No entran en la cola hasta que el cliente acepte. La próxima vez que venga, pedile el consentimiento en el POS.
+    </p>
+    {% endif %}
 
     {% if not cola.hay_telefonos %}
     <div class="mt-3">{{ vacio('Todavía no hay clientes con teléfono. Pedilo en el POS o en la tienda online y los clientes que vuelvan van a aparecer acá.') }}</div>
+    {% elif not cola.hay_consentimientos %}
+    <div class="mt-3">{{ vacio('Todavía no hay clientes que hayan aceptado recibir mensajes. Al cobrar en el POS, pedí el celular y marcá el consentimiento: aparecen acá.') }}</div>
     {% elif cola.limite_alcanzado %}
     <div class="mt-3">{{ vacio('Llegaste al límite de hoy (' ~ cola.limite_dia ~ '). Mañana sigue la cola.') }}</div>
     {% elif not sig %}

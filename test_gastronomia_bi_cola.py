@@ -28,6 +28,7 @@ from gastronomia.services.bi.cola_acciones import (
 )
 from gastronomia.services.bi.cola_config import guardar_config, leer_config
 from gastronomia.services.bi.clientes_vuelven import resumen_clientes_vuelven_seguro
+from gastronomia.services.bi.consentimiento import registrar_casilla
 from gastronomia.services.bi.historial import ClienteHistorial, historial_clientes
 from gastronomia.services.bi.plantillas import renderizar
 from gastronomia.services.bi.retorno import resumen_retorno
@@ -126,13 +127,20 @@ def _pedido(app, cliente_id, usuario_id, producto_id, dias_atras: int, *, celula
         return pedido.id_pedido
 
 
+def _consentir(app, cliente_id: int, celular: str) -> None:
+    with app.app_context():
+        registrar_casilla(cliente_id, celular, True)
+
+
 def _habitual(app, cliente_id, usuario_id, producto_id, celular: str, nombre: str) -> None:
     # Compras hace 30, 23, 16 y 9 dias: intervalo 7, ultima compra hace 9 dias (supera el intervalo).
+    _consentir(app, cliente_id, celular)
     for dias in (30, 23, 16, 9):
         _pedido(app, cliente_id, usuario_id, producto_id, dias, celular=celular, nombre=nombre)
 
 
 def _segunda(app, cliente_id, usuario_id, producto_id, celular: str, nombre: str, dias: int = 10) -> None:
+    _consentir(app, cliente_id, celular)
     _pedido(app, cliente_id, usuario_id, producto_id, dias, celular=celular, nombre=nombre)
 
 

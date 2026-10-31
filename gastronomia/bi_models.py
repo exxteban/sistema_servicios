@@ -58,3 +58,44 @@ class GastronomiaBiEvento(db.Model):
     __table_args__ = (
         db.Index('ix_gastro_bi_evento_tipo', 'cliente_id', 'tipo', 'fecha'),
     )
+
+
+class GastronomiaBiConsentimiento(db.Model):
+    """Estado de la casilla de consentimiento por telefono, registrado en el POS (BI-04).
+
+    estado 'acepta': entra en la cola de envio asistido.
+    estado 'sin_marcar': se cargo el telefono sin marcar la casilla; queda pendiente y visible.
+    Sin fila, el telefono no entra en la cola.
+    """
+    __tablename__ = 'gastronomia_bi_consentimientos'
+
+    id_consentimiento = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    telefono_normalizado = db.Column(db.String(30), nullable=False)
+    estado = db.Column(db.String(20), nullable=False, default='acepta', server_default='acepta')
+    fecha_estado = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('cliente_id', 'telefono_normalizado', name='uq_gastro_bi_consentimiento'),
+    )
+
+
+class GastronomiaTiendaVisita(db.Model):
+    """Visita al detalle publico de un plato de gastronomia en la tienda online (BI-04).
+
+    Guarda un hash del visitante, nunca la IP. Va aparte de TiendaVisitaEvento porque esa
+    tabla apunta a productos (insumos), no a los platos de gastronomia.
+    """
+    __tablename__ = 'gastronomia_tienda_visitas'
+
+    id_visita = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente', ondelete='CASCADE'), nullable=False, index=True)
+    producto_id = db.Column(
+        db.Integer, db.ForeignKey('gastronomia_productos.id_producto', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    visitante_hash = db.Column(db.String(64), nullable=False)
+    fecha_visita = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        db.Index('ix_gastro_tienda_visita_producto', 'cliente_id', 'producto_id', 'fecha_visita'),
+    )

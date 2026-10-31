@@ -148,10 +148,21 @@
                 Nombre / referencia de entrega
                 <input id="delivery-reference" maxlength="80" placeholder="Ej: Juan, Ana retiro, remera roja..." class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
             </label>
+            <div id="cliente-contacto" class="mt-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    Celular del cliente <span id="cliente-contacto-requerido">(opcional)</span>
+                    <input id="delivery-phone" maxlength="40" placeholder="Celular (opcional)" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                </label>
+                <label class="mt-2 flex items-start gap-2 text-xs text-gray-700 dark:text-gray-200">
+                    <input id="cliente-acepta-mensajes" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-gray-300">
+                    <span>El cliente acepta recibir mensajes del negocio (novedades y recordatorios).</span>
+                </label>
+                <p class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">Pedí el celular: con tu número te avisamos cuando vuelvas a tener tu plato favorito.</p>
+                <p id="consentimiento-estado" class="mt-1 hidden text-[11px] font-semibold"></p>
+            </div>
             <div id="delivery-fields" class="mt-3 hidden rounded-xl border border-orange-200 bg-orange-50 p-3 dark:border-orange-500/30 dark:bg-orange-500/10">
                 <p class="text-sm font-black text-orange-800 dark:text-orange-200">Datos de delivery</p>
                 <div class="mt-2 grid gap-2">
-                    <input id="delivery-phone" maxlength="40" placeholder="Celular obligatorio" class="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm font-semibold dark:border-orange-500/30 dark:bg-gray-900 dark:text-gray-100">
                     <input id="delivery-address" maxlength="240" placeholder="Direccion de entrega" class="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm font-semibold dark:border-orange-500/30 dark:bg-gray-900 dark:text-gray-100">
                     <input id="delivery-location-url" maxlength="500" placeholder="Link de ubicacion Google Maps / WhatsApp" class="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm font-semibold dark:border-orange-500/30 dark:bg-gray-900 dark:text-gray-100">
                     <div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
@@ -288,6 +299,7 @@
 <script src="{{ url_for('gastronomia.static', filename='js/pos_modifier_groups.js', v='peso-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_peso.js', v='peso-20261020-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_sugerencias.js', v='20261030-3') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/pos_consentimiento.js', v='bi04-20261031-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_order_payload.js', v='20261030-1') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos.js', v='tipo-pedido-20261030-4') }}"></script>
 <script src="{{ url_for('gastronomia.static', filename='js/pos_category_order.js', v='20260528-3') }}"></script>

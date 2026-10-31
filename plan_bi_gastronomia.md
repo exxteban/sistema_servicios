@@ -194,14 +194,14 @@ Objetivo: que el negocio tenga por dónde recibir pedidos sin comisión y que ca
 
 - [ ] **Lista de activación comercial** con progreso visible: tienda online publicada con fotos y precios, horario cargado, QR impreso (mesa, mostrador, bolsa de delivery), link en la bio de Instagram y en el estado de WhatsApp, mensaje de bienvenida listo para copiar.
 - [x] Detectar automáticamente lo que ya está hecho (tienda activa, platos sin foto o sin precio) y pedir confirmación manual solo de lo externo (bio de Instagram, QR impreso).
-- [ ] Generar materiales listos: QR descargable e imprimible, texto para la bio, texto para el estado de WhatsApp con el link de la tienda.
+- [x] Generar materiales listos: QR descargable e imprimible, texto para la bio, texto para el estado de WhatsApp con el link de la tienda.
 - [x] Indicador **pedidos por canal propio frente a plataformas externas**, por semana.
 - [x] **Comisión evitada estimada**: solo si el dueño configura el porcentaje de comisión de cada plataforma; sin dato, no se muestra.
 - [x] Indicador **porcentaje de pedidos con cliente identificado**, por canal.
-- [ ] En el POS, campo de teléfono rápido y visible para mostrador y retiro, opcional y sin bloquear el cobro; reutilizar la normalización existente.
+- [x] En el POS, campo de teléfono rápido y visible para mostrador y retiro, opcional y sin bloquear el cobro; reutilizar la normalización existente.
 - [ ] Mostrar al cajero un texto sugerido para pedir el teléfono, vinculado a la fidelización cuando esté activa («con tu número sumás para tu beneficio»).
-- [ ] Registrar si el cliente aceptó recibir mensajes; por defecto, sin consentimiento confirmado no entra en las colas de la fase 2.
-- [ ] Embudo de la tienda online con `TiendaVisitaEvento`: visitas, platos vistos y pedidos web, para detectar platos muy vistos y poco pedidos.
+- [x] Registrar si el cliente aceptó recibir mensajes; por defecto, sin consentimiento confirmado no entra en las colas de la fase 2.
+- [x] Embudo de la tienda online: visitas, visitantes y pedidos web por plato, para detectar platos muy vistos y poco pedidos. Usa una tabla propia de visitas a platos de gastronomía, no `TiendaVisitaEvento` (ver BI-04).
 
 ### Criterios de aceptación
 
@@ -448,9 +448,9 @@ Reutilizar `test_inteligencia_comercial.py`, `test_inteligencia_bi_context.py`, 
 
 ## 17. Próxima unidad de trabajo
 
-**Verificación pendiente:** ver en navegador la tarjeta «Clientes que vuelven» (BI-02) y el bloque «Tu mes en el sistema» (BI-03), en escritorio, celular y tema oscuro.
+**Verificación pendiente:** ver en navegador «Clientes que vuelven» (BI-02), «Tu mes en el sistema» (BI-03), el embudo, los materiales y la casilla del POS (BI-04), en escritorio, celular y tema oscuro.
 
-**BI-04: resto de la fase 1 y salud de uso.** Materiales de activación (QR, texto de bio y de estado de WhatsApp), teléfono rápido en el POS sin bloquear el cobro, registro de consentimiento para mensajes y embudo de la tienda online. Después, el panel de salud de uso solo para root (fase 3).
+**BI-05: salud de uso y consentimiento en la tienda online.** Panel de salud de uso solo para root (fase 3, segunda parte). Registrar el consentimiento también en el checkout de la tienda online, solo vía API y dentro de `tienda_online/`. Vincular el texto sugerido del POS con la fidelización cuando esté activa.
 
 Actualizar este documento al cerrar cada entrega con alcance real, pruebas realizadas, limitaciones y siguiente paso. Marcar una casilla como terminada únicamente cuando la implementación y sus criterios de aceptación estén verificados.
 
@@ -566,3 +566,41 @@ Actualizar este documento al cerrar cada entrega con alcance real, pruebas reali
 **Siguiente paso**
 
 - Verificar en navegador BI-02 y BI-03. Después, BI-04 (resto de la fase 1 y salud de uso).
+
+### BI-04 — resto de la fase 1: materiales, consentimiento, POS y embudo (31/10/2026)
+
+**Alcance real**
+
+- Materiales de activación (`materiales.py`), dentro de la lista de activación: enlace público de la tienda, QR en SVG descargable (imprimible como SVG), texto para la bio de Instagram y texto para el estado de WhatsApp. Sin tienda activa o sin URL pública no se muestran.
+- Teléfono y consentimiento en el POS: el celular queda visible en mostrador, retiro y delivery (opcional, salvo delivery), con la casilla «El cliente acepta recibir mensajes del negocio». `pos_consentimiento.js` (nuevo) envía el consentimiento al guardar el pedido con `POST /api/gastronomia/bi/consentimiento` (permiso `gastronomia_pos`). Si falla, el pedido guardado no cambia.
+- Consentimiento (`consentimiento.py`, tabla `gastronomia_bi_consentimientos`, aditiva): la cola de BI-02 solo contacta a teléfonos con consentimiento registrado (estado `acepta`). Cada pedido guardado con celular informa el resultado de la casilla. Si el celular no tiene consentimiento y la casilla no estaba marcada, queda como `sin_marcar`: el POS lo avisa en su caja de alerta y el tablero cuenta los celulares pendientes. Si nadie consintió, el bloque lo explica.
+- Embudo de la tienda (`embudo.py`, tabla `gastronomia_tienda_visitas`): el detalle público de cada plato registra una visita con hash de cliente, plato, IP y navegador; no se guarda la IP. El bloque «Tienda online: de la visita al pedido» muestra visitantes, visitas, pedidos web y los platos que miran pero no piden (al menos 5 visitantes y menos de 0,1 pedidos web por visitante). Ventana de 30 días.
+
+**Decisiones**
+
+- Embudo en tabla propia, no en `TiendaVisitaEvento`. Esa tabla apunta a `productos` (insumos), no a `gastronomia_productos`. Además, el detalle gastronómico salía antes de registrar visitas, así que no había datos. El cambio en la API de la tienda son 4 líneas que llaman al servicio.
+- El consentimiento es requisito para la cola, como fija el plan. Consecuencia: hasta que el POS registre consentimientos, la cola de BI-02 queda vacía. El bloque lo indica en vez de mostrar un estado vacío genérico.
+- Desmarcar la casilla no revoca nada. La baja sigue siendo «no quiere mensajes».
+- La casilla se desmarca al cambiar el tipo de pedido, al limpiar y al cargar un pedido, para que un consentimiento no pase al cliente siguiente.
+- Casilla olvidada: el sistema no marca nada por defecto. Si se guarda un celular sin casilla y el cliente no tiene consentimiento, se avisa en el POS y queda pendiente en el tablero («Celulares cargados sin la casilla de consentimiento marcada»). El aviso no bloquea el cobro.
+
+**Pruebas**
+
+- `test_gastronomia_bi_consentimiento.py` (11), `test_gastronomia_bi_materiales.py` (4) y `test_gastronomia_bi_embudo.py` (5): 20 pruebas nuevas, en verde. Cubren el estado `sin_marcar`, que desmarcar no revoca, el conteo pendiente en el tablero y la API con y sin casilla.
+- `test_gastronomia_bi_cola.py`: sus helpers registran consentimiento para los contactos que espera la cola. Las 15 pruebas siguen en verde.
+- `pos_consentimiento.js`, probado en Node con un DOM simulado: no envía sin celular, envía `acepta` según la casilla con el token CSRF, avisa en el POS cuando la casilla quedó sin marcar, y muestra el rechazo del servidor y el error de red. Ese script está en el scratchpad y no en el repo.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 349 pasaron y 42 se omitieron (las de MariaDB).
+- Navegador: no verificado. El panel de navegador bloqueó la navegación a `localhost`, también para BI-02 y BI-03.
+
+**Limitaciones y pendiente**
+
+- El consentimiento no se registra en el checkout de la tienda online. Requiere cambiar `tienda_online/` consumiendo la API. Por ahora, los clientes que solo compraron en la tienda no entran en la cola.
+- El texto sugerido del POS no está vinculado a la fidelización todavía.
+- `gastronomia/static/js/pos.js` quedó en 600 líneas, en el límite. El próximo cambio en el POS debe separar código.
+- `app/routes/tienda_api.py` ya tenía 1458 líneas antes de este cambio, por encima del límite de 600. No se agregó lógica ahí, solo la llamada.
+- Sin panel de salud de uso (fase 3, segunda parte).
+- Sin medición con datos reales.
+
+**Siguiente paso**
+
+- Verificar en navegador BI-02, BI-03 y BI-04. Después, BI-05.

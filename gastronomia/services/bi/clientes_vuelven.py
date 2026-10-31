@@ -8,6 +8,7 @@ from datetime import date
 
 from flask import current_app, has_app_context
 
+from gastronomia.services.bi.consentimiento import contar_sin_marcar
 from gastronomia.services.bi.cola import resumen_cola
 from gastronomia.services.bi.retorno import resumen_retorno
 
@@ -17,6 +18,7 @@ def resumen_clientes_vuelven(cliente_id: int, hoy: date | None = None) -> dict:
         'disponible': True,
         'cola': resumen_cola(cliente_id, hoy),
         'retorno': resumen_retorno(cliente_id),
+        'sin_marcar': contar_sin_marcar(cliente_id),
     }
 
 

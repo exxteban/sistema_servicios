@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from app.utils.helpers import utc_bounds_for_local_dates, utc_naive_to_local
 from gastronomia.bi_models import GastronomiaBiContacto, GastronomiaBiNoContactar
 from gastronomia.services.bi.cola_config import SEGMENTOS_PLANTILLA, leer_config, plantilla
+from gastronomia.services.bi.consentimiento import telefonos_con_consentimiento
 from gastronomia.services.bi.historial import historial_clientes
 from gastronomia.services.bi.plantillas import contexto_negocio, renderizar
 from gastronomia.services.bi.segmentos import HABITUAL_AUSENTE, clasificar_segmentos
@@ -28,12 +29,14 @@ def construir_cola(cliente_id: int, hoy: date) -> tuple[dict, list[dict]]:
     candidatos = clasificar_segmentos(
         historial, hoy, segunda_min=cfg['segunda_min'], segunda_max=cfg['segunda_max'],
     )
+    consentidos = telefonos_con_consentimiento(cliente_id)
     no_contactar = _telefonos_no_contactar(cliente_id)
     recientes = _telefonos_enviados_recientes(cliente_id, cfg['frecuencia_dias'])
     cerrados = _claves_cerradas(cliente_id)
     disponibles = [
         candidato for candidato in candidatos
-        if candidato['telefono'] not in no_contactar
+        if candidato['telefono'] in consentidos
+        and candidato['telefono'] not in no_contactar
         and candidato['telefono'] not in recientes
         and clave_contacto(candidato) not in cerrados
     ]
@@ -87,6 +90,7 @@ def resumen_cola(cliente_id: int, hoy: date | None = None) -> dict:
         }
     return {
         'hay_telefonos': bool(historial),
+        'hay_consentimientos': bool(set(historial) & telefonos_con_consentimiento(cliente_id)),
         'en_cola': len(disponibles),
         'enviados_hoy': enviados,
         'limite_dia': cfg['limite_dia'],

@@ -1,6 +1,7 @@
 <div x-show="inteligenciaTab === 'gastronomia'" {% if vista_activa != 'gastronomia' %}style="display: none;"{% endif %} class="app-tab-panel space-y-4">
     {% include "inteligencia/gastronomia/_kpis.html" %}
     {% include "inteligencia/gastronomia/_crecer.html" %}
+    {% include "inteligencia/gastronomia/_embudo_tienda.html" %}
     {% include "inteligencia/gastronomia/_clientes_vuelven.html" %}
     {% include "inteligencia/gastronomia/_reporte_valor.html" %}
     {% include "inteligencia/gastronomia/_sugerencias.html" %}
