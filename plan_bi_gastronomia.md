@@ -611,6 +611,7 @@ Se ejecutó sobre la base local de desarrollo (`inventario.db`, abierta en solo 
 - Ventas por fecha del pedido, no por fecha de cobro. El panel de Gastronomía usa el cobro (`GastronomiaPedidoPago`), así que en un mismo mes el total del reporte puede diferir de «Ventas» del panel. Se mantiene la fecha del pedido porque coincide con los indicadores de canal de BI-01 y con la definición de pedido válido de la fase 0. Está rotulado en el bloque.
 - Acompañamientos por fecha de cobro, como su medición original. También rotulado.
 - Mes sin base en el período anterior: se muestra «sin base», nunca 0 %.
+- Importados (verificado en la demo, 31/10/2026): el panel cuenta las ventas importadas desde un archivo (252 pedidos, ₲ 8.628.000) y el BI las excluye por definición de pedido válido (6 pedidos, ₲ 255.000). La diferencia coincide exacta con una importación aplicada de 246 pedidos y ₲ 8.373.000. El reporte, en el tablero y en la versión imprimible, informa ahora cuántos pedidos importados no incluye y su monto, para poder conciliar ambas cifras.
 
 **Limitaciones y pendiente**
 

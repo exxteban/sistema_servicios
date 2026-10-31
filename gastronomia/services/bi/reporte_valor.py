@@ -6,6 +6,7 @@ Definiciones:
 - Clientes nuevos: telefonos cuya primera compra valida cae en el mes. Nunca se agrupa por nombre.
 - Mensajes: envios marcados como enviados en el mes; «volvieron» solo con ventana cerrada.
 - Acompanamientos: medicion del sugeridor, por fecha de cobro, con el importe de los renglones aceptados.
+- Importados: el historial cargado desde un archivo no entra en el BI, pero se informa aparte.
 - Comision evitada: ventas de cada plataforma por el porcentaje configurado. Es una estimacion.
 
 Una metrica sin datos queda en None y se muestra como no disponible, nunca como cero.
@@ -21,7 +22,7 @@ from app.utils.helpers import today_local, utc_bounds_for_local_dates
 from gastronomia.services.bi.canales import indicadores_canales
 from gastronomia.services.bi.comision import leer_porcentajes
 from gastronomia.services.bi.historial import historial_clientes
-from gastronomia.services.bi.pedidos_validos import GRUPO_PLATAFORMA, GRUPO_PROPIO
+from gastronomia.services.bi.pedidos_validos import GRUPO_PLATAFORMA, GRUPO_PROPIO, importados_del_periodo
 from gastronomia.services.bi.retorno import resumen_envios
 from gastronomia.services.channel_price_service import CANALES_PRECIOS
 from gastronomia.services.sugerencias.medicion import resumen_seguro as resumen_sugerencias
@@ -119,6 +120,7 @@ def resumen_reporte_valor(cliente_id: int, hoy: date | None = None, ahora: datet
         'pedidos': _pedidos_y_ventas(canales_actual),
         'comparacion': _comparacion(canales_actual, canales_anterior),
         'identidad': canales_actual['identidad'],
+        'importados': importados_del_periodo(cliente_id, actual),
         'clientes_nuevos': clientes_nuevos_identificados(cliente_id, actual),
         'mensajes': _mensajes(cliente_id, actual, ahora),
         'acompanamientos': _acompanamientos(cliente_id, actual),

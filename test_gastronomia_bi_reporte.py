@@ -354,3 +354,33 @@ def test_reporte_imprimible_muestra_las_mismas_cifras_y_respeta_el_permiso(monke
     denegado = client.get('/gastronomia/bi/reporte')
     assert denegado.status_code in (302, 403)
     assert 'window.print()' not in denegado.get_data(as_text=True)
+
+
+def test_reporte_informa_los_pedidos_importados_que_no_cuenta():
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, usuario_id, producto_id = _crear_negocio(app, 'bi03_importados')
+    hoy = today_local()
+    _pedido_el(app, cliente_id, usuario_id, producto_id, hoy, total=25000)
+    _pedido_el(app, cliente_id, usuario_id, producto_id, hoy, total=40000, origen='importado')
+    _pedido_el(app, cliente_id, usuario_id, producto_id, hoy, total=60000, origen='importado')
+    _pedido_el(app, cliente_id, usuario_id, producto_id, hoy, total=99000, origen='importado', estado='cancelado')
+    _loguear(client, app, 'bi03_importados')
+
+    with app.app_context():
+        reporte = resumen_reporte_valor(cliente_id)
+    assert reporte['pedidos']['pedidos'] == 1
+    assert reporte['importados'] == {'pedidos': 2, 'ventas': 100000.0}
+
+    for ruta in ('/inteligencia?vista=gastronomia', '/gastronomia/bi/reporte'):
+        html = client.get(ruta).get_data(as_text=True)
+        assert '2 pedidos importados' in html or '2 pedidos importado' in html, ruta
+        assert '₲ 100.000' in html, ruta
+
+
+def test_reporte_sin_importados_no_agrega_la_nota():
+    app = create_app('testing')
+    cliente_id, usuario_id, producto_id = _crear_negocio(app, 'bi03_sin_importados')
+    _pedido_el(app, cliente_id, usuario_id, producto_id, today_local(), total=25000)
+    with app.app_context():
+        assert resumen_reporte_valor(cliente_id)['importados'] is None

@@ -11,6 +11,8 @@ Definicion de la fase 0 (plan_bi_gastronomia.md, seccion 5):
 """
 from __future__ import annotations
 
+from sqlalchemy import func
+
 from app import db
 from app.utils.helpers import utc_bounds_for_local_dates, utc_naive_to_local
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoItem
@@ -111,3 +113,25 @@ def filas_pedidos_validos(cliente_id: int, periodo: dict) -> list[dict]:
     )
     canales = _canales_precio_por_pedido(cliente_id, periodo)
     return [_fila(pedido, canales.get(int(pedido.id_pedido), set())) for pedido in pedidos]
+
+
+def importados_del_periodo(cliente_id: int, periodo: dict) -> dict | None:
+    """Pedidos importados (historial cargado desde un archivo) del periodo, o None si no hay.
+
+    No entran en el BI, pero el panel de ventas si los cuenta: el reporte los menciona para que las
+    cifras de ambos lugares se puedan conciliar.
+    """
+    inicio, fin = utc_bounds_for_local_dates(periodo['desde'], periodo['hasta'])
+    fila = (
+        db.session.query(func.count(GastronomiaPedido.id_pedido), func.coalesce(func.sum(GastronomiaPedido.total), 0))
+        .filter(
+            GastronomiaPedido.cliente_id == int(cliente_id),
+            GastronomiaPedido.origen_pedido == ORIGEN_IMPORTADO,
+            GastronomiaPedido.estado != 'cancelado',
+            GastronomiaPedido.fecha_creacion >= inicio,
+            GastronomiaPedido.fecha_creacion < fin,
+        )
+        .first()
+    )
+    pedidos = int(fila[0] or 0)
+    return {'pedidos': pedidos, 'ventas': round(float(fila[1] or 0), 2)} if pedidos else None

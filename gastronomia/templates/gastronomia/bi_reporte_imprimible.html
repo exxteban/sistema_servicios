@@ -72,6 +72,9 @@
     {% endif %}
     {% endif %}
 
+    {% if reporte.importados %}
+    <p class="suave">Este reporte no incluye {{ reporte.importados.pedidos }} pedido{{ 's' if reporte.importados.pedidos != 1 }} importado{{ 's' if reporte.importados.pedidos != 1 }} de un archivo ({{ reporte.importados.ventas|moneda }}), que sí suman en el panel de ventas.</p>
+    {% endif %}
     <p class="suave" style="margin-top:24px">
         Pedidos identificados por teléfono: {{ reporte.identidad.porcentaje ~ '%' if reporte.identidad.porcentaje is not none else 'sin datos' }}{% if reporte.identidad.total %} ({{ reporte.identidad.identificados }} de {{ reporte.identidad.total }}){% endif %}.
         Pedidos y ventas por fecha del pedido, sin cancelados, encargos ni importados. Es orden en el tiempo, no una causa.
