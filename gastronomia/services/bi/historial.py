@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 
+from flask import g, has_request_context
+
 from app import db
 from app.utils.helpers import utc_naive_to_local
 from gastronomia.customer_models import GastronomiaClienteFinal
@@ -33,6 +35,20 @@ class ClienteHistorial:
 
 
 def historial_clientes(cliente_id: int) -> dict[str, ClienteHistorial]:
+    """Historial completo por telefono. Dentro de una solicitud se calcula una sola vez.
+
+    La cola, los mensajes y los clientes nuevos del tablero lo piden en la misma carga. La memoria vive
+    solo lo que dura la solicitud, asi que nunca muestra datos de una solicitud anterior.
+    """
+    if not has_request_context():
+        return _calcular_historial(cliente_id)
+    memoria = g.setdefault('bi_historial_clientes', {})
+    if int(cliente_id) not in memoria:
+        memoria[int(cliente_id)] = _calcular_historial(cliente_id)
+    return memoria[int(cliente_id)]
+
+
+def _calcular_historial(cliente_id: int) -> dict[str, ClienteHistorial]:
     filas = (
         db.session.query(
             GastronomiaPedido.id_pedido,

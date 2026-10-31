@@ -455,16 +455,16 @@ Reutilizar `test_inteligencia_comercial.py`, `test_inteligencia_bi_context.py`, 
 
 Puntos que no necesitan navegador:
 
-- [ ] Commits en pasos pequeños, separando el BI (BI-01 a BI-05) de la fidelización en caja (BI-05b a BI-05d) y de los archivos de configuración local.
-- [ ] Pruebas de rechazo por permisos: un usuario sin `gastronomia_menu` en las acciones de la cola y en el POST de comisión.
-- [ ] Caché del historial de clientes, hoy recalculado varias veces en cada carga del tablero (BI-02 y BI-03).
-- [ ] Reporte mensual imprimible o descargable (fase 3).
+- [x] Commits en pasos pequeños: la corrección compartida de fidelización, la caja con beneficios y fichas, y la auditoría con el plan. `.claude/launch.json` queda fuera por ser configuración local.
+- [x] Pruebas de rechazo por permisos: sin `gastronomia_menu`, las acciones de la cola, la comisión y la activación no cambian nada (`test_gastronomia_bi_permisos.py`, con control positivo).
+- [x] Historial de clientes calculado una vez por solicitud (memoria que vive solo durante la solicitud, sin caché entre solicitudes). Con historiales muy grandes puede hacer falta una caché con vencimiento.
+- [x] Reporte mensual imprimible (`/gastronomia/bi/reporte`, se guarda como PDF desde el navegador). No hay descarga en otro formato.
 
 Puntos que requieren ver la aplicación o decidir:
 
 - [ ] Verificación en navegador, en escritorio, celular y tema oscuro: «Clientes que vuelven» (BI-02), «Tu mes en el sistema» (BI-03), embudo, materiales y casilla del POS (BI-04), «Salud de uso» y casilla de la tienda (BI-05), y la caja con beneficios y la factura (BI-05d).
 - [ ] Prueba manual en el POS de ventas: canjear un beneficio, anular la venta y comprobar que vuelve a estar disponible (cambio compartido en `beneficio_consumido`).
-- [ ] Activación por configuración de la instalación, para liberar la experiencia solo en el piloto (fase 8).
+- [x] Interruptor por instalación (`interruptor.py`, botón en «Salud de uso», solo root): apagado oculta Crecer, Clientes que vuelven y Tu mes en el sistema sin borrar datos. Por defecto está encendido; para un piloto exclusivo, apagarlo en las demás instalaciones.
 - [ ] Decidir si el piloto se entrega con el bloque apilado en el tab Gastronomía o con la vista «Tu negocio» de pestañas. Recomendación: entregar apilado y construir las pestañas junto con la fase 4.
 
 ### Después del cierre

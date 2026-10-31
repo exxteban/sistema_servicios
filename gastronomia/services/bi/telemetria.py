@@ -20,6 +20,7 @@ TIPO_NO_CONTACTAR = 'no_contactar'
 TIPO_ACTIVACION = 'activacion_marcada'
 TIPO_COMISION = 'comision_guardada'
 TIPO_CONFIG_COLA = 'config_cola_guardada'
+TIPO_INTERRUPTOR = 'interruptor_cambiado'
 
 TIPOS_COLA = (TIPO_ABIERTO, TIPO_ENVIADO, TIPO_OMITIDO, TIPO_NO_CONTACTAR)
 

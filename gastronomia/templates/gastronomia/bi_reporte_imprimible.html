@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tu mes en el sistema</title>
+    <style>
+        :root { --fondo: #fff; --texto: #1f2937; --suave: #6b7280; --borde: #e5e7eb; --acento: #0369a1; }
+        @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --fondo: #111827; --texto: #f3f4f6; --suave: #9ca3af; --borde: #374151; --acento: #7dd3fc; } }
+        @media print { :root { --fondo: #fff; --texto: #111; --suave: #444; --borde: #bbb; --acento: #111; } .no-imprimir { display: none; } }
+        body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.5 system-ui, sans-serif; }
+        main { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+        h1 { margin: 0; font-size: 24px; }
+        h2 { margin: 24px 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--acento); }
+        .suave { color: var(--suave); font-size: 13px; }
+        .acciones { display: flex; gap: 12px; margin-top: 12px; }
+        .acciones a, .acciones button { font: inherit; color: var(--acento); background: none; border: 1px solid var(--borde); border-radius: 8px; padding: 6px 12px; cursor: pointer; text-decoration: none; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { padding: 8px 4px; border-bottom: 1px solid var(--borde); text-align: left; }
+        td:last-child, th:last-child { text-align: right; }
+    </style>
+</head>
+<body>
+<main>
+    {% macro variacion(valor) %}{% if valor is none %}sin base el mes anterior{% else %}{{ '+' if valor > 0 }}{{ valor }}% vs. mismos días del mes anterior{% endif %}{% endmacro %}
+    <h1>Tu mes en el sistema</h1>
+    {% if not reporte.disponible %}
+    <p>El reporte no está disponible en este momento. Probá de nuevo más tarde.</p>
+    <div class="acciones no-imprimir"><a href="{{ url_for('inteligencia.dashboard', vista='gastronomia') }}">Volver al tablero</a></div>
+    {% else %}
+    {% set ped = reporte.pedidos %}
+    {% set comp = reporte.comparacion %}
+    {% set msg = reporte.mensajes %}
+    <p class="suave">{{ reporte.periodo_label }}</p>
+    <div class="acciones no-imprimir">
+        <button type="button" onclick="window.print()">Imprimir o guardar como PDF</button>
+        <a href="{{ url_for('inteligencia.dashboard', vista='gastronomia') }}">Volver al tablero</a>
+    </div>
+
+    {% if ped.pedidos == 0 %}
+    <p>Todavía no hay pedidos válidos este mes.</p>
+    {% else %}
+    <h2>Pedidos y ventas</h2>
+    <table>
+        <tr><th>Pedidos</th><td>{{ ped.pedidos }} <span class="suave">({{ variacion(comp.pedidos) }})</span></td></tr>
+        <tr><th>Ventas</th><td>{{ ped.ventas|moneda }} <span class="suave">({{ variacion(comp.ventas) }})</span></td></tr>
+        <tr><th>Canal propio</th><td>{{ ped.propios.ventas|moneda }} en {{ ped.propios.pedidos }} pedidos{% if ped.propios.participacion is not none %} ({{ ped.propios.participacion }}% del total){% endif %}</td></tr>
+        <tr><th>Clientes nuevos identificados</th><td>{{ reporte.clientes_nuevos }}</td></tr>
+    </table>
+
+    <h2>Mensajes de vuelta</h2>
+    {% if msg.enviados == 0 %}
+    <p class="suave">No se marcaron mensajes enviados este mes.</p>
+    {% else %}
+    <p>Enviados: {{ msg.enviados }}. Con ventana cerrada: {{ msg.enviados_cerrados }}; volvieron después del mensaje: {{ msg.volvieron }}. En observación: {{ msg.en_observacion }}.</p>
+    {% endif %}
+
+    {% if reporte.acompanamientos is not none %}
+    <h2>Acompañamientos sugeridos</h2>
+    <p>Aceptados: {{ reporte.acompanamientos.pedidos }} pedidos, {{ reporte.acompanamientos.renglones }} renglones, por {{ reporte.acompanamientos.importe|moneda }}.</p>
+    {% endif %}
+
+    {% if reporte.comision %}
+    <h2>Comisión evitada estimada</h2>
+    <p><strong>{{ reporte.comision.monto|moneda }}</strong></p>
+    <ul>
+        {% for fila in reporte.comision.detalle %}
+        <li>{{ fila.nombre }}: {{ fila.ventas|moneda }} en ventas × {{ fila.porcentaje }}%</li>
+        {% endfor %}
+    </ul>
+    <p class="suave">Supone que esas ventas de apps se habrían cobrado igual en tu canal propio.</p>
+    {% endif %}
+    {% endif %}
+
+    <p class="suave" style="margin-top:24px">
+        Pedidos identificados por teléfono: {{ reporte.identidad.porcentaje ~ '%' if reporte.identidad.porcentaje is not none else 'sin datos' }}{% if reporte.identidad.total %} ({{ reporte.identidad.identificados }} de {{ reporte.identidad.total }}){% endif %}.
+        Pedidos y ventas por fecha del pedido, sin cancelados, encargos ni importados. Es orden en el tiempo, no una causa.
+    </p>
+    {% endif %}
+</main>
+</body>
+</html>

@@ -328,3 +328,29 @@ def test_tab_muestra_comision_y_mensajes_cuando_hay_datos():
     assert 'Comisión evitada estimada: ₲ 6.250' in html
     assert 'Enviados: 1.' in html
     assert 'PedidosYa: ₲ 25.000 en ventas × 25.0%' in html
+
+
+def test_reporte_imprimible_muestra_las_mismas_cifras_y_respeta_el_permiso(monkeypatch):
+    app = create_app('testing')
+    client = app.test_client()
+    cliente_id, usuario_id, producto_id = _crear_negocio(app, 'bi03_imprimible')
+    _loguear(client, app, 'bi03_imprimible')
+
+    vacio = client.get('/gastronomia/bi/reporte')
+    assert vacio.status_code == 200
+    assert 'Todavía no hay pedidos válidos este mes.' in vacio.get_data(as_text=True)
+
+    _pedido_el(app, cliente_id, usuario_id, producto_id, today_local(), total=25000, canal_precio='pedidosya')
+    with app.app_context():
+        guardar_porcentajes(cliente_id, {'comision_pedidosya': '25'})
+    html = client.get('/gastronomia/bi/reporte').get_data(as_text=True)
+    assert '₲ 25.000' in html
+    assert '₲ 6.250' in html
+    assert 'window.print()' in html
+    assert 'no una causa' in html
+    assert 'Ver versión imprimible' in client.get('/inteligencia?vista=gastronomia').get_data(as_text=True)
+
+    monkeypatch.setattr('gastronomia.services.permisos.tiene_permiso_gastronomia', lambda *codigos: False)
+    denegado = client.get('/gastronomia/bi/reporte')
+    assert denegado.status_code in (302, 403)
+    assert 'window.print()' not in denegado.get_data(as_text=True)

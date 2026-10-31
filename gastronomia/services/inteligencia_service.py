@@ -18,6 +18,7 @@ from gastronomia.models import (
 )
 from gastronomia.services.bi.clientes_vuelven import resumen_clientes_vuelven_seguro
 from gastronomia.services.bi.crecer import resumen_crecer_seguro
+from gastronomia.services.bi.interruptor import bi_activo
 from gastronomia.services.bi.reporte_valor import resumen_reporte_valor_seguro
 from gastronomia.services.inteligencia_clientes import clientes_frecuentes_gastronomia
 from gastronomia.services.inteligencia_margen import productos_alto_volumen_bajo_margen
@@ -43,6 +44,9 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
     productos_bajo_margen = productos_alto_volumen_bajo_margen(cliente_id_resuelto, periodo_actual)
     clientes_frecuentes = clientes_frecuentes_gastronomia(cliente_id_resuelto, periodo_actual)
     insights = _construir_insights(resumen_actual, resumen_anterior, productos)
+    # Interruptor por instalacion: apagado, los bloques comerciales no se calculan ni se muestran.
+    bi_comercial = bi_activo(cliente_id_resuelto)
+    no_disponible = {'disponible': False}
 
     return {
         'activo': True,
@@ -59,9 +63,10 @@ def obtener_inteligencia_gastronomia(periodo_actual: dict, periodo_anterior: dic
         'productos_bajo_margen': productos_bajo_margen,
         'clientes_frecuentes': clientes_frecuentes,
         'sugerencias': resumen_sugerencias(cliente_id_resuelto, periodo_actual),
-        'crecer': resumen_crecer_seguro(cliente_id_resuelto, periodo_actual),
-        'clientes_vuelven': resumen_clientes_vuelven_seguro(cliente_id_resuelto),
-        'reporte_valor': resumen_reporte_valor_seguro(cliente_id_resuelto),
+        'bi_comercial_activo': bi_comercial,
+        'crecer': resumen_crecer_seguro(cliente_id_resuelto, periodo_actual) if bi_comercial else no_disponible,
+        'clientes_vuelven': resumen_clientes_vuelven_seguro(cliente_id_resuelto) if bi_comercial else no_disponible,
+        'reporte_valor': resumen_reporte_valor_seguro(cliente_id_resuelto) if bi_comercial else no_disponible,
         'insights': insights,
     }
 
