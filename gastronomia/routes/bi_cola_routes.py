@@ -15,7 +15,7 @@ from gastronomia.services.permisos import PERMISO_MENU, requiere_permiso_gastron
 
 
 def _volver_al_tablero():
-    return redirect(url_for('inteligencia.dashboard', vista='gastronomia'))
+    return redirect(url_for('inteligencia.dashboard', vista='gastronomia', _anchor='gastro-clientes'))
 
 
 def _responder_accion(accion, mensaje_ok: str | None = None):

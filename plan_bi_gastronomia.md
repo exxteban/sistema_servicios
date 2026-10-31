@@ -124,6 +124,8 @@ Reglas de diseño:
 - En celular, las pestañas son una barra horizontal desplazable y fija arriba; la cola de mensajes está pensada para usarse desde el teléfono.
 - El panel de salud de uso (fase 3) no es una pestaña del dueño: es una vista aparte, solo para root.
 
+**Decisión del 31/10/2026: sub-pestañas dentro de Gastronomía.** Con los bloques de BI apilados, la pestaña Gastronomía quedó demasiado cargada. Por pedido del dueño del proyecto se agregan sub-pestañas como chips dentro de ella, con una pregunta por sub-pestaña: **Resumen** (KPIs, platos más vendidos y decisiones), **Crecer** (activación y canales, con el número de pasos pendientes), **Clientes** (cola de mensajes, con el número en cola), **Menú y ritmo** (sugeridor, horarios, mezcla de ventas y upsell) y **Resultados** (reporte del mes). Se recuerda la última abierta y cada acción vuelve a su sub-pestaña (`#gastro-<nombre>`). Con el interruptor del BI apagado quedan solo Resumen y Menú y ritmo. Esto reemplaza, para esta etapa, la regla «sin pestañas anidadas» y la vista «Tu negocio» de cinco pestañas, que queda como opción para la fase 4.
+
 ### Pestaña «Hoy»
 
 1. Hasta 4 indicadores: pedidos, ventas, ticket promedio y uno de crecimiento (canal propio o clientes identificados), con comparación con días equivalentes cuando haya datos.

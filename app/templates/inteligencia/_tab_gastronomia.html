@@ -1,28 +1,89 @@
-<div x-show="inteligenciaTab === 'gastronomia'" {% if vista_activa != 'gastronomia' %}style="display: none;"{% endif %} class="app-tab-panel space-y-4">
+{% set gastro = panel.gastronomia %}
+{% set bi_comercial = gastro.bi_comercial_activo is not defined or gastro.bi_comercial_activo %}
+{% set pasos_pendientes = (gastro.crecer.activacion.total - gastro.crecer.activacion.completados) if gastro.crecer and gastro.crecer.disponible else 0 %}
+{% set en_cola = gastro.clientes_vuelven.cola.en_cola if gastro.clientes_vuelven and gastro.clientes_vuelven.disponible else 0 %}
+{# Una sola pregunta por sub-pestaña. La ultima abierta se recuerda y las acciones vuelven a su pestaña con #gastro-<nombre>. #}
+{% set subtabs = [('resumen', 'Resumen', 0)] %}
+{% if bi_comercial %}
+    {% set subtabs = subtabs + [('crecer', 'Crecer', pasos_pendientes), ('clientes', 'Clientes', en_cola)] %}
+{% endif %}
+{% set subtabs = subtabs + [('ritmo', 'Menú y ritmo', 0)] %}
+{% if bi_comercial %}
+    {% set subtabs = subtabs + [('resultados', 'Resultados', 0)] %}
+{% endif %}
+<div x-show="inteligenciaTab === 'gastronomia'" {% if vista_activa != 'gastronomia' %}style="display: none;"{% endif %} class="app-tab-panel space-y-4"
+     x-data="{
+         sub: 'resumen',
+         validos: {{ subtabs | map(attribute=0) | list | tojson | forceescape }},
+         init() {
+             let guardado = null;
+             try { guardado = window.localStorage.getItem('gastro_subtab'); } catch (e) {}
+             const hash = (window.location.hash || '').replace('#gastro-', '');
+             const elegido = this.validos.includes(hash) ? hash : guardado;
+             if (this.validos.includes(elegido)) this.sub = elegido;
+             if (this.validos.includes(hash)) this.$nextTick(() => document.getElementById('gastro-subtabs')?.scrollIntoView({block: 'start'}));
+         },
+         ir(nombre) {
+             this.sub = nombre;
+             try { window.localStorage.setItem('gastro_subtab', nombre); } catch (e) {}
+             window.history.replaceState({}, '', window.location.pathname + window.location.search + '#gastro-' + nombre);
+         }
+     }">
     {% if es_usuario_root_actual %}
     <div class="flex justify-end">
         <a href="{{ url_for('gastronomia.bi_salud_uso') }}" class="text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300">Salud de uso (solo root)</a>
     </div>
     {% endif %}
-    {% include "inteligencia/gastronomia/_kpis.html" %}
-    {% include "inteligencia/gastronomia/_crecer.html" %}
-    {% include "inteligencia/gastronomia/_embudo_tienda.html" %}
-    {% include "inteligencia/gastronomia/_clientes_vuelven.html" %}
-    {% include "inteligencia/gastronomia/_reporte_valor.html" %}
-    {% include "inteligencia/gastronomia/_sugerencias.html" %}
 
-    {% if not panel.gastronomia.activo %}
-    <div class="rounded-2xl border border-dashed border-violet-300 bg-violet-50 p-4 text-sm text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">
-        El radar gastronómico se activa cuando el cliente tiene Gastronomía habilitada.
+    <div id="gastro-subtabs" class="sticky top-0 z-10 -mx-1 overflow-x-auto bg-gray-50/90 px-1 py-2 backdrop-blur dark:bg-gray-900/80">
+        <div class="flex min-w-max gap-2" role="tablist" aria-label="Secciones de Gastronomía">
+            {% for clave, titulo, contador in subtabs %}
+            <button type="button" role="tab" @click="ir('{{ clave }}')" :aria-selected="sub === '{{ clave }}'"
+                    class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition"
+                    :class="sub === '{{ clave }}' ? 'border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-200' : 'border-gray-200 bg-white text-gray-600 hover:border-violet-200 hover:text-violet-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'">
+                <span>{{ titulo }}</span>
+                {% if contador %}<span class="inline-flex items-center rounded-full bg-white/80 px-2 py-0.5 text-[11px] dark:bg-gray-800/70">{{ contador }}</span>{% endif %}
+            </button>
+            {% endfor %}
+        </div>
     </div>
+
+    <section x-show="sub === 'resumen'" role="tabpanel" class="space-y-4">
+        {% include "inteligencia/gastronomia/_kpis.html" %}
+
+        {% if not panel.gastronomia.activo %}
+        <div class="rounded-2xl border border-dashed border-violet-300 bg-violet-50 p-4 text-sm text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">
+            El radar gastronómico se activa cuando el cliente tiene Gastronomía habilitada.
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            {% include "inteligencia/gastronomia/_menu.html" %}
+            {% include "inteligencia/gastronomia/_radar.html" %}
+        </div>
+    </section>
+
+    {% if bi_comercial %}
+    <section x-show="sub === 'crecer'" role="tabpanel" class="space-y-4">
+        {% include "inteligencia/gastronomia/_crecer.html" %}
+        {% include "inteligencia/gastronomia/_embudo_tienda.html" %}
+    </section>
+
+    <section x-show="sub === 'clientes'" role="tabpanel" class="space-y-4">
+        {% include "inteligencia/gastronomia/_clientes_vuelven.html" %}
+    </section>
     {% endif %}
 
-    <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        {% include "inteligencia/gastronomia/_menu.html" %}
-        {% include "inteligencia/gastronomia/_radar.html" %}
-    </div>
+    <section x-show="sub === 'ritmo'" role="tabpanel" class="space-y-4">
+        {% include "inteligencia/gastronomia/_sugerencias.html" %}
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {% include "inteligencia/gastronomia/_ritmo.html" %}
+        </div>
+    </section>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {% include "inteligencia/gastronomia/_ritmo.html" %}
-    </div>
+    {% if bi_comercial %}
+    <section x-show="sub === 'resultados'" role="tabpanel" class="space-y-4">
+        {% include "inteligencia/gastronomia/_reporte_valor.html" %}
+    </section>
+    {% endif %}
 </div>

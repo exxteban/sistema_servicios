@@ -22,4 +22,4 @@ def bi_comision_configuracion():
         flash(str(error), 'warning')
     else:
         flash('Comisiones guardadas.', 'success')
-    return redirect(url_for('inteligencia.dashboard', vista='gastronomia'))
+    return redirect(url_for('inteligencia.dashboard', vista='gastronomia', _anchor='gastro-resultados'))

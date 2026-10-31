@@ -19,4 +19,4 @@ def bi_activacion_marcar(paso: str):
         flash(mensaje_contexto_gastronomia(), 'warning')
         return redirect(url_for('main.dashboard'))
     marcar_paso_manual(cliente_id, paso, request.form.get('hecho') == '1')
-    return redirect(url_for('inteligencia.dashboard', vista='gastronomia'))
+    return redirect(url_for('inteligencia.dashboard', vista='gastronomia', _anchor='gastro-crecer'))

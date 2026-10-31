@@ -53,8 +53,15 @@ def test_sin_permiso_de_menu_las_acciones_no_cambian_nada(monkeypatch):
     assert _estado(app, cliente_id) == inicial
 
     # Control: con permiso, las mismas rutas si cambian el estado (la prueba detecta la diferencia).
+    destinos = {}
     for ruta, datos in RUTAS_CON_PERMISO_MENU[4:]:
-        assert _post(client, ruta, datos, csrf).status_code == 302
+        respuesta = _post(client, ruta, datos, csrf)
+        assert respuesta.status_code == 302
+        destinos[ruta] = respuesta.headers['Location']
+    # Cada accion vuelve a su sub-pestana de Gastronomia.
+    assert destinos['/gastronomia/bi/cola/configuracion'].endswith('#gastro-clientes')
+    assert destinos['/gastronomia/bi/comision'].endswith('#gastro-resultados')
+    assert destinos['/gastronomia/bi/activacion/qr_impreso'].endswith('#gastro-crecer')
     final = _estado(app, cliente_id)
     assert final['comision'] == 30.0
     assert final['limite_dia'] == 99
