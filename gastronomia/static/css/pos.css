@@ -582,15 +582,15 @@
         .pos-touch-layout {
             grid-template-columns: 152px minmax(520px, 1fr) minmax(320px, 380px) minmax(250px, 300px);
         }
-        .pos-order-panel {
+        .pos-order-panel,
+        .pos-checkout-panel {
             grid-column: auto;
             position: sticky;
             top: 1rem;
         }
-        .pos-checkout-panel {
-            position: sticky;
-            top: 1rem;
-            grid-column: auto;
+        .pos-order-panel {
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
         }
     }
     @media (min-width: 1800px) {
