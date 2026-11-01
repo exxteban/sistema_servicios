@@ -554,7 +554,7 @@
         .pos-category-panel {
             position: sticky;
             top: 1rem;
-            max-height: calc(100vh - 2rem);
+            max-height: calc(100cqh - 2rem);
         }
         .pos-category-list {
             grid-template-columns: 1fr;
@@ -587,10 +587,6 @@
             grid-column: auto;
             position: sticky;
             top: 1rem;
-        }
-        .pos-order-panel {
-            max-height: calc(100vh - 2rem);
-            overflow-y: auto;
         }
     }
     @media (min-width: 1800px) {
