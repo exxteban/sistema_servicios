@@ -2,6 +2,7 @@
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
+from app.services.clientes_fidelizacion import fidelizacion_config
 from gastronomia.routes.dashboard_routes import gastronomia_bp
 from gastronomia.services.access import cliente_id_actual_gastronomia, mensaje_contexto_gastronomia
 from gastronomia.services.menu_service import listar_categorias
@@ -43,4 +44,5 @@ def pos():
         puede_cobrar=tiene_permiso_gastronomia(PERMISO_CAJA),
         peso_atajos=atajos_peso(cliente_id),
         sugerencias_config=config_segura(cliente_id),
+        fidelizacion_activa=fidelizacion_config()['activa'],
     )

@@ -17,6 +17,7 @@ from app.services.clientes_fidelizacion_support import (
     vigencia_dias_config,
 )
 from app.services.clientes_fidelizacion_politica import (
+    beneficio_consumido,
     CONFIG_FIDELIZACION_MAX_BENEFICIOS_ACTIVOS,
     CONFIG_FIDELIZACION_MAX_BENEFICIOS_VENTANA,
     CONFIG_FIDELIZACION_MODO_GENERACION,
@@ -462,10 +463,7 @@ def beneficios_disponibles_cliente(id_cliente):
         ClienteFidelizacionMovimiento.fecha_movimiento.asc(),
         ClienteFidelizacionMovimiento.id_movimiento.asc(),
     ).all()
-    return [
-        item for item in originales
-        if not _tiene_hijo(int(item.id_movimiento), {'canje_manual', 'canje_venta', 'reversion_venta', 'beneficio_vencido'})
-    ]
+    return [item for item in originales if not beneficio_consumido(item.id_movimiento)]
 
 
 def beneficio_resumen_config(config):
@@ -617,6 +615,6 @@ def _buscar_beneficio_disponible(id_cliente, id_movimiento):
     ).first()
     if not beneficio:
         return None
-    if _tiene_hijo(int(beneficio.id_movimiento), {'canje_manual', 'canje_venta', 'reversion_venta', 'beneficio_vencido'}):
+    if beneficio_consumido(beneficio.id_movimiento):
         return None
     return beneficio

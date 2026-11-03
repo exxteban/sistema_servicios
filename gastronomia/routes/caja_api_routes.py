@@ -1,4 +1,6 @@
 """API de caja para Gastronomia."""
+from decimal import Decimal, InvalidOperation
+
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
@@ -14,7 +16,14 @@ from gastronomia.services.delivery_privacy import (
     ocultar_localizacion_pedido,
     ocultar_localizacion_pedidos,
 )
-from gastronomia.services.pedido_service import listar_eventos_pedido, obtener_ultimo_evento_id, serializar_pedidos
+from gastronomia.services.fidelizacion_beneficios import beneficios_para_cobro
+from gastronomia.services.fidelizacion_telefono import ficha_a_completar_ruc
+from gastronomia.services.pedido_service import (
+    listar_eventos_pedido,
+    obtener_pedido,
+    obtener_ultimo_evento_id,
+    serializar_pedidos,
+)
 from gastronomia.services.permisos import PERMISO_CAJA, requiere_permiso_gastronomia
 
 
@@ -89,13 +98,46 @@ def caja_buscar_clientes_factura():
     return jsonify({'ok': True, 'clientes': [serializar_cliente_factura(c) for c in clientes]})
 
 
+def _ficha_del_pedido_para_ruc(cliente_id, pedido_id):
+    """Ficha sin RUC del celular del pedido: si la factura le pone RUC, se completa esa ficha."""
+    if not cliente_id or pedido_id in (None, '', 0, '0'):
+        return None
+    try:
+        pedido = obtener_pedido(cliente_id, int(pedido_id))
+    except (TypeError, ValueError):
+        return None
+    return ficha_a_completar_ruc(cliente_id, pedido.celular_cliente) if pedido else None
+
+
 @gastronomia_caja_api_bp.route('/caja/clientes-factura', methods=['POST'])
 @login_required
 @requiere_permiso_gastronomia(PERMISO_CAJA)
 def caja_crear_cliente_factura():
     data = _payload()
+    ficha = _ficha_del_pedido_para_ruc(cliente_id_actual_gastronomia(), data.get('pedido_id'))
     try:
-        cliente = obtener_o_crear_cliente_factura(data.get('nombre'), data.get('ruc_ci'))
+        cliente = obtener_o_crear_cliente_factura(data.get('nombre'), data.get('ruc_ci'), ficha_a_completar=ficha)
     except ValueError as exc:
         return jsonify({'error': 'validation_error', 'mensaje': str(exc)}), 400
     return jsonify({'ok': True, 'cliente': serializar_cliente_factura(cliente)})
+
+
+@gastronomia_caja_api_bp.route('/caja/pedidos/<int:pedido_id>/beneficios', methods=['GET'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_CAJA)
+def caja_beneficios_pedido(pedido_id):
+    cliente_id = cliente_id_actual_gastronomia()
+    pedido = obtener_pedido(cliente_id, pedido_id) if cliente_id else None
+    if pedido is None:
+        return jsonify({'error': 'not_found'}), 404
+    try:
+        descuento = Decimal(str(request.args.get('descuento_monto') or 0))
+        costo_envio = Decimal(str(request.args.get('costo_envio') or 0))
+    except InvalidOperation:
+        return jsonify({'error': 'validation_error', 'mensaje': 'Descuento o envio invalido.'}), 400
+    # Con factura a un cliente elegido o electronica, la venta no usa la ficha del celular: sin beneficios.
+    con_factura = request.args.get('factura_electronica') == '1' or request.args.get('id_cliente_factura')
+    if con_factura:
+        return jsonify({'ok': True, 'items': []})
+    items = beneficios_para_cobro(cliente_id, pedido, max(descuento, Decimal('0')), max(costo_envio, Decimal('0')))
+    return jsonify({'ok': True, 'items': items})

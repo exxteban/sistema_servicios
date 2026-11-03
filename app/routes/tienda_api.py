@@ -45,6 +45,7 @@ from app.services.tienda_gastronomia_catalogo import (
     productos_gastronomia_payload,
 )
 from app.services.tienda_presupuesto import config_publica_tienda, mensaje_whatsapp_producto, tienda_es_gastronomia
+from gastronomia.services.bi.embudo import registrar_visita_plato
 from app.services.tienda_hero import (
     build_hero_carousel_items,
     normalize_hero_carousel_animation,
@@ -868,6 +869,8 @@ def get_producto_detalle(slug: str, id_producto: int):
         data = detalle_producto_gastronomia(config, id_producto)
         if not data:
             return jsonify({'error': 'producto_no_encontrado'}), 404
+        visitante = _build_visitante_hash(config.id_cliente, id_producto, _obtener_ip_cliente(), request.headers.get('User-Agent'))
+        registrar_visita_plato(config.id_cliente, id_producto, visitante)
         return jsonify(data)
 
     p = public_product_query(config).filter_by(id_producto=id_producto).first()

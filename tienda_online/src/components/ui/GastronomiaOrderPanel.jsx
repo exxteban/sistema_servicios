@@ -50,7 +50,8 @@ export default function GastronomiaOrderPanel({
     direccion_entrega: '',
     referencia_entrega: '',
     notas: '',
-    recordar_datos: true
+    recordar_datos: true,
+    acepta_mensajes: false
   })
   const [profile, setProfile] = useState(null)
   const [status, setStatus] = useState({ type: '', message: '', trackingUrl: '' })
@@ -245,6 +246,10 @@ export default function GastronomiaOrderPanel({
                   <label className="gastronomia-order-form__remember">
                     <input type="checkbox" checked={form.recordar_datos} onChange={(event) => updateForm('recordar_datos', event.target.checked)} />
                     Recordar mis datos para la proxima vez
+                  </label>
+                  <label className="gastronomia-order-form__remember">
+                    <input type="checkbox" checked={form.acepta_mensajes} onChange={(event) => updateForm('acepta_mensajes', event.target.checked)} />
+                    Acepto recibir mensajes de {config?.nombre_tienda || 'la tienda'} por WhatsApp: novedades y recordatorios. Puedo pedir que dejen de enviarlos cuando quiera.
                   </label>
                   <div className="gastronomia-order-form__actions">
                     <button type="submit" className="btn btn-primary gastronomia-order-panel__submit" disabled={submitting}>

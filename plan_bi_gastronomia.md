@@ -1,46 +1,80 @@
 # Plan de evolución del BI para gastronomía
 
-Fecha: 30/10/2026. Estado: propuesta de implementación por fases.
+Fecha: 31/10/2026. Estado: propuesta de implementación por fases (revisión 2, reorientada a generar ventas).
 
 Este documento organiza el trabajo; sus casillas pendientes no representan funcionalidades implementadas. No establece fechas de entrega: el esfuerzo se ajustará después de la fase 0. Los avances documentados de otros módulos conservan sus propios planes y validaciones.
 
 ## 1. Objetivo de producto
 
-Ayudar al dueño de un pequeño negocio gastronómico a decidir qué hacer hoy para aumentar pedidos, conseguir que los clientes vuelvan y conservar margen, con poco tiempo de configuración y seguimiento.
+Ayudar al dueño de un pequeño negocio gastronómico a **conseguir más pedidos y que sus clientes vuelvan**, con acciones concretas que pueda hacer en pocos minutos, y hacer visible el resultado de esas acciones.
+
+El cliente que abandona el sistema suele ser el que vende poco. Ese negocio tiene poco historial, así que un BI que solo analiza ventas pasadas le dirá casi siempre «datos insuficientes». Por eso el plan se ordena así:
+
+1. **Primero generar demanda** con lo que funciona sin historial: canal propio (tienda online, QR, link en redes), clientes identificados por teléfono y mensajes de regreso.
+2. **Después optimizar** con análisis: acciones priorizadas, menú rentable, días flojos y preparación.
+3. **Siempre mostrar el valor**: qué hizo el dueño con el sistema y qué ocurrió después.
 
 El ciclo que debe resolver el producto es:
 
 **Detectar una oportunidad → explicar la evidencia → preparar una acción → registrar su ejecución → medir el resultado → ajustar la recomendación.**
 
-El valor para el negocio debe ser visible. Para el proveedor del sistema, la hipótesis es que ese valor mejora la continuidad de uso; debe validarse y no asumirse como una consecuencia garantizada de aumentar ventas.
+Para el proveedor del sistema, la hipótesis es que el valor visible mejora la continuidad de uso. Se valida con el piloto; no se asume.
 
 ### Principios
 
+- Cada entrega debe aportar algo útil a un negocio **con poco o ningún historial**. Si una función solo sirve con meses de datos, no va primero.
 - Mostrar como máximo tres acciones prioritarias en la portada; conservar el detalle en vistas secundarias.
 - Usar lenguaje cotidiano: pedidos, platos, clientes que vuelven y dinero estimado que queda.
 - Explicar por qué se recomienda algo, qué datos se usaron y qué información falta.
+- Preferir acciones de un clic o pocos minutos: mensaje listo, link listo, QR listo.
 - No recomendar descuentos sistemáticamente ni promociones sin evaluar sus costos disponibles.
 - Evitar recomendaciones comerciales que agraven faltantes o saturación de cocina.
-- Funcionar desde negocios pequeños: si falta historial, ofrecer configuración guiada y reglas explícitas, sin inventar patrones.
 - Mantener pedidos, cocina y caja operativos aunque falle el BI.
-- Usar reglas y cálculos verificables como base. La IA generativa puede redactar o explicar posteriormente.
+- Usar reglas y cálculos verificables como base. La IA generativa solo redacta o explica y nunca decide.
+
+### Decisión sobre WhatsApp
+
+**Este plan no usa la WhatsApp Cloud API** (`app/services/whatsapp/`, Graph API). Todo contacto se hace con **enlaces `wa.me` con texto precargado**, que abren el WhatsApp del propio negocio; el dueño pulsa enviar. Ese patrón ya existe en gastronomía (`inteligencia_clientes.py` y `whatsapp_pedido_url` en `cliente_final_service.py`).
+
+Consecuencias de diseño:
+
+- El sistema **no puede saber** si el mensaje se envió, llegó o se leyó; solo registra lo que el dueño marca.
+- El envío es uno por uno. Para que sea rápido se usa una **cola de envío asistido** (fase 2): abrir, enviar, volver, siguiente.
+- Enviar muchos mensajes no solicitados desde un número común puede provocar bloqueos de WhatsApp. Se limitan las tandas diarias, se contacta solo a clientes que ya compraron y se respeta «no quiero recibir mensajes».
 
 ## 2. Punto de partida y reutilización
 
-Inventario inicial obtenido del código y la documentación del repositorio. La fase 0 debe confirmar contratos, cobertura y comportamiento antes de modificar cada área.
+Inventario obtenido del código. La fase 0 confirma contratos y comportamiento antes de modificar cada área.
+
+### Piezas para generar demanda (casi no usadas por el BI actual)
+
+| Pieza existente | Ubicación | Uso previsto |
+| --- | --- | --- |
+| Tienda online con pedidos gastronómicos | `tienda_online/`, `app/services/tienda_gastronomia_catalogo.py` | Canal propio sin comisión; destino de los links de mensajes y QR. |
+| Visitas e intenciones de la tienda | `TiendaVisitaEvento`, `TiendaLead`, `app/services/tienda_estadisticas.py` | Medir visitas, platos vistos y pedidos web; detectar «miran pero no piden». |
+| Promociones de la tienda | `app/services/tienda_promociones.py`, `TiendaPromocionGastronomiaProducto` | Mecanismo de ejecución de promociones de las fases 6 y 4; no crear otro. |
+| Versión directa para QR o chat | `app/templates/tienda_admin/panel.html` | Generar QR de mesa, bolsa y mostrador en la activación comercial. |
+| Origen del pedido y cliente final | `GastronomiaPedido.origen_pedido`, `cliente_final_id`, `gastronomia/customer_models.py`, `cliente_final_service.py` | Separar canal propio de apps; identidad por teléfono. |
+| Precios por plataforma externa | `gastronomia/services/channel_price_service.py` (PedidosYa, Monchis) | Comparar canal propio contra apps y estimar comisión evitada. |
+| Fidelización por compras | `app/services/clientes_fidelizacion*.py` | Incentivo para dejar el teléfono y volver; revisar si aplica a pedidos de gastronomía. |
+| Enlaces `wa.me` con texto | `inteligencia_clientes.py`, `cliente_final_service.whatsapp_pedido_url` | Base de la cola de envío asistido. |
+| Imágenes del menú | `gastronomia/services/menu_image_service.py` | Material para publicaciones y mensajes. |
+| Proveedor de IA existente | `app/services/ia/gpt_service.py`, `app/services/ia_backoffice/` | Redacción opcional de mensajes y publicaciones, después del MVP; no agregar otro proveedor. |
+
+### Piezas de análisis
 
 | Pieza existente | Ubicación | Tratamiento previsto |
 | --- | --- | --- |
-| Panel y acciones comerciales generales | `app/services/inteligencia/comercial.py`, `panel.py` | Integrar la nueva experiencia gastronómica sin duplicar alertas ni alterar otros rubros. |
+| Panel y acciones comerciales generales | `app/services/inteligencia/comercial.py`, `panel.py` | Integrar la experiencia gastronómica sin duplicar alertas ni alterar otros rubros. |
 | BI gastronómico: ventas, ticket, canales, horarios y cocina | `gastronomia/services/inteligencia_service.py` | Reutilizar consultas válidas y separar responsabilidades al crecer. |
 | Radar y tarjetas gastronómicas | `app/templates/inteligencia/gastronomia/` | Evolucionar hacia acciones con estado, evidencia y seguimiento. |
 | Promociones por hora | `gastronomia/services/inteligencia_promos.py` | Corregir comparación temporal y convertir sugerencias en propuestas evaluables. |
-| Clientes frecuentes | `gastronomia/services/inteligencia_clientes.py` | Extender con historial suficiente, identidad confiable y detección de ausencia. |
-| Alertas de margen y stock | `inteligencia_margen.py`, `inteligencia_stock.py` dentro de `gastronomia/services/` | Unificar bases de costo y vincular alertas con decisiones comerciales. |
-| Costos y ganancia estimada | `gastronomia/services/costos_service.py`, `ganancia_service.py` | Aprovechar receta, costo extra y cobertura; distinguir margen de contribución y resultado estimado. |
-| Sugerencias del POS, reglas, complementos y medición | `gastronomia/services/sugerencias/` | Conectar con BI y ampliar solo las capacidades faltantes. |
+| Clientes frecuentes | `gastronomia/services/inteligencia_clientes.py` | Extender con historial amplio, identidad confiable y detección de ausencia. |
+| Alertas de margen y stock | `inteligencia_margen.py`, `inteligencia_stock.py` | Unificar bases de costo y vincular alertas con decisiones comerciales. |
+| Costos y ganancia estimada | `costos_service.py`, `ganancia_service.py` | Distinguir margen de contribución y resultado estimado. |
+| Sugerencias del POS | `gastronomia/services/sugerencias/` | Conectar con BI y ampliar solo lo faltante. |
 
-El sugeridor del POS ya tiene reglas, asociaciones, complementos iniciales, filtros, fatiga y medición. Su plan también documenta una tarjeta de BI. **Este proyecto no debe construir un segundo sugeridor ni otro registro de exposición/aceptación.**
+El sugeridor del POS ya tiene reglas, asociaciones, complementos iniciales, filtros, fatiga y medición. **Este proyecto no construye un segundo sugeridor ni otro registro de exposición/aceptación.**
 
 Referencias internas:
 
@@ -52,277 +86,738 @@ Referencias internas:
 
 ### Brechas observadas
 
-- Las recomendaciones del radar son principalmente textos; falta un ciclo persistente de ejecución y evaluación.
-- Las promociones actuales agrupan horas de cobro de distintos días y parten de horas con ventas; falta distinguir apertura, cero pedidos y días comparables.
-- Los frecuentes se calculan dentro del período consultado; quien dejó de comprar puede quedar fuera de esa lista.
-- La identidad de frecuentes admite nombre como alternativa; no alcanza para contactar o atribuir retornos con confianza.
-- El radar de margen usa costo de receta, mientras el servicio de costos también contempla costo extra. Debe definirse una base consistente.
-- Falta conectar oportunidades, acciones realizadas y resultados observados en una experiencia sencilla.
+- El BI analiza ventas existentes pero no ayuda a conseguir pedidos nuevos ni a usar el canal propio.
+- No se mide qué parte de los pedidos llega por canal propio ni cuántos tienen un cliente identificable.
+- Las recomendaciones del radar son textos; falta un ciclo persistente de ejecución y evaluación.
+- Los frecuentes se calculan dentro del período consultado; quien dejó de comprar puede quedar fuera.
+- La identidad de frecuentes admite nombre como alternativa; no alcanza para contactar o atribuir retornos.
+- Las promociones actuales agrupan horas de distintos días y parten de horas con ventas.
+- El radar de margen usa costo de receta, mientras el servicio de costos también contempla costo extra.
+- El dueño no ve en ningún lugar qué le aportó el sistema en el mes.
 
 ## 3. Experiencia propuesta
 
-### Portada: «Tu negocio hoy»
+### Organización en pestañas
 
-1. Resumen de ventas, pedidos, ticket promedio y margen estimado con cobertura de costos visible.
-2. Comparación con días y turnos equivalentes, hasta la misma hora si la jornada sigue abierta.
-3. Tres acciones priorizadas, cada una con un único paso principal.
-4. Acceso a acciones en evaluación y a resultados recientes.
-5. Acceso secundario a menú, clientes, horarios, canales, operación y reportes existentes.
+Cada fase suma información; si todo se apila en una vista, el dueño deja de mirarla. Por eso la experiencia se organiza en pestañas, con **una pregunta por pestaña** y poco desplazamiento vertical.
 
-Ejemplo ilustrativo, sin datos reales:
+Hoy el tablero de inteligencia ya tiene pestañas (Resumen, Comercial, Operación, Gastronomía), y la pestaña Gastronomía apila KPIs, sugerencias, menú, radar y ritmo en una sola columna. Para no poner pestañas dentro de pestañas, la propuesta es una vista propia **«Tu negocio»** para instalaciones gastronómicas, con estas pestañas:
 
-> **Hay clientes habituales que todavía no volvieron.**
-> Identificamos 8 clientes cuya última compra supera su intervalo habitual.
-> Revisá la lista y prepará un mensaje relacionado con su plato favorito.
-> **Acción:** revisar clientes. **Datos:** período observado y nivel de confianza.
+| Pestaña | Pregunta que responde | Contenido | Fases |
+| --- | --- | --- | --- |
+| **Hoy** | ¿Qué hago hoy? | Hasta 3 acciones y hasta 4 indicadores del día | 1–4 |
+| **Clientes** | ¿A quién le escribo? | Cola de envío asistido; segmentos como filtros | 2 |
+| **Crecer** | ¿Por dónde me llegan pedidos? | Lista de activación, canal propio frente a apps, embudo de la tienda | 1 |
+| **Menú** | ¿Qué platos empujo o reviso? | Cuatro situaciones de platos, sugeridor y promociones | 5–6 |
+| **Resultados** | ¿Sirvió lo que hice? | Reporte del mes, acciones en evaluación e historial | 3–4 |
 
-Cada tarjeta debe responder: qué ocurre, por qué importa, qué hacer, qué esfuerzo requiere y cuándo revisar el resultado. No mostrar ganancias potenciales numéricas sin un cálculo y supuestos verificables.
+Reglas de diseño:
+
+- **Máximo cinco pestañas para el dueño.** Preparación, merma y demoras (fase 7) se suman a la pestaña Operación existente o se agregan como sexta solo cuando estén listas.
+- **Sin pestañas anidadas.** Dentro de una pestaña se usan filtros tipo chip (por ejemplo, «Primera compra», «Ausentes», «Reseñas» en Clientes), no sub-pestañas.
+- **Lo importante se ve sin desplazarse:** la respuesta principal de cada pestaña entra en la primera pantalla de una notebook de 1366×768 y de un celular. Lo demás va en «Ver más», con el modal de detalles existente (`_modal_detalles.html`).
+- **Topes por vista:** hasta 3 tarjetas de acción y hasta 4 indicadores. Las listas largas (cola, platos, historial) se paginan o cargan de a poco.
+- **Contadores en las pestañas** (por ejemplo, «Clientes 8») para saber dónde hay algo pendiente sin abrir cada una. Una pestaña sin novedades no muestra contador.
+- **Carga por pestaña:** cada pestaña se pide al abrirla, como parcial, y no se calcula todo al entrar.
+- **Enlaces directos:** cada acción abre la pestaña y el filtro correspondientes (por ejemplo, de Hoy a Clientes con «Ausentes»), y se recuerda la última pestaña abierta.
+- **Estados vacíos de una línea** con un paso concreto, sin bloques grandes de «datos insuficientes».
+- En celular, las pestañas son una barra horizontal desplazable y fija arriba; la cola de mensajes está pensada para usarse desde el teléfono.
+- El panel de salud de uso (fase 3) no es una pestaña del dueño: es una vista aparte, solo para root.
+
+**Decisión del 31/10/2026: sub-pestañas dentro de Gastronomía.** Con los bloques de BI apilados, la pestaña Gastronomía quedó demasiado cargada. Por pedido del dueño del proyecto se agregan sub-pestañas como chips dentro de ella, con una pregunta por sub-pestaña: **Resumen** (KPIs, platos más vendidos y decisiones), **Crecer** (activación y canales, con el número de pasos pendientes), **Clientes** (cola de mensajes, con el número en cola), **Menú y ritmo** (sugeridor, horarios, mezcla de ventas y upsell) y **Resultados** (reporte del mes). Se recuerda la última abierta y cada acción vuelve a su sub-pestaña (`#gastro-<nombre>`). Con el interruptor del BI apagado quedan solo Resumen y Menú y ritmo. Esto reemplaza, para esta etapa, la regla «sin pestañas anidadas» y la vista «Tu negocio» de cinco pestañas, que queda como opción para la fase 4.
+
+### Pestaña «Hoy»
+
+1. Hasta 4 indicadores: pedidos, ventas, ticket promedio y uno de crecimiento (canal propio o clientes identificados), con comparación con días equivalentes cuando haya datos.
+2. **Tres acciones para hoy**, cada una con un único paso principal. Con poco historial, las acciones vienen de la activación comercial y de la recuperación de clientes, que no necesitan historial.
+3. Nada más: el detalle vive en las otras pestañas.
+
+Ejemplos ilustrativos, sin datos reales:
+
+> **8 clientes habituales no volvieron esta semana.**
+> Su última compra supera su intervalo habitual. Tenés un mensaje listo con el plato favorito de cada uno.
+> **Acción:** enviar mensajes (8 en la cola, unos 3 minutos).
+
+> **Solo 2 de cada 10 pedidos tienen teléfono del cliente.**
+> Sin teléfono no podés avisarles cuando vuelvan a tener su plato favorito.
+> **Acción:** activar el pedido de teléfono en el POS.
+
+Cada tarjeta responde: qué ocurre, por qué importa, qué hacer, cuánto tiempo lleva y cuándo revisar el resultado. No mostrar ganancias potenciales numéricas sin un cálculo y supuestos verificables.
 
 ### Momentos de uso
 
-- Antes del turno: oportunidades, faltantes y preparación.
-- Durante la venta: aprovechar el sugeridor existente y evitar avisos que interrumpan el cobro.
-- Al cierre o semanalmente: qué se hizo, qué ocurrió después y qué conviene repetir o revisar.
-
-La primera entrega usa avisos dentro del sistema. Canales externos y envíos automáticos quedan fuera del MVP.
+- Antes del turno: acciones del día, faltantes y mensajes pendientes.
+- Durante la venta: sugeridor existente y pedido de teléfono; sin avisos que interrumpan el cobro.
+- Al cierre o semanalmente: qué se hizo, qué ocurrió después y qué conviene repetir.
+- Una vez al mes: reporte de valor.
 
 ## 4. Roadmap y dependencias
 
-| Fase | Entrega | Prioridad | Dependencias |
-| --- | --- | --- | --- |
-| 0 | Contrato de datos y diagnóstico | Obligatoria | Ninguna |
-| 1 | Motor de oportunidades y tres acciones para hoy | Alta | 0 |
-| 2 | Recuperación de clientes y segunda compra | Alta | 0 y 1 |
-| 3 | Seguimiento, resultados y resumen proactivo interno | Alta | 1 y 2; telemetría mínima desde 1 |
-| 4 | Menú rentable e integración con el sugeridor | Media | 0 y 1; medición de 3 |
-| 5 | Promociones para días, turnos y canales | Media | 3 y costos confiables de 4 |
-| 6 | Preparación, reposición, merma y capacidad | Media | 0, 3 e historial operativo suficiente |
-| 7 | Evaluación del piloto y despliegue progresivo | Transversal | Se aplica a cada entrega |
+| Fase | Entrega | Prioridad | Sirve sin historial | Dependencias |
+| --- | --- | --- | --- | --- |
+| 0 | Datos mínimos para empezar | Obligatoria | — | Ninguna |
+| 1 | Canal propio y clientes identificados | Alta | Sí | 0 |
+| 2 | Clientes que vuelven: cola de envío asistido | Alta | Parcial | 0 y 1 |
+| 3 | Reporte de valor y salud de uso | Alta | Sí | 1 y 2 |
+| 4 | Tres acciones para hoy con seguimiento | Alta | Parcial | 0–3 |
+| 5 | Menú rentable e integración con el sugeridor | Media | No | 0 y 4; costos confiables |
+| 6 | Días flojos y promociones medibles | Media | Parcial | 4 y 5 |
+| 7 | Preparación, reposición, merma y capacidad | Baja | No | 0, 4 e historial operativo |
+| 8 | Piloto y despliegue progresivo | Transversal | — | Se aplica a cada entrega |
 
-**MVP recomendado: fases 0 a 3**, reutilizando las señales actuales y el sugeridor. Las bases de medición se construyen desde la fase 1; la fase 3 completa su presentación y evaluación.
+**MVP recomendado: fases 0 a 3.** La fase 0 se limita a lo que necesitan esas entregas; el resto del diagnóstico de datos se hace antes de las fases que lo usan. La telemetría mínima (acciones vistas, iniciadas y completadas) se registra desde la fase 1.
 
-## 5. Fase 0 — Datos confiables antes de recomendar
+## 5. Fase 0 — Datos mínimos para empezar
+
+Solo lo imprescindible para las fases 1 a 3. Las definiciones de costos, turnos y comparaciones avanzadas se cierran al inicio de las fases 4 a 7.
 
 ### Trabajo
 
-- [ ] Documentar qué cuenta como pedido, venta cobrada, devolución, anulación y descuento; resolver pagos y ventas relacionadas sin duplicar importes.
-- [ ] Separar fecha del pedido para demanda de fecha de cobro para ingresos; documentar tratamiento de encargos y ventas históricas importadas.
-- [ ] Definir zona horaria local, turnos que cruzan medianoche, días de apertura y cierres excepcionales.
-- [ ] Diferenciar modalidad de entrega (salón, retiro, delivery) de canal de precios u origen comercial; revisar los campos existentes antes de agregar otros.
-- [ ] Establecer comparaciones por día de semana, turno y canal; excluir períodos incompletos o compararlos al mismo corte.
-- [ ] Definir mínimo de observaciones por indicador y estado «datos insuficientes». Propuesta inicial: evaluar entre 4 y 8 días equivalentes; calibrar con históricos y no usarlo como regla universal.
-- [ ] Unificar semántica de costos: receta, extras y modificadores, descuentos, envases y comisiones cuando estén registrados; evitar contabilizar el mismo costo dos veces.
-- [ ] Indicar si el costo es histórico o estimado con precios actuales. No reconstruir silenciosamente ganancias históricas con costos actuales.
-- [ ] Medir cobertura de costos e identificación de clientes. Costo desconocido no equivale a costo cero.
-- [ ] Auditar identidad de cliente final y separación respecto al identificador de la instalación; no agrupar personas solo por nombre.
-- [ ] Inventariar telemetría del sugeridor, tareas programadas, permisos y servicios reutilizables.
-- [ ] Preparar escenarios ficticios de restaurante, comida rápida, cafetería y negocio sin historial.
+- [x] Definir pedido válido para contar pedidos y retornos: excluir anulaciones y documentar devoluciones, encargos y ventas importadas.
+- [x] Confirmar los valores reales de `origen_pedido` y `canal_precio` y clasificarlos en canal propio (POS, tienda online, teléfono/WhatsApp) y plataformas externas (PedidosYa, Monchis).
+- [x] Auditar identidad de cliente final: normalización de teléfono, duplicados y separación respecto al `id_cliente` de la instalación; no agrupar personas solo por nombre. Hecho sobre la base local de desarrollo; repetir en cada instalación con `scripts/auditar_fichas_telefono.py` (ver «Auditoría de la fase 0»).
+- [x] Medir cobertura actual: porcentaje de pedidos con cliente identificado por canal y por modalidad. Medido en la base local de desarrollo (14 pedidos); la medición real queda para el piloto.
+- [x] Confirmar zona horaria local y días de apertura configurados, para no comparar días cerrados. Zona horaria confirmada. Días de apertura: no existe configuración estructurada (solo texto libre de horarios en la tienda), así que queda como requisito de la fase 6.
+- [x] Verificar si la fidelización por compras aplica a pedidos de gastronomía o si necesita un adaptador. Resultado: no aplica a pedidos sin cliente registrado (ver BI-05).
+- [x] Preparar escenarios ficticios: negocio nuevo sin historial, comida rápida con delivery y cafetería de mostrador (`test_gastronomia_bi_escenarios.py`).
 
 ### Criterios de aceptación
 
-- Un mismo pedido válido contribuye una sola vez a cada métrica según su definición.
-- Anulaciones y ajustes tienen un tratamiento explícito y probado.
-- Un negocio cerrado no recibe una alerta de baja demanda por ese horario.
-- Datos faltantes aparecen como desconocidos y no como estabilidad, cero ventas confirmado o alto margen.
-- Se entrega un diccionario de métricas, fuentes, filtros, cobertura y decisiones pendientes.
+- Un pedido válido cuenta una sola vez y un pedido anulado no cuenta como retorno.
+- Cada pedido queda clasificado como canal propio, plataforma externa o desconocido.
+- Datos faltantes aparecen como desconocidos, no como cero.
+- Se entrega un diccionario breve de métricas de las fases 1 a 3.
 
-## 6. Fase 1 — Tres acciones para hoy
+## 6. Fase 1 — Canal propio y clientes identificados
+
+Objetivo: que el negocio tenga por dónde recibir pedidos sin comisión y que cada venta deje un cliente contactable. Funciona desde el primer día.
 
 ### Trabajo
 
-- [ ] Definir un contrato común de oportunidad: tipo, entidad afectada, evidencia, período, confianza, urgencia, esfuerzo y acción disponible.
-- [ ] Integrar inicialmente caída de pedidos, caída de ticket, falta de stock y revisión de margen, aprovechando los detectores actuales corregidos.
-- [ ] Separar observación y recomendación: una caída de ventas no demuestra por sí sola su causa.
-- [ ] Priorizar de forma explicable: problemas operativos que impiden vender, oportunidades con evidencia y esfuerzo razonable; evitar puntajes monetarios ficticios.
-- [ ] Persistir acciones y eventos mínimos con identificador estable para impedir duplicados en cada recálculo.
-- [ ] Implementar estados: pendiente, pospuesta, en curso, en evaluación, completada, descartada y vencida; validar transiciones.
-- [ ] Añadir motivo de descarte y posposición, sin volver a mostrar la misma alerta inmediatamente.
-- [ ] Construir la portada gastronómica con máximo tres acciones y acceso al resto.
-- [ ] Vincular acciones a pantallas existentes con contexto precargado cuando sea posible y respetando permisos.
-- [ ] Hacer que los avisos de la portada y los del BI general compartan estado y conteo.
+- [x] **Lista de activación comercial** con progreso visible: tienda online publicada con fotos y precios, horario cargado, QR impreso (mesa, mostrador, bolsa de delivery), link en la bio de Instagram y en el estado de WhatsApp, mensaje de bienvenida listo para copiar.
+- [x] Detectar automáticamente lo que ya está hecho (tienda activa, platos sin foto o sin precio) y pedir confirmación manual solo de lo externo (bio de Instagram, QR impreso).
+- [x] Generar materiales listos: QR descargable e imprimible, texto para la bio, texto para el estado de WhatsApp con el link de la tienda.
+- [x] Indicador **pedidos por canal propio frente a plataformas externas**, por semana.
+- [x] **Comisión evitada estimada**: solo si el dueño configura el porcentaje de comisión de cada plataforma; sin dato, no se muestra.
+- [x] Indicador **porcentaje de pedidos con cliente identificado**, por canal.
+- [x] En el POS, campo de teléfono rápido y visible para mostrador y retiro, opcional y sin bloquear el cobro; reutilizar la normalización existente.
+- [x] Mostrar al cajero un texto sugerido para pedir el teléfono, vinculado a la fidelización cuando esté activa. Se muestra solo con fidelización activa y dice «con un celular válido, cada compra suma para la fidelización». La frase «sumás para tu beneficio» no se usa porque en gastronomía todavía no se canjean beneficios (ver BI-05b y BI-05c en la sección 18).
+- [x] Registrar si el cliente aceptó recibir mensajes; por defecto, sin consentimiento confirmado no entra en las colas de la fase 2.
+- [x] Embudo de la tienda online: visitas, visitantes y pedidos web por plato, para detectar platos muy vistos y poco pedidos. Usa una tabla propia de visitas a platos de gastronomía, no `TiendaVisitaEvento` (ver BI-04).
 
 ### Criterios de aceptación
 
-- Cada tarjeta contiene evidencia verificable, período, motivo y un paso concreto.
-- Posponer, descartar o completar sobrevive a recarga y nuevo cálculo.
-- Abrir una pantalla no marca automáticamente una acción como ejecutada.
-- Un usuario sin permiso de edición no puede ejecutar la acción mediante UI ni API.
-- El BI no bloquea pedidos, cocina ni caja; un error muestra estado de indisponibilidad o datos fechados, no un falso «todo bien».
+- Un negocio sin ventas previas ve su lista de activación y al menos una acción útil.
+- Pedir el teléfono no agrega pasos obligatorios ni demora el cobro.
+- Un teléfono mal formado no crea un cliente nuevo duplicado.
+- La comisión evitada no aparece si no hay porcentaje configurado.
+- Los pedidos de plataformas externas no se cuentan como canal propio.
 
-## 7. Fase 2 — Clientes que vuelven y segunda compra
+## 7. Fase 2 — Clientes que vuelven: cola de envío asistido
+
+Objetivo: convertir clientes identificados en segundas compras y retornos, usando el WhatsApp del negocio sin API.
+
+### Segmentos iniciales
+
+| Segmento | Regla inicial | Con poco historial |
+| --- | --- | --- |
+| Primera compra sin segunda | Compró una vez hace entre X e Y días | Regla fija configurable (ejemplo: 5 a 15 días) |
+| Habitual ausente | Superó su intervalo habitual de compra | Solo con al menos 3 compras previas |
+| Favorito disponible | Su plato favorito vuelve a estar disponible o es novedad | No requiere historial del negocio |
+| Pedido de reseña | Pedido entregado recientemente | Requiere link de reseña configurado |
 
 ### Trabajo
 
-- [ ] Consultar historial más amplio que el período visible para reconocer clientes que dejaron de aparecer.
-- [ ] Reutilizar identidad estable de cliente final y normalización de teléfono; resolver ambigüedades sin fusionar por nombre.
-- [ ] Detectar habituales que superaron su intervalo de compra y compradores nuevos sin segunda visita; definir umbrales distintos y mínimos de evidencia.
-- [ ] Mostrar fecha de última compra, frecuencia, preferencia y fundamento de selección.
-- [ ] Preparar mensajes editables con revisión del dueño, producto disponible y vínculo al menú cuando corresponda.
-- [ ] Registrar contacto confirmado manualmente; abrir WhatsApp no prueba envío, recepción ni lectura.
-- [ ] Respetar preferencias de contacto, exclusiones y frecuencia máxima; evitar listas repetitivas.
-- [ ] Ofrecer acciones útiles sin descuento obligatorio: novedad, disponibilidad del favorito o recordatorio pertinente.
-- [ ] Asociar compras posteriores con el contacto y su ventana de observación, excluyendo ventas anuladas.
+- [x] Consultar historial más amplio que el período visible para encontrar a quienes dejaron de comprar.
+- [x] Calcular los segmentos con identidad estable por teléfono; resolver ambigüedades sin fusionar por nombre.
+- [x] Mostrar última compra, frecuencia, plato favorito y por qué está en la lista.
+- [x] **Plantillas de mensaje** editables por segmento, con variables (nombre, plato favorito, link de la tienda o del plato). Ofrecer valor sin descuento obligatorio: novedad, disponibilidad del favorito, recordatorio.
+- [x] **Cola de envío asistido**: un cliente a la vez con el mensaje ya armado; botón «Abrir WhatsApp» (`wa.me` con texto), al volver «Enviado» u «Omitir», y pasa al siguiente.
+- [x] Límite diario configurable de mensajes por cola y frecuencia máxima por cliente (ejemplo: uno cada 14 días).
+- [x] Marca «no quiere mensajes» con un clic; ese cliente sale de todas las colas.
+- [ ] Link de reseña de Google configurable; mensaje de reseña después de entregas, con el mismo límite.
+- [ ] Opcional: exportar contactos con consentimiento para listas de difusión de WhatsApp Business, explicando que solo llegan a quien guardó el número del negocio.
+- [x] Asociar compras posteriores al mensaje marcado como enviado, con ventana de observación por segmento y excluyendo anulaciones.
 
 ### Criterios de aceptación
 
 - Un habitual ausente aparece aunque no haya comprado en el período actual del panel.
-- Personas homónimas no se mezclan ni reciben atribuciones ajenas.
-- Sin historial o identificación suficiente se explica la limitación y no se inventa un segmento.
-- No se envían mensajes automáticamente en esta fase.
-- El resultado se denomina «volvió después del contacto», sin afirmar causalidad demostrada.
+- Homónimos no se mezclan ni reciben atribuciones ajenas.
+- Nadie recibe dos mensajes dentro de la frecuencia máxima ni después de marcar «no quiere mensajes».
+- Abrir WhatsApp no marca el mensaje como enviado; solo la confirmación del dueño.
+- El sistema no envía nada por su cuenta ni usa la WhatsApp Cloud API.
+- El resultado se llama «volvió después del mensaje», sin afirmar causalidad.
+- Sin clientes identificados, la pantalla explica cómo conseguirlos (fase 1) en lugar de quedar vacía.
 
-## 8. Fase 3 — Seguimiento y proactividad
+## 8. Fase 3 — Reporte de valor y salud de uso
 
-### Trabajo
+Objetivo: que el dueño vea lo que obtuvo y que el proveedor detecte a tiempo una instalación en riesgo.
 
-- [ ] Guardar fecha, responsable, evidencia de origen, acción realizada y ventana de evaluación.
-- [ ] Definir ventanas por tipo de acción: resolver un faltante no se evalúa igual que recuperar clientes.
-- [ ] Medir adopción, resultados observados y cambios frente a una referencia comparable.
-- [ ] Incorporar las métricas existentes del sugeridor sin duplicar exposición, aceptación ni venta atribuida a la franja.
-- [ ] Distinguir «sugerido», «agregado al pedido», «cobrado» y «anulado»; no contar pedidos abiertos como rechazo.
-- [ ] Presentar resumen antes del turno y cierre semanal dentro del sistema, según horarios y preferencias.
-- [ ] Establecer deduplicación, caducidad y límites de avisos; silencio cuando no haya novedades relevantes.
-- [ ] Habilitar acciones «repetir», «ajustar» y «dejar de recomendar» con motivo.
-- [ ] Mostrar muestra, cobertura y fecha de actualización en resultados; no atribuir todo crecimiento al BI.
+### Reporte mensual para el dueño
+
+- [ ] Resumen dentro del sistema, también descargable o imprimible para compartir, con:
+  - pedidos y ventas por canal propio y su evolución;
+  - comisión evitada estimada, si está configurada;
+  - clientes nuevos identificados;
+  - mensajes enviados y clientes que volvieron después del mensaje;
+  - acompañamientos sugeridos aceptados y su importe (telemetría actual del sugeridor);
+  - acciones completadas en el mes.
+- [x] Redacción honesta: «después de», no «gracias a»; mostrar muestra y cobertura.
+- [ ] Si el mes fue malo, proponer las tres acciones con más potencial en lugar de solo mostrar la caída.
+
+### Salud de uso para el proveedor
+
+- [x] Panel visible solo para el usuario root dentro de **cada instalación**, sin centralizar datos ni comparar instalaciones: último uso del POS y del BI, porcentaje de la activación comercial completado, colas sin atender, tendencia de pedidos de las últimas semanas y funciones nunca usadas. Ver BI-05.
+- [x] Semáforo simple (activo, en riesgo, inactivo) con reglas explícitas y documentadas (en el módulo `salud_uso.py` y en la misma página).
+- [ ] Cualquier envío de esta información fuera de la instalación queda como decisión pendiente (sección 15) y requiere autorización del cliente.
 
 ### Criterios de aceptación
 
-- Cada acción evaluable puede recorrerse desde la recomendación hasta su resultado.
-- Recargar, reintentar o recalcular no duplica eventos ni resultados.
-- Una acción sin muestra suficiente queda «sin evidencia suficiente», no como éxito o fracaso.
-- El resumen semanal informa qué se hizo y qué ocurrió después, con comparaciones verificables.
+- El reporte coincide con los reportes existentes cuando usan la misma definición y período.
+- Una métrica sin datos se omite o se marca como no disponible, nunca como cero.
+- Un usuario no root no ve el panel de salud ni por UI ni por API.
 
-## 9. Fase 4 — Menú rentable y sugerencias existentes
+## 9. Fase 4 — Tres acciones para hoy con seguimiento
+
+Unifica el motor de oportunidades y el seguimiento. Las fuentes de acciones incluyen las fases 1 a 3 además de los detectores analíticos.
 
 ### Trabajo
 
-- [ ] Clasificar platos por popularidad y contribución estimada en guaraníes, comparando categorías y canales pertinentes.
-- [ ] Mostrar cuatro situaciones: vende y aporta; vende pero aporta poco; aporta pero vende poco; baja venta y bajo aporte.
-- [ ] Recomendar visibilidad, revisión de receta/porción/precio o prueba comercial; evitar retirar platos automáticamente.
-- [ ] Mostrar componentes de costo y cobertura; diferenciar contribución por plato del resultado después de gastos del negocio.
+- [ ] Contrato común de oportunidad: tipo, entidad afectada, evidencia, período, confianza, urgencia, tiempo estimado y acción disponible.
+- [ ] Fuentes iniciales: pasos de activación pendientes, colas de mensajes, caída de pedidos, caída de ticket, falta de stock y revisión de margen (con los detectores actuales corregidos).
+- [ ] **Acciones de calendario** que no necesitan historial, como reglas explícitas y configurables: cobro de quincena y fin de mes, feriados, fechas especiales y partidos importantes. Proponen preparar un mensaje o destacar un combo con anticipación.
+- [ ] Separar observación de recomendación: una caída de ventas no demuestra su causa.
+- [ ] Priorizar de forma explicable: primero lo que impide vender (faltantes, tienda caída), luego acciones rápidas con evidencia; sin puntajes monetarios ficticios.
+- [ ] Persistir acciones con identificador estable para evitar duplicados en cada recálculo.
+- [ ] Estados: pendiente, pospuesta, en curso, en evaluación, completada, descartada y vencida; validar transiciones.
+- [ ] Motivo de descarte y posposición, sin volver a mostrar la misma alerta inmediatamente.
+- [ ] Vincular cada acción a la pantalla existente con contexto precargado, respetando permisos.
+- [ ] Guardar fecha, responsable, evidencia, acción realizada y ventana de evaluación por tipo de acción.
+- [ ] Resumen antes del turno y cierre semanal dentro del sistema; silencio cuando no haya novedades.
+- [ ] Acciones «repetir», «ajustar» y «dejar de recomendar» con motivo.
+- [ ] Avisos de la portada y del BI general con estado y conteo compartidos.
+
+### Criterios de aceptación
+
+- Cada tarjeta tiene evidencia verificable, motivo y un paso concreto.
+- Posponer, descartar o completar sobrevive a recarga y recálculo.
+- Abrir una pantalla no marca una acción como ejecutada.
+- Una acción sin muestra suficiente queda «sin evidencia suficiente», no como éxito o fracaso.
+- Un usuario sin permiso de edición no puede ejecutar la acción por UI ni API.
+- El BI no bloquea pedidos, cocina ni caja; ante un error muestra indisponibilidad o datos fechados.
+
+## 10. Fase 5 — Menú rentable y sugerencias existentes
+
+### Trabajo previo de datos
+
+- [ ] Unificar semántica de costos: receta, extras y modificadores, descuentos, envases y comisiones registradas, sin contar el mismo costo dos veces.
+- [ ] Indicar si el costo es histórico o estimado con precios actuales; no reconstruir ganancias históricas en silencio.
+
+### Trabajo
+
+- [ ] Clasificar platos por popularidad y contribución estimada, por categoría y canal.
+- [ ] Cuatro situaciones: vende y aporta; vende pero aporta poco; aporta pero vende poco; baja venta y bajo aporte.
+- [ ] Recomendar visibilidad, revisión de receta, porción o precio, o una prueba comercial; nunca retirar platos automáticamente.
+- [ ] Para «aporta pero vende poco»: destacarlo en la tienda online, como foto principal o en un mensaje de novedad (reutilizar fases 1 y 2).
+- [ ] Usar el embudo de la tienda: plato muy visto y poco pedido sugiere revisar foto, descripción o precio.
 - [ ] Conectar oportunidades de acompañamientos con la administración y vista previa del sugeridor existente.
-- [ ] Evaluar ordenamiento por contribución solo donde haya costos suficientes, manteniendo afinidad, reglas, exclusiones, stock, canal y fatiga.
-- [ ] Mostrar aceptación y ventas asociadas a sugerencias usando su telemetría actual.
-- [ ] Revalidar disponibilidad y precios al ejecutar una acción; una recomendación guardada puede quedar desactualizada.
+- [ ] Ordenar por contribución solo donde haya costos suficientes, manteniendo afinidad, reglas, exclusiones, stock, canal y fatiga.
+- [ ] Revalidar disponibilidad y precios al ejecutar una acción guardada.
 
 ### Criterios de aceptación
 
 - Un plato sin costos completos no se clasifica como altamente rentable.
-- El BI y los reportes coinciden cuando usan la misma definición, período y base de costos.
-- No aparecen un segundo sugeridor ni nuevos eventos equivalentes a los ya existentes.
-- Los cambios conservan los flujos de modificadores, peso, edición, canal y cobro del POS.
+- El BI y los reportes coinciden con la misma definición, período y base de costos.
+- No aparecen un segundo sugeridor ni eventos equivalentes a los existentes.
+- Se conservan los flujos de modificadores, peso, edición, canal y cobro del POS.
 
-## 10. Fase 5 — Días flojos y promociones medibles
+## 11. Fase 6 — Días flojos y promociones medibles
+
+### Trabajo previo de datos
+
+- [ ] Turnos que cruzan medianoche, cierres excepcionales y comparación al mismo corte horario.
+- [ ] Mínimo de observaciones por indicador. Propuesta inicial: entre 4 y 8 días equivalentes, calibrado con históricos.
 
 ### Trabajo
 
 - [ ] Analizar días, turnos y canales equivalentes, incluyendo horas abiertas con cero pedidos.
 - [ ] Identificar si la baja está en cantidad de pedidos, ticket o mezcla de platos; presentar hipótesis por separado.
-- [ ] Preparar propuestas con productos concretos, horario, canal, duración, stock y capacidad disponibles.
+- [ ] Proponer acciones con productos concretos, horario, canal, duración, stock y capacidad.
+- [ ] Ejecutar promociones con `tienda_promociones` y los combos existentes; no crear otro mecanismo.
+- [ ] Cada promoción genera su mensaje y su texto para el estado de WhatsApp o Instagram, para la cola de la fase 2.
 - [ ] Calcular contribución estimada después del beneficio y costos variables conocidos; mostrar costos faltantes.
-- [ ] Simular escenarios, diferenciando supuesto de venta adicional y ventas que podrían ocurrir igualmente.
-- [ ] Definir un identificador de promoción y reutilizar mecanismos de combos/promociones existentes si encajan.
-- [ ] Permitir revisión y activación explícita por el dueño; no cambiar precios ni publicar automáticamente.
-- [ ] Medir pedidos asociados, ticket, descuento y contribución, comparando períodos equivalentes y posibles desplazamientos entre horarios/productos.
+- [ ] Revisión y activación explícita por el dueño; sin cambios automáticos de precio ni publicaciones automáticas.
+- [ ] Medir pedidos, ticket, descuento y contribución frente a períodos equivalentes, y posibles desplazamientos entre horarios o productos.
+- [ ] Después del MVP, redacción opcional de mensajes y publicaciones con el proveedor de IA existente, siempre editable por el dueño.
 
 ### Criterios de aceptación
 
-- La propuesta no recomienda un producto agotado ni una franja cerrada.
-- Una promoción puede aumentar facturación y empeorar contribución; el resultado muestra ambas cosas.
-- Si falta un mecanismo compatible de promociones, se documenta como dependencia antes de ofrecer un botón que prometa ejecutarla.
-- Se distingue resultado observado de incremento causado; una prueba controlada puede incorporarse cuando el volumen lo permita.
+- No se recomienda un producto agotado ni una franja cerrada.
+- Una promoción puede subir la facturación y bajar la contribución; el resultado muestra ambas.
+- Se distingue resultado observado de incremento causado.
 
-## 11. Fase 6 — Preparación, disponibilidad y servicio
+## 12. Fase 7 — Preparación, disponibilidad y servicio
+
+Mejora margen y operación más que ventas; por eso va al final.
 
 ### Trabajo
 
-- [ ] Estimar demanda por turno usando días equivalentes y un rango, con mínimos de datos por producto.
-- [ ] Vincularla a recetas, existencias, reservas y producción ya registrada; revisar unidades y cantidades fraccionarias.
-- [ ] Proponer preparación y reposición con horizonte y fundamento, sin emitir compras automáticamente.
-- [ ] Incorporar merma registrada y límites de conservación cuando existan datos; no inventar vencimientos ni vida útil.
-- [ ] Mostrar desvíos entre preparación, venta y desperdicio para ajustar recomendaciones.
-- [ ] Detectar demoras por turno, producto y modalidad con umbrales configurables, evitando un único límite universal.
-- [ ] Evitar impulsar demanda cuando hay faltantes críticos o cocina saturada; priorizar resolver la restricción.
+- [ ] Estimar demanda por turno con días equivalentes y un rango, con mínimos de datos por producto.
+- [ ] Vincularla a recetas, existencias, reservas y producción registrada; revisar unidades fraccionarias.
+- [ ] Proponer preparación y reposición con fundamento, sin emitir compras automáticamente.
+- [ ] Incorporar merma registrada y límites de conservación cuando existan datos; no inventar vencimientos.
+- [ ] Detectar demoras por turno, producto y modalidad con umbrales configurables.
+- [ ] No impulsar demanda (fases 2 y 6) cuando hay faltantes críticos o cocina saturada.
 
 ### Criterios de aceptación
 
 - La previsión informa rango, muestra y fecha; con pocos datos ofrece orientación manual.
-- Las cantidades sugeridas respetan unidades y no duplican producción/reservas existentes.
-- Se puede comparar lo sugerido con ventas, faltantes y merma posterior.
-- Las alertas de servicio distinguen demoras registradas de posibles causas todavía no comprobadas.
+- Las cantidades respetan unidades y no duplican producción o reservas existentes.
+- Las alertas distinguen demoras registradas de causas no comprobadas.
 
-## 12. Arquitectura y compatibilidad
+## 13. Arquitectura y compatibilidad
 
-- Mantener una instalación independiente por cliente; no agregar infraestructura multi-tenant ni comparaciones entre instalaciones.
-- Preservar `id_cliente`/`cliente_id`, verificando el significado de cada campo, y aplicar filtros en lecturas, escrituras, tareas y cachés.
+- Una instalación independiente por cliente; sin infraestructura multi-tenant ni comparaciones entre instalaciones.
+- Preservar `id_cliente`/`cliente_id`, verificando el significado de cada campo, y filtrar en lecturas, escrituras, tareas y cachés.
 - Antes de crear servicios, modelos o utilidades, buscar implementaciones existentes con CodeGraph y revisar sus contratos.
-- Separar detectores, priorización, persistencia, ejecución y evaluación en archivos pequeños. Ningún archivo nuevo o modificado debe superar 600 líneas; dividir antes de crecer.
-- Evaluar un paquete `gastronomia/services/bi/` para las responsabilidades nuevas, dejando los servicios existentes como integraciones o adaptadores donde corresponda.
-- Mantener rutas delgadas, plantillas parciales y scripts acotados. Evitar agregar todo a `inteligencia_service.py` o `comercial.py`.
-- Nuevos modelos propuestos: oportunidad/acción y eventos de seguimiento; evaluar configuración y evaluaciones separadas solo si son necesarias. Reutilizar identidad, pedidos, promociones y telemetría actuales.
-- Definir clave de deduplicación por instalación, detector, entidad y ventana; registrar versión de regla y evidencia usada.
-- Migraciones aditivas, campos compatibles con valores por defecto o nulos; preservar registros anteriores.
-- Cálculos pesados fuera del pedido/cobro y de la carga interactiva. Reutilizar patrones existentes de tareas, candados y publicación de resultados sin compartir responsabilidades de negocio indebidamente.
-- Conservar el último resultado válido con fecha ante fallos; definir presupuesto de tiempo y volumen después de medir en fase 0.
-- Permisos de lectura separados de acciones que editan, activan promociones o preparan contactos; aplicar validación de servidor y CSRF.
-- Cualquier trabajo del frontend público queda exclusivamente en `/tienda_online` y consume `/api/tienda/...`; no importar código del backoffice desde la tienda.
-- En el MVP, no agregar proveedores de IA, infraestructura de mensajería ni cambios automáticos de precio.
+- Separar detectores, priorización, persistencia, colas de mensajes, reporte y evaluación en archivos pequeños. Ningún archivo nuevo o modificado supera 600 líneas.
+- Paquete `gastronomia/services/bi/` para las responsabilidades nuevas (por ejemplo `activacion.py`, `segmentos.py`, `cola_mensajes.py`, `plantillas.py`, `reporte_valor.py`, `salud_uso.py`), con los servicios existentes como adaptadores.
+- Rutas delgadas, plantillas parciales y scripts acotados; no agregar todo a `inteligencia_service.py` o `comercial.py`.
+- Una plantilla parcial y un endpoint por pestaña de «Tu negocio», compatibles con el motor de pestañas existente (`?partial=1`); reutilizar el patrón `role="tablist"` del tablero de inteligencia.
+- Nuevos modelos previstos: acción/oportunidad, eventos de seguimiento, contacto de cola (cliente, segmento, plantilla, estado, fecha) y preferencia de contacto del cliente final. Reutilizar identidad, pedidos, promociones y telemetría actuales.
+- Los enlaces de WhatsApp se generan con una utilidad compartida a partir de la existente en `cliente_final_service.py`; no usar `app/services/whatsapp/`.
+- Clave de deduplicación por instalación, detector, entidad y ventana; registrar versión de regla y evidencia.
+- Migraciones aditivas, campos con valores por defecto o nulos; preservar registros anteriores.
+- Cálculos pesados fuera del pedido, el cobro y la carga interactiva, reutilizando patrones existentes de tareas y candados.
+- Conservar el último resultado válido con fecha ante fallos.
+- Permisos de lectura separados de acciones que editan, activan promociones o preparan contactos; validación de servidor y CSRF.
+- Cualquier cambio en la tienda online queda dentro de `/tienda_online` y consume `/api/tienda/...`; no importar código del backoffice desde la tienda.
+- En el MVP: sin proveedores de IA nuevos, sin WhatsApp Cloud API ni mensajería automática, y sin cambios automáticos de precio.
 
-## 13. Validación y liberación por entrega
+## 14. Validación y liberación por entrega
 
 ### Pruebas relevantes
 
-- Cálculos: períodos comparables, medianoche, apertura, pocos datos, costos incompletos, descuentos y anulaciones.
-- Aislamiento y permisos: dos contextos de cliente, acceso directo a API, caché, tareas y acciones guardadas.
+- Cálculos: pedidos válidos, anulaciones, clasificación de canal, pocos datos, días cerrados y costos incompletos.
+- Identidad y contacto: teléfonos normalizados, homónimos, duplicados, consentimiento, «no quiere mensajes», frecuencia máxima y límite diario.
+- Cola: enviar, omitir, recargar y retomar sin duplicar contactos; retorno dentro y fuera de ventana.
+- Aislamiento y permisos: dos contextos de cliente, acceso directo a API, panel root, caché y tareas.
 - Estado: recálculos, solicitudes repetidas, transiciones inválidas, caducidad y persistencia de descartes.
-- Identidad y recuperación: homónimos, teléfonos normalizados, clientes ausentes y retorno fuera de ventana.
-- Integración: oportunidad → pantalla de acción → ejecución → pedido/cobro válido → resultado.
-- Regresión: BI general, gastronomía desactivada y módulos de otros rubros; POS, cocina, caja y sugeridor.
-- UI: escritorio y móvil, tema claro/oscuro, teclado, estados vacíos, error y datos desactualizados.
-- Rendimiento: catálogo e historial representativos, latencia HTTP además del servicio, cálculos concurrentes y fallos de tareas.
-- Base de datos: migraciones y consultas sobre los motores soportados; usar datos ficticios o copias autorizadas, sin experimentar en bases productivas.
+- Integración: oportunidad → mensaje o pantalla → pedido válido → resultado → reporte mensual.
+- Regresión: BI general, gastronomía desactivada, otros rubros, POS, cocina, caja, tienda online y sugeridor.
+- UI: escritorio y móvil (la cola se usará mucho desde el celular), tema claro/oscuro, estados vacíos y error; topes por vista, respuesta principal visible sin desplazarse, carga por pestaña y enlaces directos a pestaña y filtro.
+- Rendimiento: historial y catálogo representativos, latencia HTTP y fallos de tareas.
+- Base de datos: migraciones y consultas en los motores soportados, con datos ficticios.
 
-Reutilizar inicialmente `test_inteligencia_comercial.py`, `test_inteligencia_bi_context.py`, `test_gastronomia_reportes.py`, `test_gastronomia_ganancia.py` y las suites del sugeridor. Agregar pruebas de comportamiento para riesgos nuevos, evitando repetir la implementación en los asserts.
+Reutilizar `test_inteligencia_comercial.py`, `test_inteligencia_bi_context.py`, `test_gastronomia_reportes.py`, `test_gastronomia_ganancia.py`, `test_tienda_estadisticas_panel.py`, `test_clientes_fidelizacion.py` y las suites del sugeridor. Agregar pruebas de comportamiento para los riesgos nuevos.
 
 ### Piloto y salida gradual
 
-- [ ] Seleccionar instalaciones autorizadas con operaciones distintas y registrar una línea base.
-- [ ] Liberar primero lectura/diagnóstico y luego acciones por configuración de instalación.
-- [ ] Verificar que las recomendaciones sean comprensibles y ejecutables con dueños reales.
-- [ ] Revisar avisos descartados, falsos positivos, datos insuficientes y esfuerzo de uso.
-- [ ] Definir objetivos cuantitativos del piloto después de la línea base; no prometer porcentajes de mejora sin evidencia.
-- [ ] Comparar resultados por períodos equivalentes y documentar factores externos conocidos.
-- [ ] Permitir desactivar la nueva experiencia conservando historial, reportes y operación actual.
+- [ ] Elegir instalaciones autorizadas, **incluyendo al menos una con pocas ventas**, y registrar una línea base.
+- [ ] Liberar por configuración de instalación, empezando por la activación comercial y la cola de mensajes.
+- [ ] Acompañar la primera semana: completar la activación con el dueño y enviar juntos la primera cola.
+- [ ] Revisar avisos descartados, colas abandonadas, falsos positivos y tiempo de uso.
+- [ ] Definir objetivos cuantitativos después de la línea base; no prometer porcentajes sin evidencia.
+- [ ] Permitir desactivar la experiencia conservando historial, reportes y operación.
 
-## 14. Cómo medir si sirve
+## 15. Cómo medir si sirve
 
 | Dimensión | Indicadores | Interpretación |
 | --- | --- | --- |
-| Utilidad | Acciones vistas, iniciadas, ejecutadas y descartadas con motivo | Abrir una tarjeta no equivale a hacer la acción. |
-| Venta | Pedidos, ticket y acompañamientos por pedido | Comparar turnos y canales equivalentes. |
-| Repetición | Segunda compra y retorno posterior al contacto | Solo clientes identificables; informar cobertura. |
-| Margen | Contribución estimada y descuentos | Informar costos incluidos/faltantes; no llamarlo ganancia neta. |
-| Operación | Faltantes, merma registrada y demora | Separar ausencia de registros de ausencia de problemas. |
-| Calidad del BI | Recomendaciones válidas, repetidas, vencidas y sin evidencia | Preferir pocas acciones útiles a muchas alertas. |
+| Activación | Pasos de activación completados, tienda con pedidos | Sin canal propio no hay base para crecer. |
+| Canal propio | Pedidos propios frente a plataformas, comisión evitada | Comisión solo con porcentaje configurado. |
+| Clientes | Porcentaje de pedidos identificados, clientes con consentimiento | Base de todo lo que sigue. |
+| Retorno | Segunda compra y retorno después del mensaje | Solo clientes identificables; informar cobertura. |
+| Utilidad | Acciones vistas, iniciadas, completadas y descartadas; colas atendidas | Abrir una tarjeta no es hacer la acción. |
+| Venta | Pedidos, ticket y acompañamientos por pedido | Comparar períodos equivalentes. |
+| Margen | Contribución estimada y descuentos | Informar costos faltantes; no llamarlo ganancia neta. |
+| Continuidad | Semáforo de salud de uso por instalación | Hipótesis del proveedor; datos dentro de cada instalación. |
 
-La retención del cliente del sistema se evaluará como hipótesis comercial del proveedor, con información autorizada. No requiere centralizar datos de las instalaciones ni agregar telemetría externa en este plan.
-
-## 15. Decisiones a cerrar durante la implementación
+## 16. Decisiones a cerrar
 
 | Decisión | Momento | Propuesta inicial |
 | --- | --- | --- |
-| Rubros del primer piloto | Fase 0 | Comida rápida y cafetería; adaptar por turnos y tipo de operación. |
-| Apertura y turnos | Fase 0 | Reutilizar configuración existente y pedir solo datos que falten. |
-| Definiciones de costos y cobertura | Fase 0 | Una base compartida, visible y coherente con reportes. |
-| Mínimos de datos y frecuencia de cálculo | Fases 0–1 | Configurables y calibrados con diagnóstico; no fijarlos por intuición. |
-| Ventanas de ausencia y segunda compra | Fase 2 | Basadas en recurrencia cuando haya evidencia; reglas explícitas para pocos datos. |
-| Canales externos | Después del MVP | Evaluar necesidad y permisos; no condicionan las primeras entregas. |
-| Uso de IA generativa | Después del MVP | Solo si mejora explicación/redacción y puede medirse su costo y utilidad. |
+| Rubros del piloto | Fase 0 | Comida rápida con delivery y cafetería; al menos un negocio con pocas ventas. |
+| Clasificación de canales | Fase 0 | Según `origen_pedido` y `canal_precio` reales; desconocido como categoría propia. |
+| Consentimiento de mensajes | Fase 1 | Registro explícito en POS y tienda; sin consentimiento no entra en colas. |
+| Límite diario y frecuencia de mensajes | Fase 2 | Configurable; valores iniciales conservadores para evitar bloqueos de WhatsApp. |
+| Ventanas de segunda compra y ausencia | Fase 2 | Reglas fijas con poco historial; recurrencia cuando haya evidencia. |
+| Ubicación de «Tu negocio» | Fase 1 | Vista propia con 5 pestañas para gastronomía; la pestaña Gastronomía del tablero general enlaza a ella en vez de duplicar contenido. |
+| Envío de la salud de uso al proveedor | Después del MVP | Por ahora solo visible dentro de cada instalación; exportarla requiere autorización. |
+| WhatsApp Cloud API | Fuera del plan | No se usa; solo enlaces `wa.me`. |
+| Redacción con IA | Después del MVP | Proveedor existente, editable, medido por costo y uso. |
+| Definiciones de costos y turnos | Fases 5–6 | Una base compartida, coherente con reportes. |
+| Fidelización en pedidos sin cliente registrado | Fase 1 (texto del POS) | **Resuelta en BI-05b, BI-05c y BI-05d:** el celular identifica la venta. Con ficha activa la asigna; sin ficha y con celular válido la crea. La caja de gastronomía canjea beneficios de fidelización (BI-05d). |
 
-## 16. Próxima unidad de trabajo
+## 17. Próxima unidad de trabajo
 
-**BI-01: diagnóstico y contrato de métricas de gastronomía.**
+**Punto de parada acordado (31/10/2026): cierre del MVP, fases 0 a 3.** No se empieza BI-06 (fase 4) hasta que el dueño del proyecto lo ordene. La fase 4 se decide con datos del piloto.
 
-Entregables: fuentes y filtros confirmados, escenarios de prueba, cobertura de datos, mapa de reutilización y criterios temporales/de costos. Luego implementar **BI-02: estado persistente de acciones y portada con tres oportunidades**, con telemetría desde el inicio.
+### Cierre del MVP (pendiente)
+
+Puntos que no necesitan navegador:
+
+- [x] Commits en pasos pequeños: la corrección compartida de fidelización, la caja con beneficios y fichas, y la auditoría con el plan. `.claude/launch.json` queda fuera por ser configuración local.
+- [x] Pruebas de rechazo por permisos: sin `gastronomia_menu`, las acciones de la cola, la comisión y la activación no cambian nada (`test_gastronomia_bi_permisos.py`, con control positivo).
+- [x] Historial de clientes calculado una vez por solicitud (memoria que vive solo durante la solicitud, sin caché entre solicitudes). Con historiales muy grandes puede hacer falta una caché con vencimiento.
+- [x] Reporte mensual imprimible (`/gastronomia/bi/reporte`, se guarda como PDF desde el navegador). No hay descarga en otro formato.
+
+Puntos que requieren ver la aplicación o decidir:
+
+- [ ] Verificación en navegador. **Hecho el 31/10/2026 en la demo** (celular en tema oscuro, y 1366×768 en tema claro, sin desbordes): tablero con «Activación comercial», canal propio, embudo, «Clientes que vuelven» (estado vacío) y «Tu mes en el sistema»; materiales con QR y textos; reporte imprimible; «Salud de uso»; interruptor (apagar oculta los tres bloques, encender los devuelve); y campo de celular y casilla de consentimiento en el POS. **Falta:** la cola con un contacto real (la demo no tiene clientes con consentimiento), la caja con beneficios y la factura (la demo tiene la fidelización apagada), la casilla de la tienda online (ver más abajo) y el tema claro en celular.
+- [x] Tienda online reconstruida (31/10/2026): `app/static/tienda_dist` regenerado con `vite build`; el paquete nuevo incluye la casilla de consentimiento (`acepta_mensajes`) y también lo compilado de «venta por peso» (commit 3286a2a), que tampoco estaba en el paquete anterior. 58 pruebas de tienda en verde. **Falta desplegarlo** y comprobar en la tienda pública que la casilla aparece en el pedido; la demo sirvió un paquete distinto (`index-hn0zjAZ7`) del que había en el repo, así que conviene confirmar cómo se despliega la tienda.
+- [x] Canje y anulación de beneficios verificados en la demo del servidor (31/10/2026, `demogastronomia.pysystems.online`, por los mismos endpoints que usa la pantalla): con la fidelización activada (1 compra, 10% de descuento), un cliente por celular ganó el beneficio al cobrar, la caja lo ofreció con el descuento estimado (₲ 3.500), el cobro lo aplicó y lo consumió (dejó de ofrecerse), y al anular esa venta volvió a estar disponible mientras el beneficio ganado por la venta anulada se retiró. **Falta:** hacerlo a clics en la pantalla de caja y con factura. Queda en la demo la fidelización activa y un cliente de prueba (celular 0981555101).
+- [x] Interruptor del BI y reporte verificados en la demo del servidor: apagado deja solo Resumen y Menú y ritmo, encendido devuelve las cinco; el reporte imprimible responde y coincide con el tablero (el BI cuenta todo pedido no cancelado, aunque aún no esté cobrado; el Resumen cuenta cobrados).
+- [x] Tienda online verificada en la demo del servidor (31/10/2026): tras restaurar en el servidor `app/static/tienda_dist/index.html` (estaba borrado en su copia local; `git checkout origin/main -- app/static/tienda_dist/index.html`) la tienda carga. En el pedido aparece la casilla «Acepto recibir mensajes de … por WhatsApp», desmarcada por defecto; un pedido real (#313, celular 0981555202, casilla marcada) quedó con el consentimiento registrado. Nota de despliegue: el servidor tenía archivos de un build propio sin seguimiento en `tienda_dist/assets` (`index-hn0zjAZ7.js` y otros), de antes de la reconstrucción; conviene dejar de compilar en el servidor o limpiarlos.
+- [ ] Cola de mensajes con un contacto real: en la demo no hay otros clientes identificados con consentimiento, y la ventana de «segunda compra» exige al menos 1 día (rango 1–60), así que los clientes de prueba de hoy (0981555101 y 0981555202, ambos con consentimiento) deberían aparecer a partir del 01/11/2026. La ventana quedó en 1–15 días.
+- [x] Interruptor por instalación (`interruptor.py`, botón en «Salud de uso», solo root): apagado oculta Crecer, Clientes que vuelven y Tu mes en el sistema sin borrar datos. Por defecto está encendido; para un piloto exclusivo, apagarlo en las demás instalaciones.
+- [x] Decidido (31/10/2026): el piloto se entrega con sub-pestañas dentro de Gastronomía (Resumen, Crecer, Clientes, Menú y ritmo, Resultados), no apilado (ver sección 3). La vista «Tu negocio» queda para la fase 4. Revisión de código y pruebas hecha: 320 pruebas de gastronomía en verde (42 omitidas por requerir MariaDB aislada).
+- [x] Sub-pestañas verificadas en el navegador (31/10/2026, ventana angosta y tema oscuro, base de demo): cinco chips con contador en Crecer, un solo panel visible por chip, sin desborde horizontal, y la última abierta se recuerda al recargar (`localStorage`). **Limitación encontrada:** el sistema de pestañas del tablero (`layout/tab_runtime_js_part1.html`, `normalizeKey`) carga las páginas como parciales y descarta el `#gastro-<nombre>`, así que el ancla de las redirecciones no se aplica dentro del tablero; sí funciona abriendo la URL completa fuera de él. En la práctica vuelve a la misma sub-pestaña por el recuerdo, porque la acción se hizo desde ella. **Falta:** tema claro en celular, el interruptor apagado (solo Resumen y Menú y ritmo) y comprobar una acción real de la cola o la comisión.
+
+### Después del cierre
+
+- Piloto: una instalación con pocas ventas y otra con más, con línea base y acompañamiento la primera semana (sección 14).
+- Con los resultados, **BI-06: fase 4, tres acciones para hoy con seguimiento.** Contrato común de oportunidad, persistencia con identificador estable, estados con transiciones validadas y la pestaña «Hoy» con hasta tres acciones. Empezar por activación pendiente, cola de mensajes y caída de pedidos.
+- Fuera del MVP: link de reseña, exportación de contactos, envío de la salud de uso al proveedor (requiere autorización del cliente) y los dos puntos del reporte que dependen de la fase 4.
 
 Actualizar este documento al cerrar cada entrega con alcance real, pruebas realizadas, limitaciones y siguiente paso. Marcar una casilla como terminada únicamente cuando la implementación y sus criterios de aceptación estén verificados.
+
+## 18. Registro de entregas
+
+### Auditoría de la fase 0 (31/10/2026)
+
+Se ejecutó sobre la base local de desarrollo (`inventario.db`, abierta en solo lectura), no sobre una instalación real. Sirve para detectar problemas de datos y fijar el método; los porcentajes reales salen del piloto.
+
+**Cobertura de identificación (pedidos válidos: 14, del 24/05 al 08/06/2026)**
+
+| Origen y modalidad | Pedidos | Identificados | Celular inválido |
+| --- | --- | --- | --- |
+| POS, mostrador | 10 | 0 | 0 |
+| POS, mesa | 1 | 0 | 0 |
+| POS, delivery | 1 | 1 | 0 |
+| Tienda, delivery | 1 | 1 | 0 |
+| Tienda, retiro | 1 | 1 | 0 |
+
+- La muestra es muy pequeña. Solo se identifican los pedidos con delivery, retiro o tienda, donde el celular es obligatorio. En mostrador y mesa no se identificó ninguno. Esto confirma la brecha que ataca el campo de teléfono del POS (BI-04).
+
+**Identidad en la ficha de clientes (183 fichas sin contar consumidor final; 177 con teléfono)**
+
+- 3 celulares repetidos en 6 fichas: `+595981693161` (fichas 2 y 136), `+595976775769` (10 y 88) y `+595982909192` (54 y 151). Son personas o negocios con nombres distintos y el mismo celular. Por la regla de BI-05c, ninguna se asigna sola; el dueño decide.
+- 2 teléfonos que no normalizan: `+549112602-5132` (largo inválido) y `NO SABE`.
+- Ningún nombre de cliente se repite, así que agrupar por nombre no habría producido fusiones falsas en esta base, pero tampoco reconocería a las fichas con celular repetido.
+
+**Zona horaria y días de apertura**
+
+- Zona horaria: `America/Asuncion`, configurable con `APP_TIMEZONE`. Los rangos de fechas del BI usan `utc_bounds_for_local_dates`, que la respeta.
+- Días de apertura: no hay configuración estructurada. La tienda guarda un texto libre (`texto_horarios`). Hasta definirla, ningún análisis puede saber si un día sin pedidos fue un día cerrado. Es requisito de la fase 6.
+
+**Escenarios ficticios** (`test_gastronomia_bi_escenarios.py`, 3 pruebas en verde)
+
+- Negocio nuevo: sin pedidos, cobertura «sin datos» (no 0 %), sin semanas, sin historial y sin romper el bloque.
+- Comida rápida con delivery: separa canal propio y PedidosYa, deja fuera cancelados, cuenta el celular mal formado como inválido y calcula 40 % de cobertura.
+- Cafetería de mostrador: 5 pedidos sin celular dan cobertura 0 %, distinta de «sin datos», y la cola queda vacía.
+
+**Pendiente**
+
+- Correr la medición y el script de duplicados en cada instalación del piloto.
+- Definir los días de apertura antes de la fase 6.
+
+### BI-01 — núcleo implementado (31/10/2026)
+
+**Alcance real**
+
+- Fase 0 (código): clasificación de pedidos y canales en `gastronomia/services/bi/pedidos_validos.py`; identidad por teléfono en `identidad.py`; cobertura por canal.
+  - Valores confirmados en código: `origen_pedido` ∈ {`pos`, `tienda_online`, `importado`}; `canal_precio`, que vive en el ítem y no en el pedido, ∈ {`pedidosya`, `monchis`, nulo}.
+  - Exclusiones: cancelados, importados y encargos. No hay devoluciones como estado: una anulación pasa a `cancelado`.
+  - Teléfono/WhatsApp no es un origen propio: el pedido entra como `pos` con el teléfono cargado.
+- Fase 1 parcial:
+  - Lista de activación (`activacion.py`): pasos automáticos (platos, tienda, fotos, precios, horario) y pasos manuales (QR impreso, bio de Instagram, estado de WhatsApp) que confirma el dueño. Se guardan en `Configuracion` con la clave incluyendo el `id_cliente`.
+  - Indicadores de canal propio frente a plataformas por semana, y cobertura de identidad por canal (`canales.py`).
+- Presentación: bloque «Crecer» en el tab Gastronomía (`_crecer.html`, incluido desde `_tab_gastronomia.html`). Se calcula dentro de `obtener_inteligencia_gastronomia` con degradación segura (`crecer.py`). Ruta nueva `POST /gastronomia/bi/activacion/<paso>` con permiso `gastronomia_menu` y CSRF.
+
+**Pruebas**
+
+- `test_gastronomia_bi_fase0.py`: 11 pruebas nuevas, todas en verde. Cubren clasificación, exclusiones, pedido con varios ítems, identidad por teléfono sin mezclar nombres, cobertura nula, semanas, activación de negocio nuevo, detección de fotos y precios, aislamiento de pasos manuales por cliente, integración con el dashboard y el POST, y degradación del bloque.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 303 pasaron y 42 se omitieron. Las omitidas son las de MariaDB de `test_gastronomia_sugerencias_mysql.py`, que requieren `scripts/probar_sugerencias_mysql.py`.
+- No verificado visualmente en navegador (layout, tema oscuro, celular). Solo se comprobó el HTML renderizado en las pruebas.
+
+**Limitaciones y pendiente**
+
+- Sin medición sobre datos reales: la cobertura actual de cada instalación queda para el piloto.
+- `inteligencia_clientes.py` (frecuentes) todavía agrupa por nombre cuando no hay teléfono. Es una brecha ya registrada en la sección 2; el código nuevo no lo hace.
+- Fuera de BI-01: comisión evitada (requiere porcentaje configurado), materiales (QR, textos de bio y de estado), mensaje de bienvenida, campo de teléfono en el POS, consentimiento, embudo de la tienda, y la vista «Tu negocio» con pestañas. Por ahora el bloque vive en el tab Gastronomía del tablero.
+- Días de apertura: no encontré configuración de días de apertura en el código; sigue sin confirmar.
+- Permisos: no hay prueba de que un usuario sin `gastronomia_menu` reciba rechazo en el POST.
+
+**Siguiente paso**
+
+- Cerrar BI-01 con medición en datos reales del piloto y los materiales de activación. Después, BI-02: cola de envío asistido.
+
+### BI-02 — cola de envío asistido (31/10/2026)
+
+**Alcance real**
+
+- Historial amplio por teléfono (`gastronomia/services/bi/historial.py`): pedidos válidos sin límite de periodo. Nunca agrupa por nombre. Un pedido sin teléfono válido usa el del cliente final.
+- Segmentos (`segmentos.py`):
+  - Segunda compra: una sola fecha de compra, entre `segunda_min` y `segunda_max` días.
+  - Habitual ausente: 3 o más fechas de compra, y más días sin comprar que su intervalo mediano, con tope de 120 días.
+  - Las fechas se cuentan por día: dos pedidos el mismo día cuentan como uno.
+- Cola (`cola.py`, `cola_acciones.py`): un contacto a la vez. Cada acción vuelve a validar el contacto contra la cola actual. Límite diario (por defecto 20) y frecuencia máxima por cliente (por defecto 14 días). «No quiere mensajes» saca el teléfono de todas las colas. Abrir WhatsApp registra la apertura y no marca el mensaje como enviado.
+- Plantillas (`plantillas.py`, `cola_config.py`): una por segmento, editables, con `{nombre}`, `{plato}`, `{negocio}` y `{link}`. No incluyen descuento. El enlace `wa.me` es compartido (`whatsapp.py`); `whatsapp_pedido_url` lo usa ahora, con la misma salida.
+- Atribución (`retorno.py`): compras posteriores al envío marcado, dentro de una ventana cerrada (15 días para segunda compra, 30 para habitual ausente), excluyendo anulados. El texto dice «volvió después del mensaje», sin afirmar causa.
+- Telemetría (`gastronomia/bi_models.py`): eventos `whatsapp_abierto`, `mensaje_enviado`, `mensaje_omitido` y `no_contactar`. Las vistas no se registran, porque requerirían una escritura en cada carga del tablero.
+- Modelos nuevos, todos aditivos y creados por `create_all()`: contactos de la cola, no-contactar y eventos.
+- Presentación: tarjeta «Clientes que vuelven» en el tab Gastronomía. Los formularios son POST con CSRF y el permiso `gastronomia_menu`. «Abrir WhatsApp» abre en una pestaña nueva.
+
+**Pruebas**
+
+- `test_gastronomia_bi_cola.py`: 15 pruebas nuevas, en verde. Cubren reglas de segmentos, historial fuera de periodo y homónimos, habitual ausente fuera de periodo, «no quiere mensajes», abrir sin marcar enviado, límite diario, omitidos, frecuencia, atribución con anulados, configuración fuera de rango, plantilla sin tienda, enlace `wa.me`, acciones y configuración por POST, y degradación del bloque.
+- Con BI-01 suman 26 pruebas en verde.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 318 pasaron y 42 se omitieron (las de MariaDB).
+
+**Decisiones**
+
+- Deduplicación por cliente, teléfono, segmento y último pedido. Una compra nueva crea un contacto nuevo; un envío o un descarte no se repite para el mismo último pedido.
+- Valores por defecto configurables en la tarjeta: 20 mensajes por día, 14 días de frecuencia y segunda compra entre 5 y 15 días.
+- Constantes, no configurables: tope de ausencia de 120 días y ventanas de atribución de 15 y 30 días.
+
+**Limitaciones y pendiente**
+
+- Sin verificar en navegador: el formulario con `target="_blank"` que abre WhatsApp, y el layout en celular y tema oscuro.
+- El historial completo se recalcula en cada carga del tablero. Con historiales grandes conviene caché o carga por pestaña (fase 4 del roadmap).
+- Sin link de reseña, sin exportación de contactos y sin segmento «favorito disponible». Los dos primeros son opcionales en la fase 2; el tercero no está en el alcance de BI-02.
+- El estado vacío («sin clientes con teléfono») no tiene prueba propia.
+- No hay prueba de rechazo para un usuario sin `gastronomia_menu` en las acciones.
+- Sin medición con datos reales.
+
+**Siguiente paso**
+
+- Verificar la tarjeta y el formulario en navegador. Después, piloto con una instalación real.
+
+### BI-03 — reporte de valor del mes (31/10/2026)
+
+**Alcance real**
+
+- Fase 3, primera parte: bloque «Tu mes en el sistema» en el tab Gastronomía (`_reporte_valor.html`), con el mes en curso hasta hoy y la comparación con los mismos días del mes anterior (`reporte_valor.py`).
+  - Pedidos y ventas por canal propio, plataformas y desconocido. Pedidos válidos por fecha del pedido, con el total del pedido.
+  - Clientes nuevos identificados: teléfonos cuya primera compra válida cae en el mes. No se agrupa por nombre.
+  - Mensajes de vuelta: envíos del mes de la cola de BI-02. «Volvieron» solo con ventana cerrada.
+  - Acompañamientos aceptados del sugeridor existente, con el importe de los renglones aceptados.
+  - Cobertura de pedidos identificados por teléfono del mes.
+- Fase 1, comisión evitada: porcentaje por plataforma en el mismo bloque (`comision.py`, `POST /gastronomia/bi/comision`, permiso `gastronomia_menu`, CSRF). Sin porcentaje no se muestra nada. Es una estimación: ventas de la plataforma × porcentaje.
+- Reutilización: `retorno.py` separa el conteo por rango en `resumen_envios` y el resumen de BI-02 lo usa sin cambiar. `canales.py` suma ventas y desglose por plataforma. `pedidos_validos.py` agrega el total a cada fila. `medicion.py` (sugeridor) agrega `importe`. Todos cambios aditivos.
+
+**Pruebas**
+
+- `test_gastronomia_bi_reporte.py`: 11 pruebas nuevas, en verde. Cubren periodos equivalentes, variación sin base previa, canal propio frente a apps con cancelados excluidos, clientes nuevos por teléfono con homónimos separados, mensajes (cerrados, volvieron, en observación y fuera del mes), comisión solo con porcentaje, rechazo de valores inválidos sin guardar nada, reporte sin pedidos, degradación del bloque, render del tab con datos y POST.
+- `test_gastronomia_sugerencias_medicion.py`: aserción del importe de los renglones aceptados.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 329 pasaron y 42 se omitieron (las de MariaDB).
+
+**Decisiones**
+
+- Ventas por fecha del pedido, no por fecha de cobro. El panel de Gastronomía usa el cobro (`GastronomiaPedidoPago`), así que en un mismo mes el total del reporte puede diferir de «Ventas» del panel. Se mantiene la fecha del pedido porque coincide con los indicadores de canal de BI-01 y con la definición de pedido válido de la fase 0. Está rotulado en el bloque.
+- Acompañamientos por fecha de cobro, como su medición original. También rotulado.
+- Mes sin base en el período anterior: se muestra «sin base», nunca 0 %.
+- Importados (verificado en la demo, 31/10/2026): el panel cuenta las ventas importadas desde un archivo (252 pedidos, ₲ 8.628.000) y el BI las excluye por definición de pedido válido (6 pedidos, ₲ 255.000). La diferencia coincide exacta con una importación aplicada de 246 pedidos y ₲ 8.373.000. El reporte, en el tablero y en la versión imprimible, informa ahora cuántos pedidos importados no incluye y su monto, para poder conciliar ambas cifras.
+
+**Limitaciones y pendiente**
+
+- Sin descarga ni versión imprimible. Sin acciones completadas (fase 4) ni «Si el mes fue malo, proponer acciones» (depende de la fase 4). Sin panel de salud de uso (fase 3, segunda parte).
+- La comparación es mensual; no hay serie semanal de ventas.
+- Pendiente decidir si «Ventas» del reporte debe usar cobro para igualar el panel.
+- `historial_clientes` se calcula varias veces por carga (cola, mensajes y clientes nuevos). Conviene una caché junto con la de BI-02.
+- No verificado visualmente en navegador (layout, celular, tema oscuro). Pendiente junto con la tarjeta de BI-02.
+- Permisos: no hay prueba de rechazo para un usuario sin `gastronomia_menu` en el POST, igual que en BI-02.
+- Sin medición con datos reales.
+
+**Siguiente paso**
+
+- Verificar en navegador BI-02 y BI-03. Después, BI-04 (resto de la fase 1 y salud de uso).
+
+### BI-04 — resto de la fase 1: materiales, consentimiento, POS y embudo (31/10/2026)
+
+**Alcance real**
+
+- Materiales de activación (`materiales.py`), dentro de la lista de activación: enlace público de la tienda, QR en SVG descargable (imprimible como SVG), texto para la bio de Instagram y texto para el estado de WhatsApp. Sin tienda activa o sin URL pública no se muestran.
+- Teléfono y consentimiento en el POS: el celular queda visible en mostrador, retiro y delivery (opcional, salvo delivery), con la casilla «El cliente acepta recibir mensajes del negocio». `pos_consentimiento.js` (nuevo) envía el consentimiento al guardar el pedido con `POST /api/gastronomia/bi/consentimiento` (permiso `gastronomia_pos`). Si falla, el pedido guardado no cambia.
+- Consentimiento (`consentimiento.py`, tabla `gastronomia_bi_consentimientos`, aditiva): la cola de BI-02 solo contacta a teléfonos con consentimiento registrado (estado `acepta`). Cada pedido guardado con celular informa el resultado de la casilla. Si el celular no tiene consentimiento y la casilla no estaba marcada, queda como `sin_marcar`: el POS lo avisa en su caja de alerta y el tablero cuenta los celulares pendientes. Si nadie consintió, el bloque lo explica.
+- Embudo de la tienda (`embudo.py`, tabla `gastronomia_tienda_visitas`): el detalle público de cada plato registra una visita con hash de cliente, plato, IP y navegador; no se guarda la IP. El bloque «Tienda online: de la visita al pedido» muestra visitantes, visitas, pedidos web y los platos que miran pero no piden (al menos 5 visitantes y menos de 0,1 pedidos web por visitante). Ventana de 30 días.
+
+**Decisiones**
+
+- Embudo en tabla propia, no en `TiendaVisitaEvento`. Esa tabla apunta a `productos` (insumos), no a `gastronomia_productos`. Además, el detalle gastronómico salía antes de registrar visitas, así que no había datos. El cambio en la API de la tienda son 4 líneas que llaman al servicio.
+- El consentimiento es requisito para la cola, como fija el plan. Consecuencia: hasta que el POS registre consentimientos, la cola de BI-02 queda vacía. El bloque lo indica en vez de mostrar un estado vacío genérico.
+- Desmarcar la casilla no revoca nada. La baja sigue siendo «no quiere mensajes».
+- La casilla se desmarca al cambiar el tipo de pedido, al limpiar y al cargar un pedido, para que un consentimiento no pase al cliente siguiente.
+- Casilla olvidada: el sistema no marca nada por defecto. Si se guarda un celular sin casilla y el cliente no tiene consentimiento, se avisa en el POS y queda pendiente en el tablero («Celulares cargados sin la casilla de consentimiento marcada»). El aviso no bloquea el cobro.
+
+**Pruebas**
+
+- `test_gastronomia_bi_consentimiento.py` (11), `test_gastronomia_bi_materiales.py` (4) y `test_gastronomia_bi_embudo.py` (5): 20 pruebas nuevas, en verde. Cubren el estado `sin_marcar`, que desmarcar no revoca, el conteo pendiente en el tablero y la API con y sin casilla.
+- `test_gastronomia_bi_cola.py`: sus helpers registran consentimiento para los contactos que espera la cola. Las 15 pruebas siguen en verde.
+- `pos_consentimiento.js`, probado en Node con un DOM simulado: no envía sin celular, envía `acepta` según la casilla con el token CSRF, avisa en el POS cuando la casilla quedó sin marcar, y muestra el rechazo del servidor y el error de red. Ese script está en el scratchpad y no en el repo.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 349 pasaron y 42 se omitieron (las de MariaDB).
+- Navegador: no verificado. El panel de navegador bloqueó la navegación a `localhost`, también para BI-02 y BI-03.
+
+**Limitaciones y pendiente**
+
+- El consentimiento no se registra en el checkout de la tienda online. Requiere cambiar `tienda_online/` consumiendo la API. Por ahora, los clientes que solo compraron en la tienda no entran en la cola.
+- ~~El texto sugerido del POS no está vinculado a la fidelización todavía.~~ Resuelto en BI-05b/BI-05c.
+- `gastronomia/static/js/pos.js` quedó en 600 líneas, en el límite. El próximo cambio en el POS debe separar código.
+- `app/routes/tienda_api.py` ya tenía 1458 líneas antes de este cambio, por encima del límite de 600. No se agregó lógica ahí, solo la llamada.
+- Sin panel de salud de uso (fase 3, segunda parte).
+- Sin medición con datos reales.
+
+**Siguiente paso**
+
+- Verificar en navegador BI-02, BI-03 y BI-04. Después, BI-05.
+
+### BI-05 — salud de uso, consentimiento en la tienda y telemetría (31/10/2026)
+
+**Alcance real**
+
+- Fase 3, segunda parte: panel «Salud de uso» solo para root (`GET /gastronomia/bi/salud-uso`, plantilla `gastronomia/bi_salud_uso.html`). El enlace aparece en el tab Gastronomía solo a root. Cada instalación ve solo sus datos.
+  - Cálculo en `gastronomia/services/bi/salud_uso.py`: último pedido (POS y tienda por separado), última acción en el BI, activación completada, cola (contactos pendientes y último contacto), pedidos por semana de las últimas 6 semanas y funciones usadas.
+  - Funciones usadas en `salud_funciones.py`: pedidos en el POS, teléfono en pedidos, pedidos de tienda, consentimiento en el POS, cola, activación, comisión y configuración de la cola. Cada una se marca «sin usar» si no hay rastro.
+- Semáforo con reglas explícitas, documentadas en el módulo y en la misma página: **activo** (pedido válido en 7 días y acción en el BI en 30), **inactivo** (sin pedidos o último de más de 14 días), **en riesgo** (el resto).
+- Telemetría (`gastronomia/services/bi/telemetria.py`): cambiar la activación, las comisiones o la configuración de la cola deja un evento. La cola usa ahora ese mismo registro; se quitó su copia privada en `cola_acciones.py`. Las vistas siguen sin registrarse.
+- Consentimiento en el checkout de la tienda online: casilla sin marcar en `tienda_online/src/components/ui/GastronomiaOrderPanel.jsx`. Si el cliente la marca, `POST /api/tienda/<slug>/gastronomia/pedido` recibe `acepta_mensajes: true` y registra la aceptación (`app/routes/tienda_gastronomia_api.py`). Sin marcar no queda nada registrado. Solo el valor `true` exacto cuenta.
+
+**Decisiones**
+
+- «Último uso del BI» cuenta acciones que cambian datos, no vistas. Registrar cada carga del tablero escribiría en la base.
+- El semáforo usa pedidos de cualquier canal, no solo POS. Así una instalación que opera por tienda no aparece como inactiva. Los números por canal se muestran aparte.
+- **Fidelización no se vinculó al texto del POS.** Se verificó que el programa solo suma a ventas con cliente registrado: `clientes_fidelizacion_sincronizacion.py` excluye el consumidor final (id 1) y los pedidos sin factura a un cliente registrado caen en ese consumidor. Decir «con tu número sumás para tu beneficio» sería una promesa falsa. Resuelto después en BI-05b a BI-05d (ver sección 16).
+- El sugeridor del POS no entra en «funciones usadas»: su medición es de exposición, no de uso.
+- El acceso de root usa `es_usuario_root` (`app/services/ia_backoffice/security.py`), la misma regla del asistente IA.
+- La tienda no importa código del backoffice: la lógica de consentimiento vive en `gastronomia/services/bi/consentimiento.py` y la API solo la llama.
+
+**Pruebas**
+
+- `test_gastronomia_bi_salud.py` (12): semáforo por reglas, negocio nuevo, pedido activo, en riesgo, inactivo con motivo, telemetría de cambios, cola sin atender, tendencia de 6 semanas, aislamiento entre instalaciones, 403 a un admin del negocio, enlace solo a root, render con datos.
+- `test_gastronomia_bi_consentimiento_tienda.py` (3): aceptación registra, sin aceptación no deja nada (incluido `'true'` como valor no válido), aceptación resuelve un pendiente del POS.
+- Suites `test_gastronomia_*`, `test_inteligencia_*` y `test_tienda_*`: 364 pasaron y 42 se omitieron (las de MariaDB). Antes de esta entrega eran 349.
+- `tienda_online` compila con `vite build` (salida en el scratchpad, no en el repo).
+- Navegador: no verificado.
+
+**Limitaciones y pendiente**
+
+- Sin verificar en navegador: el panel, el enlace del tablero, la casilla de la tienda, el tema oscuro y el celular. Queda junto con BI-02 a BI-04.
+- Las acciones anteriores a esta entrega no tienen evento. Una instalación que solo usó el BI antes figura «sin acciones» hasta la próxima.
+- Sin vínculo con la fidelización (ver decisiones).
+- El envío de la salud de uso fuera de la instalación no está implementado: requiere autorización del cliente.
+- Corrección posterior: `app/static/tienda_dist` sí está en el repo, pero no se regeneró; la casilla de la tienda no está en el paquete publicado (ver sección 17).
+
+**Siguiente paso**
+
+- Verificar en navegador BI-02 a BI-05. Después, BI-06: fase 4, tres acciones para hoy con seguimiento.
+
+### BI-05b — adaptador de fidelización por teléfono (31/10/2026)
+
+**Alcance real**
+
+- Cobro de gastronomía (`gastronomia/services/caja_service.py`): si el cajero no eligió cliente para la factura y no se pide factura electrónica, la venta se asigna al cliente registrado cuyo teléfono coincide con el celular del pedido. Si la asignación ocurre, la compra se registra al cobrar con `registrar_compra_fidelizacion_por_venta`, como en el POS de ventas. Anular la venta revierte la compra por el camino que ya existía.
+- Lógica en `gastronomia/services/fidelizacion_telefono.py`:
+  - Actúa solo con la fidelización activa.
+  - Nunca crea clientes: usa solo los que ya existen.
+  - Un teléfono que coincide con más de un cliente no asigna nada. No se mezclan personas.
+  - El consumidor final (id 1) y los clientes inactivos no se asignan.
+  - La comparación usa la normalización de identidad del BI; el filtro SQL solo reduce candidatos.
+- POS (`gastronomia/templates/gastronomia/pos.html`, ruta `pos_routes.py`): con fidelización activa aparece «Si ya es cliente registrado, cada compra con su número suma para la fidelización». La frase «sumás para tu beneficio» no se usa, porque en gastronomía no se canjean beneficios todavía.
+
+**Decisiones**
+
+- Match-only en esta entrega: no se crean clientes desde el celular. La creación se decidió después y se registra en BI-05c.
+- Factura primero: un cliente elegido para la factura siempre gana sobre el teléfono. La factura electrónica no usa el adaptador, así que el comprobante nunca se emite a un cliente que no lo pidió.
+- Los nombres no intervienen en la asignación.
+- El nombre «BI-06» queda reservado para la fase 4, y este adaptador se registra como BI-05b.
+
+**Pruebas**
+
+- `test_gastronomia_fidelizacion_telefono.py` (8): cobro real que asigna y suma la compra, consumidor final sin registro, factura al cliente elegido con prioridad, fidelización apagada, teléfono compartido por dos clientes, normalización y clientes inactivos, anulación que revierte la compra, frase del POS solo con fidelización activa.
+- Suites `test_gastronomia_*`, `test_inteligencia_*`, `test_tienda_*` y `test_clientes_fidelizacion.py`: 384 pasaron y 42 se omitieron (las de MariaDB). Antes de este cambio eran 364.
+- Navegador: no verificado.
+
+**Limitaciones y pendiente**
+
+- Cobertura: solo cuentan los pedidos cuyo celular ya está registrado como cliente. Para la mayoría de los clientes finales, la frase del POS no garantiza que la compra sume. Superado por BI-05c.
+- Sin canje de beneficios en la caja de gastronomía. Los puntos se acumulan pero no se gastan ahí.
+- Los pedidos de la tienda online también pasan por el mismo cobro de caja, así que el adaptador los alcanza igual que a los del POS, siempre que su celular coincida con un cliente registrado.
+
+**Siguiente paso**
+
+- Ver BI-05c y BI-05d: la creación de fichas, la unicidad por celular, el RUC y el canje en caja se resolvieron después de esta entrega.
+
+### BI-05c — creación de ficha de cliente desde el celular (31/10/2026)
+
+**Alcance real**
+
+- Con fidelización activa, si el celular del pedido es válido y ninguna ficha coincide, el cobro crea una ficha de cliente minorista activa (`gastronomia/services/fidelizacion_telefono.py`, `resolver_cliente_fidelizacion`). El nombre sale del pedido, o de la referencia de entrega, o del propio teléfono como último recurso.
+- La ficha se crea con `flush` dentro del cobro: si el cobro falla antes de confirmarse, la ficha se revierte con él.
+- La búsqueda compara el celular normalizado contra todas las fichas, activas o no. Con dos o más coincidencias, o con una sola inactiva, no se asigna ni se crea nada.
+- Con factura electrónica no se crea ni se asigna.
+- POS: la frase queda en «Con un celular válido, cada compra suma para la fidelización», solo con fidelización activa.
+
+**Decisiones**
+
+- Crear solo con fidelización activa: sin el programa no hay razón para cargar fichas en la tabla de clientes.
+- La ficha queda sin RUC/CI. Para facturar después, el cajero la completa desde el flujo de factura. No se reutiliza `obtener_o_crear_cliente_factura`: hace commit en su propia transacción y busca por RUC, así que dentro del cobro rompería la reversión.
+- Se guarda el celular normalizado (`+595…`), para que cualquier formato que se cargue después coincida con la ficha.
+- Anular la venta no borra la ficha. Solo revierte la compra.
+
+**Pruebas**
+
+- `test_gastronomia_fidelizacion_telefono.py`: 11 pruebas en verde (antes 8). Cubren la creación con el nombre del pedido, la reutilización de la ficha con otro formato de celular, la anulación, la factura que tiene prioridad, la fidelización apagada, los homónimos, la ficha inactiva que evita un duplicado, la normalización y la factura electrónica.
+- Regresión ampliada: `test_gastronomia_*`, `test_inteligencia_*`, `test_tienda_*`, `test_clientes_*`, `test_caja_*` y `test_ventas_*`: 497 pasaron y 42 se omitieron (las de MariaDB). Ese conjunto es más amplio que el de BI-05b (384), así que los números no son comparables.
+- Navegador: no verificado.
+
+**Limitaciones y pendiente**
+
+- ~~Carrera: dos cobros simultáneos con un celular nuevo podrían crear dos fichas.~~ Corregido en BI-05d con una tabla de fichas por celular y clave única.
+- ~~Las fichas creadas no tienen RUC/CI.~~ Corregido en BI-05d: la factura completa el RUC de la ficha del pedido.
+- ~~Sin canje de beneficios en la caja de gastronomía.~~ Corregido en BI-05d.
+
+**Siguiente paso**
+
+- Ver BI-05d.
+
+### BI-05d — correcciones de la ficha por celular y canje en caja (31/10/2026)
+
+**Alcance real**
+
+- Unicidad por celular: nueva tabla `gastronomia_bi_fichas_telefono` (`gastronomia/bi_models.py`), con clave única por instalación y celular normalizado. Al crear una ficha se guarda esa fila; si otro cobro la guardó primero, el segundo falla al confirmar, se revierte y pide volver a cobrar (`MSG_CARRERA`). En el reintento, la ficha ya está registrada y se usa. Las fichas creadas antes de esta entrega no tienen fila: se siguen buscando por celular.
+- RUC de la ficha: el alta de cliente para factura recibe el `pedido_id` que se está cobrando. Si el celular del pedido tiene una ficha activa sin RUC y ningún otro cliente tiene ese RUC, se completa esa ficha (RUC y nombre) en vez de crear otro cliente. Sin `pedido_id`, el comportamiento es el de antes.
+- Canje de beneficios en la caja de gastronomía:
+  - `GET /api/gastronomia/caja/pedidos/<id>/beneficios` lista los beneficios aplicables del cliente de la venta, con el descuento estimado según el descuento y el envío que haya en la pantalla.
+  - El cobro acepta `beneficio_fidelizacion_id`. Calcula el descuento con `resolver_descuento_beneficio_pos`, lo suma al descuento de la venta (`descuento_fidelizacion_monto`) y registra el canje con `registrar_canje_beneficio_en_venta`. Si no hay cliente registrado, rechaza el cobro sin cobrar nada.
+  - La caja muestra un selector «Beneficio de fidelizacion» solo cuando hay beneficios, y la vista previa del total lo descuenta. El cobro recalcula todo: la vista previa es una estimación.
+- Corrección en la lógica de fidelización compartida (`app/services/clientes_fidelizacion_politica.py`): anular una venta devolvía el saldo del canje, pero el beneficio seguía apareciendo como consumido y no se podía volver a usar. Ahora `beneficio_consumido` ignora los canjes anulados. Afecta también al POS de ventas, que usa la misma función.
+
+**Decisiones**
+
+- El orden del cobro cambió: el cliente de la venta se resuelve antes de reservar el pago, para que el descuento del beneficio entre en el pago. Si el cobro falla, la reserva del pago y la ficha se revierten juntas.
+- El canje solo se aplica a beneficios de tipo porcentaje o monto fijo, los mismos que el POS de ventas.
+- La vista previa usa el endpoint de beneficios, que también ejecuta `sincronizar_beneficios_vencidos` (la misma llamada que el POS). Es una escritura pequeña dentro de una consulta.
+
+**Pruebas**
+
+- `test_gastronomia_fidelizacion_telefono.py`: 17 pruebas en verde. Cubren la carrera (con simulación de la ficha no visible), la ficha ya registrada, el RUC completado sin duplicar, el alta de factura sin pedido, el canje estimado y descontado, la anulación que devuelve el beneficio, el rechazo sin cliente registrado, y las reglas anteriores.
+- `test_gastronomia_caja.py`: su doble de prueba de la venta ahora acepta `descuento_beneficio`. 14 pruebas en verde.
+- Regresión (corrida completa antes de corregir el doble de caja): 531 pasaron, 1 falló y 42 se omitieron (MariaDB), en gastronomía, inteligencia, tienda, clientes, caja, ventas, y los tests de fidelización del asistente y de tienda. La falla era el doble de caja de `test_caja_reserva_pago_antes_de_crear_venta_central`; después de corregirlo, el archivo `test_gastronomia_caja.py` pasa completo (14). La corrida se repitió después con `test_gastronomia_*`, `test_inteligencia_*`, `test_tienda_*`, `test_clientes_*`, `test_caja_*` y `test_ventas_*`: 503 pasaron y 42 se omitieron, sin fallas (no incluye los tests de fidelización del asistente).
+- JS: `caja.js` y `caja_factura.js` pasan `node --check`.
+- Flujo por HTTP sobre una base de prueba sembrada con datos ficticios: 9 comprobaciones en verde. Cubren la lista de beneficios con el descuento estimado (3000, y 2500 con un descuento manual de 5000), el cobro con canje (total 27000), que el beneficio canjeado deja de aparecer, el alta de factura con RUC que completa la ficha sin crear otro cliente, y el RUC y el nombre guardados.
+- Corrección posterior: la caja oculta los beneficios si la venta se factura a un cliente elegido o con factura electrónica (el cobro usa entonces ese cliente y no la ficha del celular). La ficha completada con RUC conserva su nombre salvo que fuera el celular de relleno. Pruebas: 31 en verde (telefono + caja); regresión amplia: 503 pasaron y 42 se omitieron.
+- Navegador: no verificado en pantalla. El navegador integrado no abre `localhost` ni `127.0.0.1` en esta sesión, así que el selector, la vista previa y el formulario de factura no se probaron visualmente.
+
+**Limitaciones y pendiente**
+
+- Las fichas anteriores a esta entrega no tienen fila por celular. `scripts/auditar_fichas_telefono.py <cliente_id>` (`fidelizacion_auditoria.py`) registra la fila de cada celular con una sola ficha y lista los repetidos, que nunca se asignan solos y los resuelve el dueño. Hay que ejecutarlo una vez por instalación; `--solo-listar` no escribe.
+- Alcance: BI-05b a BI-05d salieron del roadmap original. Se cierran aquí; no se amplía la fidelización de la caja salvo necesidad del BI.
+- `beneficio_consumido` es lógica compartida con el POS de ventas: probar a mano un canje y su anulación en ese POS antes de desplegar.
+- La caja no pide el RUC para una ficha que ya lo tiene: se usa tal cual.
+- Sin verificación de diseño en navegador (escritorio, celular, tema oscuro).
+
+**Siguiente paso**
+
+- Verificar la caja con beneficios y la factura en el navegador (la base de prueba queda en `caja-beneficios`, puerto 5060). Después, BI-06: fase 4.
+

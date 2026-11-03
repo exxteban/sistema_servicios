@@ -30,6 +30,7 @@ def crear_venta_central_desde_pedido(
     descuento: Decimal,
     id_cliente_venta: int | None = None,
     sena_aplicada: Decimal = Decimal('0.00'),
+    descuento_beneficio: Decimal = Decimal('0.00'),
 ):
     sesion = _sesion_abierta_usuario(usuario_id)
     if not sesion:
@@ -38,7 +39,8 @@ def crear_venta_central_desde_pedido(
     metodo = _resolver_metodo_pago(data)
     subtotal = Decimal(str(pedido.total or 0)).quantize(Decimal('0.01'))
     sena_aplicada = Decimal(str(sena_aplicada or 0)).quantize(Decimal('0.01'))
-    total = (subtotal - descuento - sena_aplicada).quantize(Decimal('0.01'))
+    descuento_beneficio = Decimal(str(descuento_beneficio or 0)).quantize(Decimal('0.01'))
+    total = (subtotal - descuento - sena_aplicada - descuento_beneficio).quantize(Decimal('0.01'))
     if total < 0:
         raise ValueError('El total del pedido no puede ser negativo.')
 
@@ -47,9 +49,9 @@ def crear_venta_central_desde_pedido(
         id_sesion_caja=sesion.id_sesion,
         id_usuario_vendedor=pedido.usuario_id,
         subtotal=subtotal,
-        descuento_monto=descuento + sena_aplicada,
+        descuento_monto=descuento + sena_aplicada + descuento_beneficio,
         descuento_manual_monto=descuento,
-        descuento_fidelizacion_monto=Decimal('0.00'),
+        descuento_fidelizacion_monto=descuento_beneficio,
         total_iva_10=Decimal('0.00'),
         total_iva_5=Decimal('0.00'),
         total_exenta=Decimal('0.00'),

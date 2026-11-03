@@ -148,6 +148,7 @@
     if (deliveryFields) {
       deliveryFields.classList.toggle('hidden', currentType !== 'delivery');
     }
+    window.GastronomiaConsentimiento?.sincronizar(currentType);
     if (currentType !== 'mesa' && tableNameInput) {
       tableNameInput.value = '';
       renderMesas();
@@ -388,6 +389,7 @@
       throw new Error('No se pudo guardar el pedido correctamente.');
     }
     lastOrderId = savedOrderId;
+    window.GastronomiaConsentimiento?.registrar(showAlert);
     if (orderId) {
       hydrateOrder(data.pedido);
       showSavedOrderAlert(data.pedido, `Pedido #${lastOrderId} actualizado.`);

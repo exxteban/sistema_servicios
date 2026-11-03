@@ -44,3 +44,16 @@
     background: rgb(120 53 15 / 0.45);
     color: rgb(253 230 138);
 }
+
+/* El POS vive dentro del scroller de la pestaña (app shell), no de la ventana:
+   ese scroller es la referencia de alto para los paneles sticky (cqh). */
+.app-tab-panel.overflow-y-auto:has(.pos-touch-layout) {
+    container-type: size;
+}
+
+@media (min-width: 1440px) {
+    .pos-order-panel {
+        max-height: calc(100cqh - 2rem);
+        overflow-y: auto;
+    }
+}

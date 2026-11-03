@@ -46,8 +46,12 @@ def buscar_clientes_factura(q: str) -> list[Cliente]:
     )
 
 
-def obtener_o_crear_cliente_factura(nombre: str, ruc_ci: str) -> Cliente:
-    """Alta rapida desde la caja: si el RUC/CI ya existe se reusa esa ficha."""
+def obtener_o_crear_cliente_factura(nombre: str, ruc_ci: str, ficha_a_completar: Cliente | None = None) -> Cliente:
+    """Alta rapida desde la caja: si el RUC/CI ya existe se reusa esa ficha.
+
+    `ficha_a_completar`: ficha del celular del pedido que todavia no tiene RUC. Si no hay otra ficha con
+    ese RUC, se completa esa en vez de crear un cliente duplicado.
+    """
     nombre = (nombre or '').strip()
     ruc_ci = (ruc_ci or '').strip()
     if not ruc_ci:
@@ -57,6 +61,13 @@ def obtener_o_crear_cliente_factura(nombre: str, ruc_ci: str) -> Cliente:
     existente = Cliente.query.filter(Cliente.ruc_ci == ruc_ci, Cliente.id_cliente != 1).first()
     if existente:
         return existente
+    if ficha_a_completar is not None:
+        ficha_a_completar.ruc_ci = ruc_ci[:50]
+        # El nombre de la ficha solo se reemplaza si era el celular de relleno: la factura puede ser de otra persona.
+        if not (ficha_a_completar.nombre or '').strip() or (ficha_a_completar.nombre or '').strip() == (ficha_a_completar.telefono or '').strip():
+            ficha_a_completar.nombre = nombre[:200]
+        db.session.commit()
+        return ficha_a_completar
     cliente = Cliente(nombre=nombre[:200], ruc_ci=ruc_ci[:50], tipo='minorista', activo=True)
     db.session.add(cliente)
     db.session.commit()
