@@ -10,7 +10,7 @@
             ? this.resumenCreditoCuotas()
             : null;
 
-        // CÃ¡lculos
+        // Cálculos
         const subtotal = this.subtotal || 0;
         const descuento = parseFloat(this.descuento) || 0;
         const beneficioDescuento = (typeof this.beneficioFidelizacionDescuentoEstimado === 'function')

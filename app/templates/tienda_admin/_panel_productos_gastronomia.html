@@ -35,7 +35,7 @@
             <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Para cargar productos, precios, fotos y disponibilidad usá el menú gastronómico.</p>
         </div>
         <a href="{{ url_for('gastronomia.menu_config') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition">
-            <i class="fas fa-utensils"></i> Cargar menÃº
+            <i class="fas fa-utensils"></i> Cargar menú
         </a>
     </div>
 </div>
@@ -64,7 +64,7 @@
                         {% if p.descripcion %}
                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-xs" title="{{ p.descripcion }}">{{ p.descripcion }}</div>
                         {% else %}
-                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Sin descripciÃ³n</div>
+                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Sin descripción</div>
                         {% endif %}
                     </td>
                     <td class="px-4 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-200">₲ {{ "{:,.0f}".format(p.precio or 0).replace(",", ".") }}</td>

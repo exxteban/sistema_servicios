@@ -288,11 +288,11 @@ def inicializar_datos_base(config_name=None):
     
     # Configuración inicial
     configuraciones = [
-        ('nombre_empresa', "Pablito's Cell", 'Nombre de la empresa'),
+        ('nombre_empresa', 'Mi Negocio', 'Nombre de la empresa'),
         (CLAVE_URL_PUBLICA_SISTEMA, '', DESC_URL_PUBLICA_SISTEMA),
         ('ruc_empresa', '00000000-0', 'RUC de la empresa'),
-        ('direccion_empresa', 'Santa Rosa c/ 10 de Agosto', 'Dirección fiscal'),
-        ('telefono_empresa', '0984758819', 'Teléfono de contacto'),
+        ('direccion_empresa', 'Dirección del local', 'Dirección fiscal'),
+        ('telefono_empresa', '', 'Teléfono de contacto'),
         ('moneda', 'PYG', 'Moneda del sistema'),
         ('iva_incluido', '1', 'Si los precios incluyen IVA'),
         ('stock_negativo_permitido', '0', 'Permitir vender sin stock'),
@@ -330,28 +330,6 @@ def inicializar_datos_base(config_name=None):
                     descripcion=DESC_VENTAS_CREDITO_METODO_PAGO_ID,
                 ))
 
-    try:
-        defaults = {
-            'nombre_empresa': "Pablito's Cell",
-            'direccion_empresa': 'Santa Rosa c/ 10 de Agosto',
-            'telefono_empresa': '0984758819',
-        }
-        placeholders = {
-            'nombre_empresa': {'', 'Mi Negocio'},
-            'direccion_empresa': {'', 'Dirección del local'},
-            'telefono_empresa': {''},
-        }
-        for clave, desired in defaults.items():
-            actual = (Configuracion.obtener(clave, '') or '').strip()
-            if actual in placeholders.get(clave, {''}):
-                cfg = db.session.get(Configuracion, clave)
-                if cfg:
-                    cfg.valor = desired
-                else:
-                    db.session.add(Configuracion(clave=clave, valor=desired, descripcion=None))
-    except Exception:
-        pass
-    
     if Usuario.query.count() == 0:
         admin = Usuario(
             username='admin',

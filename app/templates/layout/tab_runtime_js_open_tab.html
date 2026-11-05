@@ -142,13 +142,13 @@
 
                 const label = document.createElement('span');
                 label.className = 'whitespace-nowrap';
-                label.textContent = title || 'PestaÃ±a';
+                label.textContent = title || 'Pestaña';
                 btn.appendChild(label);
 
                 const closeBtn = document.createElement('span');
                 closeBtn.className = `${closeBtnBaseClass} app-tab-close select-none`;
                 closeBtn.setAttribute('role', 'button');
-                closeBtn.setAttribute('aria-label', 'Cerrar pestaÃ±a');
+                closeBtn.setAttribute('aria-label', 'Cerrar pestaña');
                 closeBtn.innerHTML = '&times;';
                 closeBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
