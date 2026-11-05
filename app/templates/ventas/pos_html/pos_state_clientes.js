@@ -123,7 +123,7 @@
             total: 0,
             procesando: false,
 
-            // Pagos mÃºltiples
+            // Pagos múltiples
             pagos: [],
             totalPagado: 0,
             saldoPendiente: 0,

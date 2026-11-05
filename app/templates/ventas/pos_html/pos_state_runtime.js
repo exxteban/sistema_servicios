@@ -48,7 +48,7 @@
                             this.cargarDatosPendienteCaja();
                         }
                     } else {
-                        // DespuÃ©s de cargar clientes, intentar restaurar estado guardado
+                        // Después de cargar clientes, intentar restaurar estado guardado
                         this.restaurarEstado();
                     }
                 });
@@ -200,7 +200,7 @@
                 }
             },
 
-            // --- Carga de ReparaciÃ³n ---
+            // --- Carga de Reparación ---
             cargarDatosReparacion() {
                 try {
                     sessionStorage.removeItem(POS_STATE_KEY); // Limpiar estado anterior
@@ -262,7 +262,7 @@
                                     }
                                 }
                             })
-                            .catch(e => console.error('Error cargando cliente de reparaciÃ³n:', e));
+                            .catch(e => console.error('Error cargando cliente de reparación:', e));
                     }
 
                     if (REPARACION_DATA.id_usuario_vendedor) {
@@ -275,15 +275,15 @@
                     // 3. Cargar Abono
                     if (REPARACION_DATA.abono > 0) {
                         this.descuento = parseFloat(REPARACION_DATA.abono);
-                        mostrarNotificacion('Abono de reparaciÃ³n aplicado como descuento', 'info');
+                        mostrarNotificacion('Abono de reparación aplicado como descuento', 'info');
                     }
 
                     this.actualizarTotal();
-                    mostrarNotificacion('Datos de reparaciÃ³n cargados', 'success');
+                    mostrarNotificacion('Datos de reparación cargados', 'success');
 
                 } catch (e) {
-                    console.error('Error cargando datos de reparaciÃ³n:', e);
-                    mostrarNotificacion('Error al cargar datos de la reparaciÃ³n', 'error');
+                    console.error('Error cargando datos de reparación:', e);
+                    mostrarNotificacion('Error al cargar datos de la reparación', 'error');
                 }
             },
 

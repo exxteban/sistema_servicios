@@ -1,7 +1,7 @@
             // --- Persistencia de Estado ---
 
             guardarEstado() {
-                // No guardar si estamos restaurando o si el carrito estÃ¡ vacÃ­o y no hay cambios
+                // No guardar si estamos restaurando o si el carrito está vacío y no hay cambios
                 const vendedorInicial = (typeof VENDEDOR_ID_INICIAL !== 'undefined' && VENDEDOR_ID_INICIAL !== null)
                     ? Number(VENDEDOR_ID_INICIAL)
                     : null;
@@ -348,7 +348,7 @@
   </div>
   <div class="sep"></div>
   <div class="center" style="font-weight:700;">TICKET PROVISIONAL</div>
-  <div class="small muted center">Se sincroniza cuando vuelva la conexiÃ³n</div>
+  <div class="small muted center">Se sincroniza cuando vuelva la conexión</div>
   <div class="sep"></div>
   <div class="small">
     <div>Fecha: <span style="white-space:nowrap;">${this.escapeHtml(fecha)}</span></div>

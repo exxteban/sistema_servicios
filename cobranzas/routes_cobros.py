@@ -163,7 +163,7 @@ def _auditar_cola_cobro_credito(item, *, estado_anterior: str):
     registrar_auditoria(
         accion='cobrar_pendiente_credito_caja',
         modulo='caja',
-        descripcion=f'CobrÃ³ pendiente de crÃ©dito #{item.id}',
+        descripcion=f'Cobró pendiente de crédito #{item.id}',
         referencia_tipo='cola_cobro',
         referencia_id=int(item.id),
         datos_anteriores={'estado': estado_anterior},
@@ -345,7 +345,7 @@ def enviar_cobro_a_caja(id_cuenta: int):
         registrar_auditoria(
             accion='enviar_cobro_credito_a_caja',
             modulo='cobranzas',
-            descripcion=f'EnviÃ³ cuenta #{cuenta.id_cuenta_cobrar} a caja',
+            descripcion=f'Envió cuenta #{cuenta.id_cuenta_cobrar} a caja',
             referencia_tipo='cola_cobro',
             referencia_id=int(pendiente.id),
             datos_nuevos={
@@ -393,7 +393,7 @@ def enviar_cobro_a_caja_html(id_cuenta: int):
         registrar_auditoria(
             accion='enviar_cobro_credito_a_caja',
             modulo='cobranzas',
-            descripcion=f'EnviÃ³ cuenta #{cuenta.id_cuenta_cobrar} a caja',
+            descripcion=f'Envió cuenta #{cuenta.id_cuenta_cobrar} a caja',
             referencia_tipo='cola_cobro',
             referencia_id=int(pendiente.id),
             datos_nuevos={
@@ -487,7 +487,7 @@ def cobrar_cola_credito_html(cola_id: int):
         registrar_auditoria(
             accion='registrar_cobro_credito',
             modulo='cobranzas',
-            descripcion=f'RegistrÃ³ cobro a cuenta #{cuenta.id_cuenta_cobrar} desde caja',
+            descripcion=f'Registró cobro a cuenta #{cuenta.id_cuenta_cobrar} desde caja',
             referencia_tipo='cuenta_por_cobrar',
             referencia_id=int(cuenta.id_cuenta_cobrar),
             datos_nuevos={

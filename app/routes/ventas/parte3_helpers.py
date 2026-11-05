@@ -418,7 +418,7 @@ def _construir_detalle_servicio(item, servicios_prefetch_por_id, servicio_opcion
             if int(subtotal_cantidad) == cantidad:
                 item_subtotal = Decimal(str(item.get('subtotal'))).quantize(Decimal('0.01'))
         except Exception:
-            return None, ({'error': f'Subtotal invÃ¡lido para servicio {id_servicio_item}'}, 400)
+            return None, ({'error': f'Subtotal inválido para servicio {id_servicio_item}'}, 400)
     if item_subtotal <= 0:
         return None, ({'error': f'Subtotal inválido para servicio {id_servicio_item}'}, 400)
     if servicio.porcentaje_iva == 10:

@@ -451,7 +451,7 @@ def test_panel_tienda_gastronomia_muestra_menu_y_permite_guardar_config():
         assert response.status_code == 200
         html = response.get_data(as_text=True)
         assert 'Menú Gastronomía' in html
-        assert 'Cargar menÃº' in html
+        assert 'Cargar menú' in html
         assert 'Combo de bebidas' in html
         assert '/tienda/gastro-admin-test' in html
 

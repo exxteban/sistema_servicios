@@ -108,7 +108,7 @@
             const tabMetaByKey = new Map();
             const creatingTabs = new Set();
 
-            // Historial de navegaciÃ³n por tab: tabId -> [url, url, ...]
+            // Historial de navegación por tab: tabId -> [url, url, ...]
             const tabHistoryById = new Map();
             const TAB_HISTORY_MAX = 50;
 
@@ -277,7 +277,7 @@
             }
 
             function setActiveTab(tabId) {
-                // Limpiar entradas huÃ©rfanas (botÃ³n removido del DOM pero no del Map)
+                // Limpiar entradas huérfanas (botón removido del DOM pero no del Map)
                 for (const [id, btn] of tabButtonsById.entries()) {
                     if (btn && !document.contains(btn)) {
                         tabButtonsById.set(id, null);
@@ -369,7 +369,7 @@
                         stack = [];
                         tabHistoryById.set(tabId, stack);
                     }
-                    // No duplicar si es la misma URL que la Ãºltima
+                    // No duplicar si es la misma URL que la última
                     if (stack.length > 0 && stack[stack.length - 1] === normalized) return;
                     stack.push(normalized);
                     if (stack.length > TAB_HISTORY_MAX) stack.shift();
@@ -391,8 +391,8 @@
                 const panel = tabPanelsById.get(tabId);
                 const isActive = btn && btn.getAttribute('aria-selected') === 'true';
 
-                // Antes de eliminar, determinar quÃ© pestaÃ±a activar si esta era la activa.
-                // Se busca la pestaÃ±a inmediatamente anterior en el DOM; si no hay, la siguiente.
+                // Antes de eliminar, determinar qué pestaña activar si esta era la activa.
+                // Se busca la pestaña inmediatamente anterior en el DOM; si no hay, la siguiente.
                 let fallbackTabId = principalTabId;
                 if (isActive && btn) {
                     const allBtns = Array.from(tabBar.querySelectorAll('button[data-tab-id]'));
