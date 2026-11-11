@@ -28,6 +28,8 @@
         {% call stat_chip('gastronomia.reportes' if permisos.reportes else 'gastronomia.caja', 'Reportes' if permisos.reportes else 'Caja', 'fas fa-chart-line' if permisos.reportes else 'fas fa-cash-register') %}
             <strong data-stat="ventas_hoy_formatted">{{ resumen.ventas_hoy_formatted }}</strong>
             <span class="gd-chip__muted">hoy · <span data-stat="pedidos_cobrados_hoy">{{ resumen.pedidos_cobrados_hoy }}</span> cobros</span>
+            <span class="gd-chip__vs gd-chip__vs--{{ resumen.ventas_hoy_tendencia or 'igual' }}" data-stat="ventas_hoy_comparacion"
+                title="Comparado con ayer hasta la misma hora" {% if not resumen.ventas_hoy_comparacion %}hidden{% endif %}>{{ resumen.ventas_hoy_comparacion or '' }}</span>
         {% endcall %}
         {% endif %}
         {% if resumen.mesas_total %}
@@ -42,6 +44,9 @@
             <span class="gd-chip__muted">en cocina</span>
         {% endcall %}
         {% endif %}
+        <button type="button" class="gd-chip atajos-boton" data-atajos-configurar title="Elegí qué pantalla abre cada tecla (F2, F4...)">
+            <i class="far fa-keyboard"></i><span>Teclas rápidas</span>
+        </button>
     </section>
     {% endif %}
 
@@ -61,20 +66,20 @@
         <h2 class="gd-section-title"><i class="fas fa-sliders"></i>Carga y configuracion</h2>
         <div class="gd-grid gd-grid--config">
             {% if permisos.menu %}
-            <a href="{{ url_for('gastronomia.menu_config') if contexto_operativo else '#' }}" data-tab-title="Cargar menu" data-tab-icon="fas fa-utensils" class="{% if contexto_operativo %}app-tab-link {% endif %}gd-card gd-card--compact gd-tone-config {% if not contexto_operativo %}is-disabled{% endif %}">
+            <a href="{{ url_for('gastronomia.menu_config') if contexto_operativo else '#' }}" {% if contexto_operativo %}data-atajo-accion="menu" {% endif %}data-tab-title="Cargar menu" data-tab-icon="fas fa-utensils" class="{% if contexto_operativo %}app-tab-link {% endif %}gd-card gd-card--compact gd-tone-config {% if not contexto_operativo %}is-disabled{% endif %}">
                 <span class="gd-card__icon"><i class="fas fa-utensils"></i></span>
                 <span class="gd-card__body">
-                    <span class="gd-card__title">Cargar menu</span>
+                    <span class="gd-card__title">Cargar menu<span data-atajo-slot></span></span>
                     <span class="gd-card__desc">Categorias, productos y disponibilidad.</span>
                 </span>
                 <i class="fas fa-arrow-right gd-card__go"></i>
             </a>
             {% endif %}
             {% if permisos.salon %}
-            <a href="{{ url_for('gastronomia.salon_config') if contexto_operativo else '#' }}" data-tab-title="Configurar salon" data-tab-icon="fas fa-chair" class="{% if contexto_operativo %}app-tab-link {% endif %}gd-card gd-card--compact gd-tone-config {% if not contexto_operativo %}is-disabled{% endif %}">
+            <a href="{{ url_for('gastronomia.salon_config') if contexto_operativo else '#' }}" {% if contexto_operativo %}data-atajo-accion="salon_config" {% endif %}data-tab-title="Configurar salon" data-tab-icon="fas fa-chair" class="{% if contexto_operativo %}app-tab-link {% endif %}gd-card gd-card--compact gd-tone-config {% if not contexto_operativo %}is-disabled{% endif %}">
                 <span class="gd-card__icon"><i class="fas fa-chair"></i></span>
                 <span class="gd-card__body">
-                    <span class="gd-card__title">Configurar salon</span>
+                    <span class="gd-card__title">Configurar salon<span data-atajo-slot></span></span>
                     <span class="gd-card__desc">Mesas, ubicacion, capacidad y orden.</span>
                 </span>
                 <i class="fas fa-arrow-right gd-card__go"></i>
@@ -87,11 +92,11 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/dashboard.css', v='20261024-3') }}">
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/dashboard.css', v='20261111-1') }}">
 {% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('gastronomia.static', filename='js/dashboard_card_order.js', v='20261024-1') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/dashboard_live.js', v='20261024-2') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/dashboard_live.js', v='20261111-1') }}"></script>
 <script>window.initGastroDashboardCardOrder?.(); window.initGastroDashboardLive?.();</script>
 {% endblock %}

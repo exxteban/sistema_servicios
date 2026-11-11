@@ -375,6 +375,7 @@ def create_app(config_name='default'):
     
     # Registrar blueprints
     from app.routes.main import main_bp
+    from app.routes.atajos_teclado import atajos_teclado_bp
     from app.routes.auth import auth_bp
     from app.routes.productos import productos_bp
     from app.routes.servicios import servicios_bp
@@ -444,6 +445,7 @@ def create_app(config_name='default'):
     import facturacion_electronica.routes_geo  # noqa: F401  (idem)
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(atajos_teclado_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(productos_bp, url_prefix='/productos')
     app.register_blueprint(servicios_bp, url_prefix='/servicios')

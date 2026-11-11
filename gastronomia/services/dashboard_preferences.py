@@ -149,6 +149,10 @@ _DASHBOARD_CARD_DEFINITIONS = (
 )
 
 
+# Publico para el catalogo de teclas rapidas (gastronomia/services/atajos_catalogo.py).
+DASHBOARD_CARD_DEFINITIONS = _DASHBOARD_CARD_DEFINITIONS
+
+
 def build_dashboard_cards(
     user: Any,
     permisos: dict[str, bool],

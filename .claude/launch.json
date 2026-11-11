@@ -87,6 +87,21 @@
         "SERVER": "flask",
         "DEBUG": "0"
       }
+    },
+    {
+      "name": "atajos-teclado",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "run.py"
+      ],
+      "port": 5061,
+      "env": {
+        "PORT": "5061",
+        "APP_CONFIG": "development",
+        "DATABASE_URL": "sqlite:///C:/Users/csarl/AppData/Local/Temp/claude/4667198908d322ff/c7c778d7-19fb-4185-ba59-2ff2363d6616/scratchpad/atajos.db",
+        "SERVER": "flask",
+        "DEBUG": "0"
+      }
     }
   ]
 }

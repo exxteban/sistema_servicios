@@ -55,6 +55,21 @@ def register_runtime_features(app, db):
             return url_for('static', filename=filename)
 
     app.jinja_env.globals['static_url'] = static_url
+
+    def atajos_teclado():
+        # Teclas rapidas del usuario; None sin sesion.
+        from flask_login import current_user
+        from app.services.atajos_teclado import contexto_atajos
+        if not getattr(current_user, 'is_authenticated', False):
+            return None
+        try:
+            return contexto_atajos(current_user)
+        except Exception:
+            # Corre en cada pagina: un atajo roto no puede tumbar la pantalla.
+            app.logger.exception('No se pudieron armar los atajos de teclado')
+            return None
+
+    app.jinja_env.globals['atajos_teclado'] = atajos_teclado
     register_bi_context(app)
 
     config_ui_keys = (

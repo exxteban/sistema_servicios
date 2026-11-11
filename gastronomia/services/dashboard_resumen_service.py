@@ -5,6 +5,7 @@ from sqlalchemy import func
 
 from app import db
 from app.services.caja_senas import sesion_caja_abierta_usuario
+from app.services.comparacion_ayer import tendencia, texto_diferencia_monto, ventana_ayer_misma_hora
 from app.utils.helpers import formato_moneda_local, today_local, utc_bounds_for_local_dates
 from gastronomia.models import GastronomiaPedido, GastronomiaPedidoPago
 from gastronomia.services.caja_service import contar_pedidos_caja
@@ -28,6 +29,8 @@ def resumen_dashboard(cliente_id: int | None, usuario, permisos: dict[str, bool]
         'ventas_hoy': None,
         'ventas_hoy_formatted': None,
         'pedidos_cobrados_hoy': None,
+        'ventas_hoy_comparacion': '',
+        'ventas_hoy_tendencia': '',
     }
     if not cliente_id:
         return resumen
@@ -46,6 +49,10 @@ def resumen_dashboard(cliente_id: int | None, usuario, permisos: dict[str, bool]
         resumen['ventas_hoy'] = total
         resumen['ventas_hoy_formatted'] = formato_moneda_local(total)
         resumen['pedidos_cobrados_hoy'] = cantidad
+        # Contra ayer hasta la misma hora (ver app/services/comparacion_ayer.py).
+        ayer, _ = _cobrado_entre(cliente_id, *ventana_ayer_misma_hora())
+        resumen['ventas_hoy_comparacion'] = texto_diferencia_monto(total, ayer)
+        resumen['ventas_hoy_tendencia'] = tendencia(total, ayer)
     return resumen
 
 
@@ -83,7 +90,10 @@ def _contar_pedidos(cliente_id: int, estados: tuple[str, ...], *, tipo: str | No
 
 def _cobrado_hoy(cliente_id: int) -> tuple[float, int]:
     hoy = today_local()
-    inicio, fin = utc_bounds_for_local_dates(hoy, hoy)
+    return _cobrado_entre(cliente_id, *utc_bounds_for_local_dates(hoy, hoy))
+
+
+def _cobrado_entre(cliente_id: int, inicio, fin) -> tuple[float, int]:
     total, cantidad = (
         db.session.query(
             func.coalesce(func.sum(GastronomiaPedidoPago.total_cobrado), 0),

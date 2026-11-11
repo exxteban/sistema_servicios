@@ -57,6 +57,9 @@
     {% include 'layout/reloadable_script_guard.html' %}
     {% include 'layout/transient_overlay_runtime.html' %}
     {% include 'layout/tienda_admin_promociones_runtime.html' %}
+    {% if current_user.is_authenticated and not embed_mode %}
+    {% include 'layout/atajos_teclado.html' %}
+    {% endif %}
     {% block extra_js %}{% endblock %}
 
     {% if current_user.is_authenticated and not embed_mode %}
