@@ -8,9 +8,6 @@ from sqlalchemy.orm import joinedload
 from app import db
 from app.models import (
     Configuracion,
-    PagoCuentaCobrar,
-    PedidoClientePago,
-    PagoVenta,
     Producto,
     SesionCaja,
     Usuario,
@@ -48,6 +45,10 @@ from gastos_corrientes.services import (
     obtener_resumen_dashboard_gastos_corrientes,
 )
 from gastronomia.services.modo_operacion import gastronomia_activa
+from app.services.dashboard_totales import (
+    comparacion_vs_ayer,
+    totales_cobrados as _obtener_totales_cobrados_dashboard,
+)
 
 main_bp = Blueprint('main', __name__)
 
@@ -71,73 +72,6 @@ def _obtener_dashboard_detallado_gastos(can_ver_gastos_corrientes, today):
         return None
     return obtener_dashboard_detallado_gastos_corrientes(today=today)
 
-
-def _filtrar_query_dashboard_por_sesion(query, *, puede_ver_otras_cajas, sesion_caja, columna_id_sesion):
-    if puede_ver_otras_cajas:
-        return query
-    if sesion_caja:
-        return query.filter(columna_id_sesion == sesion_caja.id_sesion)
-    return query.filter(False)
-
-
-def _obtener_totales_cobrados_dashboard(start_date, end_date, *, puede_ver_otras_cajas, sesion_caja):
-    start_utc, end_utc = utc_bounds_for_local_dates(start_date, end_date)
-
-    cobros_ventas_q = (
-        db.session.query(db.func.sum(PagoVenta.monto))
-        .join(Venta, PagoVenta.id_venta == Venta.id_venta)
-        .filter(
-            Venta.estado == 'completada',
-            Venta.fecha_venta >= start_utc,
-            Venta.fecha_venta < end_utc,
-        )
-    )
-    cobros_ventas_q = _filtrar_query_dashboard_por_sesion(
-        cobros_ventas_q,
-        puede_ver_otras_cajas=puede_ver_otras_cajas,
-        sesion_caja=sesion_caja,
-        columna_id_sesion=Venta.id_sesion_caja,
-    )
-    cobrado_en_ventas = float(cobros_ventas_q.scalar() or 0)
-
-    cobros_creditos_q = (
-        db.session.query(db.func.sum(PagoCuentaCobrar.monto))
-        .filter(
-            PagoCuentaCobrar.estado != 'anulado',
-            PagoCuentaCobrar.fecha_pago >= start_utc,
-            PagoCuentaCobrar.fecha_pago < end_utc,
-        )
-    )
-    cobros_creditos_q = _filtrar_query_dashboard_por_sesion(
-        cobros_creditos_q,
-        puede_ver_otras_cajas=puede_ver_otras_cajas,
-        sesion_caja=sesion_caja,
-        columna_id_sesion=PagoCuentaCobrar.id_sesion_caja,
-    )
-    cobrado_en_creditos = float(cobros_creditos_q.scalar() or 0)
-
-    cobros_pedidos_q = (
-        db.session.query(db.func.sum(PedidoClientePago.monto))
-        .filter(
-            PedidoClientePago.estado == 'activo',
-            PedidoClientePago.fecha_pago >= start_utc,
-            PedidoClientePago.fecha_pago < end_utc,
-        )
-    )
-    cobros_pedidos_q = _filtrar_query_dashboard_por_sesion(
-        cobros_pedidos_q,
-        puede_ver_otras_cajas=puede_ver_otras_cajas,
-        sesion_caja=sesion_caja,
-        columna_id_sesion=PedidoClientePago.id_sesion_caja,
-    )
-    cobrado_en_pedidos = float(cobros_pedidos_q.scalar() or 0)
-
-    return {
-        'total_cobrado': cobrado_en_ventas + cobrado_en_creditos + cobrado_en_pedidos,
-        'cobrado_en_ventas': cobrado_en_ventas,
-        'cobrado_en_creditos': cobrado_en_creditos,
-        'cobrado_en_pedidos': cobrado_en_pedidos,
-    }
 
 @main_bp.route('/health')
 def health():
@@ -391,6 +325,12 @@ def dashboard():
         dashboard_en_atencion_items=en_atencion_resumen['items'],
         usuarios_ocupados_ids=usuarios_ocupados_ids,
         dashboard_profesionales_detalle=dashboard_profesionales_detalle,
+        # Solo el inicio de servicios muestra el "vs ayer" (tarjeta Cobrado hoy).
+        dashboard_comparacion=comparacion_vs_ayer(
+            ventas_hoy=None,
+            total_cobrado_hoy=total_cobrado_display if (can_ver_ventas and range_type == 'hoy') else None,
+            puede_ver_otras_cajas=puede_ver_otras_cajas,
+        ) if dashboard_negocio.get('full_template') else {},
     )
 
 
@@ -531,7 +471,14 @@ def api_dashboard_totales():
         sesion_caja_id=(int(sesion_caja.id_sesion) if sesion_caja else None),
     )
 
+    comparacion = comparacion_vs_ayer(
+        ventas_hoy=ventas_hoy,
+        total_cobrado_hoy=total_cobrado if range_type == 'hoy' else None,
+        puede_ver_otras_cajas=puede_ver_otras_cajas,
+    )
+
     return jsonify({
+        **comparacion,
         'ventas_hoy': ventas_hoy,
         'total_cobrado': (float(total_cobrado) if total_cobrado is not None else None),
         'total_cobrado_formatted': total_cobrado_formatted,

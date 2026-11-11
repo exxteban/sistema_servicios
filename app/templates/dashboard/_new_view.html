@@ -15,7 +15,7 @@
         </span>
         {% elif mostrar_alerta_sin_caja %}
         <a href="{{ url_for('caja.abrir') if can_abrir_caja else '#' }}"
-            {% if can_abrir_caja %}data-tab-url="{{ url_for('caja.abrir') }}" data-tab-title="Abrir Caja" data-tab-icon="fas fa-wallet"{% endif %}
+            {% if can_abrir_caja %}data-atajo-accion="abrir_caja" data-tab-url="{{ url_for('caja.abrir') }}" data-tab-title="Abrir Caja" data-tab-icon="fas fa-wallet"{% endif %}
             class="{% if can_abrir_caja %}app-tab-link{% endif %} inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 ring-1 ring-amber-200/80 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-100 dark:ring-amber-800/50">
             <i class="fas fa-exclamation-triangle"></i>
             Caja sin abrir
@@ -112,16 +112,23 @@
     <section class="space-y-3">
         <div class="flex items-center justify-between gap-3">
             <h2 class="text-base font-bold text-slate-900 dark:text-white">Acciones rapidas</h2>
+            <div class="flex items-center gap-2">
+            <button type="button" data-atajos-configurar title="Elegí qué pantalla abre cada tecla (F2, F4...)"
+                class="atajos-boton rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
+                <i class="far fa-keyboard"></i>
+                Teclas rápidas
+            </button>
             <button type="button" @click="openCustomizer()"
                 class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10">
                 <i class="fas fa-sliders-h"></i>
                 Modificar
             </button>
+            </div>
         </div>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             <template x-for="action in selectedActions" :key="action.id">
                 <a :href="action.href" :data-tab-url="action.tab_url" :data-tab-title="action.tab_title"
-                    :data-tab-icon="action.tab_icon"
+                    :data-tab-icon="action.tab_icon" :data-atajo-accion="action.id"
                     class="app-tab-link group flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-slate-900">
                     <div class="flex min-w-0 items-center gap-4">
                         <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-white" :class="action.color_class">
@@ -132,7 +139,9 @@
                             <span class="block truncate text-xs text-slate-500 dark:text-slate-400" x-text="action.subtitle"></span>
                         </span>
                     </div>
-                    <i class="fas fa-chevron-right shrink-0 text-slate-500 transition group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white"></i>
+                    <span class="flex shrink-0 items-center" data-atajo-slot>
+                        <i class="fas fa-chevron-right shrink-0 text-slate-500 transition group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white"></i>
+                    </span>
                 </a>
             </template>
         </div>

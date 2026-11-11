@@ -1,0 +1,18 @@
+{# Teclas rapidas (F2, F4...). Cada usuario las asigna desde el inicio con el boton "Teclas rapidas". Ver app/services/atajos_teclado. #}
+{% set atajos_ctx = atajos_teclado() %}
+{% if atajos_ctx %}
+<link rel="stylesheet" href="{{ static_url('css/atajos_teclado.css') }}">
+<script>
+    window.__atajosTeclado = {{ atajos_ctx | tojson }};
+    window.__atajosTecladoUrl = {{ url_for('atajos_teclado.guardar') | tojson }};
+    // Sincronico a proposito: la clase tiene que estar antes de que se pinte el chip.
+    (function () {
+        try {
+            var usos = parseInt(window.localStorage.getItem('atajos_teclado_usos') || '0', 10) || 0;
+            if (usos < 1) document.documentElement.classList.add('atajo-por-aprender');
+        } catch (e) { /* sin storage no se anima: mejor quieto que eterno */ }
+    })();
+</script>
+<script src="{{ static_url('js/atajos_teclado.js') }}" defer></script>
+<script src="{{ static_url('js/atajos_teclado_modal.js') }}" defer></script>
+{% endif %}

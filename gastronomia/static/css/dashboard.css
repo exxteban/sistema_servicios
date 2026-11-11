@@ -64,6 +64,15 @@
 .gd-chip__muted { color: var(--gd-text-soft); }
 .gd-chip__dot { width: 0.5rem; height: 0.5rem; border-radius: 999px; background: var(--gd-text-muted); }
 .gd-chip__dot.is-on { background: var(--gd-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gd-ok) 22%, transparent); }
+/* "vs ayer" del cobrado: verde si viene mejor, rojo si peor (gastronomia/services/dashboard_comparacion.py). */
+.gd-chip__vs { font-weight: 600; color: var(--gd-text-soft); }
+.gd-chip__vs[hidden] { display: none; }
+.gd-chip__vs--mas { color: #059669; }
+.gd-chip__vs--menos { color: #dc2626; }
+.dark .gd-chip__vs--mas { color: #6ee7b7; }
+.dark .gd-chip__vs--menos { color: #fca5a5; }
+.gd-stats .atajos-boton { margin-left: auto; color: var(--gd-text-soft); font: inherit; font-size: 0.8125rem; }
+.gd-card__title .atajo-kbd { font-size: 0.65rem; }
 
 .gd-section-title {
     display: flex;

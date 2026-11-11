@@ -93,6 +93,10 @@
                 <div class="min-w-0">
                     <p class="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Cobrado hoy</p>
                     <p class="mt-0.5 text-xl font-black text-slate-950 dark:text-white">{{ (total_cobrado_display or 0)|moneda }}</p>
+                    {% set _vs = (dashboard_comparacion or {}) %}
+                    <p id="dashboard-servicios-cobrado-vs" title="Comparado con ayer hasta la misma hora"
+                       class="mt-0.5 truncate text-xs font-semibold {% if _vs.cobrado_hoy_tendencia == 'mas' %}text-emerald-600 dark:text-emerald-300{% elif _vs.cobrado_hoy_tendencia == 'menos' %}text-rose-600 dark:text-rose-300{% else %}text-slate-500 dark:text-slate-400{% endif %}"
+                       {% if not _vs.cobrado_hoy_comparacion %}hidden{% endif %}>{{ _vs.cobrado_hoy_comparacion or '' }}</p>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Servicios + productos + propinas</p>
                 </div>
             </div>

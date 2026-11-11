@@ -32,6 +32,11 @@
         document.querySelector('[data-stat-dot="caja_abierta"]')?.classList.toggle('is-on', Boolean(resumen[key]));
         return;
       }
+      if (key === 'ventas_hoy_comparacion') {
+        el.hidden = !resumen[key];
+        ['mas', 'menos', 'igual'].forEach((t) => el.classList.remove(`gd-chip__vs--${t}`));
+        el.classList.add(`gd-chip__vs--${resumen.ventas_hoy_tendencia || 'igual'}`);
+      }
       el.textContent = String(resumen[key]);
     });
   };
