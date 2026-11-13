@@ -1,6 +1,26 @@
 (function () {
   // El sistema abre pantallas en pestanas internas: puede haber varios paneles en el DOM.
-  document.querySelectorAll('[data-gastro-asistente]:not([data-iniciado])').forEach(iniciar);
+  function iniciarPendientes() {
+    document.querySelectorAll('[data-gastro-asistente]:not([data-iniciado])').forEach(iniciar);
+  }
+  iniciarPendientes();
+
+  // El refresco silencioso del Dashboard reemplaza el HTML del panel pero solo re-ejecuta
+  // scripts inline, no este archivo: el boton nuevo quedaba sin listeners. Un observer
+  // (uno solo por documento) inicializa cualquier panel que aparezca despues.
+  if (!window.__gastroAsistenteObserver && window.MutationObserver) {
+    let pendiente = false;
+    window.__gastroAsistenteObserver = new MutationObserver(() => {
+      if (pendiente) return;
+      pendiente = true;
+      requestAnimationFrame(() => {
+        pendiente = false;
+        window.__gastroAsistenteIniciarPendientes();
+      });
+    });
+    window.__gastroAsistenteObserver.observe(document.body, { childList: true, subtree: true });
+  }
+  window.__gastroAsistenteIniciarPendientes = iniciarPendientes;
 
   function iniciar(root) {
     root.dataset.iniciado = '1';
