@@ -91,7 +91,7 @@
                 <input id="ia_backoffice_daily_token_budget" name="ia_backoffice_daily_token_budget" type="number" min="0" max="10000000"
                        value="{{ ia_backoffice_config.daily_token_budget }}"
                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Cantidad maxima de tokens por dia. Usa 0 para dejarlo sin limite.</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Cantidad maxima de tokens por dia para cada usuario. Usa 0 para dejarlo sin limite.</p>
             </div>
             <div>
                 <label for="ia_backoffice_monthly_token_budget" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -100,7 +100,7 @@
                 <input id="ia_backoffice_monthly_token_budget" name="ia_backoffice_monthly_token_budget" type="number" min="0" max="100000000"
                        value="{{ ia_backoffice_config.monthly_token_budget }}"
                        class="w-full border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-white rounded-lg py-2 px-4 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors">
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Cantidad maxima de tokens por mes. Usa 0 para dejarlo sin limite.</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Cuota mensual de tokens de todo el sistema (suma a todos los usuarios). Usa 0 para dejarlo sin limite.</p>
             </div>
         </div>
     </div>

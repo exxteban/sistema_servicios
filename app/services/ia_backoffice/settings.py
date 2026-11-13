@@ -29,8 +29,8 @@ IA_BACKOFFICE_DEFAULTS = {
     CLAVE_DEEPSEEK_BASE_URL: ('https://api.deepseek.com', 'Base URL DeepSeek del asistente interno'),
     CLAVE_MAX_TOKENS: ('700', 'Maximo de tokens por respuesta del asistente interno'),
     CLAVE_TEMPERATURE: ('0.3', 'Temperatura del asistente interno'),
-    CLAVE_DAILY_TOKEN_BUDGET: ('50000', 'Presupuesto diario de tokens del asistente interno'),
-    CLAVE_MONTHLY_TOKEN_BUDGET: ('1000000', 'Presupuesto mensual de tokens del asistente interno'),
+    CLAVE_DAILY_TOKEN_BUDGET: ('200000', 'Presupuesto diario de tokens del asistente interno'),
+    CLAVE_MONTHLY_TOKEN_BUDGET: ('3000000', 'Presupuesto mensual de tokens del asistente interno'),
     CLAVE_READONLY_MODE: ('1', 'Modo solo lectura del asistente interno'),
     CLAVE_ASSISTED_ACTIONS_ENABLED: ('0', 'Habilita acciones asistidas confirmables del asistente interno'),
     CLAVE_ADVANCED_MODEL_ENABLED: ('0', 'Permite modelo avanzado del asistente interno'),
@@ -59,6 +59,25 @@ def asegurar_defaults_asistente() -> None:
     for clave, (valor, descripcion) in IA_BACKOFFICE_DEFAULTS.items():
         if Configuracion.obtener(clave, None) is None:
             Configuracion.establecer(clave, valor, descripcion)
+
+
+CLAVE_CUOTAS_MIGRADAS = 'ia_backoffice_cuotas_v2_migradas'
+# Defaults viejos -> nuevos. Solo se cambian si la instalacion seguia con el valor viejo exacto.
+CUOTAS_VIEJAS = {
+    CLAVE_DAILY_TOKEN_BUDGET: ('50000', '200000'),
+    CLAVE_MONTHLY_TOKEN_BUDGET: ('1000000', '3000000'),
+}
+
+
+def migrar_cuotas_default() -> None:
+    """Una sola vez: las instalaciones que quedaron con las cuotas viejas por defecto (50k diario por usuario,
+    1M mensual) pasan a 200k y 3M. Si root despues elige otro valor (incluso el viejo) no se vuelve a tocar."""
+    if Configuracion.obtener(CLAVE_CUOTAS_MIGRADAS, None) is not None:
+        return
+    for clave, (viejo, nuevo) in CUOTAS_VIEJAS.items():
+        if (Configuracion.obtener(clave, None) or '').strip() == viejo:
+            Configuracion.establecer(clave, nuevo, IA_BACKOFFICE_DEFAULTS[clave][1])
+    Configuracion.establecer(CLAVE_CUOTAS_MIGRADAS, '1', 'Cuotas IA migradas a 200k diario / 3M mensual')
 
 
 def normalizar_provider(provider: str | None) -> str:
@@ -106,8 +125,8 @@ def obtener_configuracion_asistente() -> ConfiguracionAsistenteIA:
     )
     max_tokens_raw, _ = get_setting(CLAVE_MAX_TOKENS, 'AI_BACKOFFICE_MAX_TOKENS', default='700')
     temperature_raw, _ = get_setting(CLAVE_TEMPERATURE, 'AI_BACKOFFICE_TEMPERATURE', default='0.3')
-    daily_budget_raw, _ = get_setting(CLAVE_DAILY_TOKEN_BUDGET, 'AI_BACKOFFICE_DAILY_TOKEN_BUDGET', default='50000')
-    monthly_budget_raw, _ = get_setting(CLAVE_MONTHLY_TOKEN_BUDGET, 'AI_BACKOFFICE_MONTHLY_TOKEN_BUDGET', default='1000000')
+    daily_budget_raw, _ = get_setting(CLAVE_DAILY_TOKEN_BUDGET, 'AI_BACKOFFICE_DAILY_TOKEN_BUDGET', default='200000')
+    monthly_budget_raw, _ = get_setting(CLAVE_MONTHLY_TOKEN_BUDGET, 'AI_BACKOFFICE_MONTHLY_TOKEN_BUDGET', default='3000000')
 
     return ConfiguracionAsistenteIA(
         enabled=enabled,
@@ -116,8 +135,8 @@ def obtener_configuracion_asistente() -> ConfiguracionAsistenteIA:
         deepseek_base_url=(base_url or 'https://api.deepseek.com').rstrip('/'),
         max_tokens=max(80, min(safe_int(max_tokens_raw, 700), 4000)),
         temperature=max(0.0, min(safe_float(temperature_raw, 0.3), 1.0)),
-        daily_token_budget=max(0, safe_int(daily_budget_raw, 50000)),
-        monthly_token_budget=max(0, safe_int(monthly_budget_raw, 1000000)),
+        daily_token_budget=max(0, safe_int(daily_budget_raw, 200000)),
+        monthly_token_budget=max(0, safe_int(monthly_budget_raw, 3000000)),
         readonly_mode=readonly,
         assisted_actions_enabled=assisted_actions,
         advanced_model_enabled=advanced,

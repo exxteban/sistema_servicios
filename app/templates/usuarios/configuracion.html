@@ -281,6 +281,7 @@
 
     {% include 'usuarios/_config_ia_backoffice.html' %}
 
+    {% if puede_configurar_ia %}
     <form method="POST" action="{{ url_for('usuarios.configuracion_ia') }}"
           class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 space-y-6 transition-colors duration-300">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -445,5 +446,6 @@
             </button>
         </div>
     </form>
+    {% endif %}
 </div>
 {% endblock %}

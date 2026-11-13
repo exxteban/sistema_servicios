@@ -31,6 +31,7 @@ from gastronomia.routes import importacion_api_routes as _importacion_api_routes
 from gastronomia.routes import importacion_routes as _importacion_routes  # noqa: F401
 from gastronomia.routes import entregas_routes as _entregas_routes  # noqa: F401
 from gastronomia.routes import menu_routes as _menu_routes  # noqa: F401
+from gastronomia.routes import asistente_routes as _asistente_routes  # noqa: F401
 from gastronomia.routes import sugerencias_routes as _sugerencias_routes  # noqa: F401
 from gastronomia.routes import sugerencias_api_routes as _sugerencias_api_routes  # noqa: F401
 from gastronomia.routes import menu_tv_routes as _menu_tv_routes  # noqa: F401

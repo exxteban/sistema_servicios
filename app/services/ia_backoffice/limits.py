@@ -48,15 +48,20 @@ def validar_presupuesto_tokens(tokens_estimados: int = 0, usuario=None, ahora: d
         if consumo_dia['tokens_total'] + estimado > cfg.daily_token_budget:
             return False, 'presupuesto_diario_excedido'
     if cfg.monthly_token_budget:
-        consumo_mes = obtener_consumo_tokens(rangos['mes']['desde'], rangos['mes']['hasta'], usuario=usuario)
+        # Cuota mensual de la instalacion (el cliente): suma a todos los usuarios. La diaria sigue por usuario
+        # para que una sola persona no consuma la cuota de todos.
+        consumo_mes = obtener_consumo_tokens(rangos['mes']['desde'], rangos['mes']['hasta'])
         if consumo_mes['tokens_total'] + estimado > cfg.monthly_token_budget:
             return False, 'presupuesto_mensual_excedido'
     return True, 'ok'
 
 
+CONTACTO_AMPLIAR = 'Si necesitas mas, habla con el administrador para ampliar la cuota de uso de la IA.'
+
+
 def mensaje_presupuesto_excedido(motivo: str) -> str:
     if motivo == 'presupuesto_diario_excedido':
-        return 'El asistente IA interno alcanzo el presupuesto diario de tokens. Pedile al usuario root que revise el consumo o aumente el limite.'
+        return f'Alcanzaste el limite diario de uso de la IA. Se renueva manana. {CONTACTO_AMPLIAR}'
     if motivo == 'presupuesto_mensual_excedido':
-        return 'El asistente IA interno alcanzo el presupuesto mensual de tokens. Pedile al usuario root que revise el consumo o aumente el limite.'
-    return 'El asistente IA interno alcanzo el presupuesto configurado de tokens.'
+        return f'Se alcanzo el limite mensual de uso de la IA. Se renueva el 1 del mes que viene. {CONTACTO_AMPLIAR}'
+    return f'Se alcanzo el limite de uso de la IA. {CONTACTO_AMPLIAR}'

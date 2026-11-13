@@ -24,6 +24,8 @@ asistente_ia_bp = Blueprint('asistente_ia', __name__, url_prefix='/asistente-ia'
 SESSION_HISTORY_KEY = 'ia_backoffice_historial'
 SESSION_HISTORY_SUMMARY_KEY = 'ia_backoffice_historial_resumen'
 MAX_SESSION_MESSAGES = 12
+# Modelo, proveedor, limites y consumo de tokens son configuracion: solo los ve el usuario root.
+SOLO_ROOT = 'Solo el usuario root puede ver la configuracion y el consumo de la IA.'
 
 
 def _historial() -> list[dict]:
@@ -88,6 +90,10 @@ def _consumo_diario_usuario(usuario) -> dict:
     }
 
 
+def _consumo_visible(usuario) -> dict | None:
+    return _consumo_diario_usuario(usuario) if puede_gestionar_asistente_ia(usuario) else None
+
+
 @asistente_ia_bp.route('/')
 @login_required
 def chat():
@@ -99,7 +105,7 @@ def chat():
         cfg=cfg,
         historial=_historial(),
         puede_gestionar=puede_gestionar_asistente_ia(current_user),
-        consumo_diario=_consumo_diario_usuario(current_user),
+        consumo_diario=_consumo_visible(current_user),
     )
 
 
@@ -117,16 +123,16 @@ def admin():
 @asistente_ia_bp.route('/historial')
 @login_required
 def historial():
-    if not puede_usar_asistente_ia(current_user):
-        return _bloqueo('No tienes permiso para usar el asistente IA interno.')
+    if not puede_gestionar_asistente_ia(current_user):
+        return _bloqueo(SOLO_ROOT)
     return render_template('asistente_ia/historial.html')
 
 
 @asistente_ia_bp.route('/historial/<int:id_audit>')
 @login_required
 def historial_detalle(id_audit: int):
-    if not puede_usar_asistente_ia(current_user):
-        return _bloqueo('No tienes permiso para usar el asistente IA interno.')
+    if not puede_gestionar_asistente_ia(current_user):
+        return _bloqueo(SOLO_ROOT)
     detalle = obtener_historial_interaccion(id_audit)
     if detalle is None:
         flash('Interaccion no encontrada.', 'warning')
@@ -174,7 +180,7 @@ def api_chat():
         'estado': respuesta.get('estado') or 'ok',
         'historial': historial[-MAX_SESSION_MESSAGES:],
         'accion': accion,
-        'consumo_diario': _consumo_diario_usuario(current_user),
+        'consumo_diario': _consumo_visible(current_user),
     })
 
 
@@ -219,14 +225,14 @@ def api_consumo():
 def api_consumo_usuario():
     if not puede_usar_asistente_ia(current_user):
         return _bloqueo('No tienes permiso para usar el asistente IA interno.')
-    return jsonify({'ok': True, 'consumo_diario': _consumo_diario_usuario(current_user)})
+    return jsonify({'ok': True, 'consumo_diario': _consumo_visible(current_user)})
 
 
 @asistente_ia_bp.route('/api/historial')
 @login_required
 def api_historial():
-    if not puede_usar_asistente_ia(current_user):
-        return _bloqueo('No tienes permiso para usar el asistente IA interno.')
+    if not puede_gestionar_asistente_ia(current_user):
+        return _bloqueo(SOLO_ROOT)
     return jsonify({
         'ok': True,
         **buscar_historial_interacciones(
@@ -241,8 +247,8 @@ def api_historial():
 @asistente_ia_bp.route('/api/historial/<int:id_audit>')
 @login_required
 def api_historial_detalle(id_audit: int):
-    if not puede_usar_asistente_ia(current_user):
-        return _bloqueo('No tienes permiso para usar el asistente IA interno.')
+    if not puede_gestionar_asistente_ia(current_user):
+        return _bloqueo(SOLO_ROOT)
     detalle = obtener_historial_interaccion(id_audit)
     if detalle is None:
         return jsonify({'ok': False, 'error': 'no_encontrado', 'mensaje': 'Interaccion no encontrada.'}), 404

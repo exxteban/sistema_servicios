@@ -78,6 +78,9 @@ def ensure_gastronomia_schema():
     GastronomiaClienteFinal.__table__.create(bind=db.engine, checkfirst=True)
     GastronomiaClienteDireccion.__table__.create(bind=db.engine, checkfirst=True)
     GastronomiaClienteFavorito.__table__.create(bind=db.engine, checkfirst=True)
+    from gastronomia.asistente_models import GastronomiaAsistenteMensaje, GastronomiaAsistentePropuesta
+    GastronomiaAsistenteMensaje.__table__.create(bind=db.engine, checkfirst=True)
+    GastronomiaAsistentePropuesta.__table__.create(bind=db.engine, checkfirst=True)
     dialect = db.engine.dialect.name
     if dialect == 'sqlite':
         _ensure_sqlite_columns()
