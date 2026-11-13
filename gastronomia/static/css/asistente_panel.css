@@ -1,0 +1,95 @@
+/* Panel lateral del asistente IA de gastronomia (CSS propio: no depende del build de Tailwind). */
+.ga-lanzador {
+    position: fixed; right: 1rem; bottom: 4.5rem; z-index: 11995;
+    display: flex; align-items: center; gap: .3rem;
+}
+.ga-colapsar {
+    width: 1.5rem; height: 1.5rem; border-radius: 9999px; border: 1px solid rgba(148, 163, 184, .35);
+    background: rgba(15, 23, 42, .85); color: #cbd5e1; font-size: .65rem; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; opacity: .75;
+}
+.ga-colapsar:hover { opacity: 1; color: #fff; }
+.ga-pestana {
+    position: fixed; right: 0; bottom: 4.5rem; z-index: 11995;
+    display: inline-flex; align-items: center; gap: .3rem;
+    padding: .45rem .45rem .45rem .5rem; border: 0; border-radius: .6rem 0 0 .6rem; cursor: pointer;
+    background: #f59e0b; color: #fff; font-size: .75rem; opacity: .8;
+    box-shadow: -4px 4px 12px rgba(0, 0, 0, .25);
+}
+.ga-pestana:hover { opacity: 1; padding-right: .7rem; }
+.ga-pestana .fa-chevron-left { font-size: .6rem; }
+.ga-fab {
+    position: relative;
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .75rem 1.1rem; border: 0; border-radius: 9999px; cursor: pointer;
+    background: #f59e0b; color: #fff; font-weight: 600; font-size: .875rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, .25);
+}
+.ga-fab:hover { background: #d97706; }
+.ga-fondo { position: fixed; inset: 0; z-index: 11996; background: rgba(0, 0, 0, .3); }
+.ga-panel {
+    position: fixed; top: var(--ga-top, 0px); right: 0; bottom: 0; z-index: 11997;
+    width: 100%; max-width: 28rem;
+    display: flex; flex-direction: column;
+    background: #fff; color: #111827;
+    border-left: 1px solid #e5e7eb; box-shadow: -10px 0 30px rgba(0, 0, 0, .2);
+    transform: translateX(100%); transition: transform .2s ease;
+}
+.ga-panel.ga-abierto { transform: translateX(0); }
+.ga-panel.ga-arrastrando { transition: none; user-select: none; }
+.ga-resize {
+    position: absolute; top: 0; bottom: 0; left: -5px; width: 10px; z-index: 2;
+    cursor: ew-resize; touch-action: none;
+}
+.ga-resize::after {
+    content: ''; position: absolute; top: 50%; left: 3px; width: 4px; height: 48px;
+    margin-top: -24px; border-radius: 4px; background: #d1d5db; transition: background .15s;
+}
+.ga-resize:hover::after, .ga-resize:focus::after, .ga-arrastrando .ga-resize::after { background: #f59e0b; }
+.ga-resize:focus { outline: none; }
+@media (max-width: 640px) { .ga-resize { display: none; } }
+.ga-oculto { display: none !important; }
+.ga-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .75rem 1rem; border-bottom: 1px solid #e5e7eb; }
+.ga-titulo { font-weight: 700; display: flex; align-items: center; gap: .5rem; }
+.ga-sub { font-size: .75rem; color: #6b7280; }
+.ga-btn { border: 0; background: transparent; color: #6b7280; border-radius: .5rem; padding: .25rem .5rem; cursor: pointer; font-size: .875rem; }
+.ga-btn:hover { background: #f3f4f6; }
+.ga-cerrar { font-size: 1.4rem; line-height: 1; }
+.ga-aviso { padding: .5rem 1rem; font-size: .75rem; background: #fffbeb; color: #92400e; border-bottom: 1px solid #fcd34d; }
+.ga-ok { padding: .5rem 1rem; font-size: .75rem; background: #ecfdf5; color: #065f46; border-top: 1px solid #a7f3d0; }
+.ga-ok button { border: 0; background: none; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.ga-mensajes { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .75rem; }
+.ga-msg { max-width: 90%; white-space: pre-wrap; border-radius: 1rem; padding: .5rem .8rem; font-size: .875rem; line-height: 1.4; }
+.ga-msg-user { align-self: flex-end; background: #f59e0b; color: #fff; }
+.ga-msg-bot { align-self: flex-start; background: #f3f4f6; color: #1f2937; }
+.ga-enlace {
+    display: inline-flex; align-items: center; gap: .3rem; margin: .15rem 0;
+    padding: .2rem .6rem; border-radius: 9999px; background: #f59e0b; color: #fff !important;
+    font-weight: 600; font-size: .8rem; text-decoration: none !important;
+}
+.ga-enlace::after { content: '\2192'; }
+.ga-enlace:hover { background: #d97706; }
+.ga-pensando { animation: ga-pulso 1.2s ease-in-out infinite; }
+@keyframes ga-pulso { 50% { opacity: .5; } }
+.ga-bienvenida { background: #fffbeb; border-radius: .75rem; padding: .75rem; font-size: .875rem; }
+.ga-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.ga-chip { border: 1px solid #fcd34d; background: #fff; color: #b45309; border-radius: 9999px; padding: .3rem .75rem; font-size: .75rem; font-weight: 600; cursor: pointer; text-align: left; }
+.ga-chip:hover { background: #fef3c7; }
+.ga-form { display: flex; align-items: flex-end; gap: .5rem; padding: .75rem; border-top: 1px solid #e5e7eb; }
+.ga-input { flex: 1; resize: vertical; max-height: 10rem; border: 1px solid #d1d5db; border-radius: .75rem; padding: .5rem .75rem; font-size: .875rem; background: #fff; color: #111827; }
+.ga-enviar { border: 0; border-radius: .75rem; background: #f59e0b; color: #fff; padding: .75rem 1rem; cursor: pointer; }
+.ga-enviar:disabled { opacity: .5; }
+
+@media (min-width: 1024px) { .ga-fondo { display: none; } }
+@media (max-width: 640px) { .ga-fab-texto { display: none; } }
+
+.dark .ga-panel { background: #1f2937; color: #f3f4f6; border-left-color: #374151; }
+.dark .ga-head, .dark .ga-form { border-color: #374151; }
+.dark .ga-sub, .dark .ga-btn { color: #9ca3af; }
+.dark .ga-btn:hover { background: #374151; }
+.dark .ga-msg-bot { background: #374151; color: #f3f4f6; }
+.dark .ga-bienvenida { background: rgba(17, 24, 39, .5); }
+.dark .ga-chip { background: #1f2937; border-color: #b45309; color: #fcd34d; }
+.dark .ga-input { background: #111827; color: #fff; border-color: #4b5563; }
+.dark .ga-aviso { background: rgba(120, 53, 15, .3); color: #fde68a; border-color: #b45309; }
+.dark .ga-ok { background: rgba(6, 78, 59, .3); color: #a7f3d0; border-color: #065f46; }

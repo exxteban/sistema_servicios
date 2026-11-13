@@ -62,6 +62,7 @@ from gastronomia.stock_models import (
     GastronomiaRecetaInsumo,
 )
 from gastronomia.produccion_models import GastronomiaProduccionRegistro, GastronomiaProductoPorcion
+from gastronomia.asistente_models import GastronomiaAsistenteMensaje
 from pedidos.models import PedidoCliente, PedidoClienteDetalle, PedidoClienteHistorial, PedidoClientePago
 from cobranzas.models import PlanCreditoVenta, CuotaCreditoVenta, PagoCuentaCobrarAplicacion
 from flujo_caja.models import FlujoCajaMovimiento, FlujoCajaPlantilla, FlujoCajaSemana

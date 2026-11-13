@@ -165,7 +165,8 @@
     }
 
     function buildShell() {
-        const host = el('div', 'daily-insights-widget');
+        // Oculto hasta saber si fue cerrado por hoy: evita que aparezca un instante y desaparezca.
+        const host = el('div', 'daily-insights-widget is-loading');
         host.dataset.dailyInsightsHost = '1';
         const panel = el('section', 'daily-insights-panel');
         panel.dataset.dailyInsightsPanel = '1';
@@ -204,16 +205,24 @@
     }
 
     function loadInsights() {
-        if (!cfg.url) return;
+        if (!cfg.url) {
+            const host = document.querySelector('[data-daily-insights-host]');
+            if (host) host.classList.remove('is-loading');
+            return;
+        }
         let url = cfg.url;
         if (cfg.preview) {
             const sep = url.includes('?') ? '&' : '?';
             url = `${url}${sep}preview=1`;
         }
+        const revelar = () => {
+            const host = document.querySelector('[data-daily-insights-host]');
+            if (host) host.classList.remove('is-loading');
+        };
         fetch(url, { headers: { 'Accept': 'application/json' } })
             .then((response) => response.ok ? response.json() : null)
             .then((payload) => {
-                if (!payload || !payload.ok) return;
+                if (!payload || !payload.ok) return revelar();
                 state.payload = payload;
                 const host = document.querySelector('[data-daily-insights-host]');
                 if (host && isDismissed(payload)) {
@@ -222,10 +231,11 @@
                     host.style.display = 'none';
                     return;
                 }
+                revelar();
                 updateBadge();
                 maybePoke(payload);
             })
-            .catch(() => { });
+            .catch(revelar);
     }
 
     function init() {
