@@ -1,11 +1,11 @@
-{# Panel lateral del asistente IA. Incluir en cualquier pantalla de gastronomia. #}
-<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/asistente_panel.css', v='asistente-20261113-16') }}">
+{# Panel lateral del asistente IA. Se incluye una sola vez desde el layout (_asistente_global.html). #}
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/asistente_panel.css', v='asistente-20261113-18') }}">
 <div data-gastro-asistente
      data-url-chat="{{ url_for('gastronomia.asistente_api_chat') }}"
      data-url-limpiar="{{ url_for('gastronomia.asistente_api_limpiar') }}"
      data-url-historial="{{ url_for('gastronomia.asistente_api_historial') }}"
      data-url-propuesta="{{ url_for('gastronomia.asistente_api_confirmar', propuesta_id=0)|replace('/0/confirmar', '') }}"
-     data-csrf="{{ csrf_token() }}">
+     data-csrf="{{ csrf_token() }}"{% if asistente_global %} data-global="1"{% endif %}>
 
     <div data-asistente-lanzador class="ga-lanzador">
         <button type="button" data-asistente-colapsar class="ga-colapsar" title="Esconder a un costado" aria-label="Esconder el boton del asistente de configuracion">
@@ -36,6 +36,16 @@
                 <button type="button" data-asistente-cerrar class="ga-btn ga-cerrar" title="Cerrar">&times;</button>
             </div>
         </header>
+
+        {% if asistente_ia_gestion() %}
+        <div data-asistente-root class="ga-root-bar" data-url-consumo="{{ url_for('asistente_ia.api_consumo_usuario') }}">
+            <span data-asistente-consumo class="ga-root-consumo"></span>
+            <a href="{{ url_for('asistente_ia.historial') }}" class="app-tab-link" data-tab-url="{{ url_for('asistente_ia.historial') }}"
+               data-tab-title="Historial IA" data-tab-icon="fas fa-history"><i class="fas fa-history"></i> Historial</a>
+            <a href="{{ url_for('asistente_ia.admin') }}" class="app-tab-link" data-tab-url="{{ url_for('asistente_ia.admin') }}"
+               data-tab-title="Panel IA" data-tab-icon="fas fa-shield-alt"><i class="fas fa-shield-alt"></i> Panel IA</a>
+        </div>
+        {% endif %}
 
         <div data-asistente-aviso class="ga-aviso ga-oculto">
             El asistente IA no esta disponible por ahora. Avisale al administrador del sistema.
@@ -73,6 +83,7 @@
         </form>
     </aside>
 </div>
-<script src="{{ url_for('gastronomia.static', filename='js/asistente_contexto.js', v='asistente-20261113-16') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/asistente_propuesta.js', v='asistente-20261113-16') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/asistente_chat.js', v='asistente-20261113-16') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/asistente_contexto.js', v='asistente-20261113-18') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/asistente_propuesta.js', v='asistente-20261113-18') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/asistente_chat.js', v='asistente-20261113-18') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/asistente_global.js', v='asistente-20261113-18') }}"></script>

@@ -50,7 +50,9 @@
     }
 
     function capturar(root) {
-        const scope = root.closest('[data-app-tab-content], .app-tab-content') || document;
+        const scope = root.closest('[data-app-tab-content], .app-tab-content')
+            || document.querySelector('#app-tab-panels > .app-tab-panel:not([hidden])')
+            || document;
         const ctx = { pantalla: (document.title || '').split(' - ')[0].slice(0, MAX) };
         contextoMenu(scope, ctx);
         const sistema = pestanasSistema();

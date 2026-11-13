@@ -133,6 +133,7 @@
         guardarAbierto(true);
         // Siempre se relee: otra pestana interna pudo haber chateado o limpiado mientras tanto.
         if (!enviando) cargarHistorial();
+        document.dispatchEvent(new CustomEvent('gastro-asistente:abierto'));
         setTimeout(() => input.focus(), 200);
     }
 
@@ -274,6 +275,7 @@
             pensando.textContent = err.message;
         } finally {
             pensando.classList.remove('ga-pensando');
+            document.dispatchEvent(new CustomEvent('gastro-asistente:respuesta'));
             enviando = false;
             boton.disabled = false;
             lista.scrollTop = lista.scrollHeight;
@@ -289,6 +291,8 @@
         mostrarBienvenida();
     }
 
+    root.__abrirAsistente = abrir;
+    root.__cerrarAsistente = cerrar;
     window.addEventListener('resize', () => { ajustarTope(); restaurarAncho(); });
     restaurarAncho();
     iniciarResize();

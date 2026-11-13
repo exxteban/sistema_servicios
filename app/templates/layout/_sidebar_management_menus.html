@@ -230,7 +230,7 @@
         {% endif %}
 
         {% if p_asistente_ia %}
-        <a href="{{ url_for('asistente_ia.chat') }}" data-permiso="usar_asistente_ia"
+        <a href="{{ url_for('asistente_ia.chat') }}" data-permiso="usar_asistente_ia" data-asistente-ia-link
             data-tab-url="{{ url_for('asistente_ia.chat') }}" data-tab-title="Asistente IA"
             data-tab-icon="fas fa-robot"
             class="app-tab-link flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-gray-200 hover:text-white transition-colors group/item">

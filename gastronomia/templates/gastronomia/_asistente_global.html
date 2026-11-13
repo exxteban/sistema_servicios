@@ -1,0 +1,7 @@
+{# Panel del asistente IA disponible en todo el sistema cuando la instalacion es de gastronomia.
+   Vive en el armazon (layout), fuera de las pestanas internas: el boton "Asistente IA" de arriba lo abre
+   desde cualquier pantalla. Las paginas embebidas en pestanas (embed=1) no lo repiten. #}
+{% if current_user.is_authenticated and not embed_mode and gastro_asistente_visible() %}
+{% set asistente_global = True %}
+{% include "gastronomia/_asistente_panel.html" %}
+{% endif %}

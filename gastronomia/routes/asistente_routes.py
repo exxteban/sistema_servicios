@@ -12,6 +12,26 @@ MAX_MENSAJE = 6000
 ESTADOS_CON_RESPUESTA = {'ok', 'limite_rondas'}
 
 
+@gastronomia_bp.app_template_global('gastro_asistente_visible')
+def gastro_asistente_visible() -> bool:
+    """Panel global: instalacion de gastronomia y usuario con permiso de Menu (el mismo que piden sus APIs)."""
+    from gastronomia.services.modo_operacion import gastronomia_activa
+    from gastronomia.services.permisos import tiene_permiso_gastronomia
+
+    try:
+        return bool(gastronomia_activa() and tiene_permiso_gastronomia(PERMISO_MENU))
+    except Exception:  # noqa: BLE001 - nunca romper el layout por el asistente
+        return False
+
+
+@gastronomia_bp.app_template_global('asistente_ia_gestion')
+def asistente_ia_gestion() -> bool:
+    """Consumo, historial y panel de la IA: solo root."""
+    from app.services.ia_backoffice.security import puede_gestionar_asistente_ia
+
+    return puede_gestionar_asistente_ia(current_user)
+
+
 def _usuario_id() -> int:
     return int(current_user.id_usuario)
 

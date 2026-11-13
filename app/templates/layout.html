@@ -36,6 +36,7 @@
     {% if current_user.is_authenticated and not embed_mode and (current_user.tiene_permiso('usar_asistente_ia') or current_user.es_admin()) %}
     {% include 'layout/daily_insights_widget.html' %}
     {% endif %}
+    {% include 'gastronomia/_asistente_global.html' %}
 
     {% include 'layout/reloadable_script_guard.html' %}
     {% include 'layout/tienda_admin_promociones_runtime.html' %}

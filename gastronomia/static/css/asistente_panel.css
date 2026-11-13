@@ -109,3 +109,14 @@
 .dark .ga-prop-titulo { color: #fcd34d; }
 .dark .ga-prop-nota, .dark .ga-prop-estado { color: #d1d5db; }
 .dark .ga-prop-cancelar { color: #e5e7eb; border-color: #4b5563 !important; }
+
+/* Barra solo para root: consumo y accesos a Historial / Panel IA. */
+.ga-root-bar {
+    display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+    padding: .4rem 1rem; border-bottom: 1px solid #e5e7eb; background: #f8fafc; font-size: .75rem; color: #475569;
+}
+.ga-root-consumo { margin-right: auto; }
+.ga-root-bar a { color: #2563eb; text-decoration: none; display: inline-flex; align-items: center; gap: .25rem; }
+.ga-root-bar a:hover { text-decoration: underline; }
+.dark .ga-root-bar { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+.dark .ga-root-bar a { color: #93c5fd; }

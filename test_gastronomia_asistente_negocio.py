@@ -104,3 +104,32 @@ def test_ventas_por_plato_usan_reportes_de_gastronomia_no_productos_de_inventari
         largo = {'periodo': 'custom', 'desde': '2026-01-01', 'hasta': '2026-11-01'}
         assert 'error' in consultas_negocio.ejecutar('ganancia_del_local', largo, admin, '', cliente_id)['data']
         assert consultas_negocio.ejecutar('platos_mas_vendidos', {}, sin_ventas, '', cliente_id)['error'] == 'sin_permiso_ventas'
+
+
+def test_panel_global_en_todo_gastronomia_y_boton_de_arriba_lo_abre():
+    from app.models import Usuario
+
+    app = create_app('testing')
+    _crear_restaurante(app, 'Resto Global', 'resto_global')
+    client = app.test_client()
+    _loguear(client, app, 'resto_global')
+
+    for url in ('/gastronomia/menu', '/gastronomia/caja', '/gastronomia/'):
+        html = client.get(url).get_data(as_text=True)
+        assert html.count('data-gastro-asistente') == 1, url
+        assert 'data-global="1"' in html and 'asistente_global.js' in html
+    # Dentro de una pestana (embed) no se repite: el panel vive en el armazon.
+    assert 'data-gastro-asistente' not in client.get('/gastronomia/menu?embed=1').get_data(as_text=True)
+
+    # El acceso "Asistente IA" queda marcado para que lo intercepte el panel.
+    html = client.get('/gastronomia/menu').get_data(as_text=True)
+    assert 'Abrir Asistente IA' in html and 'data-asistente-ia-link' in html
+    # Consumo, Historial y Panel IA en el panel: solo root.
+    assert 'data-asistente-root' not in html
+
+    with app.app_context():
+        root_id = Usuario.query.filter_by(username='root').first().id_usuario
+    with client.session_transaction() as sesion:
+        sesion['_user_id'] = str(root_id)
+    html = client.get('/gastronomia/menu').get_data(as_text=True)
+    assert 'data-gastro-asistente' in html and 'data-asistente-root' in html and '/asistente-ia/historial' in html

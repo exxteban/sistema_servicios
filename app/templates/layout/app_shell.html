@@ -91,7 +91,7 @@
                     {% include 'layout/_gastos_alert_badge.html' %}
 
                     {% if p_asistente_ia %}
-                    <a href="{{ url_for('asistente_ia.chat') }}" data-permiso="usar_asistente_ia"
+                    <a href="{{ url_for('asistente_ia.chat') }}" data-permiso="usar_asistente_ia" data-asistente-ia-link
                         data-tab-url="{{ url_for('asistente_ia.chat') }}" data-tab-title="Asistente IA"
                         data-tab-icon="fas fa-robot"
                         class="app-tab-link crm-nav-pill inline-flex items-center gap-1.5"

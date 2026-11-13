@@ -144,6 +144,8 @@
         chat.setAttribute('data-tab-title', 'Asistente IA');
         chat.setAttribute('data-tab-icon', 'fas fa-robot');
         chat.classList.add('app-tab-link');
+        // En gastronomia el panel del asistente intercepta este enlace y se abre en el lugar.
+        chat.setAttribute('data-asistente-ia-link', '');
         footer.appendChild(dismiss);
         footer.appendChild(chat);
         panel.appendChild(footer);
@@ -240,6 +242,8 @@
 
     function init() {
         if (!document.body) return;
+        // El panel del asistente de gastronomia se abre encima: los insights se cierran para no taparlo.
+        document.addEventListener('gastro-asistente:abierto', closePanel);
         buildShell();
         loadInsights();
     }
