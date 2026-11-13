@@ -9,9 +9,14 @@ import logging
 
 from app.services.ia_backoffice.security import puede_usar_asistente_ia
 from app.services.ia_backoffice.temporal_args import normalizar_argumentos_temporales
-from app.services.ia_backoffice.tool_handlers import ejecutar_tool_backoffice
+from app.services.ia_backoffice.tool_handlers import _puede_consultar_ventas, ejecutar_tool_backoffice
 from app.services.ia_backoffice.tool_selector import DEFAULT_TOOLS, TOOL_INDEX, nombres_tools_relevantes
 from gastronomia.services.asistente.definiciones import TOOLS as TOOLS_PANEL
+from gastronomia.services.asistente.tools_ventas_local import (
+    TOOLS_BACKOFFICE_REEMPLAZADAS,
+    TOOLS_VENTAS_LOCAL,
+    TOOLS_VENTAS_LOCAL_FN,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +56,18 @@ def nombres_seleccionados(historial: list[dict]) -> list[str]:
     if nombres == [n for n in DEFAULT_TOOLS if n in TOOL_INDEX][:len(nombres)] and not any(p in texto for p in PISTAS_NEGOCIO):
         nombres = []
     dice_modulo = 'modulo' in recientes[-1]['content'].lower()
-    return [
+    salida = [
         n for n in nombres
-        if n in TOOL_INDEX and n not in _NOMBRES_PANEL and (dice_modulo or n not in _SOLO_SI_DICE_MODULO)
+        if n in TOOL_INDEX and n not in _NOMBRES_PANEL and n not in TOOLS_BACKOFFICE_REEMPLAZADAS
+        and (dice_modulo or n not in _SOLO_SI_DICE_MODULO)
     ]
+    # Si se habla de ventas/ganancia, van las versiones de gastronomia (por plato, con costo de recetas).
+    if any(n.startswith(('ventas_', 'metricas_')) or n in TOOLS_BACKOFFICE_REEMPLAZADAS for n in nombres):
+        salida += list(TOOLS_VENTAS_LOCAL_FN)
+    return salida
+
+
+_INDEX_LOCAL = {t['function']['name']: t for t in TOOLS_VENTAS_LOCAL}
 
 
 def tools_para(historial: list[dict], usuario) -> tuple[list[dict], set[str]]:
@@ -62,12 +75,16 @@ def tools_para(historial: list[dict], usuario) -> tuple[list[dict], set[str]]:
     if not habilitadas(usuario):
         return [], set()
     nombres = nombres_seleccionados(historial)
-    return [TOOL_INDEX[n] for n in nombres], set(nombres)
+    return [_INDEX_LOCAL.get(n) or TOOL_INDEX[n] for n in nombres], set(nombres)
 
 
-def ejecutar(nombre: str, args: dict, usuario, consulta: str = '') -> dict:
+def ejecutar(nombre: str, args: dict, usuario, consulta: str = '', cliente_id: int | None = None) -> dict:
     try:
         args = normalizar_argumentos_temporales(args, consulta)
+        if nombre in TOOLS_VENTAS_LOCAL_FN:
+            if not _puede_consultar_ventas(usuario):
+                return {'ok': False, 'error': 'sin_permiso_ventas', 'tool': nombre}
+            return {'ok': True, 'data': TOOLS_VENTAS_LOCAL_FN[nombre](int(cliente_id), args)}
         return ejecutar_tool_backoffice(nombre, args, usuario=usuario)
     except Exception as exc:  # noqa: BLE001 - nunca romper el chat por una consulta
         logger.exception('Error en consulta de negocio %s desde el asistente gastronomia', nombre)
@@ -84,6 +101,8 @@ Consultas del negocio (ventas, caja, cobranzas, stock, gastos, clientes, pedidos
   las tools del local (ver_menu, ver_insumos, ver_plato, estado_configuracion, guardar_*).
 - La fecha de hoy es {fecha}: usala para interpretar hoy, ayer, esta semana, este mes.
 - Montos en guaranies: escribi "Gs." y separador de miles (ej. Gs. 1.250.000), nunca "$".
+- Para platos mas vendidos usa platos_mas_vendidos; para ganancia, margen o rentabilidad usa ganancia_del_local
+  (sale de los pedidos cobrados y el costo de las recetas). Si un dato no aparece en las tools, decilo; no inventes la causa.
 - Si una consulta devuelve sin_permiso_*, deci que ese usuario no tiene acceso a esos datos; no adivines numeros.
 - Estas consultas no modifican nada: no digas que cobraste, anulaste ni cambiaste datos."""
 

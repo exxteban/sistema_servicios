@@ -372,6 +372,14 @@ def _puede_consultar_metricas_operativas(usuario) -> bool:
     )
 
 
+def _ejecutar_handler(nombre: str, handler, args: dict, usuario):
+    """Con gastronomia activa, las tools de ventas por producto suman los platos (guardados como servicio)."""
+    from gastronomia.services.asistente.backoffice_gastronomia import ejecutar_si_gastronomia
+
+    data = ejecutar_si_gastronomia(nombre, args, handler, usuario)
+    return handler(args, usuario=usuario) if data is None else data
+
+
 def ejecutar_tool_backoffice(nombre: str, argumentos: dict | None = None, usuario=None) -> dict:
     handler = BACKOFFICE_TOOL_HANDLERS.get(nombre)
     if not handler:
@@ -441,7 +449,7 @@ def ejecutar_tool_backoffice(nombre: str, argumentos: dict | None = None, usuari
         cacheado = obtener_tool_cache(nombre, args, usuario)
         if cacheado is not None:
             return {'ok': True, 'tool': nombre, 'data': cacheado}
-        data = handler(args, usuario=usuario)
+        data = _ejecutar_handler(nombre, handler, args, usuario)
         guardar_tool_cache(nombre, args, usuario, data)
         return {'ok': True, 'tool': nombre, 'data': data}
     except Exception as exc:

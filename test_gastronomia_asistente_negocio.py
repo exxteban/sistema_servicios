@@ -2,7 +2,7 @@
 from types import SimpleNamespace
 
 from app import create_app
-from gastronomia.services.asistente import consultas_negocio, motor
+from gastronomia.services.asistente import consultas_negocio, motor, tools_ventas_local
 from gastronomia.services.asistente.definiciones import TOOLS
 from test_gastronomia_asistente_ia import _FakeClient, _tool_call
 from test_gastronomia_menu import _crear_restaurante, _csrf, _loguear
@@ -83,3 +83,24 @@ def test_panel_responde_consulta_de_ventas_con_tool_del_backoffice(monkeypatch):
     client.post('/gastronomia/asistente/api/chat', headers=headers, json={'mensaje': 'ponele 150 g de carne a la clasica'})
     assert {t['function']['name'] for t in enviados[2]['tools']} == NOMBRES_PANEL
     assert 'Consultas del negocio' not in enviados[2]['messages'][0]['content']
+
+
+def test_ventas_por_plato_usan_reportes_de_gastronomia_no_productos_de_inventario():
+    app = create_app('testing')
+    cliente_id = _crear_restaurante(app, 'Resto Platos', 'resto_platos')
+    nombres = consultas_negocio.nombres_seleccionados([_u('cual fue el plato mas vendido y cuanto gane este mes?')])
+    assert {'platos_mas_vendidos', 'ganancia_del_local'} <= set(nombres)
+    # Estas cruzan DetalleVenta.id_producto y en gastronomia (plato = servicio) darian vacio o ganancia sin costo.
+    assert not set(nombres) & tools_ventas_local.TOOLS_BACKOFFICE_REEMPLAZADAS
+    assert 'platos_mas_vendidos' not in consultas_negocio.nombres_seleccionados([_u('como esta la caja')])
+
+    admin = SimpleNamespace(is_authenticated=True, es_admin=lambda: True, tiene_permiso=lambda c: True)
+    sin_ventas = SimpleNamespace(is_authenticated=True, es_admin=lambda: False, tiene_permiso=lambda c: False)
+    with app.app_context():
+        r = consultas_negocio.ejecutar('platos_mas_vendidos', {'periodo': '7d'}, admin, 'plato mas vendido', cliente_id)
+        assert r['ok'] and r['data']['platos'] == [] and r['data']['periodo'] == 'Ultimos 7 dias'
+        r = consultas_negocio.ejecutar('ganancia_del_local', {'periodo': 'mes'}, admin, 'cuanto gane', cliente_id)
+        assert r['ok'] and r['data']['totales']['ventas'] == 0 and 'dias' not in r['data']
+        largo = {'periodo': 'custom', 'desde': '2026-01-01', 'hasta': '2026-11-01'}
+        assert 'error' in consultas_negocio.ejecutar('ganancia_del_local', largo, admin, '', cliente_id)['data']
+        assert consultas_negocio.ejecutar('platos_mas_vendidos', {}, sin_ventas, '', cliente_id)['error'] == 'sin_permiso_ventas'

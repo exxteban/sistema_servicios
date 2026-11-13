@@ -102,8 +102,9 @@ def ventas_por_metodo(cliente_id: int, inicio: datetime, fin: datetime) -> list[
     ]
 
 
-def productos_mas_vendidos(cliente_id: int, inicio: datetime, fin: datetime, limite: int = 10) -> list[dict]:
-    filas = (
+def productos_mas_vendidos(cliente_id: int, inicio: datetime, fin: datetime, limite: int | None = 10) -> list[dict]:
+    """Platos vendidos en el periodo (por pago). limite=None trae todos (para costos/rentabilidad)."""
+    consulta = (
         db.session.query(
             GastronomiaPedidoItem.producto_id,
             GastronomiaPedidoItem.nombre_producto,
@@ -120,9 +121,10 @@ def productos_mas_vendidos(cliente_id: int, inicio: datetime, fin: datetime, lim
         )
         .group_by(GastronomiaPedidoItem.producto_id, GastronomiaPedidoItem.nombre_producto)
         .order_by(func.sum(GastronomiaPedidoItem.cantidad).desc())
-        .limit(max(1, min(50, int(limite or 10))))
-        .all()
     )
+    if limite is not None:
+        consulta = consulta.limit(max(1, min(50, int(limite or 10))))
+    filas = consulta.all()
     return [
         {
             'producto_id': producto_id,

@@ -102,7 +102,7 @@ def generar_respuesta(historial: list[dict], cliente_id: int, usuario) -> dict:
                 if tc.function.name in TOOLS_ESCRITURA:
                     resultado = propuestas.preparar(tc.function.name, args, cliente_id, pendientes, acciones)
                 elif tc.function.name in nombres_negocio:
-                    resultado = consultas_negocio.ejecutar(tc.function.name, args, usuario, consulta)
+                    resultado = consultas_negocio.ejecutar(tc.function.name, args, usuario, consulta, cliente_id)
                 else:
                     resultado = ejecutar_tool(tc.function.name, args, cliente_id, usuario_id)
                 tools_usadas.append(tc.function.name)
