@@ -144,7 +144,12 @@
         guardarAbierto(false);
     }
 
-    const ENLACE_RE = /\[([^\]\n]{1,80})\]\((\/(?!\/)[^)\s]{0,300})\)/g;
+    // Sin "\": el navegador trata "/\host" como "//host" (enlace a otro sitio).
+    const ENLACE_RE = /\[([^\]\n]{1,80})\]\((\/(?![\/\\])[^)\s\\]{0,300})\)/g;
+
+    function esRutaInterna(href) {
+        try { return new URL(href, window.location.origin).origin === window.location.origin; } catch (e) { return false; }
+    }
 
     function tituloPestana(href) {
         if (href.includes('/salon')) return ['Configurar salon', 'fas fa-chair'];
@@ -159,6 +164,7 @@
     function pintarTexto(div, texto) {
         let ultimo = 0;
         texto.replace(ENLACE_RE, (completo, etiqueta, href, pos) => {
+            if (!esRutaInterna(href)) return completo;
             div.appendChild(document.createTextNode(texto.slice(ultimo, pos)));
             const a = document.createElement('a');
             const [titulo, icono] = tituloPestana(href);
@@ -224,6 +230,8 @@
             alResolver: (data) => {
                 burbuja(data.mensaje || 'Listo.', 'assistant');
                 if (data.hubo_cambios) avisoRecarga.classList.remove('ga-oculto');
+                // La barra "Se guardaron cambios" achica la lista: sin esto el resultado queda tapado.
+                lista.scrollTop = lista.scrollHeight;
             },
         });
     }
