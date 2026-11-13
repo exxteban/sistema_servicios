@@ -76,6 +76,11 @@ def _resolver_parametros_ia() -> dict:
 @usuarios_bp.route('/configuracion/ia', methods=['POST'])
 @login_required
 def configuracion_ia():
+    from app.services.ia_backoffice.security import es_usuario_root
+
+    if not es_usuario_root(current_user):
+        flash('Solo el usuario root puede configurar la IA.', 'danger')
+        return redirect(url_for('usuarios.configuracion'))
     if not current_user.tiene_permiso('gestionar_usuarios'):
         if getattr(current_user, 'modo_demo', False):
             flash('Modo demo: esta acción está deshabilitada.', 'warning')

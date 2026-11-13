@@ -566,5 +566,8 @@ def inicializar_datos_base(config_name=None):
             raise
     
     ensure_rol_contador(commit=False)
+    from app.services.ia_backoffice.settings import migrar_cuotas_default
+
+    migrar_cuotas_default()
     db.session.commit()
     print("[OK] Datos base inicializados correctamente")

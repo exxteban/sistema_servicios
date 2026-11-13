@@ -89,6 +89,7 @@ def configuracion():
         logo_tamano_maximo_mb=2,
         ia_backoffice_config=obtener_configuracion_asistente(),
         ia_backoffice_puede_gestionar=puede_gestionar_asistente_ia(current_user),
+        puede_configurar_ia=es_usuario_root(current_user),
     )
 
 

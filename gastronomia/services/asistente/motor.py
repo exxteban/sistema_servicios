@@ -69,7 +69,7 @@ def generar_respuesta(historial: list[dict], cliente_id: int, usuario) -> dict:
         return _respuesta(mensaje_presupuesto_excedido(motivo), motivo, cfg)
     client, _ = _crear_cliente(cfg.provider, cfg.deepseek_base_url)
     if client is None:
-        return _respuesta('El asistente IA no tiene API key configurada todavia.', 'sin_api_key', cfg)
+        return _respuesta('El asistente IA no esta disponible por ahora. Avisale al administrador del sistema.', 'sin_api_key', cfg)
 
     usage = {'tokens_prompt': 0, 'tokens_completion': 0}
     tools_usadas, acciones = [], []

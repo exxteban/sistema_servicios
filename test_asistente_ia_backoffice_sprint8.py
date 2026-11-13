@@ -160,7 +160,8 @@ def test_sprint8_presupuesto_diario_bloquea_cuando_consumo_mas_estimado_supera_l
         assert permitido is False
         assert motivo == 'presupuesto_diario_excedido'
         assert respuesta['estado'] == 'presupuesto_diario_excedido'
-        assert 'presupuesto diario' in respuesta['contenido']
+        assert 'limite diario' in respuesta['contenido']
+        assert 'ampliar la cuota' in respuesta['contenido']
 
 
 def test_sprint8_presupuesto_mensual_bloquea_sin_api_key():
@@ -183,7 +184,8 @@ def test_sprint8_presupuesto_mensual_bloquea_sin_api_key():
         respuesta = generar_respuesta_backoffice([{'role': 'user', 'content': 'Resumen de caja'}], admin)
 
         assert respuesta['estado'] == 'presupuesto_mensual_excedido'
-        assert 'presupuesto mensual' in respuesta['contenido']
+        assert 'limite mensual' in respuesta['contenido']
+        assert 'administrador' in respuesta['contenido']
 
 
 def test_sprint8_endpoint_consumo_es_solo_para_root_y_devuelve_metricas():
@@ -233,16 +235,22 @@ def test_sprint8_endpoint_consumo_usuario_devuelve_solo_consumo_del_usuario_actu
         registrar_interaccion(admin, 'Admin uso', 'Respuesta', tokens_prompt=10, tokens_completion=15)
         registrar_interaccion(root, 'Root uso', 'Respuesta', tokens_prompt=40, tokens_completion=20)
         admin_id = admin.id_usuario
+        root_id = root.id_usuario
 
-    _loguear(client, admin_id)
+    _loguear(client, root_id)
     response = client.get('/asistente-ia/api/consumo-usuario')
     assert response.status_code == 200
     data = response.get_json()
 
     assert data['ok'] is True
     assert data['consumo_diario']['limite'] == 100
-    assert data['consumo_diario']['usado'] == 25
-    assert data['consumo_diario']['restante'] == 75
+    assert data['consumo_diario']['usado'] == 60
+    assert data['consumo_diario']['restante'] == 40
+
+    # El consumo y los limites son configuracion: un admin no los ve.
+    _loguear(client, admin_id)
+    data = client.get('/asistente-ia/api/consumo-usuario').get_json()
+    assert data['ok'] is True and data['consumo_diario'] is None
 
 
 def test_sprint8_endpoint_historial_es_root_only_y_busca_consultas():
@@ -264,15 +272,15 @@ def test_sprint8_endpoint_historial_es_root_only_y_busca_consultas():
 
     _loguear(client, admin_id)
     response = client.get('/asistente-ia/api/historial?q=abril&top_n=5')
+    assert response.status_code == 403
+
+    _loguear(client, root_id)
+    response = client.get('/asistente-ia/api/historial?q=abril&top_n=5')
     assert response.status_code == 200
     data = response.get_json()
     assert data['ok'] is True
     assert data['items']
     assert any('abril' in (item['pregunta_preview'] or '').lower() for item in data['items'])
-
-    _loguear(client, root_id)
-    response = client.get('/asistente-ia/api/historial?q=abril&top_n=5')
-    assert response.status_code == 200
 
 
 def test_sprint8_endpoint_historial_detalle_devuelve_interaccion_y_no_reanuda_chat():
@@ -291,8 +299,13 @@ def test_sprint8_endpoint_historial_detalle_devuelve_interaccion_y_no_reanuda_ch
         )
         audit_id = audit.id_audit
         admin_id = admin.id_usuario
+        root_id = Usuario.query.filter_by(username='root').first().id_usuario
 
     _loguear(client, admin_id)
+    assert client.get(f'/asistente-ia/api/historial/{audit_id}').status_code == 403
+    assert client.get(f'/asistente-ia/historial/{audit_id}').status_code in (302, 303, 403)
+
+    _loguear(client, root_id)
     response = client.get(f'/asistente-ia/api/historial/{audit_id}')
     assert response.status_code == 200
     data = response.get_json()
@@ -330,23 +343,17 @@ def test_sprint8_consumo_diario_se_renderiza_en_chat_y_panel_admin_es_root_only(
     response = client.get('/asistente-ia/')
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert 'ia-chat-usage' in html
-    assert 'Consumo diario IA' in html
+    assert 'ia-chat-usage' not in html
+    assert 'Consumo diario IA' not in html
     assert 'caja y fidelización' in html
     assert 'ia-consumo-panel' not in html
     assert 'admin.js' not in html
     assert 'Panel IA' not in html
-    assert 'Historial' in html
-    assert '/asistente-ia/historial' in html
+    assert '/asistente-ia/historial' not in html
     response = client.get('/asistente-ia/admin')
     assert response.status_code in (302, 303)
     response = client.get('/asistente-ia/historial')
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    assert 'Historial de consultas' in html
-    assert 'Solo lectura' in html
-    assert 'Abrir en otra pestana' in html
-    assert 'js/asistente_ia/historial.js' in html
+    assert response.status_code in (302, 303, 403)
 
     _loguear(client, root_id)
     response = client.get('/asistente-ia/')
@@ -391,9 +398,9 @@ def test_sprint8_historial_renderiza_paginacion_optimizada():
             tokens_completion=7,
             tools_usadas=['ventas_resumen_periodo'],
         )
-        admin_id = admin.id_usuario
+        root_id = Usuario.query.filter_by(username='root').first().id_usuario
 
-    _loguear(client, admin_id)
+    _loguear(client, root_id)
     response = client.get('/asistente-ia/historial')
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -434,10 +441,10 @@ def test_sprint8_api_chat_devuelve_consumo_diario_actualizado():
             Configuracion.establecer_bool(CLAVE_ENABLED, True)
             Configuracion.establecer(CLAVE_DAILY_TOKEN_BUDGET, '100')
             Configuracion.establecer(CLAVE_MONTHLY_TOKEN_BUDGET, '0')
-            admin = Usuario.query.filter_by(username='admin').first()
-            admin_id = admin.id_usuario
+            root = Usuario.query.filter_by(username='root').first()
+            root_id = root.id_usuario
 
-        _loguear(client, admin_id)
+        _loguear(client, root_id)
         csrf = client.get('/auth/csrf').get_json()['csrf_token']
         response = client.post(
             '/asistente-ia/api/chat',
@@ -497,3 +504,84 @@ def test_sprint8_resumen_historial_respeta_limite_de_caracteres():
 
     assert len(resumen) <= 300
     assert 'Asistente:' in resumen
+
+
+def test_cuota_mensual_es_de_toda_la_instalacion_y_la_diaria_por_usuario():
+    app = create_app('testing')
+
+    with app.app_context():
+        admin = Usuario.query.filter_by(username='admin').first()
+        root = Usuario.query.filter_by(username='root').first()
+        Configuracion.establecer_bool(CLAVE_ENABLED, True)
+        Configuracion.establecer(CLAVE_MAX_TOKENS, '10')
+        registrar_interaccion(root, 'Consumo de otro usuario', 'Respuesta', tokens_prompt=15, tokens_completion=5)
+
+        # Mensual: el consumo de root tambien cuenta para admin.
+        Configuracion.establecer(CLAVE_DAILY_TOKEN_BUDGET, '0')
+        Configuracion.establecer(CLAVE_MONTHLY_TOKEN_BUDGET, '25')
+        assert validar_presupuesto_tokens(10, usuario=admin) == (False, 'presupuesto_mensual_excedido')
+
+        # Diario: solo cuenta lo de cada usuario.
+        Configuracion.establecer(CLAVE_DAILY_TOKEN_BUDGET, '25')
+        Configuracion.establecer(CLAVE_MONTHLY_TOKEN_BUDGET, '0')
+        assert validar_presupuesto_tokens(10, usuario=admin) == (True, 'ok')
+        assert validar_presupuesto_tokens(10, usuario=root) == (False, 'presupuesto_diario_excedido')
+
+
+def test_integracion_ia_y_cuota_por_defecto_solo_root():
+    from app.services.ia_backoffice.settings import obtener_configuracion_asistente
+
+    app = create_app('testing')
+    client = app.test_client()
+    with app.app_context():
+        assert obtener_configuracion_asistente().monthly_token_budget == 3000000
+        assert obtener_configuracion_asistente().daily_token_budget == 200000
+        root_id = Usuario.query.filter_by(username='root').first().id_usuario
+        admin_id = Usuario.query.filter_by(username='admin').first().id_usuario
+        Configuracion.establecer('ia_model', 'modelo-secreto-root')
+
+    _loguear(client, admin_id)
+    html = client.get('/usuarios/configuracion').get_data(as_text=True)
+    assert 'Integración IA' not in html and 'modelo-secreto-root' not in html
+    csrf = client.get('/auth/csrf').get_json()['csrf_token']
+    client.post('/usuarios/configuracion/ia', data={'ia_model': 'cambio-admin', 'csrf_token': csrf})
+    with app.app_context():
+        assert Configuracion.obtener('ia_model', '') == 'modelo-secreto-root'
+
+    _loguear(client, root_id)
+    html = client.get('/usuarios/configuracion').get_data(as_text=True)
+    assert 'Integración IA' in html and 'modelo-secreto-root' in html
+
+
+def test_migracion_cuotas_viejas_pasan_a_200k_y_3m_una_sola_vez():
+    from app.services.ia_backoffice.settings import CLAVE_CUOTAS_MIGRADAS, migrar_cuotas_default
+
+    app = create_app('testing')
+    with app.app_context():
+        Configuracion.establecer(CLAVE_DAILY_TOKEN_BUDGET, '50000')
+        Configuracion.establecer(CLAVE_MONTHLY_TOKEN_BUDGET, '1000000')
+        db.session.query(Configuracion).filter_by(clave=CLAVE_CUOTAS_MIGRADAS).delete()
+        db.session.commit()
+        migrar_cuotas_default()
+        assert Configuracion.obtener(CLAVE_DAILY_TOKEN_BUDGET) == '200000'
+        assert Configuracion.obtener(CLAVE_MONTHLY_TOKEN_BUDGET) == '3000000'
+        # Root las vuelve a poner a mano: no se pisan.
+        Configuracion.establecer(CLAVE_DAILY_TOKEN_BUDGET, '50000')
+        Configuracion.establecer(CLAVE_MONTHLY_TOKEN_BUDGET, '1000000')
+        migrar_cuotas_default()
+        assert Configuracion.obtener(CLAVE_DAILY_TOKEN_BUDGET) == '50000'
+        assert Configuracion.obtener(CLAVE_MONTHLY_TOKEN_BUDGET) == '1000000'
+
+
+def test_migracion_no_toca_cuotas_personalizadas():
+    from app.services.ia_backoffice.settings import CLAVE_CUOTAS_MIGRADAS, migrar_cuotas_default
+
+    app = create_app('testing')
+    with app.app_context():
+        Configuracion.establecer(CLAVE_DAILY_TOKEN_BUDGET, '80000')
+        Configuracion.establecer(CLAVE_MONTHLY_TOKEN_BUDGET, '0')
+        db.session.query(Configuracion).filter_by(clave=CLAVE_CUOTAS_MIGRADAS).delete()
+        db.session.commit()
+        migrar_cuotas_default()
+        assert Configuracion.obtener(CLAVE_DAILY_TOKEN_BUDGET) == '80000'
+        assert Configuracion.obtener(CLAVE_MONTHLY_TOKEN_BUDGET) == '0'
