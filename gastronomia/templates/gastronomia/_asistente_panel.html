@@ -55,7 +55,7 @@
                         'Donde configuro las mesas?',
                         'Que me falta para empezar a vender?',
                         'Cargame el menu por mi: te lo paso por aca',
-                    ] %}
+                    ] + (['Como vienen las ventas y la caja hoy?'] if current_user.tiene_permiso('usar_asistente_ia') or current_user.es_admin() else []) %}
                     <button type="button" data-asistente-sugerencia class="ga-chip">{{ sugerencia }}</button>
                     {% endfor %}
                 </div>

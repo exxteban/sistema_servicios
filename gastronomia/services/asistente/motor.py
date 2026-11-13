@@ -18,7 +18,7 @@ from app.services.ia_backoffice.response_engine import (
     _usage_dict,
 )
 from app.services.ia_backoffice.settings import obtener_configuracion_asistente
-from gastronomia.services.asistente import propuestas
+from gastronomia.services.asistente import consultas_negocio, propuestas
 from gastronomia.services.asistente.contexto_pantalla import etiqueta_contexto
 from gastronomia.services.asistente.definiciones import TOOLS
 from gastronomia.services.asistente.ejecutor import ejecutar_tool, guardo_algo as _guardo_algo  # noqa: F401
@@ -71,14 +71,20 @@ def generar_respuesta(historial: list[dict], cliente_id: int, usuario) -> dict:
     if client is None:
         return _respuesta('El asistente IA no tiene API key configurada todavia.', 'sin_api_key', cfg)
 
-    messages = _mensajes(historial)
     usage = {'tokens_prompt': 0, 'tokens_completion': 0}
     tools_usadas, acciones = [], []
     pendientes = propuestas.nuevas_pendientes()
     usuario_id = getattr(usuario, 'id_usuario', None)
+    # Consultas de negocio del Asistente IA del topbar (solo lectura), elegidas por lo que pide el usuario.
+    tools_negocio, nombres_negocio = consultas_negocio.tools_para(historial, usuario)
+    tools_modelo = TOOLS + tools_negocio
+    messages = _mensajes(historial)
+    if tools_negocio:
+        messages[0]['content'] += consultas_negocio.prompt_extra()
+    consulta = next((m.get('content') or '' for m in reversed(historial) if m.get('role') == 'user'), '')
     try:
         for _ in range(MAX_RONDAS):
-            response = client.chat.completions.create(**_completion_kwargs(cfg, messages, tools=TOOLS))
+            response = client.chat.completions.create(**_completion_kwargs(cfg, messages, tools=tools_modelo))
             for clave, valor in _usage_dict(response).items():
                 usage[clave] += valor
             message = response.choices[0].message
@@ -95,6 +101,8 @@ def generar_respuesta(historial: list[dict], cliente_id: int, usuario) -> dict:
                     args = {}
                 if tc.function.name in TOOLS_ESCRITURA:
                     resultado = propuestas.preparar(tc.function.name, args, cliente_id, pendientes, acciones)
+                elif tc.function.name in nombres_negocio:
+                    resultado = consultas_negocio.ejecutar(tc.function.name, args, usuario, consulta)
                 else:
                     resultado = ejecutar_tool(tc.function.name, args, cliente_id, usuario_id)
                 tools_usadas.append(tc.function.name)
