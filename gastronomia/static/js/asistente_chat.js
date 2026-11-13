@@ -194,14 +194,29 @@
         return data;
     }
 
+    function mostrarPropuesta(propuesta) {
+        const modulo = window.GastroAsistentePropuesta;
+        if (!modulo || !propuesta) return;
+        modulo.pintar(propuesta, {
+            lista,
+            base: root.dataset.urlPropuesta,
+            pedir,
+            alResolver: (data) => {
+                burbuja(data.mensaje || 'Listo.', 'assistant');
+                if (data.hubo_cambios) avisoRecarga.classList.remove('ga-oculto');
+            },
+        });
+    }
+
     async function cargarHistorial() {
         try {
             const data = await pedir(root.dataset.urlHistorial, 'GET');
             $('[data-asistente-aviso]').classList.toggle('ga-oculto', !!data.ia_habilitada);
             const historial = data.historial || [];
-            if (!historial.length) return mostrarBienvenida();
+            if (!historial.length && !data.propuesta) return mostrarBienvenida();
             lista.innerHTML = '';
             historial.forEach((m) => burbuja(m.content, m.role));
+            mostrarPropuesta(data.propuesta);
         } catch (err) {
             mostrarBienvenida();
         }
@@ -226,6 +241,7 @@
             pintarTexto(pensando, data.mensaje || 'Listo.');
             $('[data-asistente-aviso]').classList.toggle('ga-oculto', data.estado !== 'desactivado');
             if (data.hubo_cambios) avisoRecarga.classList.remove('ga-oculto');
+            mostrarPropuesta(data.propuesta);
         } catch (err) {
             pensando.textContent = err.message;
         } finally {

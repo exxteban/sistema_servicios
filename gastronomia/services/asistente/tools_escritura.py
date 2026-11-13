@@ -6,7 +6,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from app import db
 from app.models.producto import Categoria, Producto
-from gastronomia.services.asistente import resolver
+from gastronomia.services.asistente import combinar, resolver
 from gastronomia.services.costos_service import guardar_costo_extra, guardar_precio_compra_insumo
 from gastronomia.services.menu_service import (
     actualizar_estado_producto,
@@ -67,29 +67,48 @@ def _con_resultados(items, fn) -> dict:
 def crear_categorias(cliente_id: int, args: dict) -> dict:
     def _uno(item):
         data = item if isinstance(item, dict) else {'nombre': item}
-        existente = resolver.categoria(cliente_id, data.get('nombre'))
-        if existente and resolver.normalizar(existente.nombre) == resolver.normalizar(data.get('nombre')):
+        existente = resolver.categoria(cliente_id, data.get('nombre'), exacto=True)
+        if existente:
             return {'id_categoria': existente.id_categoria, 'nombre': existente.nombre, 'ya_existia': True}
         cat = guardar_categoria(cliente_id, {'visible': True, **data})
         return {'id_categoria': cat.id_categoria, 'nombre': cat.nombre}
     return _con_resultados(_lote(args, 'categorias'), _uno)
 
 
+def plato_existente(cliente_id: int, item: dict):
+    """Plato a editar: por id (y el nombre, si viene, debe coincidir) o por nombre exacto.
+
+    Evita que un id equivocado de la IA renombre y pise otro plato: renombrar exige nuevo_nombre.
+    """
+    if item.get('id_producto') not in (None, ''):
+        existente = resolver.plato_para_escribir(cliente_id, item['id_producto'])
+        if item.get('nombre') and resolver.normalizar(item['nombre']) != resolver.normalizar(existente.nombre):
+            raise ValueError(
+                f"El id {item['id_producto']} es el plato '{existente.nombre}', no '{item['nombre']}'. "
+                'Para renombrar usa nuevo_nombre; si es otro plato, no mandes id_producto.'
+            )
+        return existente
+    return resolver.plato(cliente_id, item.get('nombre'), exacto=True)
+
+
+def categoria_de_plato(cliente_id: int, item: dict, existente):
+    if item.get('categoria'):
+        return resolver.categoria_para_escribir(cliente_id, item['categoria'])
+    if existente:
+        return existente.categoria
+    raise ValueError(f"Falta la categoria del plato nuevo '{item.get('nombre')}'.")
+
+
 def guardar_platos(cliente_id: int, args: dict) -> dict:
-    """Crea o edita platos. Si existe uno con el mismo nombre, lo actualiza."""
+    """Crea o edita platos. Si existe uno con el mismo nombre exacto, lo actualiza."""
     def _uno(item):
-        categoria = resolver.categoria(cliente_id, item.get('categoria'))
-        if item.get('categoria') and not categoria:
-            raise ValueError(f"Categoria '{item.get('categoria')}' no existe. Creala primero.")
-        existente = resolver.plato(cliente_id, item.get('id_producto') or item.get('nombre'))
-        if existente and item.get('id_producto') is None and resolver.normalizar(existente.nombre) != resolver.normalizar(item.get('nombre')):
-            existente = None
-        if not categoria and existente:
-            categoria = existente.categoria
-        if not categoria:
-            raise ValueError(f"Categoria '{item.get('categoria')}' no existe. Creala primero.")
+        existente = plato_existente(cliente_id, item)
+        categoria = categoria_de_plato(cliente_id, item, existente)
+        nombre = str(item.get('nuevo_nombre') or item.get('nombre') or (existente.nombre if existente else '')).strip()
+        if not nombre:
+            raise ValueError('El plato necesita nombre.')
         data = {
-            'nombre': item.get('nombre') or (existente.nombre if existente else ''),
+            'nombre': nombre,
             'categoria_id': categoria.id_categoria,
             'descripcion': item.get('descripcion', existente.descripcion if existente else ''),
             'precio': _monto(item.get('precio'), existente.precio if existente else 0),
@@ -108,15 +127,13 @@ def guardar_platos(cliente_id: int, args: dict) -> dict:
 
 
 def cambiar_estado_plato(cliente_id: int, args: dict) -> dict:
-    plato = resolver.plato(cliente_id, args.get('plato'))
-    if not plato:
-        return {'error': 'Plato no encontrado.'}
+    plato = resolver.plato_para_escribir(cliente_id, args.get('plato'))
     data = {k: args[k] for k in ('precio', 'disponible', 'visible', 'publicado_tienda') if k in args}
     if 'precio' in data:
         data['precio'] = _monto(data['precio'])
     actualizar_estado_producto(cliente_id, plato.id_producto, data)
     if 'costo_extra' in args:
-        guardar_costo_extra(cliente_id, plato.id_producto, args['costo_extra'])
+        guardar_costo_extra(cliente_id, plato.id_producto, _monto(args['costo_extra']))
     return {'id_producto': plato.id_producto, 'nombre': plato.nombre, 'cambios': list(data) + (['costo_extra'] if 'costo_extra' in args else [])}
 
 
@@ -155,9 +172,7 @@ def guardar_insumos(cliente_id: int, args: dict, usuario_id: int | None = None) 
         unidad = str(item.get('unidad') or 'unidad').strip().lower()
         if unidad not in UNIDADES_STOCK:
             raise ValueError(f"Unidad '{unidad}' invalida. Usa: {', '.join(sorted(UNIDADES_STOCK))}.")
-        existente = resolver.insumo(cliente_id, nombre)
-        if existente and resolver.normalizar(existente.nombre) != resolver.normalizar(nombre):
-            existente = None
+        existente = resolver.insumo(cliente_id, nombre, exacto=True)
         if existente:
             if item.get('unidad') and unidad != (existente.unidad_stock or 'unidad'):
                 if _insumo_en_uso(cliente_id, existente):
@@ -197,59 +212,98 @@ def guardar_insumos(cliente_id: int, args: dict, usuario_id: int | None = None) 
 
 
 def guardar_receta_plato(cliente_id: int, args: dict) -> dict:
-    """Reemplaza la receta completa del plato (insumo + cantidad en su unidad)."""
-    plato = resolver.plato(cliente_id, args.get('plato'))
-    if not plato:
-        return {'error': 'Plato no encontrado.'}
-    items, faltantes = [], []
+    """Agrega/actualiza, quita o reemplaza ingredientes de la receta (cantidad en la unidad del insumo)."""
+    plato = resolver.plato_para_escribir(cliente_id, args.get('plato'))
+    modo = combinar.modo(args)
+    pedido, faltantes, invalidas = {}, [], []
     for fila in _lote(args, 'ingredientes'):
-        insumo = resolver.insumo(cliente_id, fila.get('insumo'))
+        fila = fila if isinstance(fila, dict) else {'insumo': fila}
+        insumo = resolver.insumo(cliente_id, fila.get('insumo'), exacto=True)
         if not insumo:
             faltantes.append(fila.get('insumo'))
             continue
-        items.append({'insumo_id': insumo.id_producto, 'cantidad': int(round(float(fila.get('cantidad') or 0)))})
+        if modo == 'quitar':
+            pedido[insumo.id_producto] = 0
+            continue
+        try:
+            pedido[insumo.id_producto] = combinar.cantidad_receta(fila.get('cantidad'), insumo)
+        except ValueError as exc:
+            invalidas.append(str(exc))
     if faltantes:
         return {'error': 'Insumos inexistentes, crealos primero con guardar_insumos.', 'faltantes': faltantes}
+    if invalidas:
+        return {'error': 'Cantidades invalidas, no se guardo nada.', 'detalle': invalidas}
     actual = obtener_receta(cliente_id, plato.id_producto)
+    previos = {i['insumo_id']: i['cantidad'] for i in actual['items']}
+    final = combinar.combinar(previos, pedido, modo)
+    items = [{'insumo_id': k, 'cantidad': v} for k, v in final.items()]
     opciones = [
         {'opcion_id': o['opcion_id'], 'insumo_id': o['insumo_id'], 'cantidad_delta': o['cantidad_delta']}
         for o in actual.get('opciones', [])
     ]
     receta = guardar_receta(cliente_id, plato.id_producto, {'items': items, 'opciones': opciones})
-    return {'plato': plato.nombre, 'ingredientes': [(i['insumo_nombre'], i['cantidad'], i['unidad_stock']) for i in receta['items']]}
+    return {'plato': plato.nombre, 'modo': modo,
+            'ingredientes': [(i['insumo_nombre'], i['cantidad'], i['unidad_stock']) for i in receta['items']]}
+
+
+def _nombre_item(item) -> str:
+    return str((item.get('nombre') if isinstance(item, dict) else item) or '').strip()
 
 
 def configurar_extras_plato(cliente_id: int, args: dict) -> dict:
-    plato = resolver.plato(cliente_id, args.get('plato'))
-    if not plato:
-        return {'error': 'Plato no encontrado.'}
-    hecho = {}
+    plato = resolver.plato_para_escribir(cliente_id, args.get('plato'))
+    modo = combinar.modo(args)
+    hecho = {'modo': modo}
     if 'adicionales' in args:
-        lineas = [f"{a.get('nombre')}|{_monto(a.get('precio'))}" for a in _lote(args, 'adicionales') if isinstance(a, dict)]
+        pedido = {
+            resolver.normalizar(_nombre_item(a)): (_nombre_item(a), a.get('precio') if isinstance(a, dict) else 0)
+            for a in _lote(args, 'adicionales') if _nombre_item(a)
+        }
+        final = combinar.combinar(combinar.adicionales_actuales(cliente_id, plato.id_producto), pedido, modo)
+        lineas = [f'{nombre}|{_monto(precio)}' for nombre, precio in final.values()]
         sincronizar_adicionales_precio(cliente_id, plato.id_producto, lineas)
-        hecho['adicionales'] = len(lineas)
+        hecho['adicionales'] = [nombre for nombre, _ in final.values()]
     if 'quitables' in args:
-        nombres = [str(n) for n in _lote(args, 'quitables')]
-        sincronizar_ingredientes_removibles(cliente_id, plato.id_producto, nombres)
-        hecho['quitables'] = len(nombres)
+        actuales = combinar.quitables_actuales(cliente_id, plato.id_producto)
+        pedido = {}
+        for q in _lote(args, 'quitables'):
+            nombre = _nombre_item(q)
+            if nombre:
+                clave = resolver.normalizar(nombre)
+                pedido[clave] = (nombre, actuales.get(clave, (nombre, 0))[1])
+        final = combinar.combinar(actuales, pedido, modo)
+        sincronizar_ingredientes_removibles(
+            cliente_id, plato.id_producto,
+            [{'nombre': nombre, 'descuento': _monto(descuento)} for nombre, descuento in final.values()],
+        )
+        hecho['quitables'] = [nombre for nombre, _ in final.values()]
     return {'plato': plato.nombre, **hecho}
 
 
-def crear_mesas(cliente_id: int, args: dict) -> dict:
-    cantidad = max(1, min(100, int(args.get('cantidad') or 1)))
-    prefijo = str(args.get('prefijo') or 'Mesa').strip()[:20]
-    capacidad = int(args.get('capacidad') or 4)
+MAX_MESAS = 50
+
+
+def plan_mesas(cliente_id: int, args: dict) -> tuple[list[tuple[str, int]], int]:
+    """[(nombre, orden)] de las mesas a crear y su capacidad; lo usa tambien la vista previa."""
+    cantidad = max(1, min(MAX_MESAS, int(args.get('cantidad') or 1)))
+    prefijo = str(args.get('prefijo') or 'Mesa').strip()[:20] or 'Mesa'
+    capacidad = max(1, min(50, int(args.get('capacidad') or 4)))
     existentes = {m.nombre.lower() for m in listar_mesas(cliente_id, incluir_inactivas=True)}
-    creadas, numero = [], int(args.get('desde_numero') or 1)
-    while len(creadas) < cantidad and numero < 1000:
+    plan, numero = [], max(1, int(args.get('desde_numero') or 1))
+    while len(plan) < cantidad and numero < 1000:
         nombre = f'{prefijo} {numero}'
         numero += 1
-        if nombre.lower() in existentes:
-            continue
+        if nombre.lower() not in existentes:
+            plan.append((nombre, numero))
+    return plan, capacidad
+
+
+def crear_mesas(cliente_id: int, args: dict) -> dict:
+    plan, capacidad = plan_mesas(cliente_id, args)
+    for nombre, orden in plan:
         guardar_mesa(cliente_id, {'nombre': nombre, 'capacidad': capacidad,
-                                  'ubicacion': args.get('ubicacion') or '', 'orden': numero})
-        creadas.append(nombre)
-    return {'creadas': creadas}
+                                  'ubicacion': str(args.get('ubicacion') or '')[:80], 'orden': orden})
+    return {'creadas': [nombre for nombre, _ in plan]}
 
 
 TOOLS_ESCRITURA = {

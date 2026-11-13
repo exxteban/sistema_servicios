@@ -1,9 +1,10 @@
 {# Panel lateral del asistente IA. Incluir en cualquier pantalla de gastronomia. #}
-<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/asistente_panel.css', v='asistente-20261113-13') }}">
+<link rel="stylesheet" href="{{ url_for('gastronomia.static', filename='css/asistente_panel.css', v='asistente-20261113-14') }}">
 <div data-gastro-asistente
      data-url-chat="{{ url_for('gastronomia.asistente_api_chat') }}"
      data-url-limpiar="{{ url_for('gastronomia.asistente_api_limpiar') }}"
      data-url-historial="{{ url_for('gastronomia.asistente_api_historial') }}"
+     data-url-propuesta="{{ url_for('gastronomia.asistente_api_confirmar', propuesta_id=0)|replace('/0/confirmar', '') }}"
      data-csrf="{{ csrf_token() }}">
 
     <div data-asistente-lanzador class="ga-lanzador">
@@ -72,5 +73,6 @@
         </form>
     </aside>
 </div>
-<script src="{{ url_for('gastronomia.static', filename='js/asistente_contexto.js', v='asistente-20261113-13') }}"></script>
-<script src="{{ url_for('gastronomia.static', filename='js/asistente_chat.js', v='asistente-20261113-13') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/asistente_contexto.js', v='asistente-20261113-14') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/asistente_propuesta.js', v='asistente-20261113-14') }}"></script>
+<script src="{{ url_for('gastronomia.static', filename='js/asistente_chat.js', v='asistente-20261113-14') }}"></script>

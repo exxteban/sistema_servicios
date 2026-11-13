@@ -37,6 +37,8 @@ def asistente_api_historial():
     from app.services.ia_backoffice.settings import obtener_configuracion_asistente
     from gastronomia.services.asistente import historial as historial_db
 
+    from gastronomia.services.asistente import propuestas
+
     _limpiar_legado()
     cliente_id = cliente_id_actual_gastronomia()
     mensajes = historial_db.listar(cliente_id, _usuario_id()) if cliente_id else []
@@ -44,6 +46,7 @@ def asistente_api_historial():
         'ok': True,
         'historial': [{'role': m['role'], 'content': m['content']} for m in mensajes],
         'ia_habilitada': bool(obtener_configuracion_asistente().enabled),
+        'propuesta': propuestas.vigente(cliente_id, _usuario_id()) if cliente_id else None,
     })
 
 
@@ -72,19 +75,27 @@ def asistente_api_chat():
     contexto = sanitizar_contexto(data.get('contexto'))
     historial = historial_db.listar(cliente_id, _usuario_id())
     historial.append({'role': 'user', 'content': pregunta, 'contexto': contexto})
+    from gastronomia.services.asistente import propuestas
+
     respuesta = generar_respuesta(historial, int(cliente_id), current_user)
     contenido = respuesta.get('contenido') or ''
+    acciones = respuesta.get('acciones') or []
+    propuesta = None
     # Solo se guarda si la IA respondio de verdad: avisos de "desactivado"/error no son conversacion.
     if respuesta.get('estado') in ESTADOS_CON_RESPUESTA:
         historial_db.agregar(cliente_id, _usuario_id(), 'user', pregunta, contexto)
         historial_db.agregar(cliente_id, _usuario_id(), 'assistant', contenido)
+        # Nada se guarda todavia: queda como propuesta hasta que el usuario toque Confirmar.
+        if acciones:
+            propuesta = propuestas.crear(cliente_id, _usuario_id(), acciones)
 
     registrar_interaccion(
         current_user,
         f'[gastronomia_config] {pregunta}',
         contenido,
         tools_usadas=respuesta.get('tools_usadas') or [],
-        argumentos_normalizados={'cambios': respuesta.get('cambios') or []},
+        argumentos_normalizados={'propuesta': propuesta['id'] if propuesta else None,
+                                 'acciones_propuestas': [{'tool': a['tool'], 'args': a['args']} for a in acciones]},
         tokens_prompt=respuesta.get('tokens_prompt') or 0,
         tokens_completion=respuesta.get('tokens_completion') or 0,
         modelo=respuesta.get('modelo') or '',
@@ -95,8 +106,47 @@ def asistente_api_chat():
         'ok': True,
         'mensaje': contenido,
         'estado': respuesta.get('estado'),
-        'hubo_cambios': any(c.get('ok') for c in respuesta.get('cambios') or []),
+        'hubo_cambios': False,
+        'propuesta': propuesta,
     })
+
+
+def _resolver_propuesta(propuesta_id: int, accion: str):
+    from app.services.ia_backoffice.audit import registrar_interaccion
+    from gastronomia.services.asistente import propuestas
+
+    cliente_id = cliente_id_actual_gastronomia()
+    if not cliente_id:
+        return jsonify({'ok': False, 'mensaje': 'Gastronomia no esta activa.'}), 403
+    if accion == 'confirmar':
+        resultado = propuestas.confirmar(cliente_id, _usuario_id(), propuesta_id)
+    else:
+        resultado = propuestas.cancelar(cliente_id, _usuario_id(), propuesta_id)
+    registrar_interaccion(
+        current_user,
+        f'[gastronomia_config] {accion} propuesta #{propuesta_id}',
+        resultado.get('mensaje') or '',
+        tools_usadas=[d['tool'] for d in resultado.get('detalle') or []],
+        argumentos_normalizados={'propuesta': propuesta_id, 'acciones': resultado.get('detalle') or []},
+        estado=accion if resultado.get('ok') else 'propuesta_no_vigente',
+    )
+    status = 200 if resultado.get('ok') else 409
+    return jsonify({k: v for k, v in resultado.items() if k != 'detalle'}), status
+
+
+@gastronomia_bp.route('/asistente/api/propuesta/<int:propuesta_id>/confirmar', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def asistente_api_confirmar(propuesta_id: int):
+    """Unico camino por el que el asistente guarda cambios: el usuario toca Confirmar."""
+    return _resolver_propuesta(propuesta_id, 'confirmar')
+
+
+@gastronomia_bp.route('/asistente/api/propuesta/<int:propuesta_id>/cancelar', methods=['POST'])
+@login_required
+@requiere_permiso_gastronomia(PERMISO_MENU)
+def asistente_api_cancelar(propuesta_id: int):
+    return _resolver_propuesta(propuesta_id, 'cancelar')
 
 
 @gastronomia_bp.route('/asistente/api/limpiar', methods=['POST'])
@@ -109,5 +159,8 @@ def asistente_api_limpiar():
     _limpiar_legado()
     cliente_id = cliente_id_actual_gastronomia()
     if cliente_id:
+        from gastronomia.services.asistente import propuestas
+
         historial_db.limpiar(cliente_id, _usuario_id())
+        propuestas.descartar_pendientes(cliente_id, _usuario_id(), estado='cancelada')
     return jsonify({'ok': True, 'historial': []})

@@ -93,3 +93,19 @@
 .dark .ga-input { background: #111827; color: #fff; border-color: #4b5563; }
 .dark .ga-aviso { background: rgba(120, 53, 15, .3); color: #fde68a; border-color: #b45309; }
 .dark .ga-ok { background: rgba(6, 78, 59, .3); color: #a7f3d0; border-color: #065f46; }
+
+/* Propuesta de cambios: nada se guarda hasta tocar Confirmar. */
+.ga-propuesta { align-self: stretch; border: 1px solid #f59e0b; background: #fffbeb; border-radius: .9rem; padding: .7rem .85rem; font-size: .84rem; color: #1f2937; }
+.ga-prop-titulo { font-weight: 700; margin-bottom: .35rem; color: #92400e; }
+.ga-prop-lista { margin: 0 0 .4rem 1.1rem; padding: 0; list-style: disc; display: flex; flex-direction: column; gap: .2rem; }
+.ga-prop-nota { font-size: .75rem; color: #6b7280; margin-bottom: .5rem; }
+.ga-prop-acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
+.ga-prop-acciones button { border-radius: 9999px; padding: .35rem .9rem; font-weight: 600; font-size: .8rem; cursor: pointer; border: 1px solid transparent; }
+.ga-prop-acciones button:disabled { opacity: .6; cursor: wait; }
+.ga-prop-confirmar { background: #16a34a; color: #fff; }
+.ga-prop-cancelar { background: transparent; color: #374151; border-color: #d1d5db !important; }
+.ga-prop-estado { font-weight: 600; font-size: .78rem; color: #374151; }
+.dark .ga-propuesta { background: rgba(120, 53, 15, .25); border-color: #b45309; color: #f3f4f6; }
+.dark .ga-prop-titulo { color: #fcd34d; }
+.dark .ga-prop-nota, .dark .ga-prop-estado { color: #d1d5db; }
+.dark .ga-prop-cancelar { color: #e5e7eb; border-color: #4b5563 !important; }

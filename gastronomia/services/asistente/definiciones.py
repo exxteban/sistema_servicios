@@ -20,6 +20,8 @@ _STR = {'type': 'string'}
 _NUM = {'type': 'number'}
 _BOOL = {'type': 'boolean'}
 _PLATO = {'type': 'string', 'description': 'Nombre o id del plato'}
+_MODO = {'type': 'string', 'enum': ['agregar', 'quitar', 'reemplazar'],
+         'description': 'agregar (defecto, conserva lo existente), quitar o reemplazar todo'}
 
 TEMAS_GUIA = [
     'empezar', 'categorias', 'platos', 'menu_cargado', 'plantilla', 'extras', 'recetas', 'insumos',
@@ -45,7 +47,8 @@ TOOLS = [
     _tool(
         'guardar_platos', 'Crea o edita platos del menu. Si el nombre ya existe lo actualiza. Precio en moneda local sin separadores.',
         {'platos': {'type': 'array', 'items': {'type': 'object', 'properties': {
-            'id_producto': {'type': 'integer', 'description': 'Solo para editar uno existente'},
+            'id_producto': {'type': 'integer', 'description': 'Solo para editar uno existente (el nombre debe coincidir)'},
+            'nuevo_nombre': {'type': 'string', 'description': 'Solo para renombrar un plato existente'},
             'nombre': _STR, 'categoria': {'type': 'string', 'description': 'Nombre o id de categoria existente'},
             'precio': _NUM, 'descripcion': _STR, 'disponible': _BOOL,
         }, 'required': ['nombre']}}},
@@ -65,15 +68,20 @@ TOOLS = [
         ['insumos'],
     ),
     _tool(
-        'guardar_receta_plato', 'Define la receta COMPLETA de un plato (reemplaza la anterior). Cantidades enteras en la unidad del insumo. Los insumos deben existir.',
-        {'plato': _PLATO, 'ingredientes': {'type': 'array', 'items': {'type': 'object', 'properties': {
-            'insumo': {'type': 'string', 'description': 'Nombre o id del insumo'}, 'cantidad': _NUM,
-        }, 'required': ['insumo', 'cantidad']}}},
+        'guardar_receta_plato', 'Carga ingredientes de la receta de un plato. modo=agregar (defecto) suma o actualiza la cantidad '
+        'de los insumos indicados y deja el resto; quitar saca los indicados; reemplazar deja SOLO los indicados. '
+        'Cantidades enteras en la unidad del insumo (para fracciones usa insumos en g/ml). Los insumos deben existir.',
+        {'plato': _PLATO, 'modo': _MODO, 'ingredientes': {'type': 'array', 'items': {'type': 'object', 'properties': {
+            'insumo': {'type': 'string', 'description': 'Nombre o id del insumo'},
+            'cantidad': {'type': 'number', 'description': 'No hace falta con modo=quitar'},
+        }, 'required': ['insumo']}}},
         ['plato', 'ingredientes'],
     ),
     _tool(
-        'configurar_extras_plato', 'Define adicionales con precio (ej. extra queso) y/o ingredientes que el cliente puede pedir sin (ej. sin cebolla). Cada lista reemplaza la anterior.',
-        {'plato': _PLATO,
+        'configurar_extras_plato', 'Adicionales con precio (ej. extra queso) y/o ingredientes que el cliente puede pedir sin (ej. sin cebolla). '
+        'modo=agregar (defecto) suma o actualiza los indicados y conserva los demas; quitar saca los indicados; '
+        'reemplazar deja SOLO los indicados.',
+        {'plato': _PLATO, 'modo': _MODO,
          'adicionales': {'type': 'array', 'items': {'type': 'object', 'properties': {'nombre': _STR, 'precio': _NUM}, 'required': ['nombre']}},
          'quitables': {'type': 'array', 'items': _STR}},
         ['plato'],

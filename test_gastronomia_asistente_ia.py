@@ -107,10 +107,25 @@ def test_endpoint_chat_ejecuta_tools_en_varias_rondas(monkeypatch):
     data = resp.get_json()
     assert resp.status_code == 200, data
     assert data['mensaje'] == 'Listo, cargue Muzza.'
-    assert data['hubo_cambios'] is True
+    # La IA solo propone: nada se guardo hasta que el usuario confirma.
+    assert data['hubo_cambios'] is False
+    assert data['propuesta']['resumen'] == ["Crear categoria 'Pizzas'", "Crear plato 'Muzza' en 'Pizzas' a 45.000"]
+    with app.app_context():
+        assert GastronomiaProducto.query.filter_by(cliente_id=cliente_id, nombre='Muzza').count() == 0
+    historial = client.get('/gastronomia/asistente/api/historial').get_json()
+    assert historial['propuesta']['id'] == data['propuesta']['id']
+
+    url = f"/gastronomia/asistente/api/propuesta/{data['propuesta']['id']}/confirmar"
+    confirmado = client.post(url, headers={'X-CSRFToken': _csrf(html)})
+    assert confirmado.status_code == 200 and confirmado.get_json()['hubo_cambios'] is True
+    assert 'Muzza' in confirmado.get_json()['mensaje']
     with app.app_context():
         assert GastronomiaProducto.query.filter_by(cliente_id=cliente_id, nombre='Muzza').count() == 1
-    assert len(client.get('/gastronomia/asistente/api/historial').get_json()['historial']) == 2
+    # Un solo uso: un doble clic no vuelve a ejecutar.
+    assert client.post(url, headers={'X-CSRFToken': _csrf(html)}).status_code == 409
+    historial = client.get('/gastronomia/asistente/api/historial').get_json()
+    assert len(historial['historial']) == 3 and historial['propuesta'] is None
+    assert historial['historial'][-1]['content'].startswith('[El usuario confirmo los cambios]')
 
     # Limpiar: se olvida todo, el siguiente pedido al modelo no lleva la charla previa.
     assert client.post('/gastronomia/asistente/api/limpiar', headers={'X-CSRFToken': _csrf(html)}).get_json()['ok']
@@ -285,3 +300,55 @@ def test_ia_desactivada_no_ensucia_historial(monkeypatch):
     data = client.post('/gastronomia/asistente/api/chat', headers=headers, json={'mensaje': 'hola'}).get_json()
     assert data['estado'] == 'desactivado'
     assert client.get('/gastronomia/asistente/api/historial').get_json()['historial'] == []
+
+
+def test_receta_y_extras_agregan_sin_borrar_lo_existente():
+    app = create_app('testing')
+    cliente_id = _crear_restaurante(app, 'Resto Modo', 'resto_modo')
+    with app.app_context():
+        _tool('crear_categorias', {'categorias': [{'nombre': 'Burgers'}]}, cliente_id)
+        _tool('guardar_platos', {'platos': [{'nombre': 'Doble', 'categoria': 'Burgers', 'precio': 40000}]}, cliente_id)
+        _tool('guardar_insumos', {'insumos': [
+            {'nombre': 'Pan', 'unidad': 'unidad', 'precio_compra': 2000},
+            {'nombre': 'Carne', 'unidad': 'g', 'precio_compra': 60},
+            {'nombre': 'Cheddar', 'unidad': 'g', 'precio_compra': 80},
+        ]}, cliente_id)
+
+        def receta():
+            return {r['insumo']: r['cantidad'] for r in _tool('ver_plato', {'plato': 'Doble'}, cliente_id)['receta']}
+
+        _tool('guardar_receta_plato', {'plato': 'Doble', 'ingredientes': [
+            {'insumo': 'Pan', 'cantidad': 1}, {'insumo': 'Carne', 'cantidad': 300}]}, cliente_id)
+        # "agregale 40 g de cheddar y subi la carne a 320": no se pierde el pan.
+        _tool('guardar_receta_plato', {'plato': 'Doble', 'ingredientes': [
+            {'insumo': 'Cheddar', 'cantidad': 40}, {'insumo': 'Carne', 'cantidad': 320}]}, cliente_id)
+        assert receta() == {'Pan': 1, 'Carne': 320, 'Cheddar': 40}
+        _tool('guardar_receta_plato', {'plato': 'Doble', 'modo': 'quitar', 'ingredientes': [{'insumo': 'Cheddar'}]}, cliente_id)
+        assert receta() == {'Pan': 1, 'Carne': 320}
+        _tool('guardar_receta_plato', {'plato': 'Doble', 'modo': 'reemplazar', 'ingredientes': [{'insumo': 'Carne', 'cantidad': 150}]}, cliente_id)
+        assert receta() == {'Carne': 150}
+
+        # Fracciones en insumos por unidad: error claro y no se toca la receta.
+        mal = _tool('guardar_receta_plato', {'plato': 'Doble', 'ingredientes': [{'insumo': 'Pan', 'cantidad': 0.5}]}, cliente_id)
+        assert 'enteras' in mal['detalle'][0] and receta() == {'Carne': 150}
+        cero = _tool('guardar_receta_plato', {'plato': 'Doble', 'ingredientes': [{'insumo': 'Carne', 'cantidad': 0.2}]}, cliente_id)
+        assert 'mayor a cero' in cero['detalle'][0]
+
+        def extras():
+            grupos = _tool('ver_plato', {'plato': 'Doble'}, cliente_id)['grupos_opciones']
+            return {g['tipo']: {o['nombre']: o['precio_delta'] for o in g['opciones']} for g in grupos}
+
+        _tool('configurar_extras_plato', {'plato': 'Doble', 'adicionales': [{'nombre': 'Extra queso', 'precio': 5000}],
+                                          'quitables': ['Cebolla']}, cliente_id)
+        _tool('configurar_extras_plato', {'plato': 'Doble', 'adicionales': [{'nombre': 'Bacon', 'precio': 7000}],
+                                          'quitables': ['Pepino']}, cliente_id)
+        assert extras()['extra'] == {'Extra queso': 5000, 'Bacon': 7000}
+        assert set(extras()['ingrediente_removible']) == {'Cebolla', 'Pepino'}
+        _tool('configurar_extras_plato', {'plato': 'Doble', 'modo': 'quitar', 'adicionales': [{'nombre': 'extra queso'}]}, cliente_id)
+        assert extras()['extra'] == {'Bacon': 7000}
+        _tool('configurar_extras_plato', {'plato': 'Doble', 'modo': 'reemplazar', 'quitables': ['Tomate']}, cliente_id)
+        assert set(extras()['ingrediente_removible']) == {'Tomate'}
+        assert extras()['extra'] == {'Bacon': 7000}
+
+        invalido = ejecutar_tool('configurar_extras_plato', {'plato': 'Doble', 'modo': 'borrar_todo'}, cliente_id, None)
+        assert not invalido['ok'] and 'Modo' in invalido['error']
